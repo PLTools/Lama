@@ -1,3 +1,4 @@
+(*
 open Expr
 
 (* read x; 
@@ -45,3 +46,4 @@ let run input stmt = srun input (compile_stmt stmt)
 let _ = match run [2; 3] t with [result] -> Printf.printf "Result: %d\n" result
 let _ = try ignore (run [2] t) with Failure s -> Printf.printf "Error: %s\n" s
 
+ *)

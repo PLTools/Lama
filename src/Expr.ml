@@ -1,82 +1,45 @@
-open GT
+(* Opening a library for generic programming (https://github.com/dboulytchev/GT).
+   The library provides "@type ..." syntax extension and plugins like show, gmap, etc.
+*)
+open GT 
+             
+(* The type for the expression. Note, in regular OCaml there is no "@type..." notation, 
+   it came from GT. *)
+@type expr =
+  (* integer constant *) | Const of int
+  (* variable         *) | Var   of string
+  (* binary operator  *) | Binop of string * expr * expr with show
 
-@type expr = 
-| Const of int 
-| Var of string 
-| Add of expr * expr 
-| Mul of expr * expr with show, html, gmap
+(* Available binary operators:
+    !!                   --- disjunction
+    &&                   --- conjunction
+    ==, !=, <=, <, >=, > --- comparisons
+    +, -                 --- addition, subtraction
+    *, /, %              --- multiplication, division, reminder
+*)
 
-let rec eval state expr =
-  match expr with
-  | Const  n       -> n
-  | Var    x       -> state x
-  | Add   (e1, e2) -> eval state e1 + eval state e2
-  | Mul   (e1, e2) -> eval state e1 * eval state e2
-;;
+(* State: a partial map from variables to integer values. *)
+type state = string -> int
 
-@type stmt =
-| Skip
-| Assign of string * expr
-| Read   of string
-| Write  of expr
-| Seq    of stmt * stmt with show, html, gmap
+(* Empty state: maps every variable into nothing. *)
+let empty = fun x -> failwith (Printf.sprintf "Undefined variable %s" x)
 
-let run input stmt = 
-  let rec run' (state, output, input) stmt =
-    let eval' e = eval (fun x -> List.assoc x state) e in
-    match stmt with
-    | Skip            -> (state, output, input)
-    | Assign (x, e)   -> ((x, eval' e)::state, output, input)
-    | Write   e       -> (state, output @ [eval' e], input)
-    | Seq    (s1, s2) -> run' (run' (state, output, input) s1) s2
-    | Read    x       -> 
-	(match input with
-	 | []          -> failwith "empty input"
-	 | y :: input' -> ((x, y)::state, output, input')
-	)
-  in
-  let (_, output, _) = run' ([], [], input) stmt in
-  output
-;;
+(* Update: non-destructively "modifies" the state s by binding the variable x to value v and 
+   returns the new state.
+*)
+let update x v s = fun y -> if x = y then v else s y
 
-@type instr =
-| S_READ 
-| S_WRITE
-| S_PUSH of int
-| S_LD   of string
-| S_ST   of string
-| S_ADD  
-| S_MUL with show, html, gmap
+(* An example of a non-trivial state: *)                                                   
+let s = update "x" 1 @@ update "y" 2 @@ update "z" 3 @@ update "t" 4 empty
 
-let srun input code =
-  let rec srun' (state, stack, input, output) code =
-    match code with
-    | [] -> output
-    | instr :: code' ->
-	srun' (match instr with
-	       | S_READ   -> (match input with y::input' -> (state, y::stack, input', output      ) | [] -> failwith "empty input"    )
-	       | S_WRITE  -> (match stack with y::stack' -> (state, stack'  , input , output @ [y]) | [] -> failwith "stack underflow") 
-	       | S_PUSH n -> (state, n::stack, input, output)
-	       | S_LD   x -> (state, (List.assoc x state)::stack, input, output)
-	       | S_ST   x -> (match stack with y::stack' -> ((x, y)::state, stack, input, output)    | [] -> failwith "stack underflow")
-	       | S_ADD    -> (match stack with x::y::stack' -> (state, (y+x)::stack', input, output) | [] -> failwith "stack underflow")
-	       | S_MUL    -> (match stack with x::y::stack' -> (state, (y*x)::stack', input, output) | [] -> failwith "stack underflow")
-              ) 
-	      code'
-  in
-  srun' ([], [], input, []) code
-
-let rec compile_expr expr =
-  match expr with
-  | Var    x       -> [S_LD x]
-  | Const  n       -> [S_PUSH n]
-  | Add   (e1, e2) -> compile_expr e1 @ compile_expr e2 @ [S_ADD]
-  | Mul   (e1, e2) -> compile_expr e1 @ compile_expr e2 @ [S_MUL]
-
-let rec compile_stmt stmt =
-  match stmt with
-  | Skip            -> []
-  | Assign (x, e)   -> compile_expr e @ [S_ST x]
-  | Read    x       -> [S_READ; S_ST x]
-  | Write   e       -> compile_expr e @ [S_WRITE]
-  | Seq    (s1, s2) -> compile_stmt s1 @ compile_stmt s2
+(* Some testing *)
+let _ =
+  List.iter
+    (fun x ->
+       try  Printf.printf "%s=%d\n" x @@ s x
+       with Failure s -> Printf.printf "%s\n" s
+    ) ["x"; "a"; "y"; "z"; "t"; "b"]
+  
+  
+                                                                 
+                
