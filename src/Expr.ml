@@ -47,7 +47,7 @@ let _ =
 
      val eval : state -> expr -> int
  
-   Takes a state and an expression, andreturns the value of the expression in 
+   Takes a state and an expression, and returns the value of the expression in 
    the given state.
  *)
 let rec eval st expr =
