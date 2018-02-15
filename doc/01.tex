@@ -1,0 +1,256 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath}
+\usepackage{alltt}
+\usepackage{pslatex}
+\usepackage{epigraph}
+\usepackage{verbatim}
+\usepackage{latexsym}
+\usepackage{array}
+\usepackage{comment}
+\usepackage{makeidx}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{verbatim}
+\usepackage{color}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{hyperref}
+\usepackage{stmaryrd}
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage{graphicx}
+\usepackage{euscript}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{multirow,bigdelim}
+
+\makeatletter
+
+\makeatother
+
+\definecolor{shadecolor}{gray}{1.00}
+\definecolor{darkgray}{gray}{0.30}
+
+\newcommand{\set}[1]{\{#1\}}
+\newcommand{\angled}[1]{\langle {#1} \rangle}
+\newcommand{\fib}{\rightarrow_{\mathit{fib}}}
+\newcommand{\fibm}{\Rightarrow_{\mathit{fib}}}
+\newcommand{\oo}[1]{{#1}^o}
+\newcommand{\inml}[1]{\mbox{\lstinline{#1}}}
+\newcommand{\goal}{\mathfrak G}
+\newcommand{\inmath}[1]{\mbox{$#1$}}
+\newcommand{\sembr}[1]{\llbracket{#1}\rrbracket}
+
+\newcommand{\withenv}[2]{{#1}\vdash{#2}}
+\newcommand{\ruleno}[1]{\eqno[\textsc{#1}]}
+\newcommand{\trule}[2]{\dfrac{#1}{#2}}
+
+\definecolor{light-gray}{gray}{0.90}
+\newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
+
+\newcommand{\nredrule}[3]{
+  \begin{array}{cl}
+    \textsf{[{#1}]}& 
+    \begin{array}{c}
+      #2 \\
+      \hline
+      \raisebox{-1pt}{\ensuremath{#3}}
+    \end{array}
+  \end{array}}
+
+\newcommand{\naxiom}[2]{
+  \begin{array}{cl}
+    \textsf{[{#1}]} & \raisebox{-1pt}{\ensuremath{#2}}
+  \end{array}}
+
+\lstdefinelanguage{ocaml}{
+keywords={let, begin, end, in, match, type, and, fun, 
+function, try, with, class, object, method, of, rec, repeat, until,
+while, not, do, done, as, val, inherit, module, sig, @type, struct, 
+if, then, else, open, virtual, new, fresh},
+sensitive=true,
+%basicstyle=\small,
+commentstyle=\scriptsize\rmfamily,
+keywordstyle=\ttfamily\bfseries,
+identifierstyle=\ttfamily,
+basewidth={0.5em,0.5em},
+columns=fixed,
+fontadjust=true,
+literate={fun}{{$\lambda$}}1 {->}{{$\to$}}3 {===}{{$\equiv$}}1 {=/=}{{$\not\equiv$}}1 {|>}{{$\triangleright$}}3 {\&\&\&}{{$\wedge$}}2 {|||}{{$\vee$}}2 {^}{{$\uparrow$}}1,
+morecomment=[s]{(*}{*)}
+}
+
+\lstset{
+mathescape=true,
+%basicstyle=\small,
+identifierstyle=\ttfamily,
+keywordstyle=\bfseries,
+commentstyle=\scriptsize\rmfamily,
+basewidth={0.5em,0.5em},
+fontadjust=true,
+escapechar=!,
+language=ocaml
+}
+
+\sloppy
+
+\newcommand{\ocaml}{\texttt{OCaml}\xspace}
+
+\theoremstyle{definition}
+
+\title{Introduction: Languages, Semantics, Interpreters, Compilers\\
+  (the first draft)
+}
+
+\author{Dmitry Boulytchev}
+
+\begin{document}
+
+\maketitle
+
+\section{Language and semantics}
+
+A language is a collection of programs. A program is an \emph{abstract syntax tree} (AST), which describes the hierarchy of constructs. An abstract
+syntax of a programming language describes the format of abstract syntax trees of programs in this language. Thus, a language is a set of constructive
+objects, each of which can be constructively manipulated.
+
+The semantics of a language $\mathscr L$ is a total map
+
+$$
+\sembr{\bullet}_{\mathscr L} : \mathscr L \to \mathscr D
+$$
+
+where $\mathscr D$ is some \emph{semantic domain}. The choice of the domain is at our command; for example, for Turing-complete languages $\mathscr D$ can
+be the set of all partially-recursive (computable) functions.
+
+\section{Interpreters}
+
+In reality, the semantics often is described using \emph{interpreters}:
+
+$$
+eval : \mathscr L \to \mbox{\lstinline|Input|} \to \mbox{\lstinline|Output|}
+$$
+
+where \lstinline|Input| and \lstinline|Output| are sets of (all possible) inputs and outputs for the programs in the language $\mathscr L$. We claim $eval$ to
+possess the following property
+
+$$
+\forall p \in \mathscr L,\, \forall x\in \mbox{\lstinline|Input|} : \sembr{p}_{\mathscr L}\;x = eval\; p\; x
+$$
+
+In other words, an interpreter takes a program and its input as arguments, and returns what the program would return, being run on that
+argument. The equality in the definitional property of an interpreter has to be read ``if the right hand side is defined, then the left hand side
+is defined, too, and their values coinside'', and vice-versa.
+
+Why interpreters are so important? Because they can be written as programs in a \emph{meta-lanaguge}, or a \mbox{language of implementation}. For example,
+if we take ocaml as a language of implementation, then an interpreter of a language $\mathscr L$ is some ocaml program $eval$, such that
+
+$$
+\forall p \in \mathscr L,\, \forall x\in \mbox{\lstinline|Input|} : \sembr{p}_{\mathscr L}\;x = \sembr{eval}_{\mbox{ocaml}}\; p\; x
+$$
+
+How to define $\sembr{\bullet}_{\mbox{ocaml}}$? We can write an interpreter in some other language. Thus, a \emph{tower} of meta-languages and interpreters
+comes into consideration. When to stop? When the meta-language is simple enough for intuitive understanding (in reality: some math-based frameworks like
+operational, denotational or game semantics, etc.)
+
+Pragmatically: if you have a good implementation of a good programming language you trust, you can write interpreters of other languages.
+
+\section{Compilers}
+
+A compiler is just a language transformer
+
+$$
+comp :\mathscr L \to \mathscr M
+$$
+
+for two languages $\mathscr L$ and $\mathscr M$; we expect a compiler to be total and to possess the following property:
+
+$$
+\forall p\in\mathscr L\;\;\sembr{p}_{\mathscr L}=\sembr{comp\; p}_{\mathscr M}
+$$
+
+Again, the equality in this definition is understood functionally. The property itself is called a \emph{complete} (or full) correctness. In reality
+compilers are \emph{partially} correct, which means, that the domain of compiled programs can be wider.
+
+And, again, we expect compilers to be defined in terms of some implementation language. Thus, a compiler is a program (in, say, ocaml), such, that
+its semantics in ocaml possesses the following property (fill the rest yourself).
+
+
+\section{The first example: language of expressions}
+
+Abstract syntax:
+
+$$
+\begin{array}{rcll}
+  \mathscr X & = & \{x, y, z, \dots\}            & \mbox{(variables)}\\
+  \otimes    & = & \{\lstinline|+|, \lstinline|-|, \lstinline|*|, \lstinline|/|, \lstinline|%|,
+                     \lstinline|<|, \lstinline|<=|, \lstinline|>|, \lstinline|>=|, \lstinline|==|,
+                     \lstinline|!=|, \lstinline|!!|, \lstinline|&&|\} & \mbox{(binary operators)}\\
+   \mathscr E & = & \mathscr X                    & \mbox{(expressions)}\\
+              &   & \mathbb N                     & \\
+              &   & \mathscr E \otimes \mathscr E & 
+\end{array}
+$$
+
+Semantics of expressions:
+
+\begin{itemize}
+\item state $\sigma :\mathscr X \to \mathbb Z$ assigns values to (some) variables;
+\item semantics $\sembr{\bullet}$ assigns each expression a total map $\Sigma \to \mathbb Z$, where
+$\Sigma$ is the set of all states.
+\end{itemize}
+
+Empty state $\bot$: undefined for any variable.
+
+Denotational style of semantic description:
+
+$$
+\begin{array}{rclcl}
+  \sembr{n}          & = & \lambda \sigma . n                                        & , & n\in \mathbb N \\
+  \sembr{x}          & = & \lambda \sigma . \sigma x                                 & , & x\in \mathscr X \\
+  \sembr{A\otimes B} & = & \lambda \sigma . (\sembr{A}\sigma \oplus \sembr{B}\sigma) & , & A,\,B \in \mathscr E
+\end{array}  
+$$
+
+\begin{center}
+\begin{tabular}{c|cl}
+  $\otimes$     & $\oplus$ in ocaml\\
+  \hline
+  \lstinline|+|  & \lstinline|+|   \\
+  \lstinline|-|  & \lstinline|-|   \\
+  \lstinline|*|  & \lstinline|*|   \\
+  \lstinline|/|  & \lstinline|/|   \\
+  \lstinline|%|  & \lstinline|mod| \\
+  \lstinline|<|  & \lstinline|<|  & \rdelim\}{6}{5mm}[  see note 1 below] \\
+  \lstinline|>|  & \lstinline|>|   \\
+  \lstinline|<=| & \lstinline|<=|  \\
+  \lstinline|>=| & \lstinline|>=|  \\
+  \lstinline|==| & \lstinline|=|   \\
+  \lstinline|!=| & \lstinline|<>|  \\
+  \lstinline|&&| & \lstinline|&&| & \rdelim\}{2}{5mm}[  see note 2 below]\\
+  \lstinline|!!| & \lstinline/||/ 
+\end{tabular}
+\end{center}
+
+Note 1: the result is converted into integers (true $\to$ 1, false $\to$ 0).
+
+Note 2: the arguments are converted to booleans (0 $\to$ false, not 0 $\to$ true), the result is converted to
+integers as in the previous note.
+
+Important observations:
+
+\begin{enumerate}
+  \item $\sembr{\bullet}$ is defined \emph{compositionally}: the meaning of an expression is defined in terms of meanings
+  of its proper subexpressions. This is an important property of denotational style.
+  \item $\sembr{\bullet}$ is total, since it takes into account all possible ways to deconstruct any expression.
+  \item $\sembr{\bullet}$ is deterministic: there is no way to assign different meanings to the same expression, since
+  we deconstruct each expression unambiguously.
+  \item $\otimes$ is an element of language \emph{syntax}, while $\oplus$ is its interpretation in the meta-language of
+  semanic description (simpler: in the language of interpreter implementation).
+  \item This concrete semantics is \emph{strict}: for a binary operator both its arguments are evaluated unconditionally; thus,
+  for example, \lstinline|1 !! x| is undefined in empty state.
+\end{enumerate}
+
+
+
+\end{document}
