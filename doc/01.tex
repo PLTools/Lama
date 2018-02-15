@@ -132,7 +132,7 @@ eval : \mathscr L \to \mbox{\lstinline|Input|} \to \mbox{\lstinline|Output|}
 $$
 
 where \lstinline|Input| and \lstinline|Output| are sets of (all possible) inputs and outputs for the programs in the language $\mathscr L$. We claim $eval$ to
-posess the following property
+possess the following property
 
 $$
 \forall p \in \mathscr L,\, \forall x\in \mbox{\lstinline|Input|} : \sembr{p}_{\mathscr L}\;x = eval\; p\; x
@@ -163,7 +163,7 @@ $$
 comp :\mathscr L \to \mathscr M
 $$
 
-for two languages $\mathscr L$ and $\mathscr M$; we expect a compilerto be total and to posess the following property:
+for two languages $\mathscr L$ and $\mathscr M$; we expect a compiler to be total and to possess the following property:
 
 $$
 \forall p\in\mathscr L\;\;\sembr{p}_{\mathscr L}=\sembr{comp\; p}_{\mathscr M}
@@ -173,7 +173,7 @@ Again, the equality in this definition is understood functionally. The property 
 compilers are \emph{partially} correct, which means, that the domain of compiled programs can be wider.
 
 And, again, we expect compilers to be defined in terms of some implementation language. Thus, a compiler is a program (in, say, ocaml), such, that
-its semantics in ocaml posesses the following property (fill the rest yourself).
+its semantics in ocaml possesses the following property (fill the rest yourself).
 
 
 \section{The first example: language of expressions}
@@ -225,7 +225,7 @@ $$
   \lstinline|>|  & \lstinline|>|   \\
   \lstinline|<=| & \lstinline|<=|  \\
   \lstinline|>=| & \lstinline|>=|  \\
-  \lstinline|==| & \lstinline|==|  \\
+  \lstinline|==| & \lstinline|=|   \\
   \lstinline|!=| & \lstinline|<>|  \\
   \lstinline|&&| & \lstinline|&&| & \rdelim\}{2}{5mm}[  see note 2 below]\\
   \lstinline|!!| & \lstinline/||/ 
@@ -234,7 +234,8 @@ $$
 
 Note 1: the result is converted into integers (true $\to$ 1, false $\to$ 0).
 
-Note 2: the arguments are converted to booleans (0 $\to$ false, not 0 $\to$ true), the result is converted to integers as in the previous note.
+Note 2: the arguments are converted to booleans (0 $\to$ false, not 0 $\to$ true), the result is converted to
+integers as in the previous note.
 
 Important observations:
 
