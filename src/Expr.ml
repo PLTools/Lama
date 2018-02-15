@@ -6,7 +6,8 @@
 open GT 
              
 (* The type for the expression. Note, in regular OCaml there is no "@type..." 
-   notation, it came from GT. *)
+   notation, it came from GT. 
+*)
 @type expr =
   (* integer constant *) | Const of int
   (* variable         *) | Var   of string
