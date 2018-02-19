@@ -10,7 +10,6 @@ build: [
   [make "-f" "Makefile" ]
 ]
 
-install: [make "-f" "Makefile" "PREFIX=%{prefix}%" "install"]
 remove:  ["ocamlfind" "remove" "compiler-workout"]
 flags: [ light-uninstall ]
 
