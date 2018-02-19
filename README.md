@@ -12,5 +12,3 @@ Building:
 * `opam install GT`
 * To build the sources: `make` from the top project directory
 * To test: `test.sh` from `regression` subfolder
-
-
