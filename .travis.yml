@@ -1,0 +1,8 @@
+language: c
+sudo: required
+install: wget https://raw.githubusercontent.com/anlun/ocaml-ci-scripts/patch-1/.travis-opam.sh
+script: bash -ex .travis-opam.sh
+env:
+  - OCAML_VERSION=4.06
+os:
+  - linux
