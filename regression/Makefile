@@ -15,10 +15,10 @@ all: .depend $(TOPFILE).opt
 	$(OCAMLDEP) $(PXFLAGS) *.ml > .depend
 
 $(TOPFILE).opt: $(SOURCES:.ml=.cmx)
-	$(OCAMLOPT) -o $(TOPFILE).opt $(OFLAGS) $(LIBS:.cma=.cmxa) ostap.cmx Expr.cmx Embedding.cmx $(SOURCES:.ml=.cmx)
+	$(OCAMLOPT) -o $(TOPFILE).opt $(OFLAGS) $(LIBS:.cma=.cmxa) ostap.cmx Syntax.cmx Embedding.cmx SM.cmx $(SOURCES:.ml=.cmx)
 
 $(TOPFILE).byte: $(SOURCES:.ml=.cmo)
-	$(OCAMLC) -o $(TOPFILE).byte $(BFLAGS) $(LIBS) ostap.cmo Expr.cmo Embedding.cmo $(SOURCES:.ml=.cmo) 
+	$(OCAMLC) -o $(TOPFILE).byte $(BFLAGS) $(LIBS) ostap.cmo Syntax.cmo Embedding.cmo SM.cmo $(SOURCES:.ml=.cmo) 
 
 clean:
 	rm -Rf *.cmi *.cmo *.cmx *.annot *.o *.opt *.byte *~
