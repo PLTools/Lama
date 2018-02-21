@@ -3,6 +3,7 @@ open GT
 (* The type for the stack machine instructions *)
 @type insn =
 (* binary operator                 *) | BINOP of string
+(* put a constant on the stack     *) | CONST of int                 
 (* read to stack                   *) | READ
 (* write from stack                *) | WRITE
 (* load a variable to the stack    *) | LD    of string
