@@ -21,7 +21,7 @@ $(TOPFILE).byte: $(SOURCES:.ml=.cmo)
 	$(OCAMLC) -o $(TOPFILE).byte $(BFLAGS) $(LIBS) ostap.cma $(SOURCES:.ml=.cmo) 
 
 clean:
-	rm -Rf *.cmi *.cmo *.cmx *.annot *.o *.opt *.byte *~
+	rm -Rf *.cmi *.cmo *.cmx *.annot *.o *.opt *.byte *~ .depend
 
 -include .depend
 # generic rules

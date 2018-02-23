@@ -9,7 +9,7 @@ BFLAGS = -rectypes -I `ocamlfind -query GT` -I `ocamlfind -query re`  -I `ocamlf
 OFLAGS = $(BFLAGS)
 
 all: .depend $(TOPFILE).opt
-	./$(TOPFILE).opt > $(TOPFILE).log && diff $(TOPFILE).log orig/$(TOPFILE).log 
+	./$(TOPFILE).opt > $(TOPFILE).log && diff -a --strip-trailing-cr $(TOPFILE).log orig/$(TOPFILE).log 
 
 .depend: $(SOURCES)
 	$(OCAMLDEP) $(PXFLAGS) *.ml > .depend
@@ -21,7 +21,7 @@ $(TOPFILE).byte: $(SOURCES:.ml=.cmo)
 	$(OCAMLC) -o $(TOPFILE).byte $(BFLAGS) $(LIBS) ostap.cmo Syntax.cmo Embedding.cmo SM.cmo $(SOURCES:.ml=.cmo) 
 
 clean:
-	rm -Rf *.cmi *.cmo *.cmx *.annot *.o *.opt *.byte *~
+	rm -Rf *.cmi *.cmo *.cmx *.annot *.o *.opt *.byte *~ *.log .depend
 
 -include .depend
 # generic rules
