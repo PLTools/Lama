@@ -1,45 +1,14 @@
-OCAMLC = ocamlc
-OCAMLOPT = ocamlopt
-OCAMLDEP = ocamldep
-SOURCES = common.ml $(TOPFILE).ml
-LIBS = GT.cma unix.cma re.cma re_emacs.cma re_str.cma
-CAMLP5 = -pp "camlp5o -I `ocamlfind -query GT.syntax` -I `ocamlfind -query ostap.syntax` pa_ostap.cmo pa_gt.cmo -L `ocamlfind -query GT.syntax`"
-PXFLAGS = $(CAMLP5)
-BFLAGS = -rectypes -I `ocamlfind -query GT` -I `ocamlfind -query re`  -I `ocamlfind -query ostap` -I ../src 
-OFLAGS = $(BFLAGS)
+TESTS=test001 test002 test003 test004 test005 test006 test007 test008
 
-all: .depend $(TOPFILE).opt
-	./$(TOPFILE).opt > $(TOPFILE).log && diff -a --strip-trailing-cr $(TOPFILE).log orig/$(TOPFILE).log 
+RC=../src/rc.opt
 
-.depend: $(SOURCES)
-	$(OCAMLDEP) $(PXFLAGS) *.ml > .depend
+.PHONY: check $(TESTS) 
 
-$(TOPFILE).opt: $(SOURCES:.ml=.cmx)
-	$(OCAMLOPT) -o $(TOPFILE).opt $(OFLAGS) $(LIBS:.cma=.cmxa) ostap.cmx Syntax.cmx Embedding.cmx SM.cmx $(SOURCES:.ml=.cmx)
+check: $(TESTS) 
 
-$(TOPFILE).byte: $(SOURCES:.ml=.cmo)
-	$(OCAMLC) -o $(TOPFILE).byte $(BFLAGS) $(LIBS) ostap.cmo Syntax.cmo Embedding.cmo SM.cmo $(SOURCES:.ml=.cmo) 
+$(TESTS): %: %.expr
+	cat $@.input | $(RC) -i $< > $@.log && diff $@.log orig/$@.log
+	cat $@.input | $(RC) -s $< > $@.log && diff $@.log orig/$@.log
 
 clean:
-	rm -Rf *.cmi *.cmo *.cmx *.annot *.o *.opt *.byte *~ *.log .depend
-
--include .depend
-# generic rules
-
-###############
-%.cmi: %.mli
-	$(OCAMLC) -c $(BFLAGS) $(PXFLAGS) $<
-
-# Note: cmi <- mli should go first
-%.cmi: %.ml
-	$(OCAMLC) -c $(BFLAGS) $(PXFLAGS) $<
-
-%.cmo: %.ml
-	$(OCAMLC) -c $(BFLAGS) $(PXFLAGS) $<
-
-%.o: %.ml
-	$(OCAMLOPT) -c $(OFLAGS) $(STATIC) $(PXFLAGS) $<
-
-%.cmx: %.ml
-	$(OCAMLOPT) -c $(OFLAGS) $(STATIC) $(PXFLAGS) $<
-
+	rm -f test*.log *.s *~ $(TESTS)

@@ -1,0 +1,5 @@
+skip;
+x0 := read ();
+x1 := read ();
+y := 17+x1-36*x1;
+write (y)
