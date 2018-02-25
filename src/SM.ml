@@ -14,7 +14,7 @@ type prg = insn list
 (* The type for the stack machine configuration: a stack and a configuration from statement
    interpreter
  *)
-type config = int list * Syntax.Stmt.config
+type config = int list * Language.Stmt.config
 
 (* Stack machine interpreter
 
@@ -26,7 +26,7 @@ let eval _ = failwith "Not yet implemented"
 
 (* Stack machine compiler
 
-     val compile : Syntax.Stmt.t -> prg
+     val compile : Language.Stmt.t -> prg
 
    Takes a program in the source language and returns an equivalent program for the
    stack machine

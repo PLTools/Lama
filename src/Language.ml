@@ -1,8 +1,11 @@
 (* Opening a library for generic programming (https://github.com/dboulytchev/GT).
    The library provides "@type ..." syntax extension and plugins like show, etc.
 *)
-open GT 
-    
+open GT
+
+(* Opening a library for combinator-based syntax analysis *)
+open Ostap.Combinators
+       
 (* Simple expressions: syntax and semantics *)
 module Expr =
   struct
@@ -43,6 +46,11 @@ module Expr =
     *)
     let eval _ = failwith "Not implemented yet"
 
+    (* Statement parser *)
+    ostap (
+      parse: empty {failwith "Not implemented yet"}
+    )
+
   end
                     
 (* Simple statements: syntax and sematics *)
@@ -66,5 +74,27 @@ module Stmt =
        Takes a configuration and a statement, and returns another configuration
     *)
     let eval _ = failwith "Not implemented yet"
-                                                         
+
+    (* Statement parser *)
+    ostap (
+      parse: empty {failwith "Not implemented yet"}
+    )
+      
   end
+
+(* The top-level definitions *)
+
+(* The top-level syntax category is statement *)
+type t = Stmt.t    
+
+(* Top-level evaluator
+
+     eval : t -> int list -> int list
+
+   Takes a program and its input stream, and returns the output stream
+*)
+let eval p i =
+  let _, _, o = Stmt.eval (Expr.empty, i, []) p in o
+
+(* Top-level parser *)
+let parse = Stmt.parse                                                     
