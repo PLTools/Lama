@@ -24,6 +24,14 @@ type config = int list * Language.Stmt.config
  *)                         
 let eval _ = failwith "Not yet implemented"
 
+(* Top-level evaluation
+
+     val run : prg -> int list -> int list
+
+   Takes an input stream, a program, and returns an output stream this program calculates
+*)
+let run p i = let (_, (_, _, o)) = eval ([], (Expr.empty, i, [])) p in o
+
 (* Stack machine compiler
 
      val compile : Language.Stmt.t -> prg
@@ -31,5 +39,6 @@ let eval _ = failwith "Not yet implemented"
    Takes a program in the source language and returns an equivalent program for the
    stack machine
  *)
-
 let compile _ = failwith "Not yet implemented"
+
+                         

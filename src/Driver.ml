@@ -21,7 +21,7 @@ let main =
     let stack      = Sys.argv.(1) = "-s"  in
     let infile     = Sys.argv.(2) in
     match parse infile with
-    | `Ok ((_, stmt) as prog) ->
+    | `Ok prog ->
        let rec read acc =
          try
 	   let r = read_int () in
@@ -33,7 +33,7 @@ let main =
        let output = 
 	 if interpret 
 	 then Language.eval prog input 
-	 else SM.eval (SM.compile prog) input
+	 else SM.run (SM.compile prog) input
        in
        List.iter (fun i -> Printf.printf "%d\n" i) output
     | `Fail er -> Printf.eprintf "Syntax error: %s\n" er
