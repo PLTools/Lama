@@ -1,1 +1,4 @@
-make TOPFILE=test000
+make check
+pushd expressions && make check && popd
+pushd deep-expressions && make check && popd
+
