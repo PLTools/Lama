@@ -6,6 +6,7 @@ let parse infile =
     (object
        inherit Matcher.t s
        inherit Util.Lexers.decimal s
+       inherit Util.Lexers.ident ["read"; "write"] s
        inherit Util.Lexers.skip [
 	 Matcher.Skip.whitespaces " \t\n";
 	 Matcher.Skip.lineComment "--";
@@ -18,7 +19,6 @@ let parse infile =
 let main =
   try
     let interpret  = Sys.argv.(1) = "-i"  in
-    let stack      = Sys.argv.(1) = "-s"  in
     let infile     = Sys.argv.(2) in
     match parse infile with
     | `Ok prog ->
