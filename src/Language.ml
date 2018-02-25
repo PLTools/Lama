@@ -1,8 +1,11 @@
 (* Opening a library for generic programming (https://github.com/dboulytchev/GT).
    The library provides "@type ..." syntax extension and plugins like show, etc.
 *)
-open GT 
-    
+open GT
+
+(* Opening a library for combinator-based syntax analysis *)
+open Ostap.Combinators
+       
 (* Simple expressions: syntax and semantics *)
 module Expr =
   struct
@@ -68,6 +71,11 @@ module Expr =
       | Var   x -> st x
       | Binop (op, x, y) -> to_func op (eval st x) (eval st y)
 
+    (* Statement parser *)
+    ostap (
+      parse: empty {failwith "Not implemented yet"}
+    )
+
   end
                     
 (* Simple statements: syntax and sematics *)
@@ -96,13 +104,27 @@ module Stmt =
       | Write   e       -> (st, i, o @ [Expr.eval st e])
       | Assign (x, e)   -> (Expr.update x (Expr.eval st e) st, i, o)
       | Seq    (s1, s2) -> eval (eval conf s1) s2
-                                                         
+                                
+    (* Statement parser *)
+    ostap (
+      parse: empty {failwith "Not implemented yet"}
+    )
+      
   end
+
+(* The top-level definitions *)
+
+(* The top-level syntax category is statement *)
+type t = Stmt.t    
 
 (* Top-level evaluator
 
-     val eval : int list -> Stmt.t -> int list
+     eval : t -> int list -> int list
 
-   Takes an input stream, a program, and returns the output stream this program calculates
- *)
-let eval i p = let _, _, o = Stmt.eval (Expr.empty, i, []) p in o
+   Takes a program and its input stream, and returns the output stream
+*)
+let eval p i =
+  let _, _, o = Stmt.eval (Expr.empty, i, []) p in o
+
+(* Top-level parser *)
+let parse = Stmt.parse                                                     

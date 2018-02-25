@@ -2,7 +2,7 @@ TOPFILE = rc
 OCAMLC = ocamlc
 OCAMLOPT = ocamlopt
 OCAMLDEP = ocamldep
-SOURCES = Syntax.ml Embedding.ml SM.ml
+SOURCES = Language.ml Embedding.ml SM.ml Driver.ml
 LIBS = GT.cma unix.cma re.cma re_emacs.cma re_str.cma
 CAMLP5 = -pp "camlp5o -I `ocamlfind -query GT.syntax` -I `ocamlfind -query ostap.syntax` pa_ostap.cmo pa_gt.cmo -L `ocamlfind -query GT.syntax`"
 PXFLAGS = $(CAMLP5)
@@ -21,7 +21,7 @@ $(TOPFILE).byte: $(SOURCES:.ml=.cmo)
 	$(OCAMLC) -o $(TOPFILE).byte $(BFLAGS) $(LIBS) ostap.cma $(SOURCES:.ml=.cmo) 
 
 clean:
-	rm -Rf *.cmi *.cmo *.cmx *.annot *.o *.opt *.byte *~
+	rm -Rf *.cmi *.cmo *.cmx *.annot *.o *.opt *.byte *~ .depend
 
 -include .depend
 # generic rules
