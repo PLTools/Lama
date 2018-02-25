@@ -44,7 +44,7 @@ let rec eval ((stack, ((st, i, o) as c)) as conf) = function
    Takes an input stream, a program, and returns an output stream this program calculates
 *)
 let run p i = let (_, (_, _, o)) = eval ([], (Expr.empty, i, [])) p in o
-                                                                         
+
 (* Stack machine compiler
 
      val compile : Language.Stmt.t -> prg
@@ -52,7 +52,6 @@ let run p i = let (_, (_, _, o)) = eval ([], (Expr.empty, i, [])) p in o
    Takes a program in the source language and returns an equivalent program for the
    stack machine
 *)
-
 let rec compile =
   let rec expr = function
   | Expr.Var   x          -> [LD x]
