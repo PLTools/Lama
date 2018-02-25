@@ -1,5 +1,5 @@
 skip;
-x0 := read ();
-x1 := read ();
+read (x0);
+read (x1);
 y := x0*(28-34-x0);
 write (y)

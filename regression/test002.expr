@@ -1,4 +1,4 @@
-x := read (); 
-y := read (); 
+read (x); 
+read (y); 
 z := y*y; 
 write (x+z) 

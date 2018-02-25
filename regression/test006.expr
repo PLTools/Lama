@@ -1,5 +1,5 @@
-x := read ();
-y := read ();
+read (x);
+read (y);
 z := x < y;
 write (z);
 z := x <= y;
