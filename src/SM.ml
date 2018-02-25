@@ -1,5 +1,5 @@
 open GT       
-open Syntax
+open Language
        
 (* The type for the stack machine instructions *)
 @type insn =
@@ -39,11 +39,11 @@ let rec eval ((stack, ((st, i, o) as c)) as conf) = function
 
 (* Top-level evaluation
 
-     val run : int list -> prg -> int list
+     val run : prg -> int list -> int list
 
    Takes an input stream, a program, and returns an output stream this program calculates
- *)
-let run i p = let (_, (_, _, o)) = eval ([], (Expr.empty, i, [])) p in o
+*)
+let run p i = let (_, (_, _, o)) = eval ([], (Expr.empty, i, [])) p in o
                                                                          
 (* Stack machine compiler
 
@@ -52,7 +52,7 @@ let run i p = let (_, (_, _, o)) = eval ([], (Expr.empty, i, [])) p in o
 
    Takes a program in the source language and returns an equivalent program for the
    stack machine
- *)
+*)
 
 let rec compile =
   let rec expr = function
