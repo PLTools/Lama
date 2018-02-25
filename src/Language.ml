@@ -46,7 +46,12 @@ module Expr =
     *)
     let eval _ = failwith "Not implemented yet"
 
-    (* Statement parser *)
+    (* Expression parser. You can use the following terminals:
+
+         IDENT   --- a non-empty identifier (a-zA-Z[a-zA-Z0-9_]*) as a string
+         DECIMAL --- a decimal constant [0-9]+ as a string
+   
+    *)
     ostap (
       parse: empty {failwith "Not implemented yet"}
     )
