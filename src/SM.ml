@@ -27,7 +27,7 @@ let eval _ = failwith "Not yet implemented"
 
 (* Top-level evaluation
 
-     val run : prg -> int list -> int list
+     val run : int list -> prg -> int list
 
    Takes an input stream, a program, and returns an output stream this program calculates
 *)
