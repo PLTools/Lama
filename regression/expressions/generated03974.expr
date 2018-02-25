@@ -1,4 +1,4 @@
-skip;
+
 read (x0);
 read (x1);
 y := x1/x0*36;
