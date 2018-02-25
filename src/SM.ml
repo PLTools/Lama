@@ -47,7 +47,6 @@ let run p i = let (_, (_, _, o)) = eval ([], (Expr.empty, i, [])) p in o
                                                                          
 (* Stack machine compiler
 
-     val compile : Stmt.t -> prg
      val compile : Language.Stmt.t -> prg
 
    Takes a program in the source language and returns an equivalent program for the
