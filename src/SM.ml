@@ -16,7 +16,7 @@ type prg = insn list
 (* The type for the stack machine configuration: a stack and a configuration from statement
    interpreter
  *)
-type config = int list * Language.Stmt.config
+type config = int list * Stmt.config
 
 (* Stack machine interpreter
 

@@ -70,7 +70,12 @@ module Expr =
       | Var   x -> st x
       | Binop (op, x, y) -> to_func op (eval st x) (eval st y)
 
-    (* Expression parser *)
+    (* Expression parser. You can use the following terminals:
+
+         IDENT   --- a non-empty identifier a-zA-Z[a-zA-Z0-9_]* as a string
+         DECIMAL --- a decimal constant [0-9]+ as a string
+                                                                                                                  
+    *)
     ostap (                                      
       parse:
 	  !(Ostap.Util.expr 
@@ -93,7 +98,7 @@ module Expr =
       | x:IDENT   {Var x}
       | -"(" parse -")"
     )
-
+    
   end
                     
 (* Simple statements: syntax and sematics *)
