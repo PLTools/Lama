@@ -1,5 +1,5 @@
 skip;
-x0 := read ();
-x1 := read ();
+read (x0);
+read (x1);
 y := x1+x0-44/x0;
 write (y)

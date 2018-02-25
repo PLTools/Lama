@@ -1,5 +1,5 @@
-x := read ();
-y := read ();
+read (x);
+read (y);
 write (x-y);
 write (x/y);
 write (x%y)
