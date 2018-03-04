@@ -228,7 +228,7 @@ class env =
     method globals = S.elements globals
   end
 
-(* compiles a unit: generates machine code for the stack program and surrounds it
+(* compiles a unit: generates x86 machine code for the stack program and surrounds it
    with function prologue/epilogue
 *)
 let compile_unit env scode =  
@@ -239,8 +239,8 @@ let compile_unit env scode =
    [Mov (ebp, esp); Pop ebp; Binop ("^", eax, eax); Ret]
   )
 
-(* Generates an assembler text for a program: first compile the program into
-   the stack code, then generate x86 assember code, then print the assembler file
+(* Generates an assembler text for a program: first compiles the program into
+   the stack code, then generates x86 assember code, then prints the assembler file
 *)
 let genasm prog =
   let env, code = compile_unit (new env) (SM.compile prog) in
