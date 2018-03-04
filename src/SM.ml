@@ -4,6 +4,7 @@ open Language
 (* The type for the stack machine instructions *)
 @type insn =
 (* binary operator                 *) | BINOP of string
+(* put a constant on the stack     *) | CONST of int                 
 (* read to stack                   *) | READ
 (* write from stack                *) | WRITE
 (* put a constant of the stack     *) | CONST of int
