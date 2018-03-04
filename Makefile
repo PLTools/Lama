@@ -4,6 +4,7 @@ SHELL := /bin/bash
 
 all:
 	pushd src && make && popd
+	pushd runtime && make && popd
 
 install: ;
 
@@ -12,5 +13,6 @@ regression:
 
 clean:
 	pushd src && make clean && popd
+	pushd runtime && make clean && popd
 	pushd regression && make clean && popd
 

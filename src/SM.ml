@@ -7,7 +7,6 @@ open Language
 (* put a constant on the stack     *) | CONST of int                 
 (* read to stack                   *) | READ
 (* write from stack                *) | WRITE
-(* put a constant of the stack     *) | CONST of int
 (* load a variable to the stack    *) | LD    of string
 (* store a variable from the stack *) | ST    of string with show
 
