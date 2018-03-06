@@ -28,11 +28,11 @@ let eval _ = failwith "Not yet implemented"
 
 (* Top-level evaluation
 
-     val run : prg -> int list -> int list
+     val run : int list -> prg -> int list
 
    Takes an input stream, a program, and returns an output stream this program calculates
 *)
-let run p i = let (_, (_, _, o)) = eval ([], (Expr.empty, i, [])) p in o
+let run i p = let (_, (_, _, o)) = eval ([], (Syntax.Expr.empty, i, [])) p in o
 
 (* Stack machine compiler
 

@@ -1,0 +1,261 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath}
+\usepackage{alltt}
+\usepackage{pslatex}
+\usepackage{epigraph}
+\usepackage{verbatim}
+\usepackage{latexsym}
+\usepackage{array}
+\usepackage{comment}
+\usepackage{makeidx}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{verbatim}
+\usepackage{color}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{hyperref}
+\usepackage{stmaryrd}
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage{graphicx}
+\usepackage{euscript}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{multirow,bigdelim}
+
+\makeatletter
+
+\makeatother
+
+\definecolor{shadecolor}{gray}{1.00}
+\definecolor{darkgray}{gray}{0.30}
+
+\def\transarrow{\xrightarrow}
+\newcommand{\setarrow}[1]{\def\transarrow{#1}}
+
+\def\padding{\phantom{X}}
+\newcommand{\setpadding}[1]{\def\padding{#1}}
+
+\newcommand{\trule}[2]{\frac{#1}{#2}}
+\newcommand{\crule}[3]{\frac{#1}{#2},\;{#3}}
+\newcommand{\withenv}[2]{{#1}\vdash{#2}}
+\newcommand{\trans}[3]{{#1}\transarrow{\padding#2\padding}{#3}}
+\newcommand{\ctrans}[4]{{#1}\transarrow{\padding#2\padding}{#3},\;{#4}}
+\newcommand{\llang}[1]{\mbox{\lstinline[mathescape]|#1|}}
+\newcommand{\pair}[2]{\inbr{{#1}\mid{#2}}}
+\newcommand{\inbr}[1]{\left<{#1}\right>}
+\newcommand{\highlight}[1]{\color{red}{#1}}
+\newcommand{\ruleno}[1]{\eqno[\scriptsize\textsc{#1}]}
+\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\inmath}[1]{\mbox{$#1$}}
+\newcommand{\lfp}[1]{fix_{#1}}
+\newcommand{\gfp}[1]{Fix_{#1}}
+\newcommand{\vsep}{\vspace{-2mm}}
+\newcommand{\supp}[1]{\scriptsize{#1}}
+\newcommand{\sembr}[1]{\llbracket{#1}\rrbracket}
+\newcommand{\cd}[1]{\texttt{#1}}
+\newcommand{\free}[1]{\boxed{#1}}
+\newcommand{\binds}{\;\mapsto\;}
+\newcommand{\dbi}[1]{\mbox{\bf{#1}}}
+\newcommand{\sv}[1]{\mbox{\textbf{#1}}}
+\newcommand{\bnd}[2]{{#1}\mkern-9mu\binds\mkern-9mu{#2}}
+
+\newcommand{\meta}[1]{{\mathcal{#1}}}
+\renewcommand{\emptyset}{\varnothing}
+
+\definecolor{light-gray}{gray}{0.90}
+\newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
+
+\lstdefinelanguage{ocaml}{
+keywords={let, begin, end, in, match, type, and, fun, 
+function, try, with, class, object, method, of, rec, repeat, until,
+while, not, do, done, as, val, inherit, module, sig, @type, struct, 
+if, then, else, open, virtual, new, fresh},
+sensitive=true,
+%basicstyle=\small,
+commentstyle=\scriptsize\rmfamily,
+keywordstyle=\ttfamily\bfseries,
+identifierstyle=\ttfamily,
+basewidth={0.5em,0.5em},
+columns=fixed,
+fontadjust=true,
+literate={fun}{{$\lambda$}}1 {->}{{$\to$}}3 {===}{{$\equiv$}}1 {=/=}{{$\not\equiv$}}1 {|>}{{$\triangleright$}}3 {\&\&\&}{{$\wedge$}}2 {|||}{{$\vee$}}2 {^}{{$\uparrow$}}1,
+morecomment=[s]{(*}{*)}
+}
+
+\lstset{
+mathescape=true,
+%basicstyle=\small,
+identifierstyle=\ttfamily,
+keywordstyle=\bfseries,
+commentstyle=\scriptsize\rmfamily,
+basewidth={0.5em,0.5em},
+fontadjust=true,
+escapechar=!,
+language=ocaml
+}
+
+\sloppy
+
+\newcommand{\ocaml}{\texttt{OCaml}\xspace}
+
+\theoremstyle{definition}
+
+\title{Statements, Stack Machine, Stack Machine Compiler\\
+  (the first draft)
+}
+
+\author{Dmitry Boulytchev}
+
+\begin{document}
+
+\maketitle
+
+\section{Statements}
+
+More interesting language~--- a language of simple statements:
+
+$$
+\begin{array}{rcl}  
+  \mathscr S & = & \mathscr X \mbox{\lstinline|:=|} \;\mathscr E \\
+             &   & \mbox{\lstinline|read (|} \mathscr X \mbox{\lstinline|)|} \\
+             &   & \mbox{\lstinline|write (|} \mathscr E \mbox{\lstinline|)|} \\
+             &   & \mathscr S \mbox{\lstinline|;|} \mathscr S
+\end{array}
+$$
+
+Here $\mathscr E, \mathscr X$ stand for the sets of expressions and variables, as in the previous lecture.
+
+Again, we define the semantics for this language 
+
+$$
+\sembr{\bullet}_{\mathscr S} : \mathscr S \mapsto \mathbb Z^* \to \mathbb Z^*
+$$
+
+with the semantic domain of partial functions from integer strings to integer strings. This time we will
+use \emph{big-step operational semantics}: we define a ternary relation ``$\Rightarrow$''
+
+$$
+\Rightarrow \subseteq \mathscr C \times \mathscr S \times \mathscr C
+$$
+
+where $\mathscr C = \Sigma \times \mathbb Z^* \times \mathbb Z^*$~--- a set of all configurations during a
+program execution. We will write $c_1\xRightarrow{S}c_2$ instead of $(c_1, S, c_2)\in\Rightarrow$ and informally
+interpret the former as ``the execution of a statement $S$ in a configuration $c_1$ completes with the configuration
+$c_2$''. The components of a configuration are state, which binds (some) variables to their values, and input and
+output streams, represented as (finite) strings of integers.
+
+The relation ``$\Rightarrow$'' is defined by the following deductive system (see Fig.~\ref{bs_stmt}). The first
+three rules are \emph{axioms} as they do not have any premises. Note, according to these rules sometimes a program
+cannot do a step in a given configuration: a value of an expression can be undefined in a given state in rules
+$\rulename{Assign}$ and $\rulename{Write}$, and there can be no input value in rule $\rulename{Read}$. This style of
+a semantics description is called big-step operational semantics, since the results of a computation are
+immediately observable at the right hand side of ``$\Rightarrow$'' and, thus, the computation is performed in
+a single ``big'' step. And, again, this style of a semantic description can be used to easily implement a
+reference interpreter.
+
+With the relation ``$\Rightarrow$'' defined we can abbreviate the ``surface'' semantics for the language of statements:
+
+\setarrow{\xRightarrow}
+
+\[
+\forall S\in\mathscr S,\,\forall i\in\mathbb Z^*\;:\;\sembr{S}_{\mathscr S} i = o \Leftrightarrow \trans{\inbr{\bot, i, \epsilon}}{S}{\inbr{\_, \_, o}}
+\]
+
+
+\begin{figure}[t]
+\[\trans{\inbr{s, i, o}}{\llang{x := $\;\;e$}}{\inbr{s[x\gets\sembr{e}_{\mathscr E}\;s], i, o}}\ruleno{Assign}\]
+\[\trans{\inbr{s, z\llang{::}i, o}}{\llang{read ($x$)}}{\inbr{s[x\gets z], i, o}}\ruleno{Read}\]
+\[\trans{\inbr{s, i, o}}{\llang{write ($e$)}}{\inbr{s, i, o \llang{@} \sembr{e}_{\mathscr E}\;s}}\ruleno{Write}\]
+\[\trule{\trans{c_1}{S_1}{c^\prime},\;\trans{c^\prime}{S_2}{c_2}}{\trans{c_1}{S_1\llang{;}S_2}{c_2}}\ruleno{Seq}\]
+\caption{Big-step operational semantics for statements}
+\label{bs_stmt}
+\end{figure}
+
+\section{Stack Machine}
+
+Stack machine is a simple abstract computational device, which can be used as a convenient model to constructively describe
+the compilation process.
+
+In short, stack machine operates on the same configurations, as the language of statements, plus a stack of integers. The
+computation, performed by the stack machine, is controlled by a program, which is described as follows:
+
+\[
+\begin{array}{rcl}
+  \mathscr I & = & \llang{BINOP $\;\otimes$} \\
+             &   & \llang{CONST $\;\mathbb N$} \\
+             &   & \llang{READ} \\
+             &   & \llang{WRITE} \\
+             &   & \llang{LD $\;\mathscr X$} \\
+             &   & \llang{ST $\;\mathscr X$} \\
+  \mathscr P & = & \epsilon \\
+             &   & \mathscr I\mathscr P
+\end{array}
+\]
+
+Here the syntax category $\mathscr I$ stands for \emph{instructions}, $\mathscr P$~--- for \emph{programs}; thus, a program is a finite
+string of instructions.
+
+The semantics of stack machine program can be described, again, in the form of big-step operational semantics. This time the set of
+stack machine configurations is
+
+\[
+\mathscr C_{SM} = \mathbb Z^* \times \mathscr C
+\]
+
+where the first component is a stack, and the second~--- a configuration as in the semantics of statement language. The rules are shown on Fig.~\ref{bs_sm}; note,
+now we have one axiom and six inference rules (one per instruction).
+
+As for the statement, with the aid of the relation ``$\Rightarrow$'' we can define the surface semantics of stack machine:
+
+\[
+\forall p\in\mathscr P,\,\forall i\in\mathbb Z^*\;:\;\sembr{p}_{SM}\;i=o\Leftrightarrow\trans{\inbr{\epsilon, \inbr{\bot, i, \epsilon}}}{p}{\inbr{\_, \inbr{\_, \_, o}}}
+\]
+
+\begin{figure}[t]
+  \[\trans{c}{\epsilon}{c}\ruleno{Stop$_{SM}$}\]
+  \[\trule{\trans{\inbr{(x\oplus y)\llang{::}st, c}}{p}{c^\prime}}{\trans{\inbr{y\llang{::}x\llang{::}st, c}}{(\llang{BINOP $\;\otimes$})p}{c^\prime}}\ruleno{Binop$_{SM}$}\]
+  \[\trule{\trans{\inbr{z\llang{::}st, c}}{p}{c^\prime}}{\trans{\inbr{st, c}}{(\llang{CONST $\;z$})p}{c^\prime}}\ruleno{Const$_{SM}$}\]
+  \[\trule{\trans{\inbr{z\llang{::}st, \inbr{s, i, o}}}{p}{c^\prime}}{\trans{\inbr{st, \inbr{s, z\llang{::}i, o}}}{(\llang{READ})p}{c^\prime}}\ruleno{Read$_{SM}$}\]
+  \[\trule{\trans{\inbr{st, \inbr{s, i, o\llang{@}z}}}{p}{c^\prime}}{\trans{\inbr{z\llang{::}st, \inbr{s, i, o}}}{(\llang{WRITE})p}{c^\prime}}\ruleno{Write$_{SM}$}\]
+  \[\trule{\trans{\inbr{(s\;x)\llang{::}st, \inbr{s, i, o}}}{p}{c^\prime}}{\trans{\inbr{st, \inbr{s, i, o}}}{(\llang{LD $\;x$})p}{c^\prime}}\ruleno{LD$_{SM}$}\]
+  \[\trule{\trans{\inbr{st, \inbr{s[x\gets z], i, o}}}{p}{c^\prime}}{\trans{\inbr{z\llang{::}st, \inbr{s, i, o}}}{(\llang{ST $\;x$})p}{c^\prime}}\ruleno{ST$_{SM}$}\]
+  \caption{Big-step operational semantics for stack machine}
+  \label{bs_sm}
+\end{figure}
+
+\section{A Compiler for the Stack Machine}
+
+A compiler of the statement language into the stack machine is a total mapping
+
+\[
+\sembr{\bullet}_{comp} : \mathscr S \mapsto \mathscr P
+\]
+
+We can describe the compiler in the form of denotational semantics for the source language. In fact, we can treat the compiler as a \emph{static} semantics, which
+maps each program into its stack machine equivalent.
+
+As the source language consists of two syntactic categories (expressions and statments), the compiler has to be ``bootstrapped'' from the compiler for expressions
+$\sembr{\bullet}^{\mathscr E}_{comp}$:
+
+\[
+\begin{array}{rcl}
+  \sembr{x}^{\mathscr E}_{comp}&=&\llang{[LD $\;x$]}\\
+  \sembr{n}^{\mathscr E}_{comp}&=&\llang{[CONST $\;n$]}\\
+  \sembr{A\otimes B}^{\mathscr E}_{comp}&=&\sembr{A}^{\mathscr E}_{comp}\llang{@}\sembr{B}^{\mathscr E}_{comp}\llang{@}(\llang{BINOP $\;\otimes$})
+\end{array}
+\]
+
+And now the main dish:
+
+\[
+\begin{array}{rcl}
+  \sembr{\llang{$x$ := $e$}}_{comp}&=&\sembr{e}^{\mathscr E}_{comp}\llang{@}\llang{[ST $\;x$]}\\
+  \sembr{\llang{read ($x$)}}_{comp}&=&\llang{[READ; ST $\;x$]}\\
+  \sembr{\llang{write ($e$)}}_{comp}&=&\sembr{e}^{\mathscr E}_{comp}\llang{@}\llang{[WRITE]}\\
+  \sembr{\llang{$S_1$;$\;S_2$}}_{comp}&=&\sembr{S_1}_{comp}\llang{@}\sembr{S_2}_{comp}
+\end{array}
+\]
+
+\end{document}
