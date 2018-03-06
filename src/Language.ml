@@ -94,9 +94,9 @@ type t = Stmt.t
 
 (* Top-level evaluator
 
-     eval : int list -> t -> int list
+     eval : t -> int list -> int list
 
    Takes a program and its input stream, and returns the output stream
 *)
-let eval i p =
+let eval p i =
   let _, _, o = Stmt.eval (Expr.empty, i, []) p in o
