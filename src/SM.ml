@@ -32,7 +32,7 @@ let eval _ = failwith "Not yet implemented"
 
    Takes an input stream, a program, and returns an output stream this program calculates
 *)
-let run i p = let (_, (_, _, o)) = eval ([], (Syntax.Expr.empty, i, [])) p in o
+let run i p = let (_, (_, _, o)) = eval ([], (Language.Expr.empty, i, [])) p in o
 
 (* Stack machine compiler
 
@@ -42,5 +42,3 @@ let run i p = let (_, (_, _, o)) = eval ([], (Syntax.Expr.empty, i, [])) p in o
    stack machine
  *)
 let compile _ = failwith "Not yet implemented"
-
-                         
