@@ -1,7 +1,7 @@
 (* X86 codegeneration interface *)
 
 (* The registers: *)
-let regs        = [|"%ebx"; "%ecx"; "%esi"; "%edi"; "%eax"; "%edx"; "%ebp"; "%esp"|]
+let regs = [|"%ebx"; "%ecx"; "%esi"; "%edi"; "%eax"; "%edx"; "%ebp"; "%esp"|]
 
 (* We can not freely operate with all register; only 3 by now *)                    
 let num_of_regs = Array.length regs - 5
@@ -13,8 +13,8 @@ let word_size = 4
 type opnd = 
 | R of int     (* hard register                    *)
 | S of int     (* a position on the hardware stack *)
-| M of string  (* named memory location            *)
-| L of int     (* immediate operand                *)
+| M of string  (* a named memory location          *)
+| L of int     (* an immediate operand             *)
 
 (* For convenience we define the following synonyms for the registers: *)         
 let ebx = R 0
@@ -28,15 +28,18 @@ let esp = R 7
 
 (* Now x86 instruction (we do not need all of them): *)
 type instr =
-| Cltd
-| Set   of string * string
-| IDiv  of opnd
-| Binop of string * opnd * opnd
-| Mov   of opnd * opnd
-| Push  of opnd
-| Pop   of opnd
-| Ret
-| Call  of string
+(* copies a value from the first to the second operand  *) | Mov   of opnd * opnd
+(* makes a binary operation; note, the first operand    *) | Binop of string * opnd * opnd
+(* designates x86 operator, not the source language one *)
+(* x86 integer division, see instruction set reference  *) | IDiv  of opnd
+(* see instruction set reference                        *) | Cltd
+(* sets a value from flags; the first operand is the    *) | Set   of string * string
+(* suffix, which determines the value being set, the    *)                     
+(* the second --- (sub)register name                    *)
+(* pushes the operand on the hardware stack             *) | Push  of opnd
+(* pops from the hardware stack to the operand          *) | Pop   of opnd
+(* call a function by a name                            *) | Call  of string
+(* returns from a function                              *) | Ret
 
 (* Instruction printer *)
 let show instr =
@@ -74,7 +77,7 @@ open SM
 
      compile : env -> prg -> env * instr list
 
-   Take an environment, a stack machine program, and returns a pair --- updated environment and the list
+   Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
    of x86 instructions
 *)
 let compile env code =
@@ -131,7 +134,7 @@ let compile env code =
                | "<" | "<=" | "==" | "!=" | ">=" | ">" ->
                   (match x with
                    | M _ | S _ ->
-                     [Binop ("^"  , eax, eax);
+                     [Binop ("^", eax, eax);
                       Mov   (x, edx);
                       Binop ("cmp", edx, y);
                       Set   (suffix op, "%al");
@@ -184,7 +187,6 @@ let compile env code =
 
 (* A set of strings *)           
 module S = Set.Make (String)
-
 
 (* Environment implementation *)
 class env =
