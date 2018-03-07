@@ -103,9 +103,12 @@ let compile env code =
           | WRITE ->
              let s, env' = env#pop in
              (env', [Push s; Call "Lwrite"; Pop eax])
-  	  | CONST n ->	      
+  	  | CONST n ->
+             env#push (L n), []
+             (*
 	     let s, env' = env#allocate in
 	     (env', [Mov (L n, s)])  
+              *)
 	  | LD x ->
 	     let s, env' = (env#global x)#allocate in
              env',
