@@ -110,8 +110,11 @@ module Stmt =
     (* read into the variable           *) | Read   of string
     (* write the value of an expression *) | Write  of Expr.t
     (* assignment                       *) | Assign of string * Expr.t
-    (* composition                      *) | Seq    of t * t with show
-
+    (* composition                      *) | Seq    of t * t 
+    (* empty statement                  *) | Skip
+    (* conditional                      *) | If     of Expr.t * t * t
+    (* loop                             *) | While  of Expr.t * t with show
+                                                                    
     (* The type of configuration: a state, an input stream, an output stream *)
     type config = Expr.state * int list * int list 
 
@@ -123,10 +126,13 @@ module Stmt =
     *)
     let rec eval ((st, i, o) as conf) stmt =
       match stmt with
-      | Read    x       -> (match i with z::i' -> (Expr.update x z st, i', o) | _ -> failwith "Unexpected end of input")
-      | Write   e       -> (st, i, o @ [Expr.eval st e])
-      | Assign (x, e)   -> (Expr.update x (Expr.eval st e) st, i, o)
-      | Seq    (s1, s2) -> eval (eval conf s1) s2
+      | Read    x          -> (match i with z::i' -> (Expr.update x z st, i', o) | _ -> failwith "Unexpected end of input")
+      | Write   e          -> (st, i, o @ [Expr.eval st e])
+      | Assign (x, e)      -> (Expr.update x (Expr.eval st e) st, i, o)
+      | Seq    (s1, s2)    -> eval (eval conf s1) s2
+      | Skip               -> conf
+      | If     (e, s1, s2) -> eval conf (if Expr.eval st e <> 0 then s1 else s2)
+      | While  (e, s)      -> if Expr.eval st e = 0 then conf else eval (eval conf s) stmt
                                 
     (* Statement parser *)
     ostap (
@@ -134,9 +140,12 @@ module Stmt =
         s:stmt ";" ss:parse {Seq (s, ss)}
       | stmt;
       stmt:
-        "read" "(" x:IDENT ")"          {Read x}
-      | "write" "(" e:!(Expr.parse) ")" {Write e}
-      | x:IDENT ":=" e:!(Expr.parse)    {Assign (x, e)}            
+        %"read"  "(" x:IDENT ")"                                      {Read x}
+      | %"write" "(" e:!(Expr.parse) ")"                              {Write e}
+      | %"skip"                                                       {Skip}
+      | %"if" e:!(Expr.parse) %"then" s1:parse %"else" s2:parse %"fi" {If (e, s1, s2)}
+      | %"while" e:!(Expr.parse) %"do" s:parse %"od"                  {While (e, s)}
+      | x:IDENT ":=" e:!(Expr.parse)                                  {Assign (x, e)}            
     )
       
   end
