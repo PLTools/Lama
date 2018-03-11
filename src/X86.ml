@@ -80,7 +80,27 @@ open SM
    Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
    of x86 instructions
 *)
-let compile env code = failwith "Not yet implemented"
+let rec compile env = function
+| [] -> env, []
+| instr :: code' ->
+   let env, asm =
+     match instr with
+     | CONST n ->
+        let s, env = env#allocate in
+        env, [Mov (L n, s)]
+     | WRITE ->
+        let s, env = env#pop in
+        env, [Push s; Call "Lwrite"; Pop eax]
+     | LD x ->
+        let s, env = (env#global x)#allocate in
+        env, [Mov (M ("global_" ^ x), s)]
+     | ST x ->
+        let s, env = (env#global x)#pop in
+        env, [Mov (s, M ("global_" ^ x))]
+     | _ -> failwith "Not yet supported"
+   in
+   let env, asm' = compile env code' in
+   env, asm @ asm'  
 
 (* A set of strings *)           
 module S = Set.Make (String)
