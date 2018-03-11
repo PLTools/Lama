@@ -1,8 +1,8 @@
 language: c
-sudo: required
-install: wget https://raw.githubusercontent.com/anlun/ocaml-ci-scripts/patch-1/.travis-opam.sh
-script: bash -ex .travis-opam.sh
-env:
-  - FORK_USER=anlun FORK_BRANCH=patch-1 OCAML_VERSION=4.06
-os:
-  - linux
+services:
+  - docker
+before_install:
+    - docker pull anlun/compiler-workout-ci
+    - docker run -d -it --name compiler-workout-ci -v $(pwd):/usr/share/compiler-workout anlun/compiler-workout-ci
+script:
+     docker exec -it compiler-workout-ci sh test.sh

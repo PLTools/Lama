@@ -104,18 +104,20 @@ let compile env code =
              let s, env' = env#pop in
              (env', [Push s; Call "Lwrite"; Pop eax])
   	  | CONST n ->
-             env#push (L n), []
-             (*
+             (*env#push (L n), []*)             
 	     let s, env' = env#allocate in
 	     (env', [Mov (L n, s)])  
-              *)
+             
 	  | LD x ->
+          (* (env#global x)#push (M x), []*)
+
 	     let s, env' = (env#global x)#allocate in
              env',
 	     (match s with
 	      | S _ | M _ -> [Mov (M (env'#loc x), eax); Mov (eax, s)]
 	      | _         -> [Mov (M (env'#loc x), s)]
 	     )	        
+
 	  | ST x ->
 	     let s, env' = (env#global x)#pop in
              env',
@@ -124,64 +126,68 @@ let compile env code =
               | _         -> [Mov (s, M (env'#loc x))]
 	     )
           | BINOP op ->
-	      let x, y, env' = env#pop2    in
-	      let env'       = env'#push y in
-              env',
-	      (match op with
-	       | "/" | "%" ->
-                  [Mov (y, eax);
-                   Cltd;
-                   IDiv x;
-                   Mov ((match op with "/" -> eax | _ -> edx), y)
-                  ]
-               | "<" | "<=" | "==" | "!=" | ">=" | ">" ->
-                  (match x with
-                   | M _ | S _ ->
+	     let x, y, env' = env#pop2 in
+             env'#push y,
+             (*
+             let y, env', c = match y with L _ -> let z, env' = env'#allocate in z, env', [Mov (y, z)] | _ -> y, env'#push y, [] in
+             env',
+             c @
+              *)
+	     (match op with
+	      | "/" | "%" ->
+                 [Mov (y, eax);
+                  Cltd;
+                  IDiv x;
+                  Mov ((match op with "/" -> eax | _ -> edx), y)
+                 ]
+              | "<" | "<=" | "==" | "!=" | ">=" | ">" ->
+                 (match x with
+                  | M _ | S _ ->
                      [Binop ("^", eax, eax);
                       Mov   (x, edx);
                       Binop ("cmp", edx, y);
                       Set   (suffix op, "%al");
                       Mov   (eax, y)
                      ]
-                   | _ ->
+                  | _ ->
                      [Binop ("^"  , eax, eax);
                       Binop ("cmp", x, y);
                       Set   (suffix op, "%al");
                       Mov   (eax, y)
                      ]
-                  )
-               | "*"   ->
-		   if on_stack x && on_stack y 
-		   then [Mov (y, eax); Binop (op, x, eax); Mov (eax, y)]
-                   else [Binop (op, x, y)]
-	       | "&&" ->
-		   [Mov   (x, eax);
-		    Binop (op, x, eax);
-		    Mov   (L 0, eax);
-		    Set   ("ne", "%al");
-
-		    Mov   (y, edx);
-		    Binop (op, y, edx);
-		    Mov   (L 0, edx);
-		    Set   ("ne", "%dl");
-
-                    Binop (op, edx, eax);
-		    Set   ("ne", "%al");
-
-		    Mov   (eax, y)
-                   ]		   
-	       | "!!" ->
-		   [Mov   (y, eax);
-		    Binop (op, x, eax);
-                    Mov   (L 0, eax);
-		    Set   ("ne", "%al");
-		    Mov   (eax, y)
-                   ]		   
-	       | _   ->
-                  if on_stack x && on_stack y 
-                  then [Mov   (x, eax); Binop (op, eax, y)]
-                  else [Binop (op, x, y)]
-              )
+                 )
+              | "*" ->
+                 if on_stack x && on_stack y 
+		 then [Mov (y, eax); Binop (op, x, eax); Mov (eax, y)]
+                 else [Binop (op, x, y)]
+	      | "&&" ->
+		 [Mov   (x, eax);
+		  Binop (op, x, eax);
+		  Mov   (L 0, eax);
+		  Set   ("ne", "%al");
+                  
+		  Mov   (y, edx);
+		  Binop (op, y, edx);
+		  Mov   (L 0, edx);
+		  Set   ("ne", "%dl");
+                  
+                  Binop (op, edx, eax);
+		  Set   ("ne", "%al");
+                  
+		  Mov   (eax, y)
+                 ]		   
+	      | "!!" ->
+		 [Mov   (y, eax);
+		  Binop (op, x, eax);
+                  Mov   (L 0, eax);
+		  Set   ("ne", "%al");
+		  Mov   (eax, y)
+                 ]		   
+	      | _   ->
+                 if on_stack x && on_stack y 
+                 then [Mov   (x, eax); Binop (op, eax, y)]
+                 else [Binop (op, x, y)]
+             )
         in
         let env'', code'' = compile' env' scode' in
 	env'', code' @ code''
@@ -208,6 +214,7 @@ class env =
 	| []                            -> ebx     , 0
 	| (S n)::_                      -> S (n+1) , n+1
 	| (R n)::_ when n < num_of_regs -> R (n+1) , stack_slots
+        | (M _)::s                      -> allocate' s
 	| _                             -> S 0     , 1
 	in
 	allocate' stack
@@ -218,7 +225,7 @@ class env =
     method push y = {< stack = y::stack >}
 
     (* pops one operand from the symbolic stack *)
-    method pop  = let x::stack'    = stack in x,    {< stack = stack' >}
+    method pop  = let x::stack' = stack in x, {< stack = stack' >}
 
     (* pops two operands from the symbolic stack *)
     method pop2 = let x::y::stack' = stack in x, y, {< stack = stack' >}
