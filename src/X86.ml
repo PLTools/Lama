@@ -82,25 +82,29 @@ open SM
 *)
 let rec compile env = function
 | [] -> env, []
-| instr :: code' ->
+| instr :: code ->
    let env, asm =
      match instr with
      | CONST n ->
-        let s, env = env#allocate in
-        env, [Mov (L n, s)]
-     | WRITE ->
-        let s, env = env#pop in
-        env, [Push s; Call "Lwrite"; Pop eax]
-     | LD x ->
-        let s, env = (env#global x)#allocate in
-        env, [Mov (M ("global_" ^ x), s)]
+        let x, env = env#allocate in
+        env, [Mov (L n, x)]
+
      | ST x ->
-        let s, env = (env#global x)#pop in
-        env, [Mov (s, M ("global_" ^ x))]
-     | _ -> failwith "Not yet supported"
+        let y, env = (env#global x)#pop in
+        env, (match y with S _ -> [Mov (y, eax); Mov (eax, M (env#loc x))] | _ -> [Mov (y, M (env#loc x))])
+        
+     | LD x ->
+        let y, env = (env#global x)#allocate in
+        env, (match y with S _ -> [Mov (M (env#loc x), eax); Mov (eax, y)] | _ -> [Mov (M (env#loc x), y)])
+        
+     | WRITE ->
+        let x, env = env#pop in
+        env, [Push x; Call "Lwrite"; Pop eax]
+               
+     | _       -> failwith "Not yet implemented"
    in
-   let env, asm' = compile env code' in
-   env, asm @ asm'  
+   let env, asm' = compile env code in
+   env, asm @ asm'
 
 (* A set of strings *)           
 module S = Set.Make (String)
