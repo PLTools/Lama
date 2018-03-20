@@ -1,0 +1,20 @@
+s := 0;
+read (n);
+p := 2;
+
+while n > 0 do
+    c := 2;
+    f := 1;
+
+    for c := 2, c*c <= p && f, c := c+1
+    do  
+      f := p % c != 0
+    od;
+
+    if f != 0 then
+      if n == 1 then write (p) fi;
+      n := n - 1
+    fi;
+
+    p := p + 1
+od

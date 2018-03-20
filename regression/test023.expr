@@ -1,0 +1,8 @@
+s := 0;
+
+repeat
+  read (n);
+  s := s + n
+until n == 0;
+
+write (s)  

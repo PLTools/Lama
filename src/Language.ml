@@ -113,7 +113,8 @@ module Stmt =
     (* composition                      *) | Seq    of t * t 
     (* empty statement                  *) | Skip
     (* conditional                      *) | If     of Expr.t * t * t
-    (* loop                             *) | While  of Expr.t * t with show
+    (* loop with a pre-condition        *) | While  of Expr.t * t
+    (* loop with a post-condition       *) | Repeat of t * Expr.t with show
                                                                     
     (* The type of configuration: a state, an input stream, an output stream *)
     type config = Expr.state * int list * int list 
@@ -133,6 +134,7 @@ module Stmt =
       | Skip               -> conf
       | If     (e, s1, s2) -> eval conf (if Expr.eval st e <> 0 then s1 else s2)
       | While  (e, s)      -> if Expr.eval st e = 0 then conf else eval (eval conf s) stmt
+      | Repeat (s, e)      -> let (st, _, _) as conf' = eval conf s in if Expr.eval st e = 0 then eval conf' stmt else conf'
                                 
     (* Statement parser *)
     ostap (
@@ -140,12 +142,27 @@ module Stmt =
         s:stmt ";" ss:parse {Seq (s, ss)}
       | stmt;
       stmt:
-        %"read"  "(" x:IDENT ")"                                      {Read x}
-      | %"write" "(" e:!(Expr.parse) ")"                              {Write e}
-      | %"skip"                                                       {Skip}
-      | %"if" e:!(Expr.parse) %"then" s1:parse %"else" s2:parse %"fi" {If (e, s1, s2)}
-      | %"while" e:!(Expr.parse) %"do" s:parse %"od"                  {While (e, s)}
-      | x:IDENT ":=" e:!(Expr.parse)                                  {Assign (x, e)}            
+        %"read"  "(" x:IDENT ")"         {Read x}
+      | %"write" "(" e:!(Expr.parse) ")" {Write e}
+      | %"skip"                          {Skip}
+      | %"if" e:!(Expr.parse)
+	  %"then" the:parse 
+          elif:(%"elif" !(Expr.parse) %"then" parse)*
+	  els:(%"else" parse)? 
+        %"fi" {
+          If (e, the, 
+	         List.fold_right 
+		   (fun (e, t) elif -> If (e, t, elif)) 
+		   elif
+		   (match els with None -> Skip | Some s -> s)
+          )
+        }
+      | %"while" e:!(Expr.parse) %"do" s:parse %"od"{While (e, s)}
+      | %"for" i:parse "," c:!(Expr.parse) "," s:parse %"do" b:parse %"od" {
+	  Seq (i, While (c, Seq (b, s)))
+        }
+      | %"repeat" s:parse %"until" e:!(Expr.parse)  {Repeat (s, e)}
+      | x:IDENT ":=" e:!(Expr.parse)                {Assign (x, e)}            
     )
       
   end

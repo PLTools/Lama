@@ -1,4 +1,4 @@
-TESTS=test001 test002 test003 test004 test005 test006 test007 test008 test009 test010 test011 test012
+TESTS=test001 test002 test003 test004 test005 test006 test007 test008 test009 test010 test011 test012 test015 test017 test018 test019 test020 test021 test022 test023
 
 RC=../src/rc.opt
 

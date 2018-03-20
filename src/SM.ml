@@ -92,6 +92,11 @@ let compile p =
                                let cond, env = env#get_label in
                                let env, _, s = compile' cond env s in
                                env, false, [JMP cond; LABEL loop] @ s @ [LABEL cond] @ expr c @ [CJMP ("nz", loop)]
+                                                                                                  
+  | Stmt.Repeat (s, c)      -> let loop , env = env#get_label in
+                               let check, env = env#get_label in
+                               let env  , flag, body = compile' check env s in
+                               env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ (expr c) @ [CJMP ("z", loop)]
   in
   let env =
     object

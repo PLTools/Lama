@@ -1,0 +1,289 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath}
+\usepackage{alltt}
+\usepackage{pslatex}
+\usepackage{epigraph}
+\usepackage{verbatim}
+\usepackage{latexsym}
+\usepackage{array}
+\usepackage{comment}
+\usepackage{makeidx}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{verbatim}
+\usepackage{color}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{hyperref}
+\usepackage{stmaryrd}
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage{graphicx}
+\usepackage{euscript}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{multirow,bigdelim}
+\usepackage{subcaption}
+\usepackage{placeins}
+
+\makeatletter
+
+\makeatother
+
+\definecolor{shadecolor}{gray}{1.00}
+\definecolor{darkgray}{gray}{0.30}
+
+\def\transarrow{\xrightarrow}
+\newcommand{\setarrow}[1]{\def\transarrow{#1}}
+
+\def\padding{\phantom{X}}
+\newcommand{\setpadding}[1]{\def\padding{#1}}
+
+\newcommand{\trule}[2]{\frac{#1}{#2}}
+\newcommand{\crule}[3]{\frac{#1}{#2},\;{#3}}
+\newcommand{\withenv}[2]{{#1}\vdash{#2}}
+\newcommand{\trans}[3]{{#1}\transarrow{\padding#2\padding}{#3}}
+\newcommand{\ctrans}[4]{{#1}\transarrow{\padding#2\padding}{#3},\;{#4}}
+\newcommand{\llang}[1]{\mbox{\lstinline[mathescape]|#1|}}
+\newcommand{\pair}[2]{\inbr{{#1}\mid{#2}}}
+\newcommand{\inbr}[1]{\left<{#1}\right>}
+\newcommand{\highlight}[1]{\color{red}{#1}}
+\newcommand{\ruleno}[1]{\eqno[\scriptsize\textsc{#1}]}
+\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\inmath}[1]{\mbox{$#1$}}
+\newcommand{\lfp}[1]{fix_{#1}}
+\newcommand{\gfp}[1]{Fix_{#1}}
+\newcommand{\vsep}{\vspace{-2mm}}
+\newcommand{\supp}[1]{\scriptsize{#1}}
+\newcommand{\sembr}[1]{\llbracket{#1}\rrbracket}
+\newcommand{\cd}[1]{\texttt{#1}}
+\newcommand{\free}[1]{\boxed{#1}}
+\newcommand{\binds}{\;\mapsto\;}
+\newcommand{\dbi}[1]{\mbox{\bf{#1}}}
+\newcommand{\sv}[1]{\mbox{\textbf{#1}}}
+\newcommand{\bnd}[2]{{#1}\mkern-9mu\binds\mkern-9mu{#2}}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newcommand{\meta}[1]{{\mathcal{#1}}}
+\renewcommand{\emptyset}{\varnothing}
+
+\definecolor{light-gray}{gray}{0.90}
+\newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
+
+\lstdefinelanguage{ocaml}{
+keywords={let, begin, end, in, match, type, and, fun, 
+function, try, with, class, object, method, of, rec, repeat, until,
+while, not, do, done, as, val, inherit, module, sig, @type, struct, 
+if, then, else, open, virtual, new, fresh},
+sensitive=true,
+%basicstyle=\small,
+commentstyle=\scriptsize\rmfamily,
+keywordstyle=\ttfamily\bfseries,
+identifierstyle=\ttfamily,
+basewidth={0.5em,0.5em},
+columns=fixed,
+fontadjust=true,
+literate={fun}{{$\lambda$}}1 {->}{{$\to$}}3 {===}{{$\equiv$}}1 {=/=}{{$\not\equiv$}}1 {|>}{{$\triangleright$}}3 {\&\&\&}{{$\wedge$}}2 {|||}{{$\vee$}}2 {^}{{$\uparrow$}}1,
+morecomment=[s]{(*}{*)}
+}
+
+\lstset{
+mathescape=true,
+%basicstyle=\small,
+identifierstyle=\ttfamily,
+keywordstyle=\bfseries,
+commentstyle=\scriptsize\rmfamily,
+basewidth={0.5em,0.5em},
+fontadjust=true,
+escapechar=!,
+language=ocaml
+}
+
+\sloppy
+
+\newcommand{\ocaml}{\texttt{OCaml}\xspace}
+
+\theoremstyle{definition}
+
+\title{Structural Induction\\
+  (the first draft)
+}
+
+\author{Dmitry Boulytchev}
+
+\begin{document}
+
+\maketitle
+
+%\section{Structural Induction}
+
+
+\begin{figure}
+\begin{subfigure}{\textwidth}
+\[
+\begin{array}{rclr}
+  \sembr{n}          & = & \lambda \sigma . n & \mbox{\scriptsize\rulename{[Const]}}\\
+  \sembr{x}          & = & \lambda \sigma . \sigma x & \mbox{\scriptsize\rulename{[Var]}} \\
+  \sembr{A\otimes B} & = & \lambda \sigma . (\sembr{A}\sigma \oplus \sembr{B}\sigma) & \mbox{\scriptsize\rulename{[Binop]}}
+\end{array}
+\]
+\caption{Denotational semantics for expressions}
+\end{subfigure}
+\vskip5mm
+\begin{subfigure}{\textwidth}
+  \[\trans{c}{\epsilon}{c}\ruleno{Stop$_{SM}$}\]
+  \[\trule{\trans{\inbr{(x\oplus y)\llang{::}st, s}}{p}{c^\prime}}{\trans{\inbr{y\llang{::}x\llang{::}st, s}}{(\llang{BINOP $\;\otimes$})p}{c^\prime}}\ruleno{Binop$_{SM}$}\]
+  \[\trule{\trans{\inbr{z\llang{::}st, s}}{p}{c^\prime}}{\trans{\inbr{st, s}}{(\llang{CONST $\;z$})p}{c^\prime}}\ruleno{Const$_{SM}$}\]
+  \[\trule{\trans{\inbr{(s\;x)\llang{::}st, s}}{p}{c^\prime}}{\trans{\inbr{st, s}}{(\llang{LD $\;x$})p}{c^\prime}}\ruleno{LD$_{SM}$}\]
+  \caption{Big-step operational semantics for stack machine}
+\end{subfigure}
+\vskip5mm
+\begin{subfigure}{\textwidth}
+\[
+\begin{array}{rclr}
+  \sembr{x}^{\mathscr E}_{comp}&=&\llang{[LD $\;x$]} & \mbox{\scriptsize\rulename{[Var$_{comp}$]}} \\
+  \sembr{n}^{\mathscr E}_{comp}&=&\llang{[CONST $\;n$]} & \mbox{\scriptsize\rulename{[Const$_{comp}$]}}\\
+  \sembr{A\otimes B}^{\mathscr E}_{comp}&=&\sembr{A}^{\mathscr E}_{comp}\llang{@}\sembr{B}^{\mathscr E}_{comp}\llang{@[BINOP $\otimes$]}) & \mbox{\scriptsize\rulename{[Binop$_{comp}$]}}
+\end{array}
+\]
+\caption{Compilation}
+\end{subfigure}
+\caption{All relevant definitions}
+\label{definitions}
+\end{figure}
+
+
+We have considered two languages (a language of expressions $\mathscr E$ and a language of stack machine programs $\mathscr P$), and a compiler from the former to the latter.
+It can be formally proven, that the compiler is (fully) correct in the sense, given in the lecture 1. Due to the simplicity of the languages, the proof technique~---
+\emph{structural induction}~--- is simple as well.
+
+First, we collect all needed definitions in one place (see Fig.~\ref{definitions}). We simplified the description of stack machine semantics a little bit: first,
+we dropped off all instructions, which cannot be generated by the expression compiler, and then, we removed the input and output streams from the stack machine
+configurations, since they are never affected by the remaining instructions.
+
+\begin{lemma}(Determinism)
+  Let $p$ be an arbitrary stack machine program, and let $c$, $c_1$ and $c_2$ be arbitrary configurations. Then
+
+  \[
+    \trans{c}{p}{c_1} \wedge \trans{c}{p}{c_2} \Rightarrow c_1= c_2
+  \]
+\end{lemma}
+\begin{proof}
+  Induction on the structure of $p$.
+
+  \textbf{Base case}. If $p=\epsilon$, then, by the rule \rulename{Stop$_{SM}$}, $c_1=c$ and $c_2=c$. Since no other rule can be
+  applied, we're done.
+
+  \textbf{Induction step}. If $p=\iota p^\prime$, then, by condition, we have
+
+    \[
+      \trule{\trans{c^\prime}{p^\prime}{c_1}}{\trans{c}{\iota p^\prime}{c_1}}
+    \]
+
+    and
+
+    \[
+      \trule{\trans{c^{\prime\prime}}{p^\prime}{c_2}}{\trans{c}{\iota p^\prime}{c_2}}
+    \]
+
+    where $c^\prime$ and $c^{\prime\prime}$ depend only on $c$ and $\iota$. By the case analysis on $\iota$ we conclude, that
+    $c^\prime=c^{\prime\prime}$. Since $p^\prime$ is shorter, than $p$, we can apply the induction hypothesis, which gives us
+    $c_1=c_2$.
+\end{proof}
+
+\FloatBarrier
+
+\begin{lemma} (Compositionality)
+  Let $p=p_1p_2$ be an arbitrary stack machine program, subdivided into arbitrary subprograms $p_1$ and $p_2$. Then,
+
+  \[
+  \forall c_1, c_2:\;\trans{c_1}{p}{c_2}\;\Leftrightarrow\;\exists c^\prime:\; \trans{c_1}{p_1}{c^\prime} \wedge \trans{c^\prime}{p_2}{c_2}
+  \]
+\end{lemma}
+\begin{proof}
+  Induction on the structure of $p$.
+  
+  \textbf{Base case}. The base case $p=\epsilon$ is trivial: use the rule \rulename{Stop$_{SM}$} and get $c^\prime=c_2=c_1$.
+  
+  \textbf{Induction step}. When $p=\iota p^\prime$, then there are two cases:
+
+  \begin{itemize}
+    \item Either $p_1=\epsilon$, then $c^\prime=c_1$ trivially by the rule \rulename{Stop$_{SM}$}, and we're done.
+    \item Otherwise $p_1=\iota p_1^\prime$, and, thus, $p=\iota p_1^\prime p_2$. In order to prove the lemma, we need to prove two implications:
+      \begin{enumerate}
+      \item Let $\trans{c_1}{p=\iota p_1^\prime p_2}{c_2}$. Technically, we need here to consider three cases (one for each type of the instruction
+        $\iota$), but in all cases the outcome would be the same: we have the picture
+
+        \[
+        \trule{\trans{c^{\prime\prime}}{p_1^\prime p_2}{c_2}}{\trans{c_1}{p=\iota p_1^\prime p_2}{c_2}}
+        \]
+
+        where $c^{\prime\prime}$ depends only on $\iota$ and $c_1$. Since $p_1^\prime p_2$ is shorter, than $p$, we can apply the induction hypothesis, which gives us a
+        configuration $c^\prime$, such, that $\trans{c^{\prime\prime}}{p_1^\prime}{c^\prime}$ and $\trans{c^\prime}{p_2}{c_2}$. The observation $\trans{c_1}{\iota p_1^\prime}{c^\prime}$
+        concludes the proof (note, we implicitly use determinism here).
+      \item Let there exists $c^\prime$, such that $\trans{c_1}{\iota p_1^\prime}{c^\prime}$ and $\trans{c^\prime}{p_2}{c_2}$. From the first relation we have
+
+        \[
+          \trule{\trans{c^{\prime\prime}}{p_1^\prime}{c^\prime}}{\trans{c_1}{\iota p_1^\prime}{c^\prime}}
+        \]
+
+        where $c^{\prime\prime}$ depends only on $\iota$ and $c_1$. Since $p_1^\prime p_2$ is shorter, than $p$, we can apply the induction hypothesis, which
+        gives us $\trans{c^{\prime\prime}}{p_1^\prime p_2}{c_2}$, and, thus, $\trans{c_1}{\iota p_1^\prime p_2}{c_2}$ (again, we implicitly use determinism here).
+      \end{enumerate}
+  \end{itemize}
+\end{proof}
+
+\begin{theorem}(Correctness of compilation)
+  Let $e\in\mathscr E$ be arbitrary expression, $s$~--- arbitrary state, and $st$~--- arbitrary stack. Then
+
+  \[
+    \trans{\inbr{st, s}}{\sembr{e}^{\mathscr E}_{comp}}{\inbr{(\sembr{e}\,s)::st, s}}\; \mbox{iff} \; (\sembr{e}\,s)\; \mbox{is defined}
+  \]
+\end{theorem}
+\begin{proof}
+  Induction on the structure of $e$.
+
+  \textbf{Base case}. There are two subcases:
+
+  \begin{enumerate}
+  \item $e$ is a constant $z$. Then:
+     \begin{itemize}
+       \item $\sembr{e}\,s=z$ for each state $s$;
+       \item \mbox{$\sembr{e}^{\mathscr E}_{comp}=[\llang{CONST z}]$};
+       \item $\trans{\inbr{st, s}}{[\llang{CONST z}]}{\inbr{z::st, s}}$ for arbitrary $st$ and $s$.
+     \end{itemize}
+
+     This concludes the first base case.
+
+   \item $e$ is a variable $x$. Then:
+     \begin{itemize}
+       \item $\sembr{s}\,s=s\,x$ for each state $s$, such that $s\,x$ is defined;
+       \item \mbox{$\sembr{e}^{\mathscr E}_{comp}=[\llang{LD x}]$};
+       \item $\trans{\inbr{st, s}}{[\llang{CONST z}]}{\inbr{(s\,x)::st, s}}$ for arbitrary $st$ and arbitrary $s$, such that $s\, x$ is defined.
+     \end{itemize}
+
+     This concludes the second base case.     
+  \end{enumerate}
+
+  \textbf{Induction step}. Let $e$ be $A\otimes B$. Then:
+
+  \begin{itemize}
+    \item $\sembr{A\otimes B}s=\sembr{A}s\oplus\sembr{B}s$ for each state $s$, such that both $\sembr{A}s$ and $\sembr{B}s$ are defined;
+    \item $\sembr{A\otimes B}^{\mathscr E}_{comp}=\sembr{A}^{\mathscr E}_{comp}\llang{@}\sembr{B}^{\mathscr E}_{comp}\llang{@[BINOP $\oplus$]}$;
+    \item by the inductive hypothesis, for arbitrary $st$ and $s$
+
+      \[
+        \trans{\inbr{st, s}}{\sembr{A}^{\mathscr E}_{comp}}{\inbr{(\sembr{A}s)::st, s}} \mbox{iff} \; (\sembr{A}\,s)\; \mbox{is defined}
+      \]
+
+      and
+
+      \[
+        \trans{\inbr{(\sembr{A}s)::st, s}}{\sembr{B}^{\mathscr E}_{comp}}{\inbr{(\sembr{B}s)::(\sembr{A}s)::st, s}} \mbox{iff} \; (\sembr{A}\,s) \;\mbox{and}\; (\sembr{A}\,s) \; \mbox{are defined}
+      \]
+
+      Taking into account the semantics of \llang{BINOP $\otimes$} and applying the compositionality lemma, the theorem follows.
+  \end{itemize}
+\end{proof}
+
+\end{document}
