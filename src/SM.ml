@@ -86,7 +86,7 @@ let compile p =
   | Stmt.If     (c, s1, s2) -> let l2, env = env#get_label in
                                let env, flag1, s1 = compile' l env s1 in
                                let env, flag2, s2 = compile' l env s2 in
-                               env, true, expr c @ [CJMP ("z", l2)] @ s1 @ (if flag1 then [] else [JMP l]) @ [LABEL l2] @ s2 @ (if flag2 then [] else [JMP l])
+                               env, true, expr c @ [CJMP ("z", l2)] @ s1 @ (if flag1 then [] else [JMP l]) @ [LABEL l2] @ s2 @ (if flag2 then [] else [JMP l]) 
                                
   | Stmt.While  (c, s)      -> let loop, env = env#get_label in
                                let cond, env = env#get_label in
