@@ -1,0 +1,12 @@
+read (n);
+
+s := 1;
+
+repeat
+
+  s := s * n;
+  n := n - 1
+  
+until n == 0;
+
+write (s)
