@@ -1,0 +1,335 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath}
+\usepackage{alltt}
+\usepackage{pslatex}
+\usepackage{epigraph}
+\usepackage{verbatim}
+\usepackage{latexsym}
+\usepackage{array}
+\usepackage{comment}
+\usepackage{makeidx}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{verbatim}
+\usepackage{color}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{hyperref}
+\usepackage{stmaryrd}
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage{graphicx}
+\usepackage{euscript}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{multirow,bigdelim}
+\usepackage{subcaption}
+\usepackage{placeins}
+
+\makeatletter
+
+\makeatother
+
+\definecolor{shadecolor}{gray}{1.00}
+\definecolor{darkgray}{gray}{0.30}
+
+\def\transarrow{\xrightarrow}
+\newcommand{\setarrow}[1]{\def\transarrow{#1}}
+
+\def\padding{\phantom{X}}
+\newcommand{\setpadding}[1]{\def\padding{#1}}
+
+\newcommand{\trule}[2]{\frac{#1}{#2}}
+\newcommand{\crule}[3]{\frac{#1}{#2},\;{#3}}
+\newcommand{\withenv}[2]{{#1}\vdash{#2}}
+\newcommand{\trans}[3]{{#1}\transarrow{\padding#2\padding}{#3}}
+\newcommand{\ctrans}[4]{{#1}\transarrow{\padding#2\padding}{#3},\;{#4}}
+\newcommand{\llang}[1]{\mbox{\lstinline[mathescape]|#1|}}
+\newcommand{\pair}[2]{\inbr{{#1}\mid{#2}}}
+\newcommand{\inbr}[1]{\left<{#1}\right>}
+\newcommand{\highlight}[1]{\color{red}{#1}}
+\newcommand{\ruleno}[1]{\eqno[\scriptsize\textsc{#1}]}
+\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\inmath}[1]{\mbox{$#1$}}
+\newcommand{\lfp}[1]{fix_{#1}}
+\newcommand{\gfp}[1]{Fix_{#1}}
+\newcommand{\vsep}{\vspace{-2mm}}
+\newcommand{\supp}[1]{\scriptsize{#1}}
+\newcommand{\sembr}[1]{\llbracket{#1}\rrbracket}
+\newcommand{\cd}[1]{\texttt{#1}}
+\newcommand{\free}[1]{\boxed{#1}}
+\newcommand{\binds}{\;\mapsto\;}
+\newcommand{\dbi}[1]{\mbox{\bf{#1}}}
+\newcommand{\sv}[1]{\mbox{\textbf{#1}}}
+\newcommand{\bnd}[2]{{#1}\mkern-9mu\binds\mkern-9mu{#2}}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newcommand{\meta}[1]{{\mathcal{#1}}}
+\renewcommand{\emptyset}{\varnothing}
+
+\definecolor{light-gray}{gray}{0.90}
+\newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
+
+\lstdefinelanguage{ocaml}{
+keywords={let, begin, end, in, match, type, and, fun, 
+function, try, with, class, object, method, of, rec, repeat, until,
+while, not, do, done, as, val, inherit, module, sig, @type, struct, 
+if, then, else, open, virtual, new, fresh, skip, od, fi, elif, for},
+sensitive=true,
+%basicstyle=\small,
+commentstyle=\scriptsize\rmfamily,
+keywordstyle=\ttfamily\bfseries,
+identifierstyle=\ttfamily,
+basewidth={0.5em,0.5em},
+columns=fixed,
+fontadjust=true,
+literate={fun}{{$\lambda$}}1 {->}{{$\to$}}3 {===}{{$\equiv$}}1 {=/=}{{$\not\equiv$}}1 {|>}{{$\triangleright$}}3 {\&\&\&}{{$\wedge$}}2 {|||}{{$\vee$}}2 {^}{{$\uparrow$}}1,
+morecomment=[s]{(*}{*)}
+}
+
+\lstset{
+mathescape=true,
+%basicstyle=\small,
+identifierstyle=\ttfamily,
+keywordstyle=\bfseries,
+commentstyle=\scriptsize\rmfamily,
+basewidth={0.5em,0.5em},
+fontadjust=true,
+escapechar=!,
+language=ocaml
+}
+
+\sloppy
+
+\newcommand{\ocaml}{\texttt{OCaml}\xspace}
+
+\theoremstyle{definition}
+
+\title{Control Flow Constructs\\
+  (the first draft)
+}
+
+\author{Dmitry Boulytchev}
+
+\begin{document}
+
+\maketitle
+
+\section{Structural Control Flow}
+
+We add a few structural control flow constructs to the language:
+
+\[
+\begin{array}{rcl}
+  \mathscr S & += & \llang{skip} \\
+             &    & \llang{if $\;\mathscr E\;$ then $\;\mathscr S\;$ else $\;\mathscr S$} \\
+             &    & \llang{while $\;\mathscr E\;$ do $\;\mathscr S$}
+\end{array}
+\]
+
+The big-step operational semantics is straightforward and is shown on Fig.~\ref{bs_stmt_cf}.
+
+In the concrete syntax for the constructs we add the closing keywords ``\llang{if}'' and ``\llang{od}'' as follows:
+
+\[
+\begin{array}{c}
+  \llang{if $\;e\;$ then $\;s_1\;$ else $\;s_2\;$ fi}\\
+  \llang{while $\;e\;$ do $\;s\;$ od}
+\end{array}
+\]
+
+\begin{figure}[t]
+
+\[\trans{c}{\llang{skip}}{c}\ruleno{Skip$_{bs}$}\]
+\[
+\crule{\trans{c}{\mbox{$S_1$}}{c^\prime}}
+      {\trans{c}{\llang{if $\;e\;$ then $\;S_1\;$ else $\;S_2\;$}}{c^\prime}}
+      {\sembr{e}\;s\ne 0}\ruleno{If-True$_{bs}$}
+\]
+\[
+\crule{\trans{c}{\mbox{$S_2$}}{c^\prime}}
+      {\trans{c}{\llang{if $\;e\;$ then $\;S_1\;$ else $\;S_2\;$}}{c^\prime}}
+      {\sembr{e}\;s=0}\ruleno{If-False$_{bs}$}
+\]
+\[
+\crule{\trans{c}{\llang{$S$}}{c^\prime},\;\trans{c^\prime}{\llang{while $\;e\;$ do $\;S\;$}}{c^{\prime\prime}}}
+      {\trans{c}{\llang{while $\;e\;$ do $\;S\;$}}{c^{\prime\prime}}}
+      {\sembr{e}\;s\ne 0}\ruleno{While-True$_{bs}$}
+\]
+\[
+\ctrans{c}{\llang{while $\;e\;$ do $\;S\;$}}{c}{\sembr{e}\;s=0}\ruleno{While-False$_{bs}$}
+\]
+\caption{Big-step operational semantics for control flow statements}
+\label{bs_stmt_cf}
+\end{figure}
+
+\section{Extended Stack Machine}
+
+In order to compile the extended language into a program for the stack machine the latter has to be extended. First, we introduce a set of label names
+
+\[
+\mathscr L = \{l_1, l_2, \dots\}
+\]
+
+Then, we add three extra control flow instructions:
+
+\[
+\begin{array}{rcl}
+  \mathscr I & += & \llang{LABEL $\;\mathscr L$} \\
+             &   & \llang{JMP $\;\mathscr L$} \\
+  &   & \llang{CJMP$_x$ $\;\mathscr L$},\;\mbox{where $x\in\{\llang{nz}, \llang{z}\}$}
+\end{array}
+\]
+
+In order to give the semantics to these instructions, we need to extend the syntactic form of rules, used in the description of big-step operational smeantics. Instead of
+the rules in the form
+
+\setarrow{\xRightarrow}
+
+\[
+\trule{\trans{c}{p}{c^\prime}}{\trans{c^\prime}{p^\prime}{c^{\prime\prime}}}
+\]
+
+we use the following form
+
+\[
+\trule{\withenv{\Gamma}{\trans{c}{p}{c^\prime}}}{\withenv{\Gamma^\prime}{\trans{c^\prime}{p^\prime}{c^{\prime\prime}}}}
+\]
+
+where $\Gamma, \Gamma^\prime$~--- \emph{environments}. The structure of environments can be different in different cases; for now environment is just a program. Informally,
+the semantics of control flow instructions can not be described in terms of just a current instruction and current configuration~--- we need to take the whole
+program into account. Thus, the enclosing program is used as an environment.
+
+Additionally, for a program $P$ and a label $l$ we define a subprogram $P[l]$, such that $P$ is uniquely represented as $p^\prime(\llang{LABEL $\;l$})P[l]$.
+In other words $P[l]$ is a unique suffix of $P$, immediately following the label $l$ (if there are multiple (or no) occurrences of label $l$ in $P$, then $P[l]$ is
+undefined).
+
+All existing rules have to be rewritten~--- we need to formally add a $\withenv{P}{\dots}$ part everywhere. For the new instructions the rules are given on Fig.~\ref{bs_sm_cc}.
+
+\begin{figure}[t]
+  \[\trule{\withenv{P}{\trans{c}{p}{c^\prime}}}{\withenv{P}{\trans{c}{(\llang{LABEL $\;l$})p}{c^\prime}}}\ruleno{Label$_{SM}$}\]
+  \[\trule{\withenv{P}{\trans{c}{P[l]}{c^\prime}}}{\withenv{P}{\trans{c}{(\llang{JMP $\;l$})p}{c^\prime}}}\ruleno{JMP$_{SM}$}\]
+  \[\crule{\withenv{P}{\trans{c}{P[l]}{c^\prime}}}{\withenv{P}{\trans{\inbr{z::st, c}}{(\llang{CJMP$_{nz}$ $\;l$})p}{c^\prime}}}{z\ne 0}\ruleno{CJMP$_{nz}^+$$_{SM}$}\]
+  \[\crule{\withenv{P}{\trans{c}{p}{c^\prime}}}{\withenv{P}{\trans{\inbr{z::st, c}}{(\llang{CJMP$_{nz}$ $\;l$})p}{c^\prime}}}{z = 0}\ruleno{CJMP$_{nz}^-$$_{SM}$}\]
+  \[\crule{\withenv{P}{\trans{c}{P[l]}{c^\prime}}}{\withenv{P}{\trans{\inbr{z::st, c}}{(\llang{CJMP$_z$ $\;l$})p}{c^\prime}}}{z = 0}\ruleno{CJMP$_{z}^+$$_{SM}$}\]
+  \[\crule{\withenv{P}{\trans{c}{p}{c^\prime}}}{\withenv{P}{\trans{\inbr{z::st, c}}{(\llang{CJMP$_z$ $\;l$})p}{c^\prime}}}{z \ne 0}\ruleno{CJMP$_{z}^-$$_{SM}$}\]  
+  \caption{Big-step operational semantics for extended stack machine}
+  \label{bs_sm_cc}
+\end{figure}
+
+Finally, the top-level semantics for the extended stack machine can be redefined as follows:
+
+\[
+\forall p\in\mathscr P,\,\forall i\in\mathbb Z^*\;:\;\sembr{p}_{SM}\;i=o\Leftrightarrow\withenv{p}{\trans{\inbr{\epsilon, \inbr{\bot, i, \epsilon}}}{p}{\inbr{\_, \inbr{\_, \_, o}}}}
+\]
+
+\section{Syntax Extensions}
+
+With the structural control flow constructs already implemented, it is rather simple to ``saturate'' the language with more elaborated control constructs, using
+the method of \emph{syntactic extension}. Namely, we may introduce the following constructs
+
+\begin{lstlisting}
+    if $\;e_1\;$ then $\;s_1\;$
+  elif $\;e_2\;$ then $\;s_2\;$
+  $\dots$
+  elif $\;e_k\;$ then $\;s_k\;$
+  [ else $\;s_{k+1}\;$ ]
+    fi
+\end{lstlisting}
+
+and
+
+\begin{lstlisting}
+    for $\;s_1$, $\;e$, $\;s_2\;$ do $\;s_3\;$ od
+\end{lstlisting}
+
+only at the syntactic level, directly parsing these constructs into the original abstract syntax tree, using the following conversions:
+
+\begin{tabular}{p{3cm}p{1cm}p{3cm}}
+\begin{lstlisting}
+    if $\;e_1\;$ then $\;s_1\;$
+  elif $\;e_2\;$ then $\;s_2\;$
+  $\dots$
+  elif $\;e_k\;$ then $\;s_k\;$
+  else $\;s_{k+1}\;$
+  fi
+\end{lstlisting} &
+\begin{center}
+  \vskip1cm
+  $\leadsto$
+\end{center} &
+\begin{lstlisting}
+       if $\;e_1\;$ then $\;s_1\;$
+  else if $\;e_2\;$ then $\;s_2\;$
+  $\dots$
+  else if $\;e_k\;$ then $\;s_k\;$
+  else $\;s_{k+1}\;$ 
+       fi
+       $\dots$
+       fi
+\end{lstlisting}
+\end{tabular}
+
+\begin{tabular}{p{3cm}p{1cm}p{3cm}}
+\begin{lstlisting}
+    if $\;e_1\;$ then $\;s_1\;$
+  elif $\;e_2\;$ then $\;s_2\;$
+  $\dots$
+  elif $\;e_k\;$ then $\;s_k\;$
+  fi
+\end{lstlisting} &
+\begin{center}
+  \vskip1cm
+  $\leadsto$
+\end{center} &
+\begin{lstlisting}
+       if $\;e_1\;$ then $\;s_1\;$
+  else if $\;e_2\;$ then $\;s_2\;$
+  $\dots$
+  else if $\;e_k\;$ then $\;s_k\;$
+  else skip
+       fi
+       $\dots$
+       fi
+\end{lstlisting}
+\end{tabular}
+
+\begin{tabular}{p{5cm}p{1cm}p{3cm}}
+\begin{lstlisting}
+  for $\;s_1$, $\;e$, $\;s_2\;$ do $\;s_3\;$ od
+\end{lstlisting} &
+\begin{center}
+  $\leadsto$
+\end{center} &
+\begin{lstlisting}
+  $s_1$;
+  while $\;e\;$ do
+    $s_3$;
+    $s_2$
+  od
+\end{lstlisting}
+\end{tabular}
+
+The advantage of syntax extension method is that it makes it possible to add certain constructs with almost zero cost~--- indeed, no steps have to be made in order
+to implement the extended constructs (besides parsing). Note, the semantics of extended constructs is provided for free as well (which is not always desirable). 
+Another potential problem with syntax extensions is that they can easily provide unreasonable results. For example, one may be tempted to implement a post-condition
+loop using syntax extension:
+
+\begin{tabular}{p{5cm}p{1cm}p{3cm}}
+\begin{lstlisting}
+  repeat $\;s$ until $\;e$
+\end{lstlisting} &
+\begin{center}
+  $\leadsto$
+\end{center} &
+\begin{lstlisting}
+  $s$;
+  while $\;e\;$ == 0 do
+    $s$
+  od
+\end{lstlisting}
+\end{tabular}
+
+However, for nested \lstinline{repeat} constructs the size of extended program is exponential w.r.t. the nesting depth, which makes the whole idea unreasonable. 
+
+\end{document}
