@@ -1,0 +1,16 @@
+fun fact (n) {
+  if n <= 1
+  then result := 1
+  else
+    fact (n-1);
+    result := result * n
+  fi
+}
+
+read (n);
+
+for i := n, i >= 1, i := i-1 do
+  fact (i);
+  write (i);
+  write (result)
+od

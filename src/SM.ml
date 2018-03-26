@@ -36,8 +36,8 @@ let rec eval env ((stack, ((st, i, o) as c)) as conf) = function
     | READ        -> let z::i' = i     in eval env (z::stack, (st, i', o)) prg'
     | WRITE       -> let z::stack' = stack in eval env (stack', (st, i, o @ [z])) prg'
     | CONST i     -> eval env (i::stack, c) prg'
-    | LD x        -> eval env (st x :: stack, c) prg'
-    | ST x        -> let z::stack' = stack in eval env (stack', (Expr.update x z st, i, o)) prg'
+    | LD x        -> eval env (State.eval st x :: stack, c) prg'
+    | ST x        -> let z::stack' = stack in eval env (stack', (State.update x z st, i, o)) prg'
     | LABEL _     -> eval env conf prg'
     | JMP   l     -> eval env conf (env#labeled l)
     | CJMP (c, l) -> let x::stack' = stack in eval env conf (if (c = "z" && x = 0) || (c = "nz" && x <> 0) then env#labeled l else prg')
@@ -57,7 +57,7 @@ let run p i =
   | _ :: tl         -> make_map m tl
   in
   let m = make_map M.empty p in
-  let (_, (_, _, o)) = eval (object method labeled l = M.find l m end) ([], (Expr.empty, i, [])) p in o
+  let (_, (_, _, o)) = eval (object method labeled l = M.find l m end) ([], (State.empty, i, [])) p in o
 
 (* Stack machine compiler
 
