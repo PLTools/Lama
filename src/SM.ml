@@ -18,7 +18,7 @@ open Language
                                                    
 (* The type for the stack machine program *)                                                               
 type prg = insn list
-                
+
 (* The type for the stack machine configuration: control stack, stack and configuration from statement
    interpreter
  *)

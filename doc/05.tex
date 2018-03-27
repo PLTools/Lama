@@ -1,0 +1,286 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath}
+\usepackage{alltt}
+\usepackage{pslatex}
+\usepackage{epigraph}
+\usepackage{verbatim}
+\usepackage{latexsym}
+\usepackage{array}
+\usepackage{comment}
+\usepackage{makeidx}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{verbatim}
+\usepackage{color}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{hyperref}
+\usepackage{stmaryrd}
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage{graphicx}
+\usepackage{euscript}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{multirow,bigdelim}
+\usepackage{subcaption}
+\usepackage{placeins}
+
+\makeatletter
+
+\makeatother
+
+\definecolor{shadecolor}{gray}{1.00}
+\definecolor{darkgray}{gray}{0.30}
+
+\def\transarrow{\xrightarrow}
+\newcommand{\setarrow}[1]{\def\transarrow{#1}}
+
+\def\padding{\phantom{X}}
+\newcommand{\setpadding}[1]{\def\padding{#1}}
+
+\newcommand{\trule}[2]{\frac{#1}{#2}}
+\newcommand{\crule}[3]{\frac{#1}{#2},\;{#3}}
+\newcommand{\withenv}[2]{{#1}\vdash{#2}}
+\newcommand{\trans}[3]{{#1}\transarrow{\padding#2\padding}{#3}}
+\newcommand{\ctrans}[4]{{#1}\transarrow{\padding#2\padding}{#3},\;{#4}}
+\newcommand{\llang}[1]{\mbox{\lstinline[mathescape]|#1|}}
+\newcommand{\pair}[2]{\inbr{{#1}\mid{#2}}}
+\newcommand{\inbr}[1]{\left<{#1}\right>}
+\newcommand{\highlight}[1]{\color{red}{#1}}
+\newcommand{\ruleno}[1]{\eqno[\scriptsize\textsc{#1}]}
+\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\inmath}[1]{\mbox{$#1$}}
+\newcommand{\lfp}[1]{fix_{#1}}
+\newcommand{\gfp}[1]{Fix_{#1}}
+\newcommand{\vsep}{\vspace{-2mm}}
+\newcommand{\supp}[1]{\scriptsize{#1}}
+\newcommand{\sembr}[1]{\llbracket{#1}\rrbracket}
+\newcommand{\cd}[1]{\texttt{#1}}
+\newcommand{\free}[1]{\boxed{#1}}
+\newcommand{\binds}{\;\mapsto\;}
+\newcommand{\dbi}[1]{\mbox{\bf{#1}}}
+\newcommand{\sv}[1]{\mbox{\textbf{#1}}}
+\newcommand{\bnd}[2]{{#1}\mkern-9mu\binds\mkern-9mu{#2}}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newcommand{\meta}[1]{{\mathcal{#1}}}
+\renewcommand{\emptyset}{\varnothing}
+
+\definecolor{light-gray}{gray}{0.90}
+\newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
+
+\lstdefinelanguage{ocaml}{
+keywords={let, begin, end, in, match, type, and, fun, 
+function, try, with, class, object, method, of, rec, repeat, until,
+while, not, do, done, as, val, inherit, module, sig, @type, struct, 
+if, then, else, open, virtual, new, fresh, skip, od, fi, elif, for, local},
+sensitive=true,
+%basicstyle=\small,
+commentstyle=\scriptsize\rmfamily,
+keywordstyle=\ttfamily\bfseries,
+identifierstyle=\ttfamily,
+basewidth={0.5em,0.5em},
+columns=fixed,
+fontadjust=true,
+literate={->}{{$\to$}}3 {===}{{$\equiv$}}1 {=/=}{{$\not\equiv$}}1 {|>}{{$\triangleright$}}3 {\&\&\&}{{$\wedge$}}2 {|||}{{$\vee$}}2 {^}{{$\uparrow$}}1,
+morecomment=[s]{(*}{*)}
+}
+
+\lstset{
+mathescape=true,
+%basicstyle=\small,
+identifierstyle=\ttfamily,
+keywordstyle=\bfseries,
+commentstyle=\scriptsize\rmfamily,
+basewidth={0.5em,0.5em},
+fontadjust=true,
+escapechar=!,
+language=ocaml
+}
+
+\sloppy
+
+\newcommand{\ocaml}{\texttt{OCaml}\xspace}
+
+\theoremstyle{definition}
+
+\title{Procedures\\
+  (the first draft)
+}
+
+\author{Dmitry Boulytchev}
+
+\begin{document}
+
+\maketitle
+
+\section{Procedures}
+
+Procedures are unit-returning functions. We consider adding procedures as a separate step, since introducing full-fledged functions would require
+essential redefinition of the semantics for expressions; at the same time the code generation for funictions is a little trickier, than for procedures, so
+it is reasonable to split the implementation in two steps.
+
+At the source level the procedures are added as a separate syntactic category~--- definition $\mathscr D$:
+
+\[
+\begin{array}{rcl}
+  \mathscr D & = & \epsilon \\
+             &   & (\llang{fun $\;\mathscr X\;$ ($\mathscr X^*$) local $\;\mathscr X^*\;$ \{$\mathscr S$\}})\mathscr D
+\end{array}
+\]
+
+In other words, a definition is a (possibly empty) sequence of procedure description. Each description consists of the a name of the procedure, a
+list of names for its arguments and local variables, and a body (statement). In concrete syntax a single definition looks like
+
+\begin{lstlisting}
+  fun $name$ ($a_1$, $\;a_2$, $\dots$, $\;a_k$)
+    local $l_1$, $\;l_2$, $\dots$, $\;l_n$ {
+    $s$
+  }  
+\end{lstlisting}
+
+where $name$~--- a name for a procedure, $a_i$~--- its arguments, $l_i$~--- local variables, $s$~--- body.
+
+We also need to add a call statement to the language:
+
+\[
+\mathscr S += \mathscr X (\mathscr E^*)
+\]
+
+In a concrete syntax a call to a procedure $f$ with arguments $e_1,\dots,e_k$ looks like
+
+\[
+  \llang{$f\;$ ($e_1,\dots,e_k$)}
+\]
+
+Finally, we have to redefine the syntax category for programs at the top level:
+
+\[
+\mathscr L = \mathscr D\mathscr S
+\]
+
+In other words, we extended a statement with a set of definitions.
+
+With procedures, we need to introduce the notion of \emph{scope}. When a procedure is called, its arguments
+are associated with actual parameter values. A procedure is also in ``posession'' of its local variables.
+So, in principle, the context of a procedure execution is a set of arguments, local variables and, possibly, some
+other variables, for example, the global ones. However, the exact details of procedure context manipilation can
+differ essentially from language to language.
+
+In our case, we choose a static scoping~--- each procedure, besides its arguments and local variables, has an access
+only to global variables.  To describe this semantics, we need to change the definition of a state we've used so far:
+
+\[
+\Sigma = (\mathscr X \to \mathbb Z) \times 2^{\mathscr X} \times (\mathscr X \to \mathbb Z)
+\]
+
+Now the state is a triple: a \emph{global} state, a set of variables, and a \emph{local} state. Informally, in a new
+state $\inbr{\sigma_g,\,S,\,\sigma_l}$ $S$ describes a set of local variables, $\sigma_l$~--- their values, and $\sigma_g$~---
+the values of all other accessible variables.
+
+We need to redefine all state-manipulation primitives; first, the valuation of variables:
+
+\[
+\inbr{\sigma_g,\,S,\,\sigma_l}\;x=
+  \left\{\begin{array}{rcl}
+            \sigma_g\;x & , & x\not\in S\\
+            \sigma_l\;x & , & x \in S
+         \end{array}
+  \right.
+\]
+
+Then, updating the state:
+
+\[
+\inbr{\sigma_g,\,S,\,\sigma_l}[x\gets z] =
+  \left\{\begin{array}{rcl}
+            \inbr{\sigma_g[x\gets z],\,S,\,\sigma_l} & , & x\not\in S\\
+            \inbr{\sigma_g,\,S,\,\sigma_l[x\gets z]} & , & x \in S
+         \end{array}
+  \right.
+\]
+
+As an empty state, we take the following triple:
+
+\[
+\bot=\inbr{\bot,\,\emptyset,\,\bot}
+\]
+
+Finally, we need two transformations for states:
+
+\[
+\begin{array}{rcl}
+  \mbox{\textbf{enter}}\,\inbr{\sigma_g,\,\_,\,\_}\,S & = & \inbr{\sigma_g,\,S,\,\bot}\\
+  \mbox{\textbf{leave}}\,\inbr{\sigma_g,\,\_,\,\_}\,\inbr{\_,\,S,\,\sigma_l}& = & \inbr{\sigma_g,\,S,\,\sigma_l}
+\end{array}
+\]
+
+The first one simlulates the entering the new scope with a set of local variables $S$; the second one simulates the leaving
+from inner scope (described by the first state) to outer one (described by the second).
+
+\setarrow{\xRightarrow}
+
+All exising rules for big-step operational semantics have to be enriched by \emph{functional environment} $\Gamma$, which
+binds procedure names to their definitions. As this binding never changes during the program interpretation, we need only to
+propagate this environment, adding $\withenv{\Gamma}{...}$ for each transition ``$\trans{...}{}{...}$''. The only thing we
+need now is to describe the rule for procedure calls:
+
+\[
+\trule{\withenv{\Gamma}{\trans{\inbr{\mbox{\textbf{enter}}\;\sigma\,(\bar{a}@\bar{l})[\overline{a\gets\sembr{e}\sigma}],\,i,\,o}}{S}{\inbr{\sigma^\prime,\,i^\prime,\,o^\prime}}}}
+      {\withenv{\Gamma}{\trans{\inbr{\sigma,\,i,\,o}}{f (\bar{e})}{\inbr{\mbox{\textbf{leave}}\;\sigma^\prime\,\sigma,\,i^\prime,o^\prime}}}}
+     \ruleno{Call$_{bs}$}
+\]
+
+where $\Gamma\,f = \llang{fun $\;f\;$ ($\bar{a}$) local $\;\bar{l}\;$ \{$S$\}}$.
+
+
+\section{Extended Stack Machine}
+
+In order to support procedures and calls, we enrich the stack machine with three following instructions:
+
+\[
+\begin{array}{rcl}
+  \mathscr I & += & \llang{BEGIN $\;\mathscr X^*\;\mathscr X^*$} \\
+             &    & \llang{CALL $\;\mathscr X$}\\
+             &    & \llang{END}
+\end{array}
+\]
+
+Informally speaking, instruction \llang{BEGIN} performs entering into the scope of a procedure; its operands are the lists of argument names and
+local variables; \llang{END} leaves the scope and returns to the call site, and \llang{CALL} performs the call.
+
+We need to enrich the configurations for the stack machine as well:
+
+\[
+\mathscr C_{SM} = (\mathscr P\times \Sigma)\times\mathbb Z^*\times \mathscr C
+\]
+
+Here we added a \emph{control stack}~--- a stack of pairs of programs and states. Informally, when performing the \llang{CALL} instruction, we put the following
+program and current state on a stack to use them later on, when corresponding \llang{END} instruction will be encountered. As all other instructions does not
+affect the control stack, it gets threaded through all rules of operational semantics unchanged.
+
+Now we specify additional rules for the new instructions:
+
+\[
+\trule{\withenv{P}{\trans{\inbr{cs,\,st,\,\inbr{\mbox{\textbf{enter}}\;\sigma\,(\bar{a}@\bar{l})\overline{[a\gets z]},\,i,\,o}}}{p}{c^\prime}}}
+      {\withenv{P}{\trans{\inbr{cs,\,\bar{z}@st,\,\inbr{\sigma,\,i,\,o}}}{(\llang{BEGIN $\;\bar{a}\,\bar{l}$})p}{c^\prime}}}
+      \ruleno{Begin$_{SM}$}
+\]
+
+\[
+\trule{\withenv{P}{\trans{\inbr{(p,\,\sigma)::cs,\,st,\,\inbr{\sigma,\,i,\,o}}}{P[f]}{c^\prime}}}
+      {\withenv{P}{\trans{\inbr{cs,\,st,\,\inbr{\sigma,\,i,\,o}}}{(\llang{CALL $\;f$})p}{c^\prime}}}
+      \ruleno{Call$_{SM}$}
+\]
+
+\[
+\trule{\withenv{P}{\trans{\inbr{cs,\,st,\,\inbr{\mbox{\textbf{leave}}\;\sigma\,\sigma^\prime,\,i,\,o}}}{p^\prime}{c^\prime}}}
+      {\withenv{P}{\trans{\inbr{(p^\prime,\,\sigma^\prime)::cs,\,st,\,\inbr{\sigma,\,i,\,o}}}{\llang{END}p}{c^\prime}}}
+      \ruleno{EndRet$_{SM}$}
+\]
+
+\[
+\withenv{P}{\trans{\inbr{\epsilon,\,st,\,c}}{\llang{END}p}{\inbr{\epsilon,\,st,\,c}}}\ruleno{EndStop$_{SM}$}
+\]
+\end{document}
