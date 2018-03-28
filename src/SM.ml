@@ -31,32 +31,7 @@ type config = (prg * State.t) list * int list * Stmt.config
    Takes an environment, a configuration and a program, and returns a configuration as a result. The
    environment is used to locate a label to jump to (via method env#labeled <label_name>)
 *)                         
-let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
-| [] -> conf
-| insn :: prg' ->
-   (match insn with
-    | BINOP  op            -> let y::x::stack' = stack in eval env (cstack, Expr.to_func op x y :: stack', c) prg'
-    | READ                 -> let z::i'        = i     in eval env (cstack, z::stack, (st, i', o)) prg'
-    | WRITE                -> let z::stack'    = stack in eval env (cstack, stack', (st, i, o @ [z])) prg'
-    | CONST  i             -> eval env (cstack, i::stack, c) prg'
-    | LD x                 -> eval env (cstack, State.eval st x :: stack, c) prg'
-    | ST x                 -> let z::stack' = stack in eval env (cstack, stack', (State.update x z st, i, o)) prg'
-    | LABEL  _             -> eval env conf prg'
-    | JMP    l             -> eval env conf (env#labeled l)
-    | CJMP  (c, l)         -> let x::stack' = stack in eval env conf (if (c = "z" && x = 0) || (c = "nz" && x <> 0) then env#labeled l else prg')
-    | CALL   f             -> eval env ((prg', st)::cstack, stack, c) (env#labeled f)
-    | BEGIN (args, locals) -> let rec combine acc args stack =
-		                match args, stack with
-		                | [], _               -> List.rev acc, stack
-		                | a::args', s::stack' -> combine ((a, s)::acc) args' stack'
-		              in
-		              let state', stack' = combine [] args stack in
-                              eval env (cstack, stack', (List.fold_left (fun s (x, v) -> State.update x v s) (State.push_scope st (args @ locals)) state', i, o)) prg'
-    | END                  -> (match cstack with
-                               | (prg', st')::cstack' -> eval env (cstack', stack, (State.drop_scope st st', i, o)) prg'
-                               | []                   -> conf
-                              )
-   ) 
+let eval env ((cstack, stack, ((st, i, o) as c)) as conf) = failwith "Not implemented"
 
 (* Top-level evaluation
 
@@ -81,64 +56,4 @@ let run p i =
    Takes a program in the source language and returns an equivalent program for the
    stack machine
 *)
-let compile (defs, p) =
-  let label s = "L" ^ s in
-  let rec expr = function
-  | Expr.Var   x          -> [LD x]
-  | Expr.Const n          -> [CONST n]
-  | Expr.Binop (op, x, y) -> expr x @ expr y @ [BINOP op]
-  in
-  let rec compile_stmt l env = function  
-  | Stmt.Read    x          -> env, false, [READ; ST x]
-  | Stmt.Write   e          -> env, false, expr e @ [WRITE]
-  | Stmt.Assign (x, e)      -> env, false, expr e @ [ST x]
-  | Stmt.Skip               -> env, false, []
-
-  | Stmt.Seq    (s1, s2)    -> let l2, env = env#get_label in
-                               let env, flag1, s1 = compile_stmt l2 env s1 in
-                               let env, flag2, s2 = compile_stmt l  env s2 in
-                               env, flag2, s1 @ (if flag1 then [LABEL l2] else []) @ s2                                      
-
-  | Stmt.If     (c, s1, s2) -> let l2, env = env#get_label in
-                               let env, flag1, s1 = compile_stmt l env s1 in
-                               let env, flag2, s2 = compile_stmt l env s2 in
-                               env, true, expr c @ [CJMP ("z", l2)] @ s1 @ (if flag1 then [] else [JMP l]) @ [LABEL l2] @ s2 @ (if flag2 then [] else [JMP l]) 
-                               
-  | Stmt.While  (c, s)      -> let loop, env = env#get_label in
-                               let cond, env = env#get_label in
-                               let env, _, s = compile_stmt cond env s in
-                               env, false, [JMP cond; LABEL loop] @ s @ [LABEL cond] @ expr c @ [CJMP ("nz", loop)]
-                                                                                                  
-  | Stmt.Repeat (s, c)      -> let loop , env = env#get_label in
-                               let check, env = env#get_label in
-                               let env  , flag, body = compile_stmt check env s in
-                               env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ (expr c) @ [CJMP ("z", loop)]
-                                                                                                                     
-  | Stmt.Call   (f, args)   -> let args_code = List.concat @@ List.map expr (List.rev args) in
-                               env, false, args_code @ [CALL (label f)]
-  in
-  let compile_def env (name, (args, locals, stmt)) =
-    let lend, env       = env#get_label in
-    let env, flag, code = compile_stmt lend env stmt in
-    env,
-    [LABEL name; BEGIN (args, locals)] @
-    code @
-    (if flag then [LABEL lend] else []) @
-    [END]
-  in
-  let env =
-    object
-      val ls = 0
-      method get_label = (label @@ string_of_int ls), {< ls = ls + 1 >}
-    end
-  in
-  let env, def_code =
-    List.fold_left
-      (fun (env, code) (name, others) -> let env, code' = compile_def env (label name, others) in env, code'::code)
-      (env, [])
-      defs
-  in
-  let lend, env = env#get_label in
-  let _, flag, code = compile_stmt lend env p in
-  (LABEL "main" :: if flag then code @ [LABEL lend] else code) @ [END] @ (List.concat def_code) 
-
+let compile (defs, p) = failwith "Not implemented"
