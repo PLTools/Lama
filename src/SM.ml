@@ -22,7 +22,7 @@ type prg = insn list
 (* The type for the stack machine configuration: control stack, stack and configuration from statement
    interpreter
  *)
-type config = (prg * State.t) list * int list * Stmt.config
+type config = (prg * State.t) list * int list * Expr.config
 
 (* Stack machine interpreter
 
