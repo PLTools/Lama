@@ -121,7 +121,7 @@ Procedures are unit-returning functions. We consider adding procedures as a sepa
 essential redefinition of the semantics for expressions; at the same time the code generation for funictions is a little trickier, than for procedures, so
 it is reasonable to split the implementation in two steps.
 
-At the source level procedures are added as a separate syntactic category~--- definition $\mathscr D$:
+At the source level the procedures are added as a separate syntactic category~--- definition $\mathscr D$:
 
 \[
 \begin{array}{rcl}
@@ -130,7 +130,7 @@ At the source level procedures are added as a separate syntactic category~--- de
 \end{array}
 \]
 
-In other words, a definition is a (possibly empty) sequence of procedure descriptions. Each description consists of a name for the procedure, a
+In other words, a definition is a (possibly empty) sequence of procedure description. Each description consists of the a name of the procedure, a
 list of names for its arguments and local variables, and a body (statement). In concrete syntax a single definition looks like
 
 \begin{lstlisting}
@@ -140,7 +140,7 @@ list of names for its arguments and local variables, and a body (statement). In 
   }  
 \end{lstlisting}
 
-where $name$~--- a name for the procedure, $a_i$~--- its arguments, $l_i$~--- local variables, $s$~--- body.
+where $name$~--- a name for a procedure, $a_i$~--- its arguments, $l_i$~--- local variables, $s$~--- body.
 
 We also need to add a call statement to the language:
 
@@ -160,7 +160,7 @@ Finally, we have to redefine the syntax category for programs at the top level:
 \mathscr L = \mathscr D\mathscr S
 \]
 
-In other words, we extend a statement with a set of definitions.
+In other words, we extended a statement with a set of definitions.
 
 With procedures, we need to introduce the notion of \emph{scope}. When a procedure is called, its arguments
 are associated with actual parameter values. A procedure is also in ``posession'' of its local variables.
@@ -216,8 +216,8 @@ Finally, we need two transformations for states:
 \end{array}
 \]
 
-The first one simlulates entering the new scope with a set of local variables $S$; the second one simulates leaving
-from an inner scope (described by the first state) to an outer one (described by the second).
+The first one simlulates the entering the new scope with a set of local variables $S$; the second one simulates the leaving
+from inner scope (described by the first state) to outer one (described by the second).
 
 \setarrow{\xRightarrow}
 
@@ -248,7 +248,7 @@ In order to support procedures and calls, we enrich the stack machine with three
 \]
 
 Informally speaking, instruction \llang{BEGIN} performs entering into the scope of a procedure; its operands are the lists of argument names and
-local variables; \llang{END} leaves the scope and returns to the call site, and \llang{CALL} performs the call itself.
+local variables; \llang{END} leaves the scope and returns to the call site, and \llang{CALL} performs the call.
 
 We need to enrich the configurations for the stack machine as well:
 
