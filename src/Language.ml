@@ -162,20 +162,27 @@ module Stmt =
        Takes an environment, a configuration and a statement, and returns another configuration. The 
        environment is the same as for expressions
     *)
-    let rec eval env ((st, i, o) as conf) stmt =
+    let rec eval env ((st, i, o) as conf) k stmt =
+      let seq x y =
+        match x, y with
+        | Skip, _ -> y
+        | _, Skip -> x
+        | _       -> Seq (x, y)
+      in
       match stmt with
-      | Read    x          -> (match i with z::i' -> (State.update x z st, i', o) | _ -> failwith "Unexpected end of input")
-      | Write   e          -> let v, (st, i, o) = Expr.eval env conf e in (st, i, o @ [v])
-      | Assign (x, e)      -> let v, (st, i, o) = Expr.eval env conf e in (State.update x v st, i, o)
-      | Seq    (s1, s2)    -> eval env (eval env conf s1) s2
-      | Skip               -> conf
-      | If     (e, s1, s2) -> let v, conf = Expr.eval env conf e in eval env conf (if v <> 0 then s1 else s2)
-      | While  (e, s)      -> let v, conf = Expr.eval env conf e in if v = 0 then conf else eval env (eval env conf s) stmt                                                                        
-      | Repeat (s, e)      -> let conf     = eval env conf s in
-                              let v, conf' = Expr.eval env conf e in
-                              if v = 0 then eval env conf' stmt else conf
+      | Read    x          -> eval env (match i with z::i' -> (State.update x z st, i', o) | _ -> failwith "Unexpected end of input") Skip k
+      | Write   e          -> eval env (let v, (st, i, o) = Expr.eval env conf e in (st, i, o @ [v])) Skip k
+      | Assign (x, e)      -> eval env (let v, (st, i, o) = Expr.eval env conf e in (State.update x v st, i, o)) Skip k
+      | Seq    (s1, s2)    -> eval env conf (seq s2 k) s1
+      | Skip               -> (match k with Skip -> conf | _ -> eval env conf Skip k)
+      | If     (e, s1, s2) -> let v, conf = Expr.eval env conf e in eval env conf k (if v <> 0 then s1 else s2) 
+      | While  (e, s)      -> let v, conf = Expr.eval env conf e in
+                              if v = 0
+                              then eval env conf Skip k
+                              else eval env conf (seq stmt k) s
+      | Repeat (s, e)      -> eval env conf (seq (While (Expr.Binop ("==", e, Expr.Const 0), s)) k) s
       | Return  e          -> failwith "Not implemented"
-      | Call   (f, args)   -> snd (Expr.eval env conf (Expr.Call (f, args)))
+      | Call   (f, args)   -> eval env (snd (Expr.eval env conf (Expr.Call (f, args)))) k Skip
          
     (* Statement parser *)
     ostap (
@@ -250,10 +257,11 @@ let eval (defs, body) i =
          method definition env f args (st, i, o) =                                                                      
            let xs, locs, s      =  snd @@ M.find f m in
            let st'              = List.fold_left (fun st (x, a) -> State.update x a st) (State.enter st (xs @ locs)) (List.combine xs args) in
-           let st'', i', o'     = Stmt.eval env (st', i, o) s in
+           let st'', i', o'     = Stmt.eval env (st', i, o) Skip s in
            0, (State.leave st'' st, i', o')
        end)
       (State.empty, i, [])
+      Skip
       body
   in
   o
