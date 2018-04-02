@@ -51,9 +51,9 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
 		                | a::args', s::stack' -> combine ((a, s)::acc) args' stack'
 		              in
 		              let state', stack' = combine [] args stack in
-                              eval env (cstack, stack', (List.fold_left (fun s (x, v) -> State.update x v s) (State.push_scope st (args @ locals)) state', i, o)) prg'
+                              eval env (cstack, stack', (List.fold_left (fun s (x, v) -> State.update x v s) (State.enter st (args @ locals)) state', i, o)) prg'
     | END                  -> (match cstack with
-                               | (prg', st')::cstack' -> eval env (cstack', stack, (State.drop_scope st st', i, o)) prg'
+                               | (prg', st')::cstack' -> eval env (cstack', stack, (State.leave st st', i, o)) prg'
                                | []                   -> conf
                               )
    ) 

@@ -30,10 +30,10 @@ module State =
     let eval s x = (if List.mem x s.scope then s.l else s.g) x
 
     (* Creates a new scope, based on a given state *)
-    let push_scope st xs = {empty with g = st.g; scope = xs}
+    let enter st xs = {empty with g = st.g; scope = xs}
 
     (* Drops a scope *)
-    let drop_scope st st' = {st' with g = st.g}
+    let leave st st' = {st' with g = st.g}
 
   end
     
@@ -163,9 +163,9 @@ module Stmt =
       | Repeat (s, e)      -> let (st, _, _) as conf' = eval env conf s in if Expr.eval st e = 0 then eval env conf' stmt else conf'
       | Call   (f, args)   -> let args         = List.map (Expr.eval st) args in
                               let xs, locs, s  = env#definition f in
-                              let st'          = List.fold_left (fun st (x, a) -> State.update x a st) (State.push_scope st (xs @ locs)) (List.combine xs args) in
+                              let st'          = List.fold_left (fun st (x, a) -> State.update x a st) (State.enter st (xs @ locs)) (List.combine xs args) in
                               let st'', i', o' = eval env (st', i, o) s in
-                              (State.drop_scope st'' st, i', o')
+                              (State.leave st'' st, i', o')
                                 
     (* Statement parser *)
     ostap (
