@@ -1,0 +1,12 @@
+fun ack (m, n) {
+  if m == 0 then return n+1
+  elif m > 0 && n == 0 then return ack (m-1, 1)
+  else return ack (m-1, ack (m, n-1))
+  fi
+}
+
+for m := 0, m <= 3, m := m+1 do
+  for n := 0, n <= 8, n := n+1 do
+    write (ack (m, n))
+  od
+od

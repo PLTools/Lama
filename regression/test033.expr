@@ -1,0 +1,12 @@
+fun test (n, m) local i, s {
+  s := 0;
+  for i := 0, i <= n, i := i + 1 do
+    s := s + i;
+    if s > m then return s fi
+  od;
+  
+  return s
+}
+
+write (test (10, 100));
+write (test (100, 10))
