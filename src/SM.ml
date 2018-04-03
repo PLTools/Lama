@@ -30,7 +30,7 @@ type config = (prg * State.t) list * int list * Expr.config
 
    Takes an environment, a configuration and a program, and returns a configuration as a result. The
    environment is used to locate a label to jump to (via method env#labeled <label_name>)
-*)                         
+*)                                                  
 let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
 | [] -> conf
 | insn :: prg' ->

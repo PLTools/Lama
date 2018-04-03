@@ -1,0 +1,14 @@
+fun fib (n) {
+  if n <= 1
+  then return 1
+  else
+    return fib (n-1) + fib (n-2)
+  fi
+}
+
+read (n);
+
+for i := n, i >= 1, i := i-1 do
+  write (i);
+  write (fib (i))
+od
