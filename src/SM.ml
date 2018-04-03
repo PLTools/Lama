@@ -19,6 +19,8 @@ open Language
 (* The type for the stack machine program *)                                                               
 type prg = insn list
 
+let print_prg p = List.iter (fun i -> Printf.printf "%s\n" (show(insn) i)) p
+                            
 (* The type for the stack machine configuration: control stack, stack and configuration from statement
    interpreter
  *)
@@ -43,7 +45,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     | ST x                 -> let z::stack' = stack in eval env (cstack, stack', (State.update x z st, i, o)) prg'
     | LABEL  _             -> eval env conf prg'
     | JMP    l             -> eval env conf (env#labeled l)
-    | CJMP  (c, l)         -> let x::stack' = stack in eval env conf (if (c = "z" && x = 0) || (c = "nz" && x <> 0) then env#labeled l else prg')
+    | CJMP  (c, l)         -> let x::stack' = stack in eval env (cstack, stack', (st, i, o)) (if (c = "z" && x = 0) || (c = "nz" && x <> 0) then env#labeled l else prg')
     | CALL   f             -> eval env ((prg', st)::cstack, stack, c) (env#labeled f)
     | BEGIN (args, locals) -> let rec combine acc args stack =
 		                match args, stack with
@@ -65,6 +67,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
 let run p i =
+  (*print_prg p;*)
   let module M = Map.Make (String) in
   let rec make_map m = function
   | []              -> m
@@ -83,10 +86,14 @@ let run p i =
 *)
 let compile (defs, p) =
   let label s = "L" ^ s in
-  let rec expr = function
+  let rec call f args =
+    let args_code = List.concat @@ List.map expr (List.rev args) in
+    args_code @ [CALL (label f)]
+  and expr = function
   | Expr.Var   x          -> [LD x]
   | Expr.Const n          -> [CONST n]
   | Expr.Binop (op, x, y) -> expr x @ expr y @ [BINOP op]
+  | Expr.Call  (f, args)  -> call f args
   in
   let rec compile_stmt l env = function  
   | Stmt.Read    x          -> env, false, [READ; ST x]
@@ -114,8 +121,9 @@ let compile (defs, p) =
                                let env  , flag, body = compile_stmt check env s in
                                env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ (expr c) @ [CJMP ("z", loop)]
                                                                                                                      
-  | Stmt.Call   (f, args)   -> let args_code = List.concat @@ List.map expr (List.rev args) in
-                               env, false, args_code @ [CALL (label f)]
+  | Stmt.Call   (f, args)   -> env, false, call f args
+                                                         
+  | Stmt.Return e           -> env, false, (match e with Some e -> expr e | None -> []) @ [END]
   in
   let compile_def env (name, (args, locals, stmt)) =
     let lend, env       = env#get_label in
