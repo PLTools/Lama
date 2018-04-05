@@ -1,0 +1,296 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath}
+\usepackage{alltt}
+\usepackage{pslatex}
+\usepackage{epigraph}
+\usepackage{verbatim}
+\usepackage{latexsym}
+\usepackage{array}
+\usepackage{comment}
+\usepackage{makeidx}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{verbatim}
+\usepackage{color}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{hyperref}
+\usepackage{stmaryrd}
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage{graphicx}
+\usepackage{euscript}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{multirow,bigdelim}
+\usepackage{subcaption}
+\usepackage{placeins}
+
+\makeatletter
+
+\makeatother
+
+\definecolor{shadecolor}{gray}{1.00}
+\definecolor{darkgray}{gray}{0.30}
+
+\def\transarrow{\xrightarrow}
+\newcommand{\setarrow}[1]{\def\transarrow{#1}}
+
+\def\padding{\phantom{X}}
+\newcommand{\setpadding}[1]{\def\padding{#1}}
+
+\def\subarrow{}
+\newcommand{\setsubarrow}[1]{\def\subarrow{#1}}
+
+\newcommand{\trule}[2]{\frac{#1}{#2}}
+\newcommand{\crule}[3]{\frac{#1}{#2},\;{#3}}
+\newcommand{\withenv}[2]{{#1}\vdash{#2}}
+\newcommand{\trans}[3]{{#1}\transarrow{\padding#2\padding}\subarrow{#3}}
+\newcommand{\ctrans}[4]{{#1}\transarrow{\padding#2\padding}\subarrow{#3},\;{#4}}
+\newcommand{\llang}[1]{\mbox{\lstinline[mathescape]|#1|}}
+\newcommand{\pair}[2]{\inbr{{#1}\mid{#2}}}
+\newcommand{\inbr}[1]{\left<{#1}\right>}
+\newcommand{\highlight}[1]{\color{red}{#1}}
+\newcommand{\ruleno}[1]{\eqno[\scriptsize\textsc{#1}]}
+\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\inmath}[1]{\mbox{$#1$}}
+\newcommand{\lfp}[1]{fix_{#1}}
+\newcommand{\gfp}[1]{Fix_{#1}}
+\newcommand{\vsep}{\vspace{-2mm}}
+\newcommand{\supp}[1]{\scriptsize{#1}}
+\newcommand{\sembr}[1]{\llbracket{#1}\rrbracket}
+\newcommand{\cd}[1]{\texttt{#1}}
+\newcommand{\free}[1]{\boxed{#1}}
+\newcommand{\binds}{\;\mapsto\;}
+\newcommand{\dbi}[1]{\mbox{\bf{#1}}}
+\newcommand{\sv}[1]{\mbox{\textbf{#1}}}
+\newcommand{\bnd}[2]{{#1}\mkern-9mu\binds\mkern-9mu{#2}}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newcommand{\meta}[1]{{\mathcal{#1}}}
+\renewcommand{\emptyset}{\varnothing}
+
+\definecolor{light-gray}{gray}{0.90}
+\newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
+
+\lstdefinelanguage{ocaml}{
+keywords={let, begin, end, in, match, type, and, fun, 
+function, try, with, class, object, method, of, rec, repeat, until,
+while, not, do, done, as, val, inherit, module, sig, @type, struct, 
+if, then, else, open, virtual, new, fresh, skip, od, fi, elif, for, local, return, read, write},
+sensitive=true,
+%basicstyle=\small,
+commentstyle=\scriptsize\rmfamily,
+keywordstyle=\ttfamily\bfseries,
+identifierstyle=\ttfamily,
+basewidth={0.5em,0.5em},
+columns=fixed,
+fontadjust=true,
+literate={->}{{$\to$}}3 {===}{{$\equiv$}}1 {=/=}{{$\not\equiv$}}1 {|>}{{$\triangleright$}}3 {\&\&\&}{{$\wedge$}}2 {|||}{{$\vee$}}2 {^}{{$\uparrow$}}1,
+morecomment=[s]{(*}{*)}
+}
+
+\lstset{
+mathescape=true,
+%basicstyle=\small,
+identifierstyle=\ttfamily,
+keywordstyle=\bfseries,
+commentstyle=\scriptsize\rmfamily,
+basewidth={0.5em,0.5em},
+fontadjust=true,
+escapechar=!,
+language=ocaml
+}
+
+\sloppy
+
+\newcommand{\ocaml}{\texttt{OCaml}\xspace}
+
+\theoremstyle{definition}
+
+\title{Functions\\
+  (the first draft)
+}
+
+\author{Dmitry Boulytchev}
+
+\begin{document}
+
+\maketitle
+
+\section{Functions in Expressions}
+
+At the syntax level function calls are introduced with the following construct: 
+
+\[
+\begin{array}{rcl}
+  \mathscr E & += & \mathscr X \mathscr E^*
+\end{array}
+\]
+
+In the concrete syntax function call looks conventional:
+
+\begin{lstlisting}
+     $f$ ($e_1, e_2, \dots, e_k$)
+\end{lstlisting}
+
+where $f$~--- a function name, $e_i$~--- its actual parameters.
+
+Surpisingly, such a mild extension results in a complete redefinition of the semantics. Indeed, as function body can perform
+arbitrary actions on state, input and output streams, expressions with function calls can now have side effects. In order to express these
+side effects we need to redefine the semantics completely, this time using big-step operational style.
+
+We extend the configuration, used in the semantic description for statements, with a fourth component~--- an optional integer value:
+
+\[
+\mathscr C = \Sigma \times \mathbb Z^* \times \mathbb Z^* \times \mathbb Z^?
+\]
+
+This component will correspond to an optional return value for function/procedure calls (either integer value $n$ or ``$\hbox{---}$'', nothing).
+
+The rules inself are summarized in the Fig.~\ref{bs_expr}. Note the use of double environment for evaluating the body of function in the rule
+\rulename{Call}; note also, that now semantics of expressions and statements are mutually recursive.
+
+\setarrow{\xRightarrow}
+\setsubarrow{_{\mathscr E}}
+
+\begin{figure}
+  \[\withenv{\Phi}{\trans{\inbr{\sigma, i, o, \hbox{---}}}{n}{\inbr{\sigma, i, o, n}}} \ruleno{Const} \]
+  \[\withenv{\Phi}{\trans{\inbr{\sigma, i, o, \hbox{---}}}{x}{\inbr{\sigma, i, o, \sigma\;x}}} \ruleno{Var} \]
+  \[\trule{\withenv{\Phi}{\trans{c}{A}{c^\prime=\inbr{\_,\, \_,\, \_,\, a}}},\;
+           \withenv{\Phi}{\trans{c^\prime}{B}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, b}}}
+          }
+          {\withenv{\Phi}{\trans{c}{A\otimes B}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, a\oplus b}}}}
+          \ruleno{Binop}
+  \]
+  \[\trule{\begin{array}{c}
+             \withenv{\Phi}{\trans{c_{j-1}}{e_j}{c_j=\inbr{\sigma_j,\,i_j,\,o_j,\,v_j}}},\\
+             \Phi\;f = \llang{fun $\;f\;$ ($\overline{a}$) local $\;\overline{l}\;$ \{$s$\}},\\
+             {\setsubarrow{}
+             \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\mbox{\textbf{enter}}\;\sigma_k\; (\overline{a}@\overline{l})\; [\overline{a_j\gets v_j}],i_k,o_k,\hbox{---}}}{s}{\inbr{\sigma^\prime, i^\prime, o^\prime, n}}}}
+           \end{array}
+          }
+          {\withenv{\Phi}{\trans{c_0=\inbr{\sigma_0,\,\_,\,\_,\,\_}}{f (\overline{e_k})}{\inbr{\mbox{\textbf{leave}}\;\sigma^\prime\;\sigma_0, i^\prime, o^\prime, n}}}}
+          \ruleno{Call}
+  \]
+\caption{Big-step Operational Semantics for Expressions}
+\label{bs_expr}
+\end{figure}
+
+\section{Return Statement}
+
+In order to make it possible to return values from procedures we add a return statement to the language of statements:
+
+\[
+\mathscr S += \llang{return $\;\mathscr E^?$}
+\]
+
+And, again, this small addition leads to redefinition of the semantics in \emph{continuation-passing style} (CPS).
+
+First, we define the following meta-operator ``$\diamond$'' on statements:
+
+\[
+\begin{array}{rcl}
+  s \diamond \llang{skip} & = & s\\
+  s_1 \diamond s_2 & = & \llang{$s_1$; $\;s_2$}
+\end{array}
+\]
+
+\setsubarrow{}
+
+Then, we add another environment component, $K$, in the description of semantic relation ``$\withenv{...}{\trans{...}{...}{...}}$''. Informally
+speaking, now
+
+\[
+\withenv{K,\,\Phi}{\trans{c}{s}{c^\prime}}
+\]
+
+is read ``the execution of $s$, immediately followed by $K$, in the configuration $c$ results in the configuration $c^\prime$''. Statement $K$ is called \emph{continuation}.
+The rules themselves are shown on Fig.~\ref{bs_cps}. Note, the rule for the call statement is exactly the same, as for the call expression.
+
+\begin{figure}
+  \[\withenv{\llang{skip},\,\Phi}{\trans{c}{\llang{skip}}{c}}\ruleno{SkipSkip}\]
+  \[\trule{\withenv{\llang{skip},\,\Phi}{\trans{c}{K}{c^\prime}}}
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{skip}}{c^\prime}}}
+    \ruleno{Skip}
+  \]
+  \[\trule{{\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
+           \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma[x\gets n],\,i,\,o,\,\hbox{---}}}{K}{c^\prime}}
+          }
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{$x\,$:=$\,e$}}{c^\prime}}}
+    \ruleno{Assign}
+  \]
+  \[\trule{{\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
+           \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma,\,i,\,o@[n],\,\hbox{---}}}{K}{c^\prime}}
+          }
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{write ($e$)}}{c^\prime}}}
+    \ruleno{Write}
+  \]
+  \[\trule{
+           \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma[x\gets z],\,i,\,o,\,\hbox{---}}}{K}{c^\prime}}
+          }
+          {\withenv{K,\,\Phi}{\trans{\inbr{\sigma,\,z:i,\,o,\,\hbox{---}}}{\llang{read ($x$)}}{c^\prime}}}
+    \ruleno{Read}
+  \]
+
+  \[\trule{\withenv{s_2\diamond K,\,\Phi}{\trans{c}{\llang{$s_1$}}{c^\prime}}}
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{$s_1$; $\;s_2$}}{c^\prime}}}
+    \ruleno{Seq}
+  \]
+
+  \[\crule{{\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
+           \withenv{K,\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{\llang{$s_1$}}{c^\prime}}}
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{if $\;e\;$ then $\;s_1\;$ else $\;s_2$}}{c^\prime}}}
+          {n\ne 0}
+    \ruleno{IfTrue}
+  \]
+
+  \[\crule{{\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
+           \withenv{K,\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{\llang{$s_2$}}{c^\prime}}}
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{if $\;e\;$ then $\;s_1\;$ else $\;s_2$}}{c^\prime}}}
+          {n= 0}
+    \ruleno{IfFalse}
+  \]
+
+  \[\crule{\begin{array}{c}
+             {\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}}\\
+             \withenv{\llang{while $\;e\;$ do $\;s$}\diamond K,\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{\llang{$s$}}{c^\prime}}
+           \end{array}}
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{while $\;e\;$ do $\;s$}}{c^\prime}}}
+          {n\ne 0}
+    \ruleno{WhileTrue}
+  \]
+
+    \[\crule{{\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
+           \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{K}{c^\prime}}}
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{while $\;e\;$ do $\;s$}}{c^\prime}}}
+          {n = 0}
+    \ruleno{WhileFalse}
+  \]
+
+  \[\trule{\begin{array}{c}
+             {\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c_{j-1}}{e_j}{c_j=\inbr{\sigma_j,\,i_j,\,o_j,\,v_j}}}}\\
+             \Phi\;f = \llang{fun $\;f\;$ ($\overline{a}$) local $\;\overline{l}\;$ \{$s$\}}\\
+             \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\mbox{\textbf{enter}}\;\sigma_k\; (\overline{a}@\overline{l})\; [\overline{a_j\gets v_j}],i_k,o_k,\hbox{---}}}{s}{\inbr{\sigma^\prime, i^\prime, o^\prime, n}}}
+           \end{array}
+          }
+          {\withenv{K,\,\Phi}{\trans{c_0=\inbr{\sigma_0,\,\_,\,\_,\,\_}}{f (\overline{e_k})}{\inbr{\mbox{\textbf{leave}}\;\sigma^\prime\;\sigma_0, i^\prime, o^\prime, n}}}}
+          \ruleno{Call}
+  \]
+  
+  \[
+    \withenv{K,\,\Phi}{\trans{c}{\llang{return}}{c}}
+    \ruleno{ReturnEmpty}
+  \]
+
+  \[
+    \trule{{\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{c^\prime}}}}
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{return $\;e\;$}}{c^\prime}}}
+    \ruleno{Return}
+  \]  
+  
+  \caption{Continuation-passing Style Semantics for Statements}
+  \label{bs_cps}
+\end{figure}
+
+\end{document}
