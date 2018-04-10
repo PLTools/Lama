@@ -6,6 +6,8 @@ fun test2 (b) {
   a := b
 }
 
+read (x);
+
 test1 ();
 write (a);
 

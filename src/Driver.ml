@@ -25,11 +25,9 @@ let main =
     match parse infile with
     | `Ok prog ->
       if to_compile
-      then failwith "Not implemented yet"
-        (*            
+      then            
         let basename = Filename.chop_suffix infile ".expr" in
-        ignore @@ X86.build prog basename
-        *)
+        ignore @@ X86.build prog basename        
       else 
 	let rec read acc =
 	  try

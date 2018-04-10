@@ -21,6 +21,8 @@ fun test2 (b) {
   print ()
 }
 
+read (x);
+
 a := 100;
 b := 200;
 c := 300;

@@ -19,6 +19,8 @@ fun print () {
   write (c)
 }
 
+read (x);
+
 a := 100;
 b := 200;
 c := 300;

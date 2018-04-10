@@ -10,11 +10,12 @@ open Language
 (* load a variable to the stack    *) | LD    of string
 (* store a variable from the stack *) | ST    of string
 (* a label                         *) | LABEL of string
-(* unconditional jump              *) | JMP   of string                                                                                                                
+(* unconditional jump              *) | JMP   of string
 (* conditional jump                *) | CJMP  of string * string
-(* begins procedure definition     *) | BEGIN of string list * string list
+(* begins procedure definition     *) | BEGIN of string * string list * string list
 (* end procedure definition        *) | END
-(* calls a procedure               *) | CALL  of string with show
+(* calls a function/procedure      *) | CALL  of string * int * bool
+(* returns from a function         *) | RET   of bool with show
                                                    
 (* The type for the stack machine program *)                                                               
 type prg = insn list
@@ -46,18 +47,18 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     | LABEL  _             -> eval env conf prg'
     | JMP    l             -> eval env conf (env#labeled l)
     | CJMP  (c, l)         -> let x::stack' = stack in eval env (cstack, stack', (st, i, o)) (if (c = "z" && x = 0) || (c = "nz" && x <> 0) then env#labeled l else prg')
-    | CALL   f             -> eval env ((prg', st)::cstack, stack, c) (env#labeled f)
-    | BEGIN (args, locals) -> let rec combine acc args stack =
+    | CALL  (f, _, _)      -> eval env ((prg', st)::cstack, stack, c) (env#labeled f)
+    | BEGIN (_, args, locals) -> let rec combine acc args stack =
 		                match args, stack with
 		                | [], _               -> List.rev acc, stack
 		                | a::args', s::stack' -> combine ((a, s)::acc) args' stack'
 		              in
 		              let state', stack' = combine [] args stack in
                               eval env (cstack, stack', (List.fold_left (fun s (x, v) -> State.update x v s) (State.enter st (args @ locals)) state', i, o)) prg'
-    | END                  -> (match cstack with
-                               | (prg', st')::cstack' -> eval env (cstack', stack, (State.leave st st', i, o)) prg'
-                               | []                   -> conf
-                              )
+    | END | RET _ -> (match cstack with
+                      | (prg', st')::cstack' -> eval env (cstack', stack, (State.leave st st', i, o)) prg'
+                      | []                   -> conf
+                     )
    ) 
 
 (* Top-level evaluation
@@ -86,14 +87,14 @@ let run p i =
 *)
 let compile (defs, p) =
   let label s = "L" ^ s in
-  let rec call f args =
+  let rec call f args p =
     let args_code = List.concat @@ List.map expr (List.rev args) in
-    args_code @ [CALL (label f)]
+    args_code @ [CALL (label f, List.length args, p)]
   and expr = function
   | Expr.Var   x          -> [LD x]
   | Expr.Const n          -> [CONST n]
   | Expr.Binop (op, x, y) -> expr x @ expr y @ [BINOP op]
-  | Expr.Call  (f, args)  -> call f args
+  | Expr.Call  (f, args)  -> call f args false
   in
   let rec compile_stmt l env = function  
   | Stmt.Read    x          -> env, false, [READ; ST x]
@@ -121,15 +122,15 @@ let compile (defs, p) =
                                let env  , flag, body = compile_stmt check env s in
                                env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ (expr c) @ [CJMP ("z", loop)]
                                                                                                                      
-  | Stmt.Call   (f, args)   -> env, false, call f args
+  | Stmt.Call   (f, args)   -> env, false, call f args true
                                                          
-  | Stmt.Return e           -> env, false, (match e with Some e -> expr e | None -> []) @ [END]
+  | Stmt.Return e           -> env, false, (match e with Some e -> expr e | None -> []) @ [RET (e <> None)]
   in
   let compile_def env (name, (args, locals, stmt)) =
     let lend, env       = env#get_label in
     let env, flag, code = compile_stmt lend env stmt in
     env,
-    [LABEL name; BEGIN (args, locals)] @
+    [LABEL name; BEGIN (name, args, locals)] @
     code @
     (if flag then [LABEL lend] else []) @
     [END]
@@ -148,5 +149,5 @@ let compile (defs, p) =
   in
   let lend, env = env#get_label in
   let _, flag, code = compile_stmt lend env p in
-  (LABEL "main" :: if flag then code @ [LABEL lend] else code) @ [END] @ (List.concat def_code) 
+  (if flag then code @ [LABEL lend] else code) @ [END] @ (List.concat def_code) 
 
