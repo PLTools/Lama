@@ -9,7 +9,7 @@ fun fib (n) local r {
   fi
 }
 
-read (n);
+n := read ();
 
 for i := n, i >= 1, i := i-1 do
   fib (i);

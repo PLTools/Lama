@@ -5,10 +5,10 @@ fun ack (m, n) {
   fi
 }
 
-read (x);
+x := read ();
 
 for m := 0, m <= 3, m := m+1 do
-  for n := 0, n <= 8, n := n+1 do
-    write (ack (m, n))
+  for n := 0, n <= 8, n := n+1 do    
+    write (ack (m, n))    
   od
 od

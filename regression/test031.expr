@@ -6,7 +6,7 @@ fun fact (n) {
   fi
 }
 
-read (n);
+n := read ();
 
 for i := n, i >= 1, i := i-1 do
   write (i);

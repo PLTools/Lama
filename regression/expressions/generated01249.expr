@@ -1,5 +1,5 @@
 
-read (x0);
-read (x1);
+x0 := read ();
+x1 := read ();
 y := 17-23-29-x0;
 write (y)

@@ -1,7 +1,7 @@
 s := 0;
 
 repeat
-  read (n);
+  n := read ();
   s := s + n
 until n == 0;
 

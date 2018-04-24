@@ -1,5 +1,5 @@
 s := 0;
-read (n);
+n := read ();
 p := 2;
 
 while n > 0 do

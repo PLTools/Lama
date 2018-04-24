@@ -1,4 +1,4 @@
-read (n);
+n := read ();
 
 fib_1 := 1;
 fib_2 := 1;

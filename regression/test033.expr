@@ -8,7 +8,7 @@ fun test (n, m) local i, s {
   return s
 }
 
-read (x);
+x := read ();
 
 write (test (10, 100));
 write (test (100, 10))
