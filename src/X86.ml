@@ -220,7 +220,7 @@ let compile env code =
                         push_args env ((Push x)::acc) (n-1)
                  in
                  let env, pushs = push_args env [] n in
-                 env, pushr @ pushs @ [Call f; Binop ("+", L (n*4), esp)] @ (List.rev popr)
+                 env, pushr @ (List.rev pushs) @ [Call f; Binop ("+", L (n*4), esp)] @ (List.rev popr)
              in
              (if p then env, code else let y, env = env#allocate in env, code @ [Mov (eax, y)])
         in

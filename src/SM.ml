@@ -18,7 +18,6 @@ open Language
 (* returns from a function         *) | RET     of bool with show
                                                    
 (* The type for the stack machine program *)
-                                                     
 type prg = insn list
 
 let print_prg p = List.iter (fun i -> Printf.printf "%s\n" (show(insn) i)) p
@@ -60,7 +59,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
                                  then eval env ((prg', st)::cstack, stack, c) (env#labeled f)
                                  else eval env (env#builtin conf f n p) prg'
     | BEGIN (_, args, locals) -> let vs, stack' = split (List.length args) stack in
-                                 let state      = List.combine args vs in
+                                 let state      = List.combine args @@ List.rev vs in
                                  eval env (cstack, stack', (List.fold_left (fun s (x, v) -> State.update x v s) (State.enter st (args @ locals)) state, i, o)) prg'
     | END | RET _             -> (match cstack with
                                   | (prg', st')::cstack' -> eval env (cstack', stack, (State.leave st st', i, o)) prg'
@@ -91,7 +90,7 @@ let run p i =
          method builtin (cstack, stack, (st, i, o)) f n p =
            let f = match f.[0] with 'L' -> String.sub f 1 (String.length f - 1) | _ -> f in
            let args, stack' = split n stack in
-           let (st, i, o, r) = Language.Builtin.eval (st, i, o, None) args f in
+           let (st, i, o, r) = Language.Builtin.eval (st, i, o, None) (List.rev args) f in
            let stack'' = if p then stack' else let Some r = r in r::stack' in
            Printf.printf "Builtin: %s\n";
            (cstack, stack'', (st, i, o))
@@ -112,7 +111,7 @@ let run p i =
 let compile (defs, p) =
   let label s = "L" ^ s in
   let rec call f args p =
-    let args_code = List.concat @@ List.map expr (List.rev args) in
+    let args_code = List.concat @@ List.map expr args in
     args_code @ [CALL (label f, List.length args, p)]
   and expr = function
   | Expr.Var    x         -> [LD x]
@@ -121,7 +120,7 @@ let compile (defs, p) =
   | Expr.Binop (op, x, y) -> expr x @ expr y @ [BINOP op]
   | Expr.Call  (f, args)  -> call f args false
   | Expr.Array  xs        -> List.flatten (List.map expr xs) @ [CALL ("$array", List.length xs, false)]
-  | Expr.Elem (a, i)      -> expr i @ expr a @ [CALL ("$elem", 2, false)]
+  | Expr.Elem (a, i)      -> expr a @ expr i @ [CALL ("$elem", 2, false)]
   | Expr.Length e         -> expr e @ [CALL ("$length", 1, false)]
   in
   let rec compile_stmt l env = function  
