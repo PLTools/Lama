@@ -73,22 +73,19 @@ module Builtin =
   struct
 
     let eval (st, i, o, _) args = function
-    | "read"    -> (match i with z::i' -> (st, i', o, Some (Value.of_int z)) | _ -> failwith "Unexpected end of input")
-    | "write"   -> (st, i, o @ [Value.to_int @@ List.hd args], None)
-    | "$elem"   -> let [b; j] = args in
-                   (st, i, o, let i = Value.to_int j in
-                              Some (match b with
-                                    | Value.String s -> Value.of_int @@ Char.code s.[i]
-                                    | Value.Array  a -> List.nth a i
-
-                              )
-                   )         
-    | "$length" -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Array a -> List.length a | Value.String s -> String.length s)))
-    | "$array"  -> (st, i, o, Some (Value.of_array args))
-    | "strcat"  -> let [x; y] = args in
-                   (st, i, o, Some (Value.of_string @@ Value.to_string x ^ Value.to_string y))
-    | "isArray" -> let [a] = args in
-                   (st, i, o, Some (Value.of_int @@ match a with Array _ -> 1 | _ -> 0))
+    | "read"     -> (match i with z::i' -> (st, i', o, Some (Value.of_int z)) | _ -> failwith "Unexpected end of input")
+    | "write"    -> (st, i, o @ [Value.to_int @@ List.hd args], None)
+    | "$elem"    -> let [b; j] = args in
+                    (st, i, o, let i = Value.to_int j in
+                               Some (match b with
+                                     | Value.String s -> Value.of_int @@ Char.code s.[i]
+                                     | Value.Array  a -> List.nth a i
+                               )
+                    )         
+    | "$length"  -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Array a -> List.length a | Value.String s -> String.length s)))
+    | "$array"   -> (st, i, o, Some (Value.of_array args))
+    | "isArray"  -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.Array  _ -> 1 | _ -> 0))
+    | "isString" -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.String _ -> 1 | _ -> 0))                     
        
   end
     

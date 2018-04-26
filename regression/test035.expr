@@ -1,0 +1,21 @@
+fun printArray (x) local elem {
+  if x.length == 0 then return fi;
+  for i:=0, i<x.length, i:=i+1 do
+    write (x[i])
+  od
+}
+
+n := read ();
+
+x := [10, 20, 30, 40];
+
+printArray (x);
+
+for i:=0, i<x.length, i:=i+1 do
+  x[i] := i
+od;
+
+printArray (x)
+
+
+
