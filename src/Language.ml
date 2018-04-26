@@ -85,8 +85,11 @@ module Builtin =
                    )         
     | "$length" -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Array a -> List.length a | Value.String s -> String.length s)))
     | "$array"  -> (st, i, o, Some (Value.of_array args))
-    | s -> failwith (Printf.sprintf "Wow: %s\n" s)
-                     
+    | "strcat"  -> let [x; y] = args in
+                   (st, i, o, Some (Value.of_string @@ Value.to_string x ^ Value.to_string y))
+    | "isArray" -> let [a] = args in
+                   (st, i, o, Some (Value.of_int @@ match a with Array _ -> 1 | _ -> 0))
+       
   end
     
 (* Simple expressions: syntax and semantics *)

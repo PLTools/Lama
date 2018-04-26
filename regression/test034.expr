@@ -14,5 +14,6 @@ for i:=0, i<x.length, i:=i+1 do
   x[i] := x[i]+2  
 od;
 
-printString (x)
+printString (x);
 
+printString (strcat ("abc", "def"))

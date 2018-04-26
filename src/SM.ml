@@ -6,8 +6,6 @@ open Language
 (* binary operator                 *) | BINOP   of string
 (* put a constant on the stack     *) | CONST   of int
 (* put a string on the stack       *) | STRING  of string                      
-(* read to stack                   *) | READ
-(* write from stack                *) | WRITE
 (* load a variable to the stack    *) | LD      of string
 (* store a variable from the stack *) | ST      of string
 (* store in an array               *) | STA     of string * int
