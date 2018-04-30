@@ -5,7 +5,8 @@ open Language
 @type insn =
 (* binary operator                 *) | BINOP   of string
 (* put a constant on the stack     *) | CONST   of int
-(* put a string on the stack       *) | STRING  of string                      
+(* put a string on the stack       *) | STRING  of string
+(* create an S-expression          *) | SEXP    of string * int
 (* load a variable to the stack    *) | LD      of string
 (* store a variable from the stack *) | ST      of string
 (* store in an array               *) | STA     of string * int
@@ -48,6 +49,8 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     | BINOP  op               -> let y::x::stack' = stack in eval env (cstack, (Value.of_int @@ Expr.to_func op (Value.to_int x) (Value.to_int y)) :: stack', c) prg'
     | CONST i                 -> eval env (cstack, (Value.of_int i)::stack, c) prg'
     | STRING s                -> eval env (cstack, (Value.of_string s)::stack, c) prg'
+    | SEXP (s, n)             -> let vs, stack' = split n stack in                                 
+                                 eval env (cstack, (Value.sexp s @@ List.rev vs)::stack', c) prg'
     | LD x                    -> eval env (cstack, State.eval st x :: stack, c) prg'
     | ST x                    -> let z::stack' = stack in eval env (cstack, stack', (State.update x z st, i, o)) prg'
     | STA (x, n)              -> let v::is, stack' = split (n+1) stack in
@@ -120,6 +123,7 @@ let compile (defs, p) =
   | Expr.Binop (op, x, y) -> expr x @ expr y @ [BINOP op]
   | Expr.Call  (f, args)  -> call f args false
   | Expr.Array  xs        -> List.flatten (List.map expr xs) @ [CALL (".array", List.length xs, false)]
+  | Expr.Sexp (t, xs)     -> List.flatten (List.map expr xs) @ [CALL (".array", List.length xs, false)]
   | Expr.Elem (a, i)      -> expr a @ expr i @ [CALL (".elem", 2, false)]
   | Expr.Length e         -> expr e @ [CALL (".length", 1, false)]
   in
