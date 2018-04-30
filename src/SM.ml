@@ -74,7 +74,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
 let run p i =
-  (* print_prg p; *)
+  (*print_prg p; *)
   let module M = Map.Make (String) in
   let rec make_map m = function
   | []              -> m
@@ -119,9 +119,9 @@ let compile (defs, p) =
   | Expr.String s         -> [STRING s]
   | Expr.Binop (op, x, y) -> expr x @ expr y @ [BINOP op]
   | Expr.Call  (f, args)  -> call f args false
-  | Expr.Array  xs        -> List.flatten (List.map expr xs) @ [CALL ("$array", List.length xs, false)]
-  | Expr.Elem (a, i)      -> expr a @ expr i @ [CALL ("$elem", 2, false)]
-  | Expr.Length e         -> expr e @ [CALL ("$length", 1, false)]
+  | Expr.Array  xs        -> List.flatten (List.map expr xs) @ [CALL (".array", List.length xs, false)]
+  | Expr.Elem (a, i)      -> expr a @ expr i @ [CALL (".elem", 2, false)]
+  | Expr.Length e         -> expr e @ [CALL (".length", 1, false)]
   in
   let rec compile_stmt l env = function  
   | Stmt.Assign (x, [], e)  -> env, false, expr e @ [ST x]
