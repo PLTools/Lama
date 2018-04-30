@@ -25,6 +25,7 @@ module Value =
     | Array a -> a
     | _       -> failwith "array value expected"
 
+    let sexp   s vs = Sexp (s, vs)
     let of_int    n = Int    n
     let of_string s = String s
     let of_array  a = Array  a
@@ -226,16 +227,48 @@ module Expr =
 module Stmt =
   struct
 
+    (* Patterns in statements *)
+    module Pattern =
+      struct
+
+        (* The type for patterns *)
+        @type t =
+        (* wildcard "-"     *) | Wildcard
+        (* S-expression     *) | Sexp   of string * t list
+        (* identifier       *) | Ident  of string
+        (* constant         *) | Const  of int
+        (* string           *) | String of string
+        (* array            *) | Array  of t list
+        (* arbitrary array  *) | IsArray
+        (* arbitrary string *) | IsString
+        with show
+
+        (* Pattern parser *)                                 
+        ostap (
+          parse:
+            %"_" {Wildcard}
+          | "`" t:IDENT ps:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match ps with None -> [] | Some ps -> ps)}
+          | x:IDENT                           {Ident  x}
+          | n:DECIMAL                         {Const  n}
+          | s:STRING                          {String s}
+          | a:(-"[" !(Util.list)[parse] -"]") {Array a}
+          | "#" "[" "]"                       {IsArray}
+          | "#"                               {IsString}
+        )
+        
+      end
+        
     (* The type for statements *)
-    type t =
+    @type t =
     (* assignment                       *) | Assign of string * Expr.t list * Expr.t
     (* composition                      *) | Seq    of t * t 
     (* empty statement                  *) | Skip
     (* conditional                      *) | If     of Expr.t * t * t
     (* loop with a pre-condition        *) | While  of Expr.t * t
     (* loop with a post-condition       *) | Repeat of t * Expr.t
+    (* pattern-matching                 *) | Case   of Expr.t * (Pattern.t * Expr.t option * t) list
     (* return statement                 *) | Return of Expr.t option
-    (* call a procedure                 *) | Call   of string * Expr.t list
+    (* call a procedure                 *) | Call   of string * Expr.t list with show
                                                                     
     (* Statement evaluator
 
@@ -299,7 +332,8 @@ module Stmt =
 	  Seq (i, While (c, Seq (b, s)))
         }
       | %"repeat" s:parse %"until" e:!(Expr.parse)  {Repeat (s, e)}
-      | %"return" e:!(Expr.parse)?                  {Return e} 
+      | %"return" e:!(Expr.parse)?                  {Return e}
+      | %"case" e:!(Expr.parse) %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) (-"when" !(Expr.parse))? parse)] %"esac" {Case (e, bs)}
       | x:IDENT 
            s:(is:(-"[" !(Expr.parse) -"]")* ":=" e   :!(Expr.parse) {Assign (x, is, e)}    | 
               "("  args:!(Util.list0)[Expr.parse] ")" {Call   (x, args)}
