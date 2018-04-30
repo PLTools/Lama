@@ -71,19 +71,19 @@ module State =
 (* Builtins *)
 module Builtin =
   struct
-
+      
     let eval (st, i, o, _) args = function
     | "read"     -> (match i with z::i' -> (st, i', o, Some (Value.of_int z)) | _ -> failwith "Unexpected end of input")
     | "write"    -> (st, i, o @ [Value.to_int @@ List.hd args], None)
-    | "$elem"    -> let [b; j] = args in
+    | ".elem"    -> let [b; j] = args in
                     (st, i, o, let i = Value.to_int j in
                                Some (match b with
                                      | Value.String s -> Value.of_int @@ Char.code s.[i]
                                      | Value.Array  a -> List.nth a i
                                )
                     )         
-    | "$length"  -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Array a -> List.length a | Value.String s -> String.length s)))
-    | "$array"   -> (st, i, o, Some (Value.of_array args))
+    | ".length"  -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Array a -> List.length a | Value.String s -> String.length s)))
+    | ".array"   -> (st, i, o, Some (Value.of_array args))
     | "isArray"  -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.Array  _ -> 1 | _ -> 0))
     | "isString" -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.String _ -> 1 | _ -> 0))                     
        
@@ -158,7 +158,7 @@ module Expr =
       | Var    x -> (st, i, o, Some (State.eval st x))
       | Array xs ->
          let (st, i, o, vs) = eval_list env conf xs in
-         env#definition env "$array" vs (st, i, o, None) 
+         env#definition env ".array" vs (st, i, o, None) 
       | Sexp (t, xs) ->
          let (st, i, o, vs) = eval_list env conf xs in
          (st, i, o, Some (Value.Sexp (t, vs)))
@@ -168,10 +168,10 @@ module Expr =
          (st, i, o, Some (Value.of_int @@ to_func op (Value.to_int x) (Value.to_int y)))
       | Elem (b, i) -> 
          let (st, i, o, args) = eval_list env conf [b; i] in
-         env#definition env "$elem" args (st, i, o, None) 
+         env#definition env ".elem" args (st, i, o, None) 
       | Length e ->
          let (st, i, o, Some v) = eval env conf e in
-         env#definition env "$length" [v] (st, i, o, None) 
+         env#definition env ".length" [v] (st, i, o, None) 
       | Call (f, args) ->
          let (st, i, o, args) = eval_list env conf args in
          env#definition env f args (st, i, o, None)
@@ -244,7 +244,6 @@ module Stmt =
        Takes an environment, a configuration and a statement, and returns another configuration. The 
        environment is the same as for expressions
     *)
-
     let update st x v is =
       let rec update a v = function
       | []    -> v           
