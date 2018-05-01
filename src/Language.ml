@@ -44,28 +44,45 @@ module State =
   struct
                                                                 
     (* State: global state, local state, scope variables *)
-    type t = {g : string -> Value.t; l : string -> Value.t; scope : string list}
+    type t =
+    | G of (string -> Value.t)
+    | L of string list * (string -> Value.t) * t
 
+    (* Undefined state *)
+    let undefined x = failwith (Printf.sprintf "Undefined variable: %s" x)
+                      
     (* Empty state *)
-    let empty =
-      let e x = failwith (Printf.sprintf "Undefined variable: %s" x) in
-      {g = e; l = e; scope = []}
+    let empty = G undefined
 
     (* Update: non-destructively "modifies" the state s by binding the variable x 
        to value v and returns the new state w.r.t. a scope
     *)
     let update x v s =
       let u x v s = fun y -> if x = y then v else s y in
-      if List.mem x s.scope then {s with l = u x v s.l} else {s with g = u x v s.g}
+      let rec inner = function
+      | G s -> G (u x v s)
+      | L (scope, s, enclosing) ->
+         if List.mem x scope then L (scope, u x v s, enclosing) else L (scope, s, inner enclosing)
+      in
+      inner s
 
     (* Evals a variable in a state w.r.t. a scope *)
-    let eval s x = (if List.mem x s.scope then s.l else s.g) x
+    let rec eval s x =
+      match s with
+      | G s -> s x
+      | L (scope, s, enclosing) -> if List.mem x scope then s x else eval enclosing x
 
     (* Creates a new scope, based on a given state *)
-    let enter st xs = {empty with g = st.g; scope = xs}
+    let enter st xs =
+      match st with
+      | G _         -> L (xs, undefined, st)
+      | L (_, _, e) -> L (xs, undefined, e)
 
     (* Drops a scope *)
-    let leave st st' = {st' with g = st.g}
+    let leave (L (_, _, e)) st' =
+      match st' with
+      | L (scope, s, _) -> L (scope, s, e)
+      | G _             -> e
 
   end
 
