@@ -73,17 +73,30 @@ module State =
       | L (scope, s, enclosing) -> if List.mem x scope then s x else eval enclosing x
 
     (* Creates a new scope, based on a given state *)
-    let enter st xs =
+    let rec enter st xs =
       match st with
       | G _         -> L (xs, undefined, st)
-      | L (_, _, e) -> L (xs, undefined, e)
+      | L (_, _, e) -> enter e xs
 
     (* Drops a scope *)
-    let leave (L (_, _, e)) st' =
-      match st' with
-      | L (scope, s, _) -> L (scope, s, e)
-      | G _             -> e
+    let leave st st' =
+      let rec get = function
+      | G _ as st -> st
+      | L (_, _, e) -> get e
+      in
+      let g = get st in
+      let rec recurse = function
+      | L (scope, s, e) -> L (scope, s, recurse e)
+      | G _             -> g
+      in
+      recurse st'
 
+    (* Push a new local scope *)
+    let push st s xs = L (xs, s, st)
+
+    (* Drop a local scope *)
+    let drop (L (_, _, e)) = e
+                               
   end
 
 (* Builtins *)
@@ -258,7 +271,7 @@ module Stmt =
         (* array            *) | Array  of t list
         (* arbitrary array  *) | IsArray
         (* arbitrary string *) | IsString
-        with show
+        with show, foldl
 
         (* Pattern parser *)                                 
         ostap (
@@ -273,6 +286,10 @@ module Stmt =
           | "#"                               {IsString}
         )
         
+        let vars p =
+          let module S = Set.Make (String) in
+          S.elements @@ transform(t) (object inherit [S.t] @t[foldl] method c_Ident s _ name = S.add name s end) S.empty p
+        
       end
         
     (* The type for statements *)
@@ -285,8 +302,9 @@ module Stmt =
     (* loop with a post-condition       *) | Repeat of t * Expr.t
     (* pattern-matching                 *) | Case   of Expr.t * (Pattern.t * Expr.t option * t) list
     (* return statement                 *) | Return of Expr.t option
-    (* call a procedure                 *) | Call   of string * Expr.t list with show
-                                                                    
+    (* call a procedure                 *) | Call   of string * Expr.t list 
+    (* leave a scope                    *) | Leave  with show
+                                                                                   
     (* Statement evaluator
 
          val eval : env -> config -> t -> config
@@ -305,11 +323,12 @@ module Stmt =
           ) 
       in
       State.update x (match is with [] -> v | _ -> update (State.eval st x) v is) st
-          
+
     let rec eval env ((st, i, o, r) as conf) k stmt =
       let seq x = function Skip -> x | y -> Seq (x, y) in
       match stmt with
-      | Assign (x, is, e) ->
+      | Leave              -> eval env (State.drop st, i, o, r) Skip k 
+      | Assign (x, is, e)  ->
          let (st, i, o, is)     = Expr.eval_list env conf is       in
          let (st, i, o, Some v) = Expr.eval env (st, i, o, None) e in
          eval env (update st x v is, i, o, None) Skip k
@@ -324,7 +343,47 @@ module Stmt =
       | Repeat (s, e)      -> eval env conf (seq (While (Expr.Binop ("==", e, Expr.Const 0), s)) k) s
       | Return  e          -> (match e with None -> (st, i, o, None) | Some e -> Expr.eval env conf e)
       | Call   (f, args)   -> eval env (Expr.eval env conf (Expr.Call (f, args))) k Skip
-         
+      | Case   (e, bs)     ->
+         let (_, _, _, Some v) as conf' = Expr.eval env conf e in
+         let rec branch ((st, i, o, _) as conf) = function
+         | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) v))
+         | (patt, con, body)::tl ->
+            let rec match_patt patt v st =
+              let update x v = function
+              | None   -> None
+              | Some s -> Some (fun y -> if y = x then v else s y)
+              in
+              match patt, v with
+              | Pattern.Ident  x    , v                               -> update x v st
+              | Pattern.Wildcard    , _                               -> st
+              | Pattern.Const n     , Value.Int    n'     when n = n' -> st
+              | Pattern.String s    , Value.String s'     when s = s' -> st
+              | Pattern.Array  p    , Value.Array  p'                 -> match_list p p' st
+              | Pattern.IsArray     , Value.Array  _                  -> st
+              | Pattern.IsString    , Value.String _                  -> st
+              | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' -> match_list ps vs st
+              | _                                                     -> None
+            and match_list ps vs s =
+              match ps, vs with
+              | [], []       -> s
+              | p::ps, v::vs -> match_list ps vs (match_patt p v s)
+              | _            -> None
+            in
+            match match_patt patt v (Some State.undefined) with
+            | None     -> branch conf tl
+            | Some st' ->
+               let st'' = State.push st st' (Pattern.vars patt) in
+               let (st''', i', o', Some c) =
+                 match con with
+                 | None   -> (st'', i, o, Some (Value.of_int 1))
+                 | Some c -> Expr.eval env (st'', i, o, None) c 
+               in
+               if Value.to_int c <> 0
+               then eval env (st''', i', o', None) k (Seq (body, Leave))
+               else branch (st''', i', o', None) tl
+         in
+         branch conf' bs
+           
     (* Statement parser *)
     ostap (
       parse:
@@ -350,7 +409,7 @@ module Stmt =
         }
       | %"repeat" s:parse %"until" e:!(Expr.parse)  {Repeat (s, e)}
       | %"return" e:!(Expr.parse)?                  {Return e}
-      | %"case" e:!(Expr.parse) %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) (-"when" !(Expr.parse))? parse)] %"esac" {Case (e, bs)}
+      | %"case" e:!(Expr.parse) %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) (-"when" !(Expr.parse))? -"->" parse)] %"esac" {Case (e, bs)}
       | x:IDENT 
            s:(is:(-"[" !(Expr.parse) -"]")* ":=" e   :!(Expr.parse) {Assign (x, is, e)}    | 
               "("  args:!(Util.list0)[Expr.parse] ")" {Call   (x, args)}

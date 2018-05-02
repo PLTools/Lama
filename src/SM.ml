@@ -16,7 +16,8 @@ open Language
 (* begins procedure definition     *) | BEGIN   of string * string list * string list
 (* end procedure definition        *) | END
 (* calls a function/procedure      *) | CALL    of string * int * bool
-(* returns from a function         *) | RET     of bool with show
+(* returns from a function         *) | RET     of bool
+                                      | DROP | DUP | OVER with show
                                                    
 (* The type for the stack machine program *)
 type prg = insn list
@@ -116,6 +117,25 @@ let compile (defs, p) =
   let rec call f args p =
     let args_code = List.concat @@ List.map expr args in
     args_code @ [CALL (label f, List.length args, p)]
+  and pattern = function
+  | Stmt.Pattern.Wildcard         -> [DROP; CONST 1]
+  | Stmt.Pattern.Const     n      -> [CONST n; BINOP "=="]
+  | Stmt.Pattern.String    s      -> [STRING s; CALL ("strcmp", 2, false)]
+  | Stmt.Pattern.Ident     n      -> [DROP; CONST 1]
+  | Stmt.Pattern.Array     ps     -> [DUP;
+                                      CALL ("isArray", 1, false);
+                                      OVER;
+                                      CALL (".length", 1, false);
+                                      CONST (List.length ps);
+                                      BINOP "==";
+                                      BINOP "&&";
+                                     ]
+  | Stmt.Pattern.IsArray          -> [CALL ("isArray", 1, false)]
+  | Stmt.Pattern.IsString         -> [CALL ("isString", 1, false)]
+  | Stmt.Pattern.Sexp     (t, ps) -> []
+  and patterns = function
+  | []         -> []
+  | (e, p)::ps -> expr e @ pattern p @ [BINOP "&&"] @ patterns ps 
   and expr = function
   | Expr.Var    x         -> [LD x]
   | Expr.Const  n         -> [CONST n]
