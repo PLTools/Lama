@@ -50,7 +50,10 @@ module State =
 
     (* Undefined state *)
     let undefined x = failwith (Printf.sprintf "Undefined variable: %s" x)
-                      
+
+    (* Bind a variable to a value in a state *)
+    let bind x v s = fun y -> if x = y then v else s y 
+
     (* Empty state *)
     let empty = G undefined
 
@@ -58,11 +61,10 @@ module State =
        to value v and returns the new state w.r.t. a scope
     *)
     let update x v s =
-      let u x v s = fun y -> if x = y then v else s y in
       let rec inner = function
-      | G s -> G (u x v s)
+      | G s -> G (bind x v s)
       | L (scope, s, enclosing) ->
-         if List.mem x scope then L (scope, u x v s, enclosing) else L (scope, s, inner enclosing)
+         if List.mem x scope then L (scope, bind x v s, enclosing) else L (scope, s, inner enclosing)
       in
       inner s
 
@@ -109,8 +111,9 @@ module Builtin =
     | ".elem"    -> let [b; j] = args in
                     (st, i, o, let i = Value.to_int j in
                                Some (match b with
-                                     | Value.String s -> Value.of_int @@ Char.code s.[i]
-                                     | Value.Array  a -> List.nth a i
+                                     | Value.String   s  -> Value.of_int @@ Char.code s.[i]
+                                     | Value.Array    a  -> List.nth a i
+                                     | Value.Sexp (_, a) -> List.nth a i
                                )
                     )         
     | ".length"  -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Array a -> List.length a | Value.String s -> String.length s)))
@@ -266,11 +269,6 @@ module Stmt =
         (* wildcard "-"     *) | Wildcard
         (* S-expression     *) | Sexp   of string * t list
         (* identifier       *) | Ident  of string
-        (* constant         *) | Const  of int
-        (* string           *) | String of string
-        (* array            *) | Array  of t list
-        (* arbitrary array  *) | IsArray
-        (* arbitrary string *) | IsString
         with show, foldl
 
         (* Pattern parser *)                                 
@@ -279,16 +277,10 @@ module Stmt =
             %"_" {Wildcard}
           | "`" t:IDENT ps:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match ps with None -> [] | Some ps -> ps)}
           | x:IDENT                           {Ident  x}
-          | n:DECIMAL                         {Const  n}
-          | s:STRING                          {String s}
-          | a:(-"[" !(Util.list)[parse] -"]") {Array a}
-          | "#" "[" "]"                       {IsArray}
-          | "#"                               {IsString}
         )
         
         let vars p =
-          let module S = Set.Make (String) in
-          S.elements @@ transform(t) (object inherit [S.t] @t[foldl] method c_Ident s _ name = S.add name s end) S.empty p
+          transform(t) (object inherit [string list] @t[foldl] method c_Ident s _ name = name::s end) [] p
         
       end
         
@@ -300,7 +292,7 @@ module Stmt =
     (* conditional                      *) | If     of Expr.t * t * t
     (* loop with a pre-condition        *) | While  of Expr.t * t
     (* loop with a post-condition       *) | Repeat of t * Expr.t
-    (* pattern-matching                 *) | Case   of Expr.t * (Pattern.t * Expr.t option * t) list
+    (* pattern-matching                 *) | Case   of Expr.t * (Pattern.t * t) list
     (* return statement                 *) | Return of Expr.t option
     (* call a procedure                 *) | Call   of string * Expr.t list 
     (* leave a scope                    *) | Leave  with show
@@ -344,43 +336,29 @@ module Stmt =
       | Return  e          -> (match e with None -> (st, i, o, None) | Some e -> Expr.eval env conf e)
       | Call   (f, args)   -> eval env (Expr.eval env conf (Expr.Call (f, args))) k Skip
       | Case   (e, bs)     ->
-         let (_, _, _, Some v) as conf' = Expr.eval env conf e in
-         let rec branch ((st, i, o, _) as conf) = function
-         | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) v))
-         | (patt, con, body)::tl ->
-            let rec match_patt patt v st =
-              let update x v = function
-              | None   -> None
-              | Some s -> Some (fun y -> if y = x then v else s y)
-              in
-              match patt, v with
-              | Pattern.Ident  x    , v                               -> update x v st
-              | Pattern.Wildcard    , _                               -> st
-              | Pattern.Const n     , Value.Int    n'     when n = n' -> st
-              | Pattern.String s    , Value.String s'     when s = s' -> st
-              | Pattern.Array  p    , Value.Array  p'                 -> match_list p p' st
-              | Pattern.IsArray     , Value.Array  _                  -> st
-              | Pattern.IsString    , Value.String _                  -> st
-              | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' -> match_list ps vs st
-              | _                                                     -> None
-            and match_list ps vs s =
-              match ps, vs with
-              | [], []       -> s
-              | p::ps, v::vs -> match_list ps vs (match_patt p v s)
-              | _            -> None
-            in
-            match match_patt patt v (Some State.undefined) with
-            | None     -> branch conf tl
-            | Some st' ->
-               let st'' = State.push st st' (Pattern.vars patt) in
-               let (st''', i', o', Some c) =
-                 match con with
-                 | None   -> (st'', i, o, Some (Value.of_int 1))
-                 | Some c -> Expr.eval env (st'', i, o, None) c 
+          let (_, _, _, Some v) as conf' = Expr.eval env conf e in
+          let rec branch ((st, i, o, _) as conf) = function
+          | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) v))
+          | (patt, body)::tl ->
+             let rec match_patt patt v st =
+               let update x v = function
+               | None   -> None
+               | Some s -> Some (State.bind x v s)
                in
-               if Value.to_int c <> 0
-               then eval env (st''', i', o', None) k (Seq (body, Leave))
-               else branch (st''', i', o', None) tl
+               match patt, v with
+               | Pattern.Ident  x    , v                               -> update x v st
+               | Pattern.Wildcard    , _                               -> st
+               | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' -> match_list ps vs st
+               | _                                                     -> None
+             and match_list ps vs s =
+               match ps, vs with
+               | [], []       -> s
+               | p::ps, v::vs -> match_list ps vs (match_patt p v s)
+               | _            -> None
+             in
+             match match_patt patt v (Some State.undefined) with
+             | None     -> branch conf tl
+             | Some st' -> eval env (State.push st st' (Pattern.vars patt), i, o, None) k (Seq (body, Leave))
          in
          branch conf' bs
            
@@ -409,7 +387,7 @@ module Stmt =
         }
       | %"repeat" s:parse %"until" e:!(Expr.parse)  {Repeat (s, e)}
       | %"return" e:!(Expr.parse)?                  {Return e}
-      | %"case" e:!(Expr.parse) %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) (-"when" !(Expr.parse))? -"->" parse)] %"esac" {Case (e, bs)}
+      | %"case" e:!(Expr.parse) %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse)] %"esac" {Case (e, bs)}
       | x:IDENT 
            s:(is:(-"[" !(Expr.parse) -"]")* ":=" e   :!(Expr.parse) {Assign (x, is, e)}    | 
               "("  args:!(Util.list0)[Expr.parse] ")" {Call   (x, args)}

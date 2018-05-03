@@ -17,7 +17,13 @@ open Language
 (* end procedure definition        *) | END
 (* calls a function/procedure      *) | CALL    of string * int * bool
 (* returns from a function         *) | RET     of bool
-                                      | DROP | DUP | OVER with show
+(* drops the top element off       *) | DROP
+(* duplicates the top element      *) | DUP
+(* swaps two top elements          *) | SWAP
+(* checks the tag of S-expression  *) | TAG     of string
+(* enters a scope                  *) | ENTER   of string list
+(* leaves a scope                  *) | LEAVE
+with show
                                                    
 (* The type for the stack machine program *)
 type prg = insn list
@@ -69,6 +75,17 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
                                   | (prg', st')::cstack' -> eval env (cstack', stack, (State.leave st st', i, o)) prg'
                                   | []                   -> conf
                                  )
+    | DROP                    -> eval env (cstack, List.tl stack, c) prg'
+    | DUP                     -> eval env (cstack, List.hd stack :: stack, c) prg'
+    | SWAP                    -> let x::y::stack' = stack in
+                                 eval env (cstack, y::x::stack', c) prg'
+    | TAG t                   -> let x::stack' = stack in
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp (t', _) when t' = t -> 1 | _ -> 0) :: stack', c) prg'
+                                      
+    | ENTER xs                -> let vs, stack' = split (List.length xs) stack in
+                                 eval env (cstack, stack', (State.push st (List.fold_left (fun s (x, v) -> State.bind x v s) State.undefined (List.combine xs vs)) xs, i, o)) prg'
+                                      
+    | LEAVE                   -> eval env (cstack, stack, (State.drop st, i, o)) prg'
    ) 
 
 (* Top-level evaluation
@@ -78,7 +95,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
 let run p i =
-  (*print_prg p; *)
+  (*print_prg p;*)
   let module M = Map.Make (String) in
   let rec make_map m = function
   | []              -> m
@@ -117,25 +134,29 @@ let compile (defs, p) =
   let rec call f args p =
     let args_code = List.concat @@ List.map expr args in
     args_code @ [CALL (label f, List.length args, p)]
-  and pattern = function
-  | Stmt.Pattern.Wildcard         -> [DROP; CONST 1]
-  | Stmt.Pattern.Const     n      -> [CONST n; BINOP "=="]
-  | Stmt.Pattern.String    s      -> [STRING s; CALL ("strcmp", 2, false)]
-  | Stmt.Pattern.Ident     n      -> [DROP; CONST 1]
-  | Stmt.Pattern.Array     ps     -> [DUP;
-                                      CALL ("isArray", 1, false);
-                                      OVER;
-                                      CALL (".length", 1, false);
-                                      CONST (List.length ps);
-                                      BINOP "==";
-                                      BINOP "&&";
-                                     ]
-  | Stmt.Pattern.IsArray          -> [CALL ("isArray", 1, false)]
-  | Stmt.Pattern.IsString         -> [CALL ("isString", 1, false)]
-  | Stmt.Pattern.Sexp     (t, ps) -> []
-  and patterns = function
-  | []         -> []
-  | (e, p)::ps -> expr e @ pattern p @ [BINOP "&&"] @ patterns ps 
+  and pattern lfalse = function
+  | Stmt.Pattern.Wildcard         -> false, [DROP]
+  | Stmt.Pattern.Ident     n      -> false, [DROP]
+  | Stmt.Pattern.Sexp     (t, ps) ->
+     true,
+     [DUP; TAG t; CJMP ("z", lfalse)] @ 
+     (List.concat @@
+        List.mapi
+          (fun i p ->             
+             [DUP; CONST i; CALL (".elem", 2, false)] @
+             snd @@ pattern lfalse p
+          )
+          ps
+     )
+  and bindings p =
+    let rec inner = function
+    | Stmt.Pattern.Ident n      -> [SWAP]
+    | Stmt.Pattern.Wildcard     -> [DROP]
+    | Stmt.Pattern.Sexp (_, ps) ->
+       (List.flatten @@ List.mapi (fun i p -> [DUP; CONST i; CALL (".elem", 2, false)] @ inner p) ps) @
+       [DROP]
+    in
+    inner p @ [ENTER (Stmt.Pattern.vars p)]
   and expr = function
   | Expr.Var    x         -> [LD x]
   | Expr.Const  n         -> [CONST n]
@@ -143,7 +164,7 @@ let compile (defs, p) =
   | Expr.Binop (op, x, y) -> expr x @ expr y @ [BINOP op]
   | Expr.Call  (f, args)  -> call f args false
   | Expr.Array  xs        -> List.flatten (List.map expr xs) @ [CALL (".array", List.length xs, false)]
-  | Expr.Sexp (t, xs)     -> List.flatten (List.map expr xs) @ [CALL (".array", List.length xs, false)]
+  | Expr.Sexp (t, xs)     -> List.flatten (List.map expr xs) @ [SEXP (t, List.length xs)]
   | Expr.Elem (a, i)      -> expr a @ expr i @ [CALL (".elem", 2, false)]
   | Expr.Length e         -> expr e @ [CALL (".length", 1, false)]
   in
@@ -175,6 +196,31 @@ let compile (defs, p) =
   | Stmt.Call   (f, args)   -> env, false, call f args true
                                                          
   | Stmt.Return e           -> env, false, (match e with Some e -> expr e | None -> []) @ [RET (e <> None)]
+
+  | Stmt.Leave              -> env, false, [LEAVE]
+                                             
+  | Stmt.Case (e, [p, s])   ->
+     let      pflag, pcode = pattern l p in
+     let env, sflag, scode = compile_stmt l env (Stmt.Seq (s, Stmt.Leave))  in
+     env, pflag || sflag, expr e @ pcode @ bindings p @ scode 
+                                    
+  | Stmt.Case (e, brs)      ->
+     let n = List.length brs - 1 in
+     let env, _, _, code =
+       List.fold_left
+         (fun (env, lab, i, code) (p, s) ->
+            let (lfalse, env), jmp =
+              if i = n
+              then (l, env), []
+              else env#get_label, [JMP l]
+            in
+            let      _, pcode = pattern lfalse p     in
+            let env, _, scode = compile_stmt l env (Stmt.Seq (s, Stmt.Leave)) in
+            (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l]) @ pcode @ bindings p @ scode @ jmp) :: code)          
+         )
+         (env, None, 0, []) brs
+     in
+     env, true, expr e @ List.flatten @@ List.rev code
   in
   let compile_def env (name, (args, locals, stmt)) =
     let lend, env       = env#get_label in
