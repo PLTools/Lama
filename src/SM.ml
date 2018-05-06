@@ -95,7 +95,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
 let run p i =
-  (*print_prg p;*)
+  print_prg p;
   let module M = Map.Make (String) in
   let rec make_map m = function
   | []              -> m
@@ -153,7 +153,14 @@ let compile (defs, p) =
     | Stmt.Pattern.Ident n      -> [SWAP]
     | Stmt.Pattern.Wildcard     -> [DROP]
     | Stmt.Pattern.Sexp (_, ps) ->
-       (List.flatten @@ List.mapi (fun i p -> [DUP; CONST i; CALL (".elem", 2, false)] @ inner p) ps) @
+       (List.flatten @@
+          List.mapi
+            (fun i p ->
+               [DUP; CONST i; CALL (".elem", 2, false)] @
+                 inner p
+            )
+            ps
+       ) @
        [DROP]
     in
     inner p @ [ENTER (Stmt.Pattern.vars p)]
