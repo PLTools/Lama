@@ -95,7 +95,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
 let run p i =
-  print_prg p;
+  (*print_prg p;*)
   let module M = Map.Make (String) in
   let rec make_map m = function
   | []              -> m
@@ -134,36 +134,44 @@ let compile (defs, p) =
   let rec call f args p =
     let args_code = List.concat @@ List.map expr args in
     args_code @ [CALL (label f, List.length args, p)]
-  and pattern lfalse = function
-  | Stmt.Pattern.Wildcard         -> false, [DROP]
-  | Stmt.Pattern.Ident     n      -> false, [DROP]
-  | Stmt.Pattern.Sexp     (t, ps) ->
-     true,
-     [DUP; TAG t; CJMP ("z", lfalse)] @ 
-     (List.concat @@
-        List.mapi
-          (fun i p ->             
-             [DUP; CONST i; CALL (".elem", 2, false)] @
-             snd @@ pattern lfalse p
-          )
-          ps
-     )
+  and pattern env lfalse = function
+  | Stmt.Pattern.Wildcard        -> env, false, [DROP]
+  | Stmt.Pattern.Ident    n      -> env, false, [DROP]
+  | Stmt.Pattern.Sexp    (t, ps) ->
+     let ltag , env   = env#get_label in
+     let ldrop, env   = env#get_label in
+     let tag          = [DUP; TAG t; CJMP ("nz", ltag); LABEL ldrop; DROP; JMP lfalse; LABEL ltag] in
+     let _, env, code =
+       List.fold_left
+         (fun (i, env, code) p ->
+            let env, _, pcode = pattern env ldrop p in
+            i+1, env, ([DUP; CONST i; CALL (".elem", 2, false)] @ pcode) :: code
+         )
+         (0, env, [])
+         ps
+     in
+     env, true, tag @ List.flatten (List.rev code) @ [DROP]     
   and bindings p =
-    let rec inner = function
-    | Stmt.Pattern.Ident n      -> [SWAP]
-    | Stmt.Pattern.Wildcard     -> [DROP]
-    | Stmt.Pattern.Sexp (_, ps) ->
-       (List.flatten @@
-          List.mapi
-            (fun i p ->
-               [DUP; CONST i; CALL (".elem", 2, false)] @
-                 inner p
-            )
-            ps
-       ) @
-       [DROP]
+    let bindings =
+      transform(Stmt.Pattern.t)
+        (object inherit [int list, (string * int list) list] @Stmt.Pattern.t
+           method c_Wildcard path _      = []
+           method c_Ident    path _ s    = [s, path] 
+           method c_Sexp     path x _ ps = List.concat @@ List.mapi (fun i p -> x.GT.f (path @ [i]) p) ps
+         end)
+        []
+        p
     in
-    inner p @ [ENTER (Stmt.Pattern.vars p)]
+    List.concat 
+      (List.map
+        (fun (name, path) ->
+           [DUP] @
+           List.concat (List.map (fun i -> [CONST i; CALL (".elem", 2, false)]) path) @
+           [SWAP]
+        )
+        (List.rev bindings)
+      ) @
+    [DROP; ENTER (List.map fst bindings)]
   and expr = function
   | Expr.Var    x         -> [LD x]
   | Expr.Const  n         -> [CONST n]
@@ -207,12 +215,14 @@ let compile (defs, p) =
   | Stmt.Leave              -> env, false, [LEAVE]
                                              
   | Stmt.Case (e, [p, s])   ->
-     let      pflag, pcode = pattern l p in
-     let env, sflag, scode = compile_stmt l env (Stmt.Seq (s, Stmt.Leave))  in
-     env, pflag || sflag, expr e @ pcode @ bindings p @ scode 
+     let ldrop, env    = env#get_label in
+     let env, _, pcode = pattern env ldrop p in
+     let env, _, scode = compile_stmt ldrop env (Stmt.Seq (s, Stmt.Leave))  in
+     env, true, expr e @ [DUP] @ pcode @ bindings p @ scode @ [JMP l; LABEL ldrop; DROP] 
                                     
   | Stmt.Case (e, brs)      ->
-     let n = List.length brs - 1 in
+     let n               = List.length brs - 1 in
+     let ldrop, env      = env#get_label in
      let env, _, _, code =
        List.fold_left
          (fun (env, lab, i, code) (p, s) ->
@@ -221,13 +231,13 @@ let compile (defs, p) =
               then (l, env), []
               else env#get_label, [JMP l]
             in
-            let      _, pcode = pattern lfalse p     in
-            let env, _, scode = compile_stmt l env (Stmt.Seq (s, Stmt.Leave)) in
-            (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l]) @ pcode @ bindings p @ scode @ jmp) :: code)          
+            let env, _, pcode = pattern env lfalse p     in
+            let env, _, scode = compile_stmt ldrop env (Stmt.Seq (s, Stmt.Leave)) in
+            (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l; DUP]) @ pcode @ bindings p @ scode @ jmp) :: code)          
          )
          (env, None, 0, []) brs
      in
-     env, true, expr e @ List.flatten @@ List.rev code
+     env, true, expr e @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l; LABEL ldrop; DROP]
   in
   let compile_def env (name, (args, locals, stmt)) =
     let lend, env       = env#get_label in
