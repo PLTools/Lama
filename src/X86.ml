@@ -94,7 +94,7 @@ open SM
    of x86 instructions
 *)
 let compile env code =
-  SM.print_prg code;
+  (*SM.print_prg code;*)
   flush stdout;
   let suffix = function
   | "<"  -> "l"
@@ -351,10 +351,10 @@ class env =
     method drop_barrier = {< barrier = false >}
                             
     (* associates a stack to a label *)
-    method set_stack l = Printf.printf "Setting stack for %s\n" l; {< stackmap = M.add l stack stackmap >}
+    method set_stack l = (*Printf.printf "Setting stack for %s\n" l;*) {< stackmap = M.add l stack stackmap >}
                                
     (* retrieves a stack for a label *)
-    method retrieve_stack l = Printf.printf "Retrieving stack for %s\n" l;
+    method retrieve_stack l = (*Printf.printf "Retrieving stack for %s\n" l;*)
       try {< stack = M.find l stackmap >} with Not_found -> self
                                
     (* gets a name for a global variable *)

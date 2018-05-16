@@ -1,0 +1,17 @@
+fun f (x) {
+  case x of
+    `nil                                  -> write (0)
+  | `cons (_, `nil)                       -> write (1)
+  | `cons (_, `cons (_, `nil))            -> write (2)
+  | `cons (_, `cons (_, `cons (_, `nil))) -> write (3)
+  | _                                     -> write (4)
+  esac
+}
+
+x := read ();
+y := `nil;
+
+for i := 0, i < 10, i := i + 1 do
+  f (y);
+  y := `cons (i, y)
+od

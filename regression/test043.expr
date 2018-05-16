@@ -1,0 +1,12 @@
+fun sum (x) {
+  case x of
+    `nil          -> return 0
+  | `cons (x, tl) -> return x + sum (tl)
+  esac
+}
+
+x := read ();
+
+write (sum (`nil));
+write (sum (`cons (100, `nil)));
+write (sum (`cons (100, `cons (200, `nil))))
