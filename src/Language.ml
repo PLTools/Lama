@@ -231,7 +231,7 @@ module Expr =
 	  !(Ostap.Util.expr 
              (fun x -> x)
 	     (Array.map (fun (a, s) -> a, 
-                           List.map  (fun s -> ostap(- $(s)), (fun x y -> Binop (s, x, y))) s
+                           List.map (fun s -> ostap(- $(s)), (fun x y -> Binop (s, x, y))) s
                         ) 
               [|                
 		`Lefta, ["!!"];
