@@ -222,7 +222,7 @@ let compile (defs, p) =
                                     
   | Stmt.Case (e, brs)      ->
      let n               = List.length brs - 1 in
-     let ldrop, env      = env#get_label in
+     (*let ldrop, env      = env#get_label in*)
      let env, _, _, code =
        List.fold_left
          (fun (env, lab, i, code) (p, s) ->
@@ -232,12 +232,12 @@ let compile (defs, p) =
               else env#get_label, [JMP l]
             in
             let env, _, pcode = pattern env lfalse p     in
-            let env, _, scode = compile_stmt ldrop env (Stmt.Seq (s, Stmt.Leave)) in
+            let env, _, scode = compile_stmt l(*ldrop*) env (Stmt.Seq (s, Stmt.Leave)) in
             (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l; DUP]) @ pcode @ bindings p @ scode @ jmp) :: code)          
          )
          (env, None, 0, []) brs
      in
-     env, true, expr e @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l; LABEL ldrop; DROP]
+     env, true, expr e @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] (*; LABEL ldrop; DROP]*)
   in
   let compile_def env (name, (args, locals, stmt)) =
     let lend, env       = env#get_label in
