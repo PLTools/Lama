@@ -1,0 +1,11 @@
+fun f (a) {
+  case a of
+    `a (x, y, z) -> write (x + y + z)
+  | `b (x, y, z) -> write (x + y + z)
+  esac
+}
+
+x := read ();
+
+f (`a (100, 200, 300));
+f (`b (500, 600, 700))
