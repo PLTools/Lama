@@ -124,8 +124,22 @@ void Lprintf (char *s, ...) {
   va_list args;
 
   va_start (args, s);
-  vprintf (s, args);
+  vprintf (s, args); // vprintf (char *, va_list) <-> printf (char *, ...) 
   va_end (args);
+}
+
+void* Lstrcat (void *a, void *b) {
+  data *da = TO_DATA(a);
+  data *db = TO_DATA(b);
+  
+  data *d  = (data *) malloc (sizeof(int) + LEN(da->tag) + LEN(db->tag) + 1);
+
+  d->tag = LEN(da->tag) + LEN(db->tag);
+
+  strcpy (d->contents, da->contents);
+  strcat (d->contents, db->contents);
+
+  return d->contents;
 }
 
 void Lfprintf (FILE *f, char *s, ...) {
