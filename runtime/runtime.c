@@ -120,7 +120,11 @@ extern void Bsta (int n, int v, void *s, ...) {
   else ((int*) s)[k] = v;
 }
 
-void Lprintf (char *s, ...) {
+extern int Lraw (int x) {
+  return x >> 1;
+}
+
+extern void Lprintf (char *s, ...) {
   va_list args;
 
   va_start (args, s);
@@ -128,7 +132,7 @@ void Lprintf (char *s, ...) {
   va_end (args);
 }
 
-void* Lstrcat (void *a, void *b) {
+extern void* Lstrcat (void *a, void *b) {
   data *da = TO_DATA(a);
   data *db = TO_DATA(b);
   
@@ -142,7 +146,7 @@ void* Lstrcat (void *a, void *b) {
   return d->contents;
 }
 
-void Lfprintf (FILE *f, char *s, ...) {
+extern void Lfprintf (FILE *f, char *s, ...) {
   va_list args;
 
   va_start (args, s);
@@ -150,11 +154,11 @@ void Lfprintf (FILE *f, char *s, ...) {
   va_end (args);
 }
 
-FILE* Lfopen (char *f, char *m) {
+extern FILE* Lfopen (char *f, char *m) {
   return fopen (f, m);
 }
 
-void Lfclose (FILE *f) {
+extern void Lfclose (FILE *f) {
   fclose (f);
 }
    
@@ -166,12 +170,12 @@ extern int Lread () {
   fflush (stdout);
   scanf  ("%d", &result);
 
-  return result;
+  return (result << 1) | 0x0001;
 }
 
 /* Lwrite is an implementation of the "write" construct */
 extern int Lwrite (int n) {
-  printf ("%d\n", n);
+  printf ("%d\n", n >> 1);
   fflush (stdout);
 
   return 0;
