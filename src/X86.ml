@@ -393,7 +393,7 @@ class env =
 
     (* tag hash: gets a hash for a string tag *)
     method hash tag =
-      let h = ref 0 in
+      let h = Pervasives.ref 0 in
       for i = 0 to min (String.length tag - 1) 4 do
         h := (!h lsl 6) lor (String.index chars tag.[i])
       done;
