@@ -47,7 +47,12 @@ type instr =
 (* a conditional jump                                   *) | CJmp  of string * string
 (* a non-conditional jump                               *) | Jmp   of string
 (* directive                                            *) | Meta  of string
-                                                                            
+
+(* arithmetic correction: decrement                     *) | Dec   of opnd
+(* arithmetic correction: or 0x0001                     *) | Or1   of opnd
+(* arithmetic correction: shl 1                         *) | Sal1  of opnd
+(* arithmetic correction: shr 1                         *) | Sar1  of opnd
+                                                                                                                                   
 (* Instruction printer *)
 let show instr =
   let binop = function
@@ -82,7 +87,11 @@ let show instr =
   | Jmp    l           -> Printf.sprintf "\tjmp\t%s" l
   | CJmp  (s , l)      -> Printf.sprintf "\tj%s\t%s" s l
   | Meta   s           -> Printf.sprintf "%s\n" s
-
+  | Dec    s           -> Printf.sprintf "\tdecl\t%s" (opnd s)
+  | Or1    s           -> Printf.sprintf "\torl\t$0x0001,\t%s" (opnd s)
+  | Sal1   s           -> Printf.sprintf "\tsall\t%s" (opnd s)
+  | Sar1   s           -> Printf.sprintf "\tsarl\t%s" (opnd s)
+                                         
 (* Opening stack machine to use instructions without fully qualified names *)
 open SM
 
@@ -146,7 +155,7 @@ let compile env code =
           match instr with
   	  | CONST n ->
              let s, env' = env#allocate in
-	     (env', [Mov (L n, s)])
+	     (env', [Mov (L ((n lsl 1) lor 1), s)])
                
           | STRING s ->
              let s, env = env#string s in
@@ -184,11 +193,27 @@ let compile env code =
 	     let x, y, env' = env#pop2 in
              env'#push y,
              (match op with
-	      | "/" | "%" ->
+	      | "/" ->
                  [Mov (y, eax);
+                  Sar1 eax;
                   Cltd;
+                  (* x := x >> 1 ?? *)
+                  Sar1 x; (*!!!*)
                   IDiv x;
-                  Mov ((match op with "/" -> eax | _ -> edx), y)
+                  Sal1 eax;
+                  Or1 eax;
+                  Mov (eax, y)
+                 ]
+              | "%" ->
+                 [Mov (y, eax);
+                  Sar1 eax;
+                  Cltd;
+                  (* x := x >> 1 ?? *)
+                  Sar1 x; (*!!!*)
+                  IDiv x;
+                  Sal1 edx;
+                  Or1  edx;
+                  Mov (edx, y)
                  ]
               | "<" | "<=" | "==" | "!=" | ">=" | ">" ->
                  (match x with
@@ -197,25 +222,31 @@ let compile env code =
                       Mov   (x, edx);
                       Binop ("cmp", edx, y);
                       Set   (suffix op, "%al");
+                      Sal1   eax;
+                      Or1    eax;
                       Mov   (eax, y)
                      ]
                   | _ ->
                      [Binop ("^"  , eax, eax);
                       Binop ("cmp", x, y);
                       Set   (suffix op, "%al");
+                      Sal1   eax;
+                      Or1    eax;                      
                       Mov   (eax, y)
                      ]
                  )
               | "*" ->
-                 if on_stack x && on_stack y 
-		 then [Mov (y, eax); Binop (op, x, eax); Mov (eax, y)]
-                 else [Binop (op, x, y)]
+                 if on_stack y
+                 then [Dec y; Mov (x, eax); Sar1 eax; Binop (op, y, eax); Or1 eax; Mov (eax, y)]
+                 else [Dec y; Mov (x, eax); Sar1 eax; Binop (op, eax, y); Or1 y]
 	      | "&&" ->
-		 [Mov   (x, eax);
+		 [Dec    x; (*!!!*)
+                  Mov   (x, eax);
 		  Binop (op, x, eax);
 		  Mov   (L 0, eax);
 		  Set   ("ne", "%al");
-                  
+
+                  Dec    y; (*!!!*)
 		  Mov   (y, edx);
 		  Binop (op, y, edx);
 		  Mov   (L 0, edx);
@@ -223,20 +254,29 @@ let compile env code =
                   
                   Binop (op, edx, eax);
 		  Set   ("ne", "%al");
-                  
+                  Sal1  eax;
+                  Or1   eax;
 		  Mov   (eax, y)
                  ]		   
 	      | "!!" ->
 		 [Mov   (y, eax);
+                  Sar1  eax;
+                  Sar1  x; (*!!!*)
 		  Binop (op, x, eax);
                   Mov   (L 0, eax);
 		  Set   ("ne", "%al");
+                  Sal1  eax;
+                  Or1   eax;
 		  Mov   (eax, y)
                  ]		   
-	      | _   ->
+	      | "+" ->
                  if on_stack x && on_stack y 
-                 then [Mov   (x, eax); Binop (op, eax, y)]
-                 else [Binop (op, x, y)]
+                 then [Mov   (x, eax); Dec eax; Binop ("+", eax, y)]
+                 else [Binop (op, x, y); Dec y]
+              | "-" ->
+                 if on_stack x && on_stack y 
+                 then [Mov   (x, eax); Binop (op, eax, y); Or1 y]
+                 else [Binop (op, x, y); Or1 y]
              )
           | LABEL s     -> (if env#is_barrier then (env#drop_barrier)#retrieve_stack s else env), [Label s]
                              
@@ -244,7 +284,7 @@ let compile env code =
                                                             
           | CJMP (s, l) ->
               let x, env = env#pop in
-              env#set_stack l, [Binop ("cmp", L 0, x); CJmp  (s, l)]
+              env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, l)]
                      
           | BEGIN (f, a, l) ->
              let env = env#enter f a l in
@@ -456,7 +496,7 @@ class env =
    the stack code, then generates x86 assember code, then prints the assembler file
 *)
 let genasm (ds, stmt) =
-  let stmt = Language.Stmt.Seq (stmt, Language.Stmt.Return (Some (Language.Expr.Const 0))) in
+  let stmt = Language.Stmt.Seq (stmt, Language.Stmt.Return (Some (Language.Expr.Call ("raw", [Language.Expr.Const 0])))) in
   let env, code =
     compile
       (new env)

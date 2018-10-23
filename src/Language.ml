@@ -138,7 +138,7 @@ module Expr =
     (* variable           *) | Var    of string
     (* binary operator    *) | Binop  of string * t * t
     (* element extraction *) | Elem   of t * t
-    (* length             *) | Length of t 
+    (* length             *) | Length of t
     (* function call      *) | Call   of string * t list with show
 
     (* Available binary operators:

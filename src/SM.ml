@@ -113,7 +113,7 @@ let run p i =
            let args, stack' = split n stack in
            let (st, i, o, r) = Language.Builtin.eval (st, i, o, None) (List.rev args) f in
            let stack'' = if p then stack' else let Some r = r in r::stack' in
-           Printf.printf "Builtin: %s\n";
+           (*Printf.printf "Builtin:\n";*)
            (cstack, stack'', (st, i, o))
        end
       )
