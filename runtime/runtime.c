@@ -17,6 +17,9 @@
 # define TO_DATA(x) ((data*)((char*)(x)-sizeof(int)))
 # define TO_SEXP(x) ((sexp*)((char*)(x)-2*sizeof(int)))
 
+# define UNBOX(x) (((int) (x)) >> 1)
+# define BOX(x) ((((int) (x)) << 1) | 0x0001)
+
 typedef struct {
   int tag; 
   char contents[0];
@@ -29,15 +32,18 @@ typedef struct {
 
 extern int Blength (void *p) {
   data *a = TO_DATA(p);
-  return LEN(a->tag);
+  return BOX(LEN(a->tag));
 }
 
 extern void* Belem (void *p, int i) {
   data *a = TO_DATA(p);
+  i = UNBOX(i);
+  
+  /* printf ("elem %d = %p\n", i, (void*) ((int*) a->contents)[i]); */
 
-  if (TAG(a->tag) == STRING_TAG) return (void*)(int)(a->contents[i]);
-
-  //printf ("elem %d = %p\n", i, (void*) ((int*) a->contents)[i]);
+  if (TAG(a->tag) == STRING_TAG) {
+    return (void*) BOX(a->contents[i]);
+  }
   
   return (void*) ((int*) a->contents)[i];
 }
@@ -98,7 +104,7 @@ extern void* Bsexp (int n, ...) {
 
 extern int Btag (void *d, int t) {
   data *r = TO_DATA(d);
-  return TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t;
+  return ((TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t) << 1) | 1;
 }
 		 
 extern void Bsta (int n, int v, void *s, ...) {
@@ -109,14 +115,14 @@ extern void Bsta (int n, int v, void *s, ...) {
   va_start(args, s);
 
   for (i=0; i<n-1; i++) {
-    k = va_arg(args, int);
+    k = UNBOX(va_arg(args, int));
     s = ((int**) s) [k];
   }
 
-  k = va_arg(args, int);
+  k = UNBOX(va_arg(args, int));
   a = TO_DATA(s);
   
-  if (TAG(a->tag) == STRING_TAG)((char*) s)[k] = (char) v;
+  if (TAG(a->tag) == STRING_TAG)((char*) s)[k] = (char) (v >> 1);
   else ((int*) s)[k] = v;
 }
 
@@ -170,12 +176,12 @@ extern int Lread () {
   fflush (stdout);
   scanf  ("%d", &result);
 
-  return (result << 1) | 0x0001;
+  return BOX(result);
 }
 
 /* Lwrite is an implementation of the "write" construct */
 extern int Lwrite (int n) {
-  printf ("%d\n", n >> 1);
+  printf ("%d\n", UNBOX(n));
   fflush (stdout);
 
   return 0;
