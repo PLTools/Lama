@@ -36,7 +36,21 @@ module Value =
 
     let update_string s i x = String.init (String.length s) (fun j -> if j = i then x else s.[j])
     let update_array  a i x = List.init   (List.length a)   (fun j -> if j = i then x else List.nth a j)
-
+                                          
+    let string_val v =
+      let buf      = Buffer.create 128 in
+      let append s = Buffer.add_string buf s in
+      let rec inner = function
+      | Int    n    -> append (string_of_int n)
+      | String s    -> append "\""; append s; append "\""
+      | Array  a    -> let n = List.length a in
+                       append "["; List.iteri (fun i a -> (if i < n-1 then append ", "); inner a) a; append "]"
+      | Sexp (t, a) -> let n = List.length a in
+                       append "`"; append t; append " ("; List.iteri (fun i a -> (if i < n-1 then append ", "); inner a) a; append ")"
+      in
+      inner v;
+      Buffer.contents buf
+                      
   end
        
 (* States *)
@@ -116,10 +130,11 @@ module Builtin =
                                      | Value.Sexp (_, a) -> List.nth a i
                                )
                     )         
-    | ".length"  -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Array a -> List.length a | Value.String s -> String.length s)))
-    | ".array"   -> (st, i, o, Some (Value.of_array args))
-    | "isArray"  -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.Array  _ -> 1 | _ -> 0))
-    | "isString" -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.String _ -> 1 | _ -> 0))                     
+    | ".length"     -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Array a -> List.length a | Value.String s -> String.length s)))
+    | ".array"      -> (st, i, o, Some (Value.of_array args))
+    | ".stringval"  -> let [a] = args in (st, i, o, Some (Value.of_string @@ Value.string_val a))
+    | "isArray"     -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.Array  _ -> 1 | _ -> 0))
+    | "isString"    -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.String _ -> 1 | _ -> 0))                     
        
   end
     
@@ -131,15 +146,16 @@ module Expr =
        notation, it came from GT. 
     *)
     @type t =
-    (* integer constant   *) | Const  of int
-    (* array              *) | Array  of t list
-    (* string             *) | String of string
-    (* S-expressions      *) | Sexp   of string * t list
-    (* variable           *) | Var    of string
-    (* binary operator    *) | Binop  of string * t * t
-    (* element extraction *) | Elem   of t * t
-    (* length             *) | Length of t
-    (* function call      *) | Call   of string * t list with show
+    (* integer constant   *) | Const     of int
+    (* array              *) | Array     of t list
+    (* string             *) | String    of string
+    (* S-expressions      *) | Sexp      of string * t list
+    (* variable           *) | Var       of string
+    (* binary operator    *) | Binop     of string * t * t
+    (* element extraction *) | Elem      of t * t
+    (* length             *) | Length    of t
+    (* string conversion  *) | StringVal of t
+    (* function call      *) | Call      of string * t list with show
 
     (* Available binary operators:
         !!                   --- disjunction
@@ -187,8 +203,11 @@ module Expr =
     
     let rec eval env ((st, i, o, r) as conf) expr =
       match expr with
-      | Const  n -> (st, i, o, Some (Value.of_int n))
-      | String s -> (st, i, o, Some (Value.of_string s))
+      | Const  n    -> (st, i, o, Some (Value.of_int n))
+      | String s    -> (st, i, o, Some (Value.of_string s))
+      | StringVal s ->
+         let (st, i, o, Some s) = eval env conf s in
+         (st, i, o, Some (Value.of_string @@ Value.string_val s))
       | Var    x -> (st, i, o, Some (State.eval st x))
       | Array xs ->
          let (st, i, o, vs) = eval_list env conf xs in
@@ -248,8 +267,8 @@ module Expr =
               |] 
 	     )
 	     primary);
-      primary: b:base is:(-"[" i:parse -"]" {`Elem i} | "." %"length" {`Len}) *
-                           {List.fold_left (fun b -> function `Elem i -> Elem (b, i) | `Len -> Length b) b is};
+      primary: b:base is:(-"[" i:parse -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str})) *
+                           {List.fold_left (fun b -> function `Elem i -> Elem (b, i) | `Len -> Length b | `Str -> StringVal b) b is};
       base:
         n:DECIMAL                                         {Const n}
       | s:STRING                                          {String (String.sub s 1 (String.length s - 2))}

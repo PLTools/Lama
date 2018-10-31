@@ -183,6 +183,7 @@ let compile (defs, p) =
   | Expr.Sexp (t, xs)     -> List.flatten (List.map expr xs) @ [SEXP (t, List.length xs)]
   | Expr.Elem (a, i)      -> expr a @ expr i @ [CALL (".elem", 2, false)]
   | Expr.Length e         -> expr e @ [CALL (".length", 1, false)]
+  | Expr.StringVal e      -> expr e @ [CALL (".stringval", 1, false)]
   in
   let rec compile_stmt l env = function  
   | Stmt.Assign (x, [], e)  -> env, false, expr e @ [ST x]
