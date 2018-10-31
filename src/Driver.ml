@@ -15,6 +15,7 @@ let parse infile =
                                   "for";
                                   "fun"; "local"; "return";
                                   "length";
+                                  "string";
                                   "case"; "of"; "esac"; "when"] s
        inherit Util.Lexers.skip [
 	 Matcher.Skip.whitespaces " \t\n";
