@@ -44,9 +44,9 @@ module Value =
       | Int    n    -> append (string_of_int n)
       | String s    -> append "\""; append s; append "\""
       | Array  a    -> let n = List.length a in
-                       append "["; List.iteri (fun i a -> (if i < n-1 then append ", "); inner a) a; append "]"
+                       append "["; List.iteri (fun i a -> (if i > 0 then append ", "); inner a) a; append "]"
       | Sexp (t, a) -> let n = List.length a in
-                       append "`"; append t; append " ("; List.iteri (fun i a -> (if i < n-1 then append ", "); inner a) a; append ")"
+                       append "`"; append t; (if n > 0 then (append " ("; List.iteri (fun i a -> (if i > 0 then append ", "); inner a) a; append ")"))
       in
       inner v;
       Buffer.contents buf

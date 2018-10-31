@@ -121,12 +121,14 @@ static void printValue (void *p) {
       
     case SEXP_TAG:
       printStringBuf ("`%s", de_hash (TO_SEXP(p)->tag));
-      printStringBuf (" (");
-      for (int i = 0; i < LEN(a->tag); i++) {
-        printValue ((void*)((int*) a->contents)[i]);
-	if (i != LEN(a->tag) - 1) printStringBuf (", ");
+      if (LEN(a->tag)) {
+	printStringBuf (" (");
+	for (int i = 0; i < LEN(a->tag); i++) {
+	  printValue ((void*)((int*) a->contents)[i]);
+	  if (i != LEN(a->tag) - 1) printStringBuf (", ");
+	}
+	printStringBuf (")");
       }
-      printStringBuf (")");
       break;
       
     default:

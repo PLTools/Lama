@@ -1,0 +1,12 @@
+fun printString (s) local i {  
+  for i := 0, i < s.length, i := i + 1 do
+    write (s[i])
+  od
+}
+
+x := read ();
+printString (1.string);
+printString ("abc".string);
+printString ([].string);
+printString ([1, 2, 3].string);
+printString (`cons (1, `cons (2, `nil)).string)
