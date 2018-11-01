@@ -1,0 +1,12 @@
+`Empty
+`Node (0, `Empty, `Empty)
+`Node (0, `Empty, `Node (1, `Empty, `Empty))
+`Node (0, `Empty, `Node (1, `Empty, `Node (2, `Empty, `Empty)))
+`Node (0, `Empty, `Node (1, `Empty, `Node (2, `Empty, `Node (3, `Empty, `Empty))))
+`Node (0, `Empty, `Node (1, `Empty, `Node (2, `Empty, `Node (3, `Empty, `Node (4, `Empty, `Empty)))))
+`Node (0, `Empty, `Node (1, `Empty, `Node (2, `Empty, `Node (3, `Empty, `Node (4, `Empty, `Node (5, `Empty, `Empty))))))
+`Node (0, `Empty, `Node (1, `Empty, `Node (2, `Empty, `Node (3, `Empty, `Node (4, `Empty, `Node (5, `Empty, `Node (6, `Empty, `Empty)))))))
+`Node (0, `Empty, `Node (1, `Empty, `Node (2, `Empty, `Node (3, `Empty, `Node (4, `Empty, `Node (5, `Empty, `Node (6, `Empty, `Node (7, `Empty, `Empty))))))))
+`Node (0, `Empty, `Node (1, `Empty, `Node (2, `Empty, `Node (3, `Empty, `Node (4, `Empty, `Node (5, `Empty, `Node (6, `Empty, `Node (7, `Empty, `Node (8, `Empty, `Empty)))))))))
+`Node (0, `Empty, `Node (1, `Empty, `Node (2, `Empty, `Node (3, `Empty, `Node (4, `Empty, `Node (5, `Empty, `Node (6, `Empty, `Node (7, `Empty, `Node (8, `Empty, `Node (9, `Empty, `Empty))))))))))
+`Node (0, `Empty, `Node (1, `Empty, `Node (2, `Empty, `Node (3, `Empty, `Node (4, `Empty, `Node (5, `Empty, `Node (6, `Empty, `Node (7, `Empty, `Node (8, `Empty, `Node (9, `Empty, `Node (10, `Empty, `Empty)))))))))))
