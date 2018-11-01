@@ -1,0 +1,19 @@
+fun insert (tree, value) {
+  case tree of
+    `Empty                      -> return `Node (value, `Empty, `Empty)
+  | `Node (x, left, right) ->
+       if x > value
+          then return `Node (x, insert (left, value), right)
+          else return `Node (x, left, insert (right, value))
+       fi
+  esac  
+}
+
+tree := `Empty;
+
+for i := 0, i <= 10, i := i+1 do
+ printf ("%s\n", tree.string);
+ tree := insert (tree, i)
+od;
+
+printf ("%s\n", tree.string)
