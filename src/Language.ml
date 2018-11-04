@@ -246,15 +246,15 @@ module Expr =
          DECIMAL --- a decimal constant [0-9]+ as a string                                                                                                                  
     *)
     ostap (                                      
-      parse:
+      parse: 
 	  !(Ostap.Util.expr 
              (fun x -> x)
 	     (Array.map (fun (a, s) -> a, 
                                        List.map (fun s -> ostap(- $(s)),
                                                           (fun x y ->
-                                                            match s with
-                                                              "++" -> Call ("strcat", [x; y])
-                                                             | _ -> Binop (s, x, y)
+                                                             match s with
+                                                             | "++" -> Call ("strcat", [x; y])
+                                                             | _    -> Binop (s, x, y)
                                                           )
                                          ) s
                         ) 
@@ -266,17 +266,17 @@ module Expr =
 		`Lefta, ["*" ; "/"; "%"];
               |] 
 	     )
-	     primary);
+	     primary); 
       primary: b:base is:(-"[" i:parse -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str})) *
-                           {List.fold_left (fun b -> function `Elem i -> Elem (b, i) | `Len -> Length b | `Str -> StringVal b) b is};
+                           {List.fold_left (fun b -> function `Elem i -> Elem (b, i) | `Len -> Length b | `Str -> StringVal b) b is}; 
       base:
-        n:DECIMAL                                         {Const n}
+        n:DECIMAL                                         {Const n}  
       | s:STRING                                          {String (String.sub s 1 (String.length s - 2))}
       | c:CHAR                                            {Const  (Char.code c)}
       | "[" es:!(Util.list0)[parse] "]"                   {Array es}
       | "`" t:IDENT args:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match args with None -> [] | Some args -> args)}
       | x:IDENT s:("(" args:!(Util.list0)[parse] ")"      {Call (x, args)} | empty {Var x}) {s}
-      | -"(" parse -")"
+      | -"(" parse -")" 
     )
     
   end
