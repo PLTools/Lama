@@ -14,8 +14,17 @@ case 3 of
 esac;
 
 case `a (1, 2, 3) of
-  `b             -> write (1)
+  `a             -> write (1)
 | a@`a (_, _, _) -> case a of
                      `a (x, y, z) -> write (x); write (y); write (z)
 		    esac
+esac;
+
+case `a (1, 2, 3, 4, 5) of
+  `a                 -> write (0)
+| `a (_)             -> write (1)
+| `a (_, _)          -> write (2)
+| `a (_, _, _)       -> write (3)
+| `a (_, _, _, _)    -> write (4)
+| `a (_, _, _, _, _) -> write (5)
 esac

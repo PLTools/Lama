@@ -322,10 +322,11 @@ let compile env code =
              let x, y = env#peek2 in
              env, [Push x; Push y; Pop x; Pop y]
                            
-          | TAG t ->
-             let s, env = env#allocate in
-             let env, code = call env ".tag" 2 false in             
-             env, [Mov (L env#hash t, s)] @ code 
+          | TAG (t, n) ->
+             let s1, env = env#allocate in
+             let s2, env = env#allocate in
+             let env, code = call env ".tag" 3 false in
+             env, [Mov (L env#hash t, s1); Mov (L n, s2)] @ code 
                                   
           | ENTER xs ->             
              let env, code =

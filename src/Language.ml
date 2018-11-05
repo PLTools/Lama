@@ -130,7 +130,7 @@ module Builtin =
                                      | Value.Sexp (_, a) -> List.nth a i
                                )
                     )         
-    | ".length"     -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Array a -> List.length a | Value.String s -> String.length s)))
+    | ".length"     -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Sexp (_, a) | Value.Array a -> List.length a | Value.String s -> String.length s)))
     | ".array"      -> (st, i, o, Some (Value.of_array args))
     | ".stringval"  -> let [a] = args in (st, i, o, Some (Value.of_string @@ Value.string_val a))
     | "isArray"     -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.Array  _ -> 1 | _ -> 0))

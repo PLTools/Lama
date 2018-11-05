@@ -217,9 +217,9 @@ extern void* Bsexp (int n, ...) {
   return d->contents;
 }
 
-extern int Btag (void *d, int t) {
+extern int Btag (void *d, int t, int n) {
   data *r = TO_DATA(d);
-  return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t);
+  return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t && LEN(r->tag) == n);
 }
 		 
 extern void Bsta (int n, int v, void *s, ...) {
