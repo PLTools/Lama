@@ -132,10 +132,8 @@ module Builtin =
                     )         
     | ".length"     -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Sexp (_, a) | Value.Array a -> List.length a | Value.String s -> String.length s)))
     | ".array"      -> (st, i, o, Some (Value.of_array args))
-    | ".stringval"  -> let [a] = args in (st, i, o, Some (Value.of_string @@ Value.string_val a))
-    | "isArray"     -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.Array  _ -> 1 | _ -> 0))
-    | "isString"    -> let [a] = args in (st, i, o, Some (Value.of_int @@ match a with Value.String _ -> 1 | _ -> 0))                     
-       
+    | ".stringval"  -> let [a]    = args in (st, i, o, Some (Value.of_string @@ Value.string_val a))
+
   end
     
 (* Simple expressions: syntax and semantics *)
@@ -312,7 +310,8 @@ module Stmt =
           | "[" ps:(!(Util.list0)[parse]) "]"               {Array ps}
           | x:IDENT y:(-"@" parse)?                         {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
           | c:DECIMAL                                       {Const c}
-          | s:STRING                                        {String s}
+          | s:STRING                                        {String (String.sub s 1 (String.length s - 2))}
+          | c:CHAR                                          {Const  (Char.code c)}
           | "#" %"boxed"                                    {Boxed}
           | "#" %"unboxed"                                  {UnBoxed}
           | "#" %"string"                                   {StringTag}
@@ -387,10 +386,20 @@ module Stmt =
                | Some s -> Some (State.bind x v s)
                in
                match patt, v with
-               | Pattern.Named (x, p), v                               -> update x v (match_patt p v st )
-               | Pattern.Wildcard    , _                               -> st
-               | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' -> match_list ps vs st
-               | _                                                     -> None
+               | Pattern.Named (x, p), v                                                                  -> update x v (match_patt p v st )
+               | Pattern.Wildcard    , _                                                                  -> st
+               | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' && List.length ps = List.length vs -> match_list ps vs st
+               | Pattern.Array ps    , Value.Array vs when List.length ps = List.length vs                -> match_list ps vs st
+               | Pattern.Const n     , Value.Int n'    when n = n'                                        -> st
+               | Pattern.String s    , Value.String s' when s = s'                                        -> st
+               | Pattern.Boxed       , Value.String _ 
+               | Pattern.Boxed       , Value.Array  _
+               | Pattern.UnBoxed     , Value.Int    _
+               | Pattern.Boxed       , Value.Sexp  (_, _)                                                 
+               | Pattern.StringTag   , Value.String _
+               | Pattern.ArrayTag    , Value.Array  _ 
+               | Pattern.SexpTag     , Value.Sexp  (_, _)                                                 -> st
+               | _                                                                                        -> None                                                                            
              and match_list ps vs s =
                match ps, vs with
                | [], []       -> s

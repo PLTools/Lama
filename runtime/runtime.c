@@ -222,7 +222,52 @@ extern int Btag (void *d, int t, int n) {
   data *r = TO_DATA(d);
   return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t && LEN(r->tag) == n);
 }
-		 
+
+extern int Barray_patt (void *d, int n) {
+  if (UNBOXED(d)) return BOX(0);
+  else {
+    data *r = TO_DATA(d);
+    return BOX(TAG(r->tag) == ARRAY_TAG && LEN(r->tag) == n);
+  }
+}
+
+extern int Bstring_patt (void *x, void *y) {
+  if (UNBOXED(x)) return BOX(0);
+  else {
+    data *rx = TO_DATA(x), *ry = TO_DATA(y);
+
+    if (TAG(rx->tag) != STRING_TAG) return BOX(0);
+    
+    return BOX(strcmp (rx->contents, ry->contents) == 0 ? 1 : 0);
+  }
+}
+
+extern int Bboxed_patt (void *x) {
+  return BOX(UNBOXED(x) ? 0 : 1);
+}
+
+extern int Bunboxed_patt (void *x) {
+  return BOX(UNBOXED(x) ? 1 : 0);
+}
+
+extern int Barray_tag_patt (void *x) {
+  if (UNBOXED(x)) return BOX(0);
+  
+  return BOX(TAG(TO_DATA(x)->tag) == ARRAY_TAG);
+}
+
+extern int Bstring_tag_patt (void *x) {
+  if (UNBOXED(x)) return BOX(0);
+  
+  return BOX(TAG(TO_DATA(x)->tag) == STRING_TAG);
+}
+
+extern int Bsexp_tag_patt (void *x) {
+  if (UNBOXED(x)) return BOX(0);
+  
+  return BOX(TAG(TO_DATA(x)->tag) == SEXP_TAG);
+}
+
 extern void Bsta (int n, int v, void *s, ...) {
   va_list args;
   int i, k;
