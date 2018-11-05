@@ -310,7 +310,8 @@ let compile env code =
              let env, code = call env ".sexp" (n+1) false in
              env, [Mov (L env#hash t, s)] @ code
 
-          | DROP -> snd env#pop, []
+          | DROP ->
+             snd env#pop, []
                                    
           | DUP  ->
              let x      = env#peek in

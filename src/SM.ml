@@ -136,7 +136,7 @@ let compile (defs, p) =
     args_code @ [CALL (label f, List.length args, p)]
   and pattern env lfalse = function
   | Stmt.Pattern.Wildcard        -> env, false, [DROP]
-  | Stmt.Pattern.Ident    n      -> env, false, [DROP]
+  | Stmt.Pattern.Named   (_, p)  -> pattern env lfalse p
   | Stmt.Pattern.Sexp    (t, ps) ->
      let ltag , env   = env#get_label in
      let ldrop, env   = env#get_label in
@@ -157,8 +157,16 @@ let compile (defs, p) =
       transform(Stmt.Pattern.t)
         (object inherit [int list, (string * int list) list, _] @Stmt.Pattern.t 
            method c_Wildcard path      = []
-           method c_Ident    path s    = [s, path] 
+           method c_Named    path s p  = [s, path] @ fself path p
            method c_Sexp     path x ps = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
+           method c_UnBoxed   = invalid_arg ""
+           method c_StringTag = invalid_arg ""
+           method c_String    = invalid_arg ""
+           method c_SexpTag   = invalid_arg ""
+           method c_Const     = invalid_arg ""
+           method c_Boxed     = invalid_arg ""
+           method c_ArrayTag  = invalid_arg ""
+           method c_Array     = invalid_arg ""
          end))
         []
         p
@@ -216,30 +224,34 @@ let compile (defs, p) =
 
   | Stmt.Leave              -> env, false, [LEAVE]
                                              
-  | Stmt.Case (e, [p, s])   ->
-     let ldrop, env    = env#get_label in
-     let env, _, pcode = pattern env ldrop p in
-     let env, _, scode = compile_stmt ldrop env (Stmt.Seq (s, Stmt.Leave))  in
-     env, true, expr e @ [DUP] @ pcode @ bindings p @ scode @ [JMP l; LABEL ldrop; DROP] 
+  | Stmt.Case (e, [p, s]) ->
+     let ldrop, env          = env#get_label in
+     let env, ldrop' , pcode = pattern env ldrop p in
+     let env, ldrop'', scode = compile_stmt ldrop env (Stmt.Seq (s, Stmt.Leave))  in
+     if ldrop' || ldrop''
+     then env, true , expr e @ [DUP] @ pcode @ bindings p @ scode @ [JMP l; LABEL ldrop; DROP]
+     else env, false, expr e @ [DUP] @ pcode @ bindings p @ scode 
                                     
-  | Stmt.Case (e, brs)      ->
-     let n               = List.length brs - 1 in
-     (*let ldrop, env      = env#get_label in*)
-     let env, _, _, code =
+  | Stmt.Case (e, brs) ->
+     let n                  = List.length brs - 1 in
+     let env, _, _, code, _ =
        List.fold_left
-         (fun (env, lab, i, code) (p, s) ->
-            let (lfalse, env), jmp =
-              if i = n
-              then (l, env), []
-              else env#get_label, [JMP l]
-            in
-            let env, _, pcode = pattern env lfalse p     in
-            let env, _, scode = compile_stmt l(*ldrop*) env (Stmt.Seq (s, Stmt.Leave)) in
-            (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l; DUP]) @ pcode @ bindings p @ scode @ jmp) :: code)          
+         (fun ((env, lab, i, code, continue) as acc) (p, s) ->
+             if continue
+             then
+               let (lfalse, env), jmp =
+                 if i = n
+                 then (l, env), []
+                 else env#get_label, [JMP l]
+               in
+               let env, lfalse', pcode = pattern env lfalse p in
+               let env, l'     , scode = compile_stmt l env (Stmt.Seq (s, Stmt.Leave)) in
+               (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l; DUP]) @ pcode @ bindings p @ scode @ jmp) :: code, lfalse')
+             else acc
          )
-         (env, None, 0, []) brs
+         (env, None, 0, [], true) brs
      in
-     env, true, expr e @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] (*; LABEL ldrop; DROP]*)
+     env, true, expr e @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] 
   in
   let compile_def env (name, (args, locals, stmt)) =
     let lend, env       = env#get_label in
