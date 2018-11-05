@@ -293,7 +293,15 @@ module Stmt =
         @type t =
         (* wildcard "-"     *) | Wildcard
         (* S-expression     *) | Sexp   of string * t list
-        (* identifier       *) | Ident  of string
+        (* array            *) | Array  of t list
+        (* identifier       *) | Named  of string * t
+        (* ground integer   *) | Const  of int
+        (* ground string    *) | String of string
+        (* boxed value      *) | Boxed    
+        (* unboxed value    *) | UnBoxed  
+        (* any string value *) | StringTag
+        (* any sexp value   *) | SexpTag
+        (* any array value  *) | ArrayTag
         with show, foldl
 
         (* Pattern parser *)                                 
@@ -301,11 +309,19 @@ module Stmt =
           parse:
             %"_" {Wildcard}
           | "`" t:IDENT ps:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match ps with None -> [] | Some ps -> ps)}
-          | x:IDENT                           {Ident  x}
+          | "[" ps:(!(Util.list0)[parse]) "]"               {Array ps}
+          | x:IDENT y:(-"@" parse)?                         {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
+          | c:DECIMAL                                       {Const c}
+          | s:STRING                                        {String s}
+          | "#" %"boxed"                                    {Boxed}
+          | "#" %"unboxed"                                  {UnBoxed}
+          | "#" %"string"                                   {StringTag}
+          | "#" %"sexp"                                     {SexpTag}
+          | "#" %"array"                                    {ArrayTag}
         )
         
         let vars p = fix0 (fun f  ->
-          transform(t) (object inherit [string list, _] @t[foldl] f method c_Ident s name = name::s end)) [] p 
+          transform(t) (object inherit [string list, _] @t[foldl] f method c_Named s name p = name :: f s p end)) [] p 
         
       end
         
@@ -371,7 +387,7 @@ module Stmt =
                | Some s -> Some (State.bind x v s)
                in
                match patt, v with
-               | Pattern.Ident  x    , v                               -> update x v st
+               | Pattern.Named (x, p), v                               -> update x v (match_patt p v st )
                | Pattern.Wildcard    , _                               -> st
                | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' -> match_list ps vs st
                | _                                                     -> None

@@ -16,7 +16,8 @@ let parse infile =
                                   "fun"; "local"; "return";
                                   "length";
                                   "string";
-                                  "case"; "of"; "esac"; "when"] s
+                                  "case"; "of"; "esac"; "when";
+                                  "boxed"; "unboxed"; "string"; "sexp"; "array"] s
        inherit Util.Lexers.skip [
 	 Matcher.Skip.whitespaces " \t\n";
 	 Matcher.Skip.lineComment "--";
