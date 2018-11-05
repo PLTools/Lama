@@ -3,26 +3,26 @@ open Language
        
 (* The type for the stack machine instructions *)
 @type insn =
-(* binary operator                 *) | BINOP   of string
-(* put a constant on the stack     *) | CONST   of int
-(* put a string on the stack       *) | STRING  of string
-(* create an S-expression          *) | SEXP    of string * int
-(* load a variable to the stack    *) | LD      of string
-(* store a variable from the stack *) | ST      of string
-(* store in an array               *) | STA     of string * int
-(* a label                         *) | LABEL   of string
-(* unconditional jump              *) | JMP     of string
-(* conditional jump                *) | CJMP    of string * string
-(* begins procedure definition     *) | BEGIN   of string * string list * string list
-(* end procedure definition        *) | END
-(* calls a function/procedure      *) | CALL    of string * int * bool
-(* returns from a function         *) | RET     of bool
-(* drops the top element off       *) | DROP
-(* duplicates the top element      *) | DUP
-(* swaps two top elements          *) | SWAP
-(* checks the tag of S-expression  *) | TAG     of string
-(* enters a scope                  *) | ENTER   of string list
-(* leaves a scope                  *) | LEAVE
+(* binary operator                           *) | BINOP   of string
+(* put a constant on the stack               *) | CONST   of int
+(* put a string on the stack                 *) | STRING  of string
+(* create an S-expression                    *) | SEXP    of string * int
+(* load a variable to the stack              *) | LD      of string
+(* store a variable from the stack           *) | ST      of string
+(* store in an array                         *) | STA     of string * int
+(* a label                                   *) | LABEL   of string
+(* unconditional jump                        *) | JMP     of string
+(* conditional jump                          *) | CJMP    of string * string
+(* begins procedure definition               *) | BEGIN   of string * string list * string list
+(* end procedure definition                  *) | END
+(* calls a function/procedure                *) | CALL    of string * int * bool
+(* returns from a function                   *) | RET     of bool
+(* drops the top element off                 *) | DROP
+(* duplicates the top element                *) | DUP
+(* swaps two top elements                    *) | SWAP
+(* checks the tag and arity of S-expression  *) | TAG     of string * int
+(* enters a scope                            *) | ENTER   of string list
+(* leaves a scope                            *) | LEAVE
 with show
                                                    
 (* The type for the stack machine program *)
@@ -79,8 +79,8 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     | DUP                     -> eval env (cstack, List.hd stack :: stack, c) prg'
     | SWAP                    -> let x::y::stack' = stack in
                                  eval env (cstack, y::x::stack', c) prg'
-    | TAG t                   -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp (t', _) when t' = t -> 1 | _ -> 0) :: stack', c) prg'
+    | TAG (t, n)              -> let x::stack' = stack in
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp (t', a) when t' = t && List.length a = n -> 1 | _ -> 0) :: stack', c) prg'
                                       
     | ENTER xs                -> let vs, stack' = split (List.length xs) stack in
                                  eval env (cstack, stack', (State.push st (List.fold_left (fun s (x, v) -> State.bind x v s) State.undefined (List.combine xs vs)) xs, i, o)) prg'
@@ -140,7 +140,7 @@ let compile (defs, p) =
   | Stmt.Pattern.Sexp    (t, ps) ->
      let ltag , env   = env#get_label in
      let ldrop, env   = env#get_label in
-     let tag          = [DUP; TAG t; CJMP ("nz", ltag); LABEL ldrop; DROP; JMP lfalse; LABEL ltag] in
+     let tag          = [DUP; TAG (t, List.length ps); CJMP ("nz", ltag); LABEL ldrop; DROP; JMP lfalse; LABEL ltag] in
      let _, env, code =
        List.fold_left
          (fun (i, env, code) p ->
