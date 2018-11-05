@@ -326,8 +326,25 @@ let compile env code =
              let s1, env = env#allocate in
              let s2, env = env#allocate in
              let env, code = call env ".tag" 3 false in
-             env, [Mov (L env#hash t, s1); Mov (L n, s2)] @ code 
-                                  
+             env, [Mov (L env#hash t, s1); Mov (L n, s2)] @ code
+
+          | ARRAY n ->
+             let s, env    = env#allocate in
+             let env, code = call env ".array_patt" 2 false in
+             env, [Mov (L n, s)] @ code
+
+          | PATT StrCmp -> call env ".string_patt" 2 false
+
+          | PATT patt ->
+             call env
+               (match patt with
+                | Boxed   -> ".boxed_patt"
+                | UnBoxed -> ".unboxed_patt"
+                | Array   -> ".array_tag_patt"
+                | String  -> ".string_tag_patt"
+                | Sexp    -> ".sexp_tag_patt"
+               ) 1 false
+
           | ENTER xs ->             
              let env, code =
                List.fold_left
