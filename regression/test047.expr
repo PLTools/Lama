@@ -1,0 +1,72 @@
+fun collect_ints_acc (v, tail) local i {
+  case v of
+    a@#unboxed -> return `cons (a, tail)
+  | #string  -> return tail
+  | _       ->
+     for i := 0, i < v.length, i := i + 1 do
+       tail := collect_ints_acc (v[i], tail)
+     od;
+     return tail
+  esac
+}
+
+fun collect_ints (v) {
+  return collect_ints_acc (v, `nil)
+}
+
+fun print_list (l) {
+  case l of
+    `nil         -> skip
+  | `cons (n, t) -> write (n); print_list (t)
+  esac
+}
+
+n := read ();
+
+case 1 of
+  5 -> write (5) 
+| 4 -> write (4)
+| 3 -> write (3)
+| 2 -> write (2)
+| 1 -> write (1)
+| 0 -> write (0) 
+esac;
+
+case 1 of
+  a@5 -> write (a) 
+| a@4 -> write (a)
+| a@3 -> write (a)
+| a@2 -> write (a)
+| a@1 -> write (a)
+| a@0 -> write (a) 
+esac;
+
+case `a (1, 2, 3) of
+  `a (1, 3, 5) -> write (0)
+| `a (3, 4, 5) -> write (0)
+| `a (1, 2, 3) -> write (1)
+| `a (6, 7, 8) -> write (0)
+esac;
+
+case "abc" of
+  "def" -> write (0)
+| "ab"  -> write (0)
+| "abc" -> write (1)
+| ""    -> write (0)
+esac;
+
+case [1, 2, 3] of
+  []        -> write (0)
+| [a, b]    -> write (0)
+| [a, b, c] -> write (a); write (b); write (c)
+| [_, _, _] -> write (0)
+esac;
+
+case [1, 2, 3] of
+  []        -> write (0)
+| [a, b]    -> write (0)
+| [_, _, _] -> write (100)
+| [a, b, c] -> write (a); write (b); write (c)
+esac;
+
+print_list (collect_ints ([1, 2, 3, [4, 5, 6, `cons (1, 2, 3)]]))
