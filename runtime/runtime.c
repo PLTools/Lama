@@ -85,10 +85,11 @@ static void extendStringBuf () {
 static void printStringBuf (char *fmt, ...) {
   va_list args;
   int     written, rest;
-  char   *buf = &stringBuf.contents[stringBuf.ptr];
+  char   *buf;
 
  again:
   va_start (args, fmt);
+  buf     = &stringBuf.contents[stringBuf.ptr];
   rest    = stringBuf.len - stringBuf.ptr;
   written = vsnprintf (buf, rest, fmt, args);
   
