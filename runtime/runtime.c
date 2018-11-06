@@ -348,3 +348,34 @@ extern int Lwrite (int n) {
   return 0;
 }
 
+/* GC starts here */
+
+extern const size_t __gc_data_end, __gc_data_start;
+
+extern void __gc_root_scan_data () {
+  size_t * p = &__gc_data_start;
+
+  printf ("Start, end: %d, %d\n", &__gc_data_start, &__gc_data_end);
+  
+  while (p != &__gc_data_end) {
+    if (!UNBOXED(*p)) printf ("Root: %d\n", p);
+    p++;
+  }
+}
+
+/* extern const void * __gc_data_end, * __gc_data_start; */
+
+/* extern void __gc_root_scan_data () { */
+/*   void * p = &__gc_data_start; */
+
+/*   printf ("Start, end: %d, %d\n", &__gc_data_start, &__gc_data_end); */
+  
+/*   while (p != &__gc_data_end) { */
+/*     if (!UNBOXED(* (size_t *) p)) printf ("Root: %d\n", p); */
+/*     p = p + sizeof(size_t); */
+/*   } */
+/* } */
+
+extern void Ltest () {
+  __gc_root_scan_data ();
+}
