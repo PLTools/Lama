@@ -1,0 +1,9 @@
+1
+1
+1
+1
+1
+2
+3
+100
+`cons (3, `cons (2, `cons (1, `cons (6, `cons (5, `cons (4, `cons (3, `cons (2, `cons (1, `nil)))))))))
