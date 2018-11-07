@@ -1,7 +1,7 @@
 fun collect_ints_acc (v, tail) local i {
   case v of
     a@#unboxed -> return `cons (a, tail)
-  | #string  -> return tail
+  | #string    -> return tail
   | _       ->
      for i := 0, i < v.length, i := i + 1 do
        tail := collect_ints_acc (v[i], tail)
