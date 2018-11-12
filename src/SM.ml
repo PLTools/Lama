@@ -24,6 +24,8 @@ open Language
 (* duplicates the top element                *) | DUP
 (* swaps two top elements                    *) | SWAP
 (* checks the tag and arity of S-expression  *) | TAG     of string * int
+(* checks the tag and size of array          *) | ARRAY   of int
+(* checks various patterns                   *) | PATT    of patt
 (* enters a scope                            *) | ENTER   of string list
 (* leaves a scope                            *) | LEAVE
 with show
@@ -84,6 +86,20 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
                                  eval env (cstack, y::x::stack', c) prg'
     | TAG (t, n)              -> let x::stack' = stack in
                                  eval env (cstack, (Value.of_int @@ match x with Value.Sexp (t', a) when t' = t && List.length a = n -> 1 | _ -> 0) :: stack', c) prg'
+    | ARRAY n                 -> let x::stack' = stack in
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Array a when List.length a = n -> 1 | _ -> 0) :: stack', c) prg'
+    | PATT StrCmp             -> let x::y::stack' = stack in
+                                 eval env (cstack, (Value.of_int @@ match x, y with (Value.String xs, Value.String ys) when xs = ys -> 1 | _ -> 0) :: stack', c) prg'                                      
+    | PATT Array              -> let x::stack' = stack in
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Array _ -> 1 | _ -> 0) :: stack', c) prg'
+    | PATT String             -> let x::stack' = stack in
+                                 eval env (cstack, (Value.of_int @@ match x with Value.String _ -> 1 | _ -> 0) :: stack', c) prg'
+    | PATT Sexp               -> let x::stack' = stack in
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp _ -> 1 | _ -> 0) :: stack', c) prg'
+    | PATT Boxed              -> let x::stack' = stack in
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 0 | _ -> 1) :: stack', c) prg'
+    | PATT UnBoxed            -> let x::stack' = stack in
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 1 | _ -> 0) :: stack', c) prg'
     | ENTER xs                -> let vs, stack' = split (List.length xs) stack in
                                  eval env (cstack, stack', (State.push st (List.fold_left (fun s (x, v) -> State.bind x v s) State.undefined (List.combine xs vs)) xs, i, o)) prg'
     | LEAVE                   -> eval env (cstack, stack, (State.drop st, i, o)) prg'
@@ -138,36 +154,52 @@ let compile (defs, p) =
   and pattern env lfalse = function
   | Stmt.Pattern.Wildcard        -> env, false, [DROP]
   | Stmt.Pattern.Named   (_, p)  -> pattern env lfalse p
+  | Stmt.Pattern.Const   c       -> env, true, [CONST c; BINOP "=="; CJMP ("z", lfalse)]
+  | Stmt.Pattern.String  s       -> env, true, [STRING s; PATT StrCmp; CJMP ("z", lfalse)]
+  | Stmt.Pattern.ArrayTag        -> env, true, [PATT Array; CJMP ("z", lfalse)]
+  | Stmt.Pattern.StringTag       -> env, true, [PATT String; CJMP ("z", lfalse)]
+  | Stmt.Pattern.SexpTag         -> env, true, [PATT Sexp; CJMP ("z", lfalse)]
+  | Stmt.Pattern.UnBoxed         -> env, true, [PATT UnBoxed; CJMP ("z", lfalse)]
+  | Stmt.Pattern.Boxed           -> env, true, [PATT Boxed; CJMP ("z", lfalse)]
+  | Stmt.Pattern.Array    ps     ->
+     let lhead, env   = env#get_label in
+     let ldrop, env   = env#get_label in
+     let tag          = [DUP; ARRAY (List.length ps); CJMP ("nz", lhead); LABEL ldrop; DROP; JMP lfalse; LABEL lhead] in
+     let code, env    = pattern_list lhead ldrop env ps in
+     env, true, tag @ code @ [DROP]
   | Stmt.Pattern.Sexp    (t, ps) ->
      let lhead, env   = env#get_label in
      let ldrop, env   = env#get_label in
-     let tag          = [DUP; TAG (t, List.length ps); CJMP ("nz", ltag); LABEL ldrop; DROP; JMP lfalse; LABEL ltag] in
-     let _, env, code =
-       List.fold_left
-         (fun (i, env, code) p ->
-            let env, _, pcode = pattern env ldrop p in
-            i+1, env, ([DUP; CONST i; CALL (".elem", 2, false)] @ pcode) :: code
-         )
-         (0, env, [])
-         ps
-     in
-     env, true, tag @ List.flatten (List.rev code) @ [DROP]     
+     let tag          = [DUP; TAG (t, List.length ps); CJMP ("nz", lhead); LABEL ldrop; DROP; JMP lfalse; LABEL lhead] in
+     let code, env    = pattern_list lhead ldrop env ps in
+     env, true, tag @ code @ [DROP]
+  and pattern_list lhead ldrop env ps =
+    let _, env, code =
+      List.fold_left
+        (fun (i, env, code) p ->
+           let env, _, pcode = pattern env ldrop p in
+           i+1, env, ([DUP; CONST i; CALL (".elem", 2, false)] @ pcode) :: code
+        )
+        (0, env, [])
+        ps
+    in
+    List.flatten (List.rev code), env            
   and bindings p =
     let bindings =
       fix0 (fun fself ->
       transform(Stmt.Pattern.t)
         (object inherit [int list, (string * int list) list, _] @Stmt.Pattern.t 
-           method c_Wildcard path      = []
-           method c_Named    path s p  = [s, path] @ fself path p
-           method c_Sexp     path x ps = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
-           method c_UnBoxed   = invalid_arg ""
-           method c_StringTag = invalid_arg ""
-           method c_String    = invalid_arg ""
-           method c_SexpTag   = invalid_arg ""
-           method c_Const     = invalid_arg ""
-           method c_Boxed     = invalid_arg ""
-           method c_ArrayTag  = invalid_arg ""
-           method c_Array     = invalid_arg ""
+           method c_Wildcard  path      = []
+           method c_Named     path s p  = [s, path] @ fself path p
+           method c_Sexp      path x ps = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
+           method c_UnBoxed   _         = []
+           method c_StringTag _         = []
+           method c_String    _ _       = []
+           method c_SexpTag   _         = []
+           method c_Const     _ _       = []
+           method c_Boxed     _         = []
+           method c_ArrayTag  _         = []
+           method c_Array     path ps   = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
          end))
         []
         p
