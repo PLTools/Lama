@@ -24,8 +24,6 @@ open Language
 (* duplicates the top element                *) | DUP
 (* swaps two top elements                    *) | SWAP
 (* checks the tag and arity of S-expression  *) | TAG     of string * int
-(* checks the tag and size of array          *) | ARRAY   of int
-(* checks various patterns                   *) | PATT    of patt
 (* enters a scope                            *) | ENTER   of string list
 (* leaves a scope                            *) | LEAVE
 with show
@@ -86,20 +84,6 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
                                  eval env (cstack, y::x::stack', c) prg'
     | TAG (t, n)              -> let x::stack' = stack in
                                  eval env (cstack, (Value.of_int @@ match x with Value.Sexp (t', a) when t' = t && List.length a = n -> 1 | _ -> 0) :: stack', c) prg'
-    | ARRAY n                 -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Array a when List.length a = n -> 1 | _ -> 0) :: stack', c) prg'
-    | PATT StrCmp             -> let x::y::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x, y with (Value.String xs, Value.String ys) when xs = ys -> 1 | _ -> 0) :: stack', c) prg'                                      
-    | PATT Array              -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Array _ -> 1 | _ -> 0) :: stack', c) prg'
-    | PATT String             -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.String _ -> 1 | _ -> 0) :: stack', c) prg'
-    | PATT Sexp               -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp _ -> 1 | _ -> 0) :: stack', c) prg'
-    | PATT Boxed              -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 0 | _ -> 1) :: stack', c) prg'
-    | PATT UnBoxed            -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 1 | _ -> 0) :: stack', c) prg'
     | ENTER xs                -> let vs, stack' = split (List.length xs) stack in
                                  eval env (cstack, stack', (State.push st (List.fold_left (fun s (x, v) -> State.bind x v s) State.undefined (List.combine xs vs)) xs, i, o)) prg'
     | LEAVE                   -> eval env (cstack, stack, (State.drop st, i, o)) prg'
@@ -157,20 +141,17 @@ let compile (defs, p) =
   | Stmt.Pattern.Sexp    (t, ps) ->
      let lhead, env   = env#get_label in
      let ldrop, env   = env#get_label in
-     let tag          = [DUP; TAG (t, List.length ps); CJMP ("nz", lhead); LABEL ldrop; DROP; JMP lfalse; LABEL lhead] in
-     let code, env    = pattern_list lhead ldrop env ps in
-     env, true, tag @ code @ [DROP]
-  and pattern_list lhead ldrop env ps =
-    let _, env, code =
-      List.fold_left
-        (fun (i, env, code) p ->
-           let env, _, pcode = pattern env ldrop p in
-           i+1, env, ([DUP; CONST i; CALL (".elem", 2, false)] @ pcode) :: code
-        )
-        (0, env, [])
-        ps
-    in
-    List.flatten (List.rev code), env            
+     let tag          = [DUP; TAG (t, List.length ps); CJMP ("nz", ltag); LABEL ldrop; DROP; JMP lfalse; LABEL ltag] in
+     let _, env, code =
+       List.fold_left
+         (fun (i, env, code) p ->
+            let env, _, pcode = pattern env ldrop p in
+            i+1, env, ([DUP; CONST i; CALL (".elem", 2, false)] @ pcode) :: code
+         )
+         (0, env, [])
+         ps
+     in
+     env, true, tag @ List.flatten (List.rev code) @ [DROP]     
   and bindings p =
     let bindings =
       fix0 (fun fself ->
