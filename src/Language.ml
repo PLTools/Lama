@@ -310,8 +310,7 @@ module Stmt =
           | "[" ps:(!(Util.list0)[parse]) "]"               {Array ps}
           | x:IDENT y:(-"@" parse)?                         {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
           | c:DECIMAL                                       {Const c}
-          | s:STRING                                        {String (String.sub s 1 (String.length s - 2))}
-          | c:CHAR                                          {Const  (Char.code c)}
+          | s:STRING                                        {String s}
           | "#" %"boxed"                                    {Boxed}
           | "#" %"unboxed"                                  {UnBoxed}
           | "#" %"string"                                   {StringTag}
@@ -386,20 +385,10 @@ module Stmt =
                | Some s -> Some (State.bind x v s)
                in
                match patt, v with
-               | Pattern.Named (x, p), v                                                                  -> update x v (match_patt p v st )
-               | Pattern.Wildcard    , _                                                                  -> st
-               | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' && List.length ps = List.length vs -> match_list ps vs st
-               | Pattern.Array ps    , Value.Array vs when List.length ps = List.length vs                -> match_list ps vs st
-               | Pattern.Const n     , Value.Int n'    when n = n'                                        -> st
-               | Pattern.String s    , Value.String s' when s = s'                                        -> st
-               | Pattern.Boxed       , Value.String _ 
-               | Pattern.Boxed       , Value.Array  _
-               | Pattern.UnBoxed     , Value.Int    _
-               | Pattern.Boxed       , Value.Sexp  (_, _)                                                 
-               | Pattern.StringTag   , Value.String _
-               | Pattern.ArrayTag    , Value.Array  _ 
-               | Pattern.SexpTag     , Value.Sexp  (_, _)                                                 -> st
-               | _                                                                                        -> None                                                                            
+               | Pattern.Named (x, p), v                               -> update x v (match_patt p v st )
+               | Pattern.Wildcard    , _                               -> st
+               | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' -> match_list ps vs st
+               | _                                                     -> None
              and match_list ps vs s =
                match ps, vs with
                | [], []       -> s
