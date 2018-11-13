@@ -1,124 +1,6 @@
-\documentclass{article}
+\section{Functions}
 
-\usepackage{amssymb, amsmath}
-\usepackage{alltt}
-\usepackage{pslatex}
-\usepackage{epigraph}
-\usepackage{verbatim}
-\usepackage{latexsym}
-\usepackage{array}
-\usepackage{comment}
-\usepackage{makeidx}
-\usepackage{listings}
-\usepackage{indentfirst}
-\usepackage{verbatim}
-\usepackage{color}
-\usepackage{url}
-\usepackage{xspace}
-\usepackage{hyperref}
-\usepackage{stmaryrd}
-\usepackage{amsmath, amsthm, amssymb}
-\usepackage{graphicx}
-\usepackage{euscript}
-\usepackage{mathtools}
-\usepackage{mathrsfs}
-\usepackage{multirow,bigdelim}
-\usepackage{subcaption}
-\usepackage{placeins}
-
-\makeatletter
-
-\makeatother
-
-\definecolor{shadecolor}{gray}{1.00}
-\definecolor{darkgray}{gray}{0.30}
-
-\def\transarrow{\xrightarrow}
-\newcommand{\setarrow}[1]{\def\transarrow{#1}}
-
-\def\padding{\phantom{X}}
-\newcommand{\setpadding}[1]{\def\padding{#1}}
-
-\def\subarrow{}
-\newcommand{\setsubarrow}[1]{\def\subarrow{#1}}
-
-\newcommand{\trule}[2]{\frac{#1}{#2}}
-\newcommand{\crule}[3]{\frac{#1}{#2},\;{#3}}
-\newcommand{\withenv}[2]{{#1}\vdash{#2}}
-\newcommand{\trans}[3]{{#1}\transarrow{\padding#2\padding}\subarrow{#3}}
-\newcommand{\ctrans}[4]{{#1}\transarrow{\padding#2\padding}\subarrow{#3},\;{#4}}
-\newcommand{\llang}[1]{\mbox{\lstinline[mathescape]|#1|}}
-\newcommand{\pair}[2]{\inbr{{#1}\mid{#2}}}
-\newcommand{\inbr}[1]{\left<{#1}\right>}
-\newcommand{\highlight}[1]{\color{red}{#1}}
-\newcommand{\ruleno}[1]{\eqno[\scriptsize\textsc{#1}]}
-\newcommand{\rulename}[1]{\textsc{#1}}
-\newcommand{\inmath}[1]{\mbox{$#1$}}
-\newcommand{\lfp}[1]{fix_{#1}}
-\newcommand{\gfp}[1]{Fix_{#1}}
-\newcommand{\vsep}{\vspace{-2mm}}
-\newcommand{\supp}[1]{\scriptsize{#1}}
-\newcommand{\sembr}[1]{\llbracket{#1}\rrbracket}
-\newcommand{\cd}[1]{\texttt{#1}}
-\newcommand{\free}[1]{\boxed{#1}}
-\newcommand{\binds}{\;\mapsto\;}
-\newcommand{\dbi}[1]{\mbox{\bf{#1}}}
-\newcommand{\sv}[1]{\mbox{\textbf{#1}}}
-\newcommand{\bnd}[2]{{#1}\mkern-9mu\binds\mkern-9mu{#2}}
-\newtheorem{lemma}{Lemma}
-\newtheorem{theorem}{Theorem}
-\newcommand{\meta}[1]{{\mathcal{#1}}}
-\renewcommand{\emptyset}{\varnothing}
-
-\definecolor{light-gray}{gray}{0.90}
-\newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
-
-\lstdefinelanguage{ocaml}{
-keywords={let, begin, end, in, match, type, and, fun, 
-function, try, with, class, object, method, of, rec, repeat, until,
-while, not, do, done, as, val, inherit, module, sig, @type, struct, 
-if, then, else, open, virtual, new, fresh, skip, od, fi, elif, for, local, return, read, write},
-sensitive=true,
-%basicstyle=\small,
-commentstyle=\scriptsize\rmfamily,
-keywordstyle=\ttfamily\bfseries,
-identifierstyle=\ttfamily,
-basewidth={0.5em,0.5em},
-columns=fixed,
-fontadjust=true,
-literate={->}{{$\to$}}3 {===}{{$\equiv$}}1 {=/=}{{$\not\equiv$}}1 {|>}{{$\triangleright$}}3 {\&\&\&}{{$\wedge$}}2 {|||}{{$\vee$}}2 {^}{{$\uparrow$}}1,
-morecomment=[s]{(*}{*)}
-}
-
-\lstset{
-mathescape=true,
-%basicstyle=\small,
-identifierstyle=\ttfamily,
-keywordstyle=\bfseries,
-commentstyle=\scriptsize\rmfamily,
-basewidth={0.5em,0.5em},
-fontadjust=true,
-escapechar=!,
-language=ocaml
-}
-
-\sloppy
-
-\newcommand{\ocaml}{\texttt{OCaml}\xspace}
-
-\theoremstyle{definition}
-
-\title{Functions\\
-  (the first draft)
-}
-
-\author{Dmitry Boulytchev}
-
-\begin{document}
-
-\maketitle
-
-\section{Functions in Expressions}
+\subsection{Functions in Expressions}
 
 At the syntax level function calls are introduced with the following construct: 
 
@@ -177,7 +59,7 @@ The rules inself are summarized in the Fig.~\ref{bs_expr}. Note the use of doubl
 \label{bs_expr}
 \end{figure}
 
-\section{Return Statement}
+\subsection{Return Statement}
 
 In order to make it possible to return values from procedures we add a return statement to the language of statements:
 
@@ -269,12 +151,12 @@ The rules themselves are shown on Fig.~\ref{bs_cps}. Note, the rule for the call
   \]
 
   \[\trule{\begin{array}{c}
-             {\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c_{j-1}}{e_j}{c_j=\inbr{\sigma_j,\,i_j,\,o_j,\,v_j}}}}\\
-             \Phi\;f = \llang{fun $\;f\;$ ($\overline{a}$) local $\;\overline{l}\;$ \{$s$\}}\\
-             \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\mbox{\textbf{enter}}\;\sigma_k\; (\overline{a}@\overline{l})\; [\overline{a_j\gets v_j}],i_k,o_k,\hbox{---}}}{s}{\inbr{\sigma^\prime, i^\prime, o^\prime, n}}}
-           \end{array}
-          }
-          {\withenv{K,\,\Phi}{\trans{c_0=\inbr{\sigma_0,\,\_,\,\_,\,\_}}{f (\overline{e_k})}{\inbr{\mbox{\textbf{leave}}\;\sigma^\prime\;\sigma_0, i^\prime, o^\prime, n}}}}
+           {\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c_{j-1}}{e_j}{c_j=\inbr{\sigma_j,\,i_j,\,o_j,\,v_j}}}}\\
+            \Phi\;f = \llang{fun $\;f\;$ ($\overline{a}$) local $\;\overline{l}\;$ \{$s$\}} \\
+            \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\mbox{\textbf{enter}}\;\sigma_k\; (\overline{a}@\overline{l})\; [\overline{a_j\gets v_j}],i_k,o_k,\hbox{---}}}{s}{\inbr{\sigma^\prime, i^\prime, o^\prime, \hbox{---}}}}\\
+            \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\mbox{\textbf{leave}}\;\sigma^\prime\;\sigma_0, i^\prime, o^\prime, \hbox{---}}}{K}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, n}}}
+           \end{array}}
+          {\withenv{K,\,\Phi}{\trans{c_0=\inbr{\sigma_0,\,\_,\,\_,\,\_}}{f (\overline{e_k})}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, n}}}}
           \ruleno{Call}
   \]
   
@@ -292,5 +174,3 @@ The rules themselves are shown on Fig.~\ref{bs_cps}. Note, the rule for the call
   \caption{Continuation-passing Style Semantics for Statements}
   \label{bs_cps}
 \end{figure}
-
-\end{document}

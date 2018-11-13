@@ -1,114 +1,6 @@
-\documentclass{article}
-
-\usepackage{amssymb, amsmath}
-\usepackage{alltt}
-\usepackage{pslatex}
-\usepackage{epigraph}
-\usepackage{verbatim}
-\usepackage{latexsym}
-\usepackage{array}
-\usepackage{comment}
-\usepackage{makeidx}
-\usepackage{listings}
-\usepackage{indentfirst}
-\usepackage{verbatim}
-\usepackage{color}
-\usepackage{url}
-\usepackage{xspace}
-\usepackage{hyperref}
-\usepackage{stmaryrd}
-\usepackage{amsmath, amsthm, amssymb}
-\usepackage{graphicx}
-\usepackage{euscript}
-\usepackage{mathtools}
-\usepackage{mathrsfs}
-\usepackage{multirow,bigdelim}
-
-\makeatletter
-
-\makeatother
-
-\definecolor{shadecolor}{gray}{1.00}
-\definecolor{darkgray}{gray}{0.30}
-
-\newcommand{\set}[1]{\{#1\}}
-\newcommand{\angled}[1]{\langle {#1} \rangle}
-\newcommand{\fib}{\rightarrow_{\mathit{fib}}}
-\newcommand{\fibm}{\Rightarrow_{\mathit{fib}}}
-\newcommand{\oo}[1]{{#1}^o}
-\newcommand{\inml}[1]{\mbox{\lstinline{#1}}}
-\newcommand{\goal}{\mathfrak G}
-\newcommand{\inmath}[1]{\mbox{$#1$}}
-\newcommand{\sembr}[1]{\llbracket{#1}\rrbracket}
-
-\newcommand{\withenv}[2]{{#1}\vdash{#2}}
-\newcommand{\ruleno}[1]{\eqno[\textsc{#1}]}
-\newcommand{\trule}[2]{\dfrac{#1}{#2}}
-
-\definecolor{light-gray}{gray}{0.90}
-\newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
-
-\newcommand{\nredrule}[3]{
-  \begin{array}{cl}
-    \textsf{[{#1}]}& 
-    \begin{array}{c}
-      #2 \\
-      \hline
-      \raisebox{-1pt}{\ensuremath{#3}}
-    \end{array}
-  \end{array}}
-
-\newcommand{\naxiom}[2]{
-  \begin{array}{cl}
-    \textsf{[{#1}]} & \raisebox{-1pt}{\ensuremath{#2}}
-  \end{array}}
-
-\lstdefinelanguage{ocaml}{
-keywords={let, begin, end, in, match, type, and, fun, 
-function, try, with, class, object, method, of, rec, repeat, until,
-while, not, do, done, as, val, inherit, module, sig, @type, struct, 
-if, then, else, open, virtual, new, fresh},
-sensitive=true,
-%basicstyle=\small,
-commentstyle=\scriptsize\rmfamily,
-keywordstyle=\ttfamily\bfseries,
-identifierstyle=\ttfamily,
-basewidth={0.5em,0.5em},
-columns=fixed,
-fontadjust=true,
-literate={fun}{{$\lambda$}}1 {->}{{$\to$}}3 {===}{{$\equiv$}}1 {=/=}{{$\not\equiv$}}1 {|>}{{$\triangleright$}}3 {\&\&\&}{{$\wedge$}}2 {|||}{{$\vee$}}2 {^}{{$\uparrow$}}1,
-morecomment=[s]{(*}{*)}
-}
-
-\lstset{
-mathescape=true,
-%basicstyle=\small,
-identifierstyle=\ttfamily,
-keywordstyle=\bfseries,
-commentstyle=\scriptsize\rmfamily,
-basewidth={0.5em,0.5em},
-fontadjust=true,
-escapechar=!,
-language=ocaml
-}
-
-\sloppy
-
-\newcommand{\ocaml}{\texttt{OCaml}\xspace}
-
-\theoremstyle{definition}
-
-\title{Introduction: Languages, Semantics, Interpreters, Compilers\\
-  (the first draft)
-}
-
-\author{Dmitry Boulytchev}
-
-\begin{document}
-
-\maketitle
-
-\section{Language and semantics}
+\section{Introduction: Languages, Semantics, Interpreters, Compilers}
+  
+\subsection{Language and semantics}
 
 A language is a collection of programs. A program is an \emph{abstract syntax tree} (AST), which describes the hierarchy of constructs. An abstract
 syntax of a programming language describes the format of abstract syntax trees of programs in this language. Thus, a language is a set of constructive
@@ -123,7 +15,7 @@ $$
 where $\mathscr D$ is some \emph{semantic domain}. The choice of the domain is at our command; for example, for Turing-complete languages $\mathscr D$ can
 be the set of all partially-recursive (computable) functions.
 
-\section{Interpreters}
+\subsection{Interpreters}
 
 In reality, the semantics often is described using \emph{interpreters}:
 
@@ -155,7 +47,7 @@ operational, denotational or game semantics, etc.)
 
 Pragmatically: if you have a good implementation of a good programming language you trust, you can write interpreters of other languages.
 
-\section{Compilers}
+\subsection{Compilers}
 
 A compiler is just a language transformer
 
@@ -176,7 +68,7 @@ And, again, we expect compilers to be defined in terms of some implementation la
 its semantics in ocaml possesses the following property (fill the rest yourself).
 
 
-\section{The first example: language of expressions}
+\subsection{The first example: language of expressions}
 
 Abstract syntax:
 
@@ -250,7 +142,3 @@ Important observations:
   \item This concrete semantics is \emph{strict}: for a binary operator both its arguments are evaluated unconditionally; thus,
   for example, \lstinline|1 !! x| is undefined in empty state.
 \end{enumerate}
-
-
-
-\end{document}
