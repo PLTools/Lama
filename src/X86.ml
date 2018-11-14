@@ -344,7 +344,7 @@ let compile env code =
                 | String  -> ".string_tag_patt"
                 | Sexp    -> ".sexp_tag_patt"
                ) 1 false
-
+               
           | ENTER xs ->             
              let env, code =
                List.fold_left
