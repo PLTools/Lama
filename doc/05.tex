@@ -94,8 +94,8 @@ Finally, we need two transformations for states:
 
 \[
 \begin{array}{rcl}
-  \mbox{\textbf{enter}}\,\inbr{\sigma_g,\,\_,\,\_}\,S & = & \inbr{\sigma_g,\,S,\,\bot}\\
-  \mbox{\textbf{leave}}\,\inbr{\sigma_g,\,\_,\,\_}\,\inbr{\_,\,S,\,\sigma_l}& = & \inbr{\sigma_g,\,S,\,\sigma_l}
+  \primi{enter}{\inbr{\sigma_g,\,\_,\,\_}\,S} & = & \inbr{\sigma_g,\,S,\,\bot}\\
+  \primi{leave}{\inbr{\sigma_g,\,\_,\,\_}\,\inbr{\_,\,S,\,\sigma_l}}& = & \inbr{\sigma_g,\,S,\,\sigma_l}
 \end{array}
 \]
 
@@ -110,8 +110,8 @@ propagate this environment, adding $\withenv{\Gamma}{...}$ for each transition `
 need now is to describe the rule for procedure calls:
 
 \[
-\trule{\withenv{\Gamma}{\trans{\inbr{\mbox{\textbf{enter}}\;\sigma\,(\bar{a}@\bar{l})[\overline{a\gets\sembr{e}\sigma}],\,i,\,o}}{S}{\inbr{\sigma^\prime,\,i^\prime,\,o^\prime}}}}
-      {\withenv{\Gamma}{\trans{\inbr{\sigma,\,i,\,o}}{f (\bar{e})}{\inbr{\mbox{\textbf{leave}}\;\sigma^\prime\,\sigma,\,i^\prime,o^\prime}}}}
+\trule{\withenv{\Gamma}{\trans{\inbr{\primi{enter}{\sigma\,(\bar{a}@\bar{l})[\overline{a\gets\sembr{e}\sigma}]},\,i,\,o}}{S}{\inbr{\sigma^\prime,\,i^\prime,\,o^\prime}}}}
+      {\withenv{\Gamma}{\trans{\inbr{\sigma,\,i,\,o}}{f (\bar{e})}{\inbr{\primi{leave}{\sigma^\prime\,\sigma},\,i^\prime,o^\prime}}}}
      \ruleno{Call$_{bs}$}
 \]
 
@@ -146,7 +146,7 @@ affect the control stack, it gets threaded through all rules of operational sema
 Now we specify additional rules for the new instructions:
 
 \[
-\trule{\withenv{P}{\trans{\inbr{cs,\,st,\,\inbr{\mbox{\textbf{enter}}\;\sigma\,(\bar{a}@\bar{l})\overline{[a\gets z]},\,i,\,o}}}{p}{c^\prime}}}
+\trule{\withenv{P}{\trans{\inbr{cs,\,st,\,\inbr{\primi{enter}{\sigma\,(\bar{a}@\bar{l})\overline{[a\gets z]}},\,i,\,o}}}{p}{c^\prime}}}
       {\withenv{P}{\trans{\inbr{cs,\,\bar{z}@st,\,\inbr{\sigma,\,i,\,o}}}{(\llang{BEGIN $\;\bar{a}\,\bar{l}$})p}{c^\prime}}}
       \ruleno{Begin$_{SM}$}
 \]
@@ -158,7 +158,7 @@ Now we specify additional rules for the new instructions:
 \]
 
 \[
-\trule{\withenv{P}{\trans{\inbr{cs,\,st,\,\inbr{\mbox{\textbf{leave}}\;\sigma\,\sigma^\prime,\,i,\,o}}}{p^\prime}{c^\prime}}}
+\trule{\withenv{P}{\trans{\inbr{cs,\,st,\,\inbr{\primi{leave}{\sigma\,\sigma^\prime},\,i,\,o}}}{p^\prime}{c^\prime}}}
       {\withenv{P}{\trans{\inbr{(p^\prime,\,\sigma^\prime)::cs,\,st,\,\inbr{\sigma,\,i,\,o}}}{\llang{END}p}{c^\prime}}}
       \ruleno{EndRet$_{SM}$}
 \]

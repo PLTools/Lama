@@ -45,7 +45,7 @@
 \newcommand{\trule}[2]{\frac{#1}{#2}}
 \newcommand{\crule}[3]{\frac{#1}{#2},\;{#3}}
 \newcommand{\withenv}[2]{{#1}\vdash{#2}}
-\newcommand{\trans}[3]{{#1}\transarrow{\padding#2\padding}\subarrow{#3}}
+\newcommand{\trans}[3]{{#1}\transarrow{\padding{\textstyle #2}\padding}\subarrow{#3}}
 \newcommand{\ctrans}[4]{{#1}\transarrow{\padding#2\padding}\subarrow{#3},\;{#4}}
 \newcommand{\llang}[1]{\mbox{\lstinline[mathescape]|#1|}}
 \newcommand{\pair}[2]{\inbr{{#1}\mid{#2}}}
@@ -70,6 +70,7 @@
 \newcommand{\meta}[1]{{\mathcal{#1}}}
 \renewcommand{\emptyset}{\varnothing}
 \newcommand{\dom}[1]{\mathtt{dom}\;{#1}}
+\newcommand{\primi}[2]{\mathbf{#1}\;{#2}}
 
 \definecolor{light-gray}{gray}{0.90}
 \newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}

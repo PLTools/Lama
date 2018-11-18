@@ -30,29 +30,41 @@ We extend the configuration, used in the semantic description for statements, wi
 
 This component will correspond to an optional return value for function/procedure calls (either integer value $n$ or ``$\hbox{---}$'', nothing).
 
-The rules inself are summarized in the Fig.~\ref{bs_expr}. Note the use of double environment for evaluating the body of function in the rule
+We introduce two primitives to make the semantic description shorter:
+
+\[
+\begin{array}{c}
+  \primi{val}{\inbr{s,\,i,\,o,\,v}}=v\\
+  \primi{ret}{\inbr{s,\,i,\,o,\,\_}\,v}=\inbr{s,\,i,\,o,\,v}
+\end{array}
+\]
+
+
+The rules themselves are summarized in the Fig.~\ref{bs_expr}. Note the use of double environment for evaluating the body of a function in the rule
 \rulename{Call}; note also, that now semantics of expressions and statements are mutually recursive.
 
 \setarrow{\xRightarrow}
 \setsubarrow{_{\mathscr E}}
 
 \begin{figure}
-  \[\withenv{\Phi}{\trans{\inbr{\sigma, i, o, \hbox{---}}}{n}{\inbr{\sigma, i, o, n}}} \ruleno{Const} \]
-  \[\withenv{\Phi}{\trans{\inbr{\sigma, i, o, \hbox{---}}}{x}{\inbr{\sigma, i, o, \sigma\;x}}} \ruleno{Var} \]
-  \[\trule{\withenv{\Phi}{\trans{c}{A}{c^\prime=\inbr{\_,\, \_,\, \_,\, a}}},\;
-           \withenv{\Phi}{\trans{c^\prime}{B}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, b}}}
-          }
-          {\withenv{\Phi}{\trans{c}{A\otimes B}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, a\oplus b}}}}
-          \ruleno{Binop}
-  \]
-  \[\trule{\begin{array}{c}
-             \withenv{\Phi}{\trans{c_{j-1}}{e_j}{c_j=\inbr{\sigma_j,\,i_j,\,o_j,\,v_j}}},\\
-             \Phi\;f = \llang{fun $\;f\;$ ($\overline{a}$) local $\;\overline{l}\;$ \{$s$\}},\\
-             {\setsubarrow{}
-             \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\mbox{\textbf{enter}}\;\sigma_k\; (\overline{a}@\overline{l})\; [\overline{a_j\gets v_j}],i_k,o_k,\hbox{---}}}{s}{\inbr{\sigma^\prime, i^\prime, o^\prime, n}}}}
+  \arraycolsep=10pt
+  \[\withenv{\Phi}{\trans{\inbr{\sigma,\, i,\, o,\, \_}}{n}{\inbr{\sigma,\, i,\, o,\, n}}} \ruleno{Const} \]\vskip2mm
+  \[\withenv{\Phi}{\trans{\inbr{\sigma,\, i,\, o,\, \_}}{x}{\inbr{\sigma,\, i,\, o,\, \sigma\;x}}} \ruleno{Var} \]\vskip2mm
+  \[\trule{\begin{array}{cc}
+             \withenv{\Phi}{\trans{c}{A}{c^\prime}} & \withenv{\Phi}{\trans{c^\prime}{B}{c^{\prime\prime}}}
            \end{array}
           }
-          {\withenv{\Phi}{\trans{c_0=\inbr{\sigma_0,\,\_,\,\_,\,\_}}{f (\overline{e_k})}{\inbr{\mbox{\textbf{leave}}\;\sigma^\prime\;\sigma_0, i^\prime, o^\prime, n}}}}
+          {\withenv{\Phi}{\trans{c}{A\otimes B}{\primi{ret}{(\primi{val}{c^\prime}\oplus\primi{val}{c^{\prime\prime}})}}}}
+          \ruleno{Binop}
+  \]\vskip2mm
+  \[\trule{\begin{array}{c}
+             \withenv{\Phi}{\trans{c_{j-1}}{e_j}{c_j=\inbr{\sigma_j,\,i_j,\,o_j,\,v_j}}}\\
+             \Phi\;f = \llang{fun $\;f\;$ ($\overline{a}$) local $\;\overline{l}\;$ \{$s$\}}\\
+             {\setsubarrow{}
+             \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\primi{enter}{\sigma_k\; (\overline{a}@\overline{l})\; [\overline{a_j\gets v_j}]},\,i_k,o_k,\hbox{---}}}{s}{\inbr{\sigma^\prime, i^\prime, o^\prime, n}}}}
+           \end{array}
+          }
+          {\withenv{\Phi}{\trans{c_0=\inbr{\sigma_0,\,\_,\,\_,\,\_}}{f (\overline{e_k})}{\inbr{\primi{leave}{\sigma^\prime\;\sigma_0}, i^\prime, o^\prime, n}}}}
           \ruleno{Call}
   \]
 \caption{Big-step Operational Semantics for Expressions}
@@ -96,14 +108,16 @@ The rules themselves are shown on Fig.~\ref{bs_cps}. Note, the rule for the call
           {\withenv{K,\,\Phi}{\trans{c}{\llang{skip}}{c^\prime}}}
     \ruleno{Skip}
   \]
-  \[\trule{{\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
-           \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma[x\gets n],\,i,\,o,\,\hbox{---}}}{K}{c^\prime}}
-          }
+  \[\trule{
+           \begin{array}{cc}
+             {\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}} & \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma[x\gets n],\,i,\,o,\,\hbox{---}}}{K}{c^\prime}}
+           \end{array}}
           {\withenv{K,\,\Phi}{\trans{c}{\llang{$x\,$:=$\,e$}}{c^\prime}}}
     \ruleno{Assign}
   \]
-  \[\trule{{\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
-           \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma,\,i,\,o@[n],\,\hbox{---}}}{K}{c^\prime}}
+  \[\trule{\begin{array}{cc}
+             {\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}} & \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma,\,i,\,o@[n],\,\hbox{---}}}{K}{c^\prime}}
+           \end{array}
           }
           {\withenv{K,\,\Phi}{\trans{c}{\llang{write ($e$)}}{c^\prime}}}
     \ruleno{Write}
@@ -120,41 +134,44 @@ The rules themselves are shown on Fig.~\ref{bs_cps}. Note, the rule for the call
     \ruleno{Seq}
   \]
 
-  \[\crule{{\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
-           \withenv{K,\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{\llang{$s_1$}}{c^\prime}}}
+  \[\trule{\begin{array}{cc}
+             {\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}} & \withenv{K,\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{\llang{$s_1$}}{c^\prime}}\\
+             n\ne 0 &
+           \end{array}
+          }
           {\withenv{K,\,\Phi}{\trans{c}{\llang{if $\;e\;$ then $\;s_1\;$ else $\;s_2$}}{c^\prime}}}
-          {n\ne 0}
     \ruleno{IfTrue}
   \]
 
-  \[\crule{{\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
-           \withenv{K,\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{\llang{$s_2$}}{c^\prime}}}
+  \[\trule{\begin{array}{cc}
+              {\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,0}}}} & \withenv{K,\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{\llang{$s_2$}}{c^\prime}}
+            \end{array}
+          }
           {\withenv{K,\,\Phi}{\trans{c}{\llang{if $\;e\;$ then $\;s_1\;$ else $\;s_2$}}{c^\prime}}}
-          {n= 0}
     \ruleno{IfFalse}
   \]
 
-  \[\crule{\begin{array}{c}
-             {\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}}\\
-             \withenv{\llang{while $\;e\;$ do $\;s$}\diamond K,\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{\llang{$s$}}{c^\prime}}
+  \[\trule{\begin{array}{cc}
+              {\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}} &
+              \withenv{\llang{while $\;e\;$ do $\;s$}\diamond K,\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{\llang{$s$}}{c^\prime}}\\
+              n \ne 0 & 
            \end{array}}
           {\withenv{K,\,\Phi}{\trans{c}{\llang{while $\;e\;$ do $\;s$}}{c^\prime}}}
-          {n\ne 0}
     \ruleno{WhileTrue}
   \]
 
-    \[\crule{{\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,n}}}};\;
-           \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{K}{c^\prime}}}
+  \[\trule{\begin{array}{cc}
+              {\setsubarrow{_{\mathscr E}} \withenv{\Phi}{\trans{c}{e}{\inbr{\sigma,\,i,\,o,\,0}}}} & \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\sigma,\,i,\,o,\,\hbox{---}}}{K}{c^\prime}}
+           \end{array}}
           {\withenv{K,\,\Phi}{\trans{c}{\llang{while $\;e\;$ do $\;s$}}{c^\prime}}}
-          {n = 0}
     \ruleno{WhileFalse}
   \]
 
   \[\trule{\begin{array}{c}
            {\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c_{j-1}}{e_j}{c_j=\inbr{\sigma_j,\,i_j,\,o_j,\,v_j}}}}\\
             \Phi\;f = \llang{fun $\;f\;$ ($\overline{a}$) local $\;\overline{l}\;$ \{$s$\}} \\
-            \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\mbox{\textbf{enter}}\;\sigma_k\; (\overline{a}@\overline{l})\; [\overline{a_j\gets v_j}],i_k,o_k,\hbox{---}}}{s}{\inbr{\sigma^\prime, i^\prime, o^\prime, \hbox{---}}}}\\
-            \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\mbox{\textbf{leave}}\;\sigma^\prime\;\sigma_0, i^\prime, o^\prime, \hbox{---}}}{K}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, n}}}
+            \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\primi{enter}{\sigma_k\; (\overline{a}@\overline{l})\; [\overline{a_j\gets v_j}]},i_k,o_k,\hbox{---}}}{s}{\inbr{\sigma^\prime, i^\prime, o^\prime, \hbox{---}}}}\\
+            \withenv{\llang{skip},\,\Phi}{\trans{\inbr{\primi{leave}{\sigma^\prime\;\sigma_0}, i^\prime, o^\prime, \hbox{---}}}{K}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, n}}}
            \end{array}}
           {\withenv{K,\,\Phi}{\trans{c_0=\inbr{\sigma_0,\,\_,\,\_,\,\_}}{f (\overline{e_k})}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, n}}}}
           \ruleno{Call}

@@ -24,25 +24,35 @@ In the concrete syntax for the constructs we add the closing keywords ``\llang{i
 \]
 
 \begin{figure}[t]
-
-\[\trans{c}{\llang{skip}}{c}\ruleno{Skip$_{bs}$}\]
+\arraycolsep=10pt
+%\def\arraystretch{2.9}
+\[\trans{c}{\llang{skip}}{c}\ruleno{Skip$_{bs}$}\]\vskip2mm
 \[
-\crule{\trans{c}{\mbox{$S_1$}}{c^\prime}}
+\trule{\begin{array}{cc}
+          \sembr{e}\;s\ne 0 & \trans{c}{\mbox{$S_1$}}{c^\prime}
+       \end{array}}
       {\trans{c=\inbr{s, \_, \_}}{\llang{if $\;e\;$ then $\;S_1\;$ else $\;S_2\;$}}{c^\prime}}
-      {\sembr{e}\;s\ne 0}\ruleno{If-True$_{bs}$}
-\]
+      \ruleno{If-True$_{bs}$}
+\]\vskip2mm
 \[
-\crule{\trans{c}{\mbox{$S_2$}}{c^\prime}}
+\trule{\begin{array}{cc}
+          \sembr{e}\;s=0 & \trans{c}{\mbox{$S_1$}}{c^\prime}
+       \end{array}}
       {\trans{c=\inbr{s, \_, \_}}{\llang{if $\;e\;$ then $\;S_1\;$ else $\;S_2\;$}}{c^\prime}}
-      {\sembr{e}\;s=0}\ruleno{If-False$_{bs}$}
-\]
+      \ruleno{If-False$_{bs}$}
+\]\vskip3mm
 \[
-\crule{\trans{c}{\llang{$S$}}{c^\prime},\;\trans{c^\prime}{\llang{while $\;e\;$ do $\;S\;$}}{c^{\prime\prime}}}
+\trule{\begin{array}{ccc}
+         {\sembr{e}\;s\ne 0} & \trans{c}{\llang{$S$}}{c^\prime} & \trans{c^\prime}{\llang{while $\;e\;$ do $\;S\;$}}{c^{\prime\prime}}\\
+       \end{array}
+      }
       {\trans{c=\inbr{s, \_, \_}}{\llang{while $\;e\;$ do $\;S\;$}}{c^{\prime\prime}}}
-      {\sembr{e}\;s\ne 0}\ruleno{While-True$_{bs}$}
-\]
+      \ruleno{While-True$_{bs}$}
+\]\vskip3mm
 \[
-\ctrans{c=\inbr{s, \_, \_}}{\llang{while $\;e\;$ do $\;S\;$}}{c}{\sembr{e}\;s=0}\ruleno{While-False$_{bs}$}
+\trule{\sembr{e}\;s=0}
+      {\trans{c=\inbr{s, \_, \_}}{\llang{while $\;e\;$ do $\;S\;$}}{c}}
+      \ruleno{While-False$_{bs}$}
 \]
 \caption{Big-step operational semantics for control flow statements}
 \label{bs_stmt_cf}

@@ -11,7 +11,7 @@ For an array $(n, f)$ we assume $\dom{f}=[0\,..\,n-1]$. An element selection fun
 
 \[
 \begin{array}{c}
-  [\bullet] : \mathscr A (\mathscr E) \to \mathbb N \to \mathscr E\\[2mm]
+  \bullet[\bullet] : \mathscr A (\mathscr E) \to \mathbb N \to \mathscr E\\[2mm]
   (n, f) [i] = \left\{
                   \begin{array}{rcl}
                      f\;i &, & i < n\\
@@ -20,22 +20,6 @@ For an array $(n, f)$ we assume $\dom{f}=[0\,..\,n-1]$. An element selection fun
                \right.
 \end{array}
 \]
-
-\begin{comment}
-A set of (ASCII) characters:
-
-\[
-\mathscr C = [0\,..\,255]
-\]
-
-A string is an array of characters:
-
-\[
-\mathscr S = \mathscr A (\mathscr C)
-\]
-
-Adding strings and arrays to the language changes the set of values the programs operate on:
-\end{comment}
 
 We represent arrays by \emph{references}. Thus, we introduce a (linearly) ordered set of locations
 
@@ -57,12 +41,16 @@ unambiguously discriminate between the shapes of each value. To access arrays, w
     \mathscr M = \mathscr L \to \mathscr A\,(\mathscr V)
 \]
 
-We now add two more components to the states: a memory function $\mu$ and the first free memory location $l_m$. 
+We now add two more components to the configurations: a memory function $\mu$ and the first free memory location $l_m$, and
+define the following primitive:
 
-%Enriching the value set extends the definitions of state (which now has to map variable names to values) and
-%stack (similarly), but does not affect the definition of input/output streams, read and write primitives, etc.
+\[
+\primi{mem}{\inbr{s,\,\mu,\,l_m,\,i,\,o,\,v}}=\mu
+\]
 
-\subsection{Adding arrays/strings on expression level}
+which gives a memory function from a configuration.
+
+\subsection{Adding arrays on expression level}
 
 On expression level, abstractly/concretely:
 
@@ -74,19 +62,18 @@ On expression level, abstractly/concretely:
 \end{array}
 \]
 
-In addition, in a concrete syntax we supply two special forms for strings: \llang{'$x$'} as a denotation for integer code of ASCII symbol
-$x$, and \llang{"..."}~--- a string constant.
+%In addition, in a concrete syntax we supply two special forms for strings: \llang{'$x$'} as a denotation for integer code of ASCII symbol
+%$x$, and \llang{"..."}~--- a string constant.
 
 The semantics of enriched expressions is modified as follows. First, we add two additional premises to the rule for binary operators:
 
 \setsubarrow{_{\mathscr E}}
-\[\trule{\begin{array}{c}
-            \withenv{\Phi}{\trans{c}{A}{c^\prime=\inbr{\_,\, \_,\, \_,\, a}}}\\
-            \withenv{\Phi}{\trans{c^\prime}{B}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, b}}}\\
-            a\in\mathbb Z,\,b\in\mathbb Z
+\[\trule{\begin{array}{ccc}
+            \withenv{\Phi}{\trans{c}{A}{c^\prime}} &\phantom{XXXXX}& \withenv{\Phi}{\trans{c^\prime}{B}{c^{\prime\prime}}}\\
+            \primi{val}{c^\prime}\in\mathbb Z      &               & \primi{val}{c^{\prime\prime}}\in\mathbb Z
           \end{array}
         }
-        {\withenv{\Phi}{\trans{c}{A\otimes B}{\inbr{\sigma^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, a\oplus b}}}}
+        {\withenv{\Phi}{\trans{c}{A\otimes B}{\primi{ret}{c^{\prime\prime}\;(\primi{val}{c^\prime}\oplus \primi{val}{c^{\prime\prime}})}}}}
         \ruleno{Binop}
 \]
        
@@ -94,31 +81,40 @@ These two premises ensure that both operand expressions are evaluated into integ
 kinds of expressions (see Figure~\ref{array_expressions}).
 
 \begin{figure}
-  \[\trule{\begin{array}{c}
-             \withenv{\Phi}{\trans{c}{E}{c^\prime=\inbr{\_, \_, \_, l}}}\\
-             \withenv{\Phi}{\trans{c^\prime}{J}{\inbr{s^{\prime\prime}=\inbr{\_,\, \_,\, \_,\, \mu,\,\_},\, i^{\prime\prime},\, o^{\prime\prime},\, j}}}\\
-             l\in \mathscr L,\,(n,\,f)=\mu\,\;l\,j\in\mathbb N,\,j<n
+  \[\trule{\begin{array}{ccc}
+             \withenv{\Phi}{\trans{c}{e}{c^\prime}} &\phantom{XXXX} &\withenv{\Phi}{\trans{c^\prime}{j}{c^{\prime\prime}}}\\
+             l=\primi{val}{c^\prime}                &               &j=\primi{val}{c^{\prime\prime}}\\
+             l\in\mathscr L                       &                &j\in\mathbb N\\
+             (n,\,f)=\primi{mem}{l}               &                &j<n
            \end{array}}
-          {\withenv{\Phi}{\trans{c}{E\,\mathtt{[}J\mathtt{]}}{\inbr{s^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, f\,j}}}}
+          {\withenv{\Phi}{\trans{c}{e\,\mathtt{[}j\mathtt{]}}{\primi{ret}{c^{\prime\prime}(f\;j)}}}}
           \ruleno{ArrayElement}
   \]
-  \[\trule{\withenv{\Phi}{\trans{c_j}{e_j}{c_{j+1}=\inbr{\inbr{\sigma_g^{j+1},\,S^{j+1},\,\sigma_l^{j+1},\,\mu^{j+1},\,l_{m_{j+1}}}, i_{j+1}, o_{j+1}, a_j}}},\,j\in [0..k]}
-          {\withenv{\Phi}{\trans{c_0}{\mathtt{[}e_0, e_1,...,e_k\mathtt{]}}{\inbr{\inbr{\sigma_g^{j+1},\,S^{j+1},\,\sigma_l^{j+1},\,\mu^{j+1}[l_{m_{k+1}}\gets (k,\,\lambda i\,.\,a_i)],\, l_{m_{k+1}+1}}, i_{k+1}, o_{k+1}, l_{m_{k+1}}}}}}
-          \ruleno{ArrayConstructor}
-  \]
+  \vskip5mm        
   \[\trule{\begin{array}{c}
-              \withenv{\Phi}{\trans{c}{E}{\inbr{s^{\prime\prime}=\inbr{\_,\,\_,\,\_,\,\mu,\,\_}, i^{\prime\prime}, o^{\prime\prime}, l}}}\\
-              l\in\mathscr L,\,(n,\,f)=\mu\;l
+              \withenv{\Phi}{\trans{c_j}{e_j}{c_{j+1}}},\,j\in [0..k]\\
+              \inbr{s,\,\mu,\,l_m,\,i,\,o,\,\_}=c_{k+1}
+           \end{array}
+          }
+          {\withenv{\Phi}{\trans{c_0}{\mathtt{[}e_0, e_1,...,e_k\mathtt{]}}{\inbr{s,\,\mu\,[l_m\gets(k+1,\,\lambda n.\primi{val}{c_n})],\,l_{m+1},\,i,\,o,\,l_m}}}}
+          \ruleno{Array}
+  \]
+  \vskip5mm        
+  \[\trule{\begin{array}{c}
+              \withenv{\Phi}{\trans{c}{e}{c^\prime}}\\
+              l=\primi{val}{c^\prime}\\
+              l\in\mathscr L\\
+              (n,\,f)=(\primi{mem}{c^\prime})\;l
             \end{array}
           }
-          {\withenv{\Phi}{\trans{c}{E\mathtt{.length}}{\inbr{s^{\prime\prime}, i^{\prime\prime}, o^{\prime\prime}, n}}}}
+          {\withenv{\Phi}{\trans{c}{e\mathtt{.length}}{\primi{return}{c^\prime\;n}}}}
           \ruleno{ArrayLength}
   \]
   \caption{Big-step Operational Semantics for Array Expressions}
   \label{array_expressions}
 \end{figure}
 
-\subsection{Adding arrays/strings on statement level}
+\subsection{Adding arrays on statement level}
 
 On statement level, we add the single construct:
 
@@ -127,17 +123,30 @@ On statement level, we add the single construct:
 \]
 
 This construct is interpreted as an assignment to an element of an array. The semantics of this construct is described by the following rule:
-
 \[
 \trule{\setsubarrow{_{\mathscr E}}
-       \begin{array}{c}
-         \withenv{\Phi}{\trans{c}{E}{c^\prime=\inbr{\_,\_,\_, (n,\,f)}}}\\
-         \withenv{\Phi}{\trans{c^\prime}{J}{c^{\prime\prime}=\inbr{\_,\_,\_,j}}}\\
-         \withenv{\Phi}{\trans{c^{\prime\prime}}{F}{c^{\prime\prime\prime}=\inbr{s^{\prime\prime},i^{\prime\prime},o^{\prime\prime},y}}}\\
-         j\in\mathbb N,\,j<n\\
-         \setsubarrow{}\withenv{\llang{skip},\,\Phi}{\trans{\inbr{\mathtt{update}(s^{\prime\prime}, E, (n,\,f [j\gets y])),i^{\prime\prime},o^{\prime\prime},\hbox{---}}}{K}{\widetilde{c}}}
+       \begin{array}{ccccc}
+         \withenv{\Phi}{\trans{c}{e}{c^\prime}} & \phantom{XXX} & \withenv{\Phi}{\trans{c^\prime}{j}{c^{\prime\prime}}} & \phantom{XXX} & \withenv{\Phi}{\trans{c^{\prime\prime}}{g}{\inbr{s,\mu,l_m,i,o,v}}}\\
+            l=\primi{val}{c^\prime}             &               & i=\primi{val}{c^{\prime\prime}}                      &               & \\
+            l\in\mathscr L                     &               &  i\in\mathbb N                                   &               & \\[3mm]
+            \multicolumn{5}{c}{(n,\,f)=\mu\;l}\\
+            \multicolumn{5}{c}{i<n}\\
+            \multicolumn{5}{c}{\setsubarrow{}\withenv{\llang{skip},\,\Phi}{\trans{\inbr{s,\,\mu\,[l\gets (n,\,f\,[i\gets x])],\,l_m,\,i,\,o,\,\hbox{---}}}{K}{\widetilde{c}}}}
        \end{array}
       }
-      {\setsubarrow{}\withenv{K,\,\Phi}{\trans{c}{E\mathtt{[}J\mathtt{]}\llang{:=}F}{\widetilde{c}}}}
+      {\setsubarrow{}\withenv{K,\,\Phi}{\trans{c}{e\mathtt{[}j\mathtt{]}\llang{:=}g}{\widetilde{c}}}}
       \ruleno{ArrayAssign}
 \]
+
+\subsection{Strings}
+
+With arrays in our hands, we can easily add strings as arrays of characters. In fact, on the source language the strings can be
+introduced as a syntactic extension:
+
+\begin{enumerate}
+  \item we add a character constants \llang{'c'} as a shortcut for their integer codes;
+  \item we add a string literals \llang{"abcd..."} as a shortcut for arrays \llang{['a', 'b', 'c', 'd', ...]}.
+\end{enumerate}
+
+Nothing else has to be done~--- now we have mutable reference-representable strings.
+
