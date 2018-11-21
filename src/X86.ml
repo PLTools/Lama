@@ -19,6 +19,8 @@ let word_size = 4;;
 | L of int     (* an immediate operand             *)
 with show
 
+let show_opnd = show(opnd)
+              
 (* For convenience we define the following synonyms for the registers: *)         
 let ebx = R 0
 let ecx = R 1
@@ -164,7 +166,7 @@ let compile env code =
              (env, Mov (M ("$" ^ s), l) :: call)
              
 	  | LD x ->
-             let s, env' = (env#global x)#allocate in
+             let s, env' = (env#variable x)#allocate in
              env',
 	     (match s with
 	      | S _ | M _ -> [Mov (env'#loc x, eax); Mov (eax, s)]
@@ -172,7 +174,7 @@ let compile env code =
 	     )
                
           | STA (x, n) ->
-             let s, env = (env#global x)#allocate in
+             let s, env = (env#variable x)#allocate in
              let push =
                match s with
                | S _ | M _ -> [Mov (env#loc x, eax); Mov (eax, s)]
@@ -182,7 +184,7 @@ let compile env code =
              env, push @ code
                            
 	  | ST x ->
-	     let s, env' = (env#global x)#pop in
+	     let s, env' = (env#variable x)#pop in
              env',
              (match s with
               | S _ | M _ -> [Mov (s, eax); Mov (eax, env'#loc x)]
@@ -425,13 +427,13 @@ class env =
     (* allocates a fresh position on a symbolic stack *)
     method allocate =    
       let x, n =
-	let rec allocate' = function
-	| []                            -> ebx          , 0
-	| (S n)::_                      -> S (n+1)      , n+2
-	| (R n)::_ when n < num_of_regs -> R (n+1)      , stack_slots
-	| _                             -> S static_size, static_size+1
-	in
-	allocate' stack
+        let rec allocate' = function
+        | []                            -> ebx          , 0
+        | (S n)::_                      -> S (n+1)      , n+2
+        | (R n)::_ when n < num_of_regs -> R (n+1)      , stack_slots
+        | _                             -> S static_size, static_size+1
+        in
+        allocate' stack
       in
       x, {< stack_slots = max n stack_slots; stack = x::stack >}
 
@@ -458,8 +460,11 @@ class env =
       done;
       !h      
              
-    (* registers a global variable in the environment *)
-    method global x  = {< globals = S.add ("global_" ^ x) globals >}
+    (* registers a variable in the environment *)
+    method variable x =
+      match self#loc x with
+      | M name -> {< globals = S.add name globals >}
+      | _      -> self
 
     (* registers a string constant *)
     method string x =
@@ -515,14 +520,24 @@ class env =
    the stack code, then generates x86 assember code, then prints the assembler file
 *)
 let genasm (ds, stmt) =
-  let stmt = Language.Stmt.Seq (stmt, Language.Stmt.Return (Some (Language.Expr.Call ("raw", [Language.Expr.Const 0])))) in
+  let stmt =
+    Language.Stmt.Seq (
+        Language.Stmt.Call ("__gc_init", []),
+        Language.Stmt.Seq (stmt, Language.Stmt.Return (Some (Language.Expr.Call ("raw", [Language.Expr.Const 0]))))
+      )
+  in
   let env, code =
     compile
       (new env)
       ((LABEL "main") :: (BEGIN ("main", [], [])) :: SM.compile (ds, stmt))
   in
-  let data = Meta "\t.data" :: (List.map (fun s      -> Meta (Printf.sprintf "%s:\t.int\t0"         s  )) env#globals) @
-                               (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings) in 
+  let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
+  let data = [Meta "\t.data"; Meta (Printf.sprintf "\t.globl\t%s" gc_start); Meta (Printf.sprintf "\t.globl\t%s" gc_end)] @
+             [Meta (Printf.sprintf "%s:" gc_start)] @
+             (List.map (fun s      -> Meta (Printf.sprintf "%s:\t.int\t1"         s  )) env#globals) @
+             [Meta (Printf.sprintf "%s:" gc_end)] @
+             (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings)
+  in 
   let asm = Buffer.create 1024 in
   List.iter
     (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show i))
@@ -535,5 +550,5 @@ let build prog name =
   Printf.fprintf outf "%s" (genasm prog);
   close_out outf;
   let inc = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
-  Sys.command (Printf.sprintf "gcc -m32 -o %s %s/runtime.o %s.s" name inc name)
+  Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s/gc_runtime.o %s/runtime.o %s.s" name inc inc name)
  

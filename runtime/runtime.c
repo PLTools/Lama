@@ -351,17 +351,23 @@ extern int Lwrite (int n) {
 /* GC starts here */
 
 extern const size_t __gc_data_end, __gc_data_start;
+extern size_t __gc_stack_bottom, __gc_stack_top;
+
+extern void L__gc_init ();
 
 extern void __gc_root_scan_data () {
   size_t * p = &__gc_data_start;
 
-  printf ("Start, end: %d, %d\n", &__gc_data_start, &__gc_data_end);
+  printf ("Start, end: %lx, %lx\n", &__gc_data_start, &__gc_data_end);
   
   while (p != &__gc_data_end) {
-    if (!UNBOXED(*p)) printf ("Root: %d\n", p);
+    if (!UNBOXED(*p)) printf ("Root: %lx\n", *p);
     p++;
   }
 }
+
+extern void __gc_root_scan_stack ();
+
 
 /* extern const void * __gc_data_end, * __gc_data_start; */
 
@@ -376,6 +382,17 @@ extern void __gc_root_scan_data () {
 /*   } */
 /* } */
 
+extern char __executable_start;
+extern char __etext;
+
 extern void Ltest () {
+  printf("\n");
+  printf("STA 0x%lx\n", (unsigned long)&__executable_start);
+  printf("END 0x%lx\n", (unsigned long)&__etext);
   __gc_root_scan_data ();
+  __gc_root_scan_stack ();
+
+  //  printf("STA 0x%lx\n", (unsigned long)&__executable_start);
+  //  printf("END 0x%lx\n", (unsigned long)&__etext);
+  //  printf("RET 0x%lx\n\n", __builtin_return_address(0));
 }
