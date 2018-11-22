@@ -4,7 +4,7 @@ let parse infile =
   let s = Util.read infile in
   Util.parse
     (object
-       inherit Matcher.t s
+       inherit Matcher.stream s
        inherit Util.Lexers.decimal s
        inherit Util.Lexers.string s
        inherit Util.Lexers.char   s

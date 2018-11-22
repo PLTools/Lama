@@ -103,7 +103,7 @@ open SM
    of x86 instructions
 *)
 let compile env code =
-  (*SM.print_prg code;*)
+  SM.print_prg code;
   flush stdout;
   let suffix = function
   | "<"  -> "l"
@@ -279,7 +279,7 @@ let compile env code =
                  else [Binop (op, x, y); Or1 y]
              )
           | LABEL s     -> (if env#is_barrier then (env#drop_barrier)#retrieve_stack s else env), [Label s]
-                             
+                         
 	  | JMP   l     -> (env#set_stack l)#set_barrier, [Jmp l]
                                                             
           | CJMP (s, l) ->

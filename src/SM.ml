@@ -33,7 +33,7 @@ with show
 (* The type for the stack machine program *)
 type prg = insn list
 
-let print_prg p = List.iter (fun i -> Printf.printf "%s\n\!" (show(insn) i)) p
+let print_prg p = List.iter (fun i -> Printf.printf "%s\n" (show(insn) i)) p
                             
 (* The type for the stack machine configuration: control stack, stack and configuration from statement
    interpreter
