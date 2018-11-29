@@ -7,18 +7,24 @@ printf_format5:		.string	"LOL\n"
 __gc_stack_bottom:	.long	0
 __gc_stack_top:	        .long	0
 	
-			.globl L__gc_init
-			.globl __gc_root_scan_stack
-	
+			.globl	L__gc_init
+			.globl	__gc_root_scan_stack
+			.extern	init_pool
+			.extern	__gc_test_and_copy_root
 			.text
 L__gc_init:		movl	%esp, __gc_stack_bottom
 			addl	$4, __gc_stack_bottom
+			call	init_pool
 			ret
 
 __gc_root_scan_stack:
+	pushl	%ebp
+	movl	%esp, %ebp
+	pushl	%ebx
+	pushl	%edx
 			movl	%esp, __gc_stack_top
 			movl	%esp, %eax
-			jmp next
+			jmp 	next
 
 loop:
 			movl	(%eax), %ebx
@@ -54,15 +60,22 @@ check22:
 loop2:
 			andl	$0x00000001, %ebx
 			jnz     next
+gc_run_t:
 			pushl 	%eax
-			pushl	(%eax)
-        		pushl	$printf_format
-        		call	printf
-        		addl	$8, %esp
+//			pushl	(%eax)
+  			pushl	%eax
+      			call	__gc_test_and_copy_root
+        		addl	$4, %esp
 			popl	%eax
 
 next:
 			addl	$4, %eax
 			cmpl	%eax, __gc_stack_bottom
 			jne	loop
+returnn:
+			movl	$0, %eax
+			popl	%edx
+			popl	%ebx
+			movl	%ebp, %esp 
+			popl	%ebp
 			ret
