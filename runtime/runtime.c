@@ -8,6 +8,8 @@
 # include <sys/mman.h>
 # include <assert.h>
 
+// # define DEBUG_PRINT 1
+
 # define STRING_TAG 0x00000001
 # define ARRAY_TAG  0x00000003
 # define SEXP_TAG   0x00000005
@@ -44,12 +46,16 @@ char* de_hash (int n) {
   static char buf[6];
   char *p = &buf[5];
 
-  /*printf ("tag: %d\n", n);*/
+#ifdef DEBUG_PRINT
+  printf ("de_hash: tag: %d\n", n);
+#endif
   
   *p-- = 0;
 
   while (n != 0) {
-    /*printf ("char: %c\n", chars [n & 0x003F]);*/
+#ifdef DEBUG_PRINT
+    printf ("char: %c\n", chars [n & 0x003F]);
+#endif
     *p-- = chars [n & 0x003F];
     n = n >> 6;
   }
@@ -144,8 +150,6 @@ extern void* Belem (void *p, int i) {
   data *a = TO_DATA(p);
   i = UNBOX(i);
   
-  /* printf ("elem %d = %p\n", i, (void*) ((int*) a->contents)[i]); */
-
   if (TAG(a->tag) == STRING_TAG) {
     return (void*) BOX(a->contents[i]);
   }
@@ -203,7 +207,9 @@ extern void* Bsexp (int n, ...) {
   sexp *r;
   data *d;
 
+#ifdef DEBUG_PRINT
   printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+2));
+#endif
   r = (sexp*) alloc (sizeof(int) * (n+2));
   d = &(r->contents);
     
@@ -213,16 +219,12 @@ extern void* Bsexp (int n, ...) {
   
   for (i=0; i<n-1; i++) {
     int ai = va_arg(args, int);
-    //printf ("arg %d = %x\n", i, ai);
     ((int*)d->contents)[i] = ai; 
   }
 
   r->tag = va_arg(args, int);
   va_end(args);
 
-  //printf ("tag %d\n", r->tag);
-  //printf ("returning %p\n", d->contents);
-  
   return d->contents;
 }
 
@@ -454,19 +456,25 @@ extern size_t * gc_copy (size_t *obj) {
   sexp   *s    = NULL;
   size_t *copy = NULL;
   int     i    = 0;
+#ifdef DEBUG_PRINT
   int len1, len2, len3;
   void * objj;
   void * newobjj = (void*)current;
   printf("gc_copy: %x cur = %x starts\n", obj, current);
+#endif
 
   if (!IS_VALID_HEAP_POINTER(obj)) {
+#ifdef DEBUG_PRINT
     printf ("gc_copy: invalid ptr: %x\n", obj);
+#endif
     return obj;
   }
 
   if (!IN_PASSIVE_SPACE(current)) {
+#ifdef DEBUG_PRINT
     printf("ERROR: gc_copy: out-of-space %x %x %x\n", current, to_space.begin, to_space.end);
     fflush(stdout);
+#endif
     perror("ERROR: gc_copy: out-of-space\n");
     exit (6);
   }
@@ -475,7 +483,9 @@ extern size_t * gc_copy (size_t *obj) {
     return (size_t *) d->tag;
 
   copy = current;
+#ifdef DEBUG_PRINT
   objj = d;
+#endif
   switch (TAG(d->tag)) {
     case ARRAY_TAG:
       current += (LEN(d->tag) + 1) * sizeof (int);
@@ -493,28 +503,34 @@ extern size_t * gc_copy (size_t *obj) {
       break;
     case SEXP_TAG  :
       s = TO_SEXP(obj);
+#ifdef DEBUG_PRINT
       objj = s;
       len1 = LEN(s->contents.tag);
       len2 = LEN(s->tag);
       len3 = LEN(d->tag);
       printf("len1 = %li, len2=%li, len3 = %li\n",len1,len2,len3);
+#endif
       current += (LEN(s->contents.tag) + 2) * sizeof (int);
       *copy = s->tag;
       copy++;
       *copy   = s->contents.tag;
       copy++;
-      len3 = LEN(s->contents.tag);
+      i = LEN(s->contents.tag);
       s->contents.tag = (int) copy;
-      copy_elements (copy, obj, len3);
+      copy_elements (copy, obj, i);
       break;
   default:
+#ifdef DEBUG_PRINT
     printf ("ERROR: gc_copy: weird tag: %x", TAG(d->tag));
     fflush(stdout);
+#endif
     perror ("ERROR: gc_copy: weird tag");
     exit(5);
   }
+#ifdef DEBUG_PRINT
   printf("gc_copy: %x -> %x\n", objj, newobjj);
   fflush(stdout);
+#endif
   return copy;
 }
 
@@ -555,7 +571,10 @@ static int free_pool (pool * p) {
 
 static void * gc (size_t size) {
   current = to_space.begin;
-  printf("gc: current: %x; to_space.b = %x; to_space.e = %x; f_space.b = %x; f_space.e = %x\n", current, to_space.begin, to_space.end, from_space.begin, from_space.end);
+#ifdef DEBUG_PRINT
+  printf("gc: current: %x; to_space.b = %x; to_space.e = %x; f_space.b = %x; f_space.e = %x\n",
+	 current, to_space.begin, to_space.end, from_space.begin, from_space.end);
+#endif
   __gc_root_scan_data  ();
   __gc_root_scan_stack ();
   if (!IN_PASSIVE_SPACE(current)) {
@@ -575,12 +594,18 @@ static void * gc (size_t size) {
 
 static void * alloc (size_t size) {
   if (from_space.current + size < from_space.end) {
+#ifdef DEBUG_PRINT
     printf("alloc: current: %x %zu", from_space.current, size);
+#endif
     void * p = (void*) from_space.current;
     from_space.current += size;
+#ifdef DEBUG_PRINT
     printf(";new current: %x \n", from_space.current);
+#endif
     return p;
   }
+#ifdef DEBUG_PRINT
   printf("alloc: call gc: %zu\n", size);
+#endif
   return gc (size);
 }
