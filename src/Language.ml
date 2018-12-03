@@ -11,7 +11,7 @@ open Combinators
 module Value =
   struct
 
-    @type t = Int of int | String of bytes | Array of t array | Sexp of string * t list (*with show*)
+    @type t = Int of int | String of bytes | Array of t array | Sexp of string * t list with show
 
     let to_int = function 
     | Int n -> n 
@@ -377,7 +377,7 @@ module Stmt =
       | Case   (e, bs)     ->
           let (_, _, _, Some v) as conf' = Expr.eval env conf e in
           let rec branch ((st, i, o, _) as conf) = function
-          | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" "" (*show(Value.t) v*))
+          | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) v))
           | (patt, body)::tl ->
              let rec match_patt patt v st =
                let update x v = function
