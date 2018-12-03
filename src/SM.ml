@@ -186,21 +186,21 @@ let compile (defs, p) =
     List.flatten (List.rev code), env            
   and bindings p =
     let bindings =
-      fix0 (fun fself ->
       transform(Stmt.Pattern.t)
-        (object inherit [int list, (string * int list) list, _] @Stmt.Pattern.t 
-           method c_Wildcard  path      = []
-           method c_Named     path s p  = [s, path] @ fself path p
-           method c_Sexp      path x ps = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
-           method c_UnBoxed   _         = []
-           method c_StringTag _         = []
-           method c_String    _ _       = []
-           method c_SexpTag   _         = []
-           method c_Const     _ _       = []
-           method c_Boxed     _         = []
-           method c_ArrayTag  _         = []
-           method c_Array     path ps   = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
-         end))
+        (fun fself ->
+           object inherit [int list, (string * int list) list, _] @Stmt.Pattern.t 
+             method c_Wildcard  path _      = []
+             method c_Named     path _ s p  = [s, path] @ fself path p
+             method c_Sexp      path _ x ps = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
+             method c_UnBoxed   _ _         = []
+             method c_StringTag _ _         = []
+             method c_String    _ _ _       = []
+             method c_SexpTag   _ _         = []
+             method c_Const     _ _ _       = []
+             method c_Boxed     _ _         = []
+             method c_ArrayTag  _ _         = []
+             method c_Array     path _ ps   = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
+           end)
         []
         p
     in
