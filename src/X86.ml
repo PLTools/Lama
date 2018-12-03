@@ -103,7 +103,7 @@ open SM
    of x86 instructions
 *)
 let compile env code =
-  SM.print_prg code;
+  (*SM.print_prg code;*)
   flush stdout;
   let suffix = function
   | "<"  -> "l"
