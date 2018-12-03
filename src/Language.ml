@@ -318,9 +318,8 @@ module Stmt =
           | "#" %"sexp"                                     {SexpTag}
           | "#" %"array"                                    {ArrayTag}
         )
-        
-        let vars p = fix0 (fun f  ->
-          transform(t) (object inherit [string list, _] @t[foldl] f method c_Named s name p = name :: f s p end)) [] p 
+
+        let vars p = transform(t) (fun f -> object inherit [string list, _] @t[foldl] f method c_Named s _ name p = name :: f s p end) [] p 
         
       end
         
