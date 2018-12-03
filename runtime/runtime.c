@@ -8,7 +8,7 @@
 # include <sys/mman.h>
 # include <assert.h>
 
-// # define DEBUG_PRINT 1
+# define DEBUG_PRINT 1
 
 # define STRING_TAG 0x00000001
 # define ARRAY_TAG  0x00000003
@@ -200,12 +200,11 @@ extern void* Barray (int n, ...) {
 }
 
 extern void* Bsexp (int n, ...) {
-  va_list args;
-  int i;
-  //  sexp *r = (sexp*) alloc (sizeof(int) * (n+2));
-  // data *d = &(r->contents);
-  sexp *r;
-  data *d;
+  va_list args = (va_list) BOX(NULL);
+  int     i    = BOX(0);
+  int     ai   = BOX(0);
+  sexp   *r    = (sexp*) BOX(NULL);
+  data   *d    = (sexp*) BOX(NULL);
 
 #ifdef DEBUG_PRINT
   printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+2));
@@ -218,7 +217,7 @@ extern void* Bsexp (int n, ...) {
   va_start(args, n);
   
   for (i=0; i<n-1; i++) {
-    int ai = va_arg(args, int);
+    ai = va_arg(args, int);
     ((int*)d->contents)[i] = ai; 
   }
 
@@ -593,11 +592,12 @@ static void * gc (size_t size) {
 }
 
 static void * alloc (size_t size) {
+  void * p = BOX(NULL);
   if (from_space.current + size < from_space.end) {
 #ifdef DEBUG_PRINT
     printf("alloc: current: %x %zu", from_space.current, size);
 #endif
-    void * p = (void*) from_space.current;
+    p = (void*) from_space.current;
     from_space.current += size;
 #ifdef DEBUG_PRINT
     printf(";new current: %x \n", from_space.current);
