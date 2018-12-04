@@ -48,14 +48,14 @@ With the relation ``$\Rightarrow$'' defined we can abbreviate the ``surface'' se
 \setarrow{\xRightarrow}
 
 \[
-\forall S\in\mathscr S,\,\forall i\in\mathbb Z^*\;:\;\sembr{S}_{\mathscr S} i = o \Leftrightarrow \trans{\inbr{\bot, i, \epsilon}}{S}{\inbr{\_, \_, o}}
+\forall S\in\mathscr S,\,\forall \iota\in\mathbb Z^*\;:\;\sembr{S}_{\mathscr S} \iota = o \Leftrightarrow \trans{\inbr{\bot, i, \epsilon}}{S}{\inbr{\_, \_, o}}
 \]
 
 
 \begin{figure}[t]
-\[\trans{\inbr{s, i, o}}{\llang{x := $\;\;e$}}{\inbr{s[x\gets\sembr{e}_{\mathscr E}\;s], i, o}}\ruleno{Assign}\]
-\[\trans{\inbr{s, z\llang{::}i, o}}{\llang{read ($x$)}}{\inbr{s[x\gets z], i, o}}\ruleno{Read}\]
-\[\trans{\inbr{s, i, o}}{\llang{write ($e$)}}{\inbr{s, i, o \llang{@} \sembr{e}_{\mathscr E}\;s}}\ruleno{Write}\]
+\[\trans{\inbr{\sigma,\, \iota,\, o}}{\llang{x := $\;\;e$}}{\inbr{\sigma\,[x\gets\sembr{e}_{\mathscr E}\;\sigma],\, \iota,\, o}}\ruleno{Assign}\]
+\[\trans{\inbr{\sigma,\, z\iota,\, o}}{\llang{read ($x$)}}{\inbr{\sigma\,[x\gets z],\, \iota,\, o}}\ruleno{Read}\]
+\[\trans{\inbr{\sigma,\, \iota,\, o}}{\llang{write ($e$)}}{\inbr{\sigma,\, \iota,\, o(\sembr{e}_{\mathscr E}\;\sigma)}}\ruleno{Write}\]
 \[\trule{\trans{c_1}{S_1}{c^\prime},\;\trans{c^\prime}{S_2}{c_2}}{\trans{c_1}{S_1\llang{;}S_2}{c_2}}\ruleno{Seq}\]
 \caption{Big-step operational semantics for statements}
 \label{bs_stmt}

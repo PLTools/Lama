@@ -74,10 +74,8 @@ Abstract syntax:
 
 $$
 \begin{array}{rcll}
-  \mathscr X & = & \{x, y, z, \dots\}            & \mbox{(variables)}\\
-  \otimes    & = & \{\lstinline|+|, \lstinline|-|, \lstinline|*|, \lstinline|/|, \lstinline|%|,
-                     \lstinline|<|, \lstinline|<=|, \lstinline|>|, \lstinline|>=|, \lstinline|==|,
-                     \lstinline|!=|, \lstinline|!!|, \lstinline|&&|\} & \mbox{(binary operators)}\\
+  \mathscr X & = & \{x,\, y,\, z,\, \dots\}            & \mbox{(variables)}\\
+  \otimes    & = & \{+,\, -,\, \times,\, /,\, \%,\, <,\, \le,\, >,\, \ge,\, =,\,\ne,\, \vee,\, \wedge\} & \mbox{(binary operators)}\\
    \mathscr E & = & \mathscr X                    & \mbox{(expressions)}\\
               &   & \mathbb N                     & \\
               &   & \mathscr E \otimes \mathscr E & 
@@ -108,19 +106,19 @@ $$
 \begin{tabular}{c|cl}
   $\otimes$     & $\oplus$ in ocaml\\
   \hline
-  \lstinline|+|  & \lstinline|+|   \\
-  \lstinline|-|  & \lstinline|-|   \\
-  \lstinline|*|  & \lstinline|*|   \\
-  \lstinline|/|  & \lstinline|/|   \\
-  \lstinline|%|  & \lstinline|mod| \\
-  \lstinline|<|  & \lstinline|<|  & \rdelim\}{6}{5mm}[  see note 1 below] \\
-  \lstinline|>|  & \lstinline|>|   \\
-  \lstinline|<=| & \lstinline|<=|  \\
-  \lstinline|>=| & \lstinline|>=|  \\
-  \lstinline|==| & \lstinline|=|   \\
-  \lstinline|!=| & \lstinline|<>|  \\
-  \lstinline|&&| & \lstinline|&&| & \rdelim\}{2}{5mm}[  see note 2 below]\\
-  \lstinline|!!| & \lstinline/||/ 
+  $+$      & \lstinline|+|   \\
+  $-$      & \lstinline|-|   \\
+  $\times$ & \lstinline|*|   \\
+  $/$      & \lstinline|/|   \\
+  $\%$     & \lstinline|mod| \\
+  $<$      & \lstinline|<|  & \rdelim\}{6}{5mm}[  see note 1 below] \\
+  $>$      & \lstinline|>|   \\
+  $\le$    & \lstinline|<=|  \\
+  $\ge$    & \lstinline|>=|  \\
+  $=$      & \lstinline|=|   \\
+  $\ne$    & \lstinline|<>|  \\
+  $\wedge$ & \lstinline|&&| & \rdelim\}{2}{5mm}[  see note 2 below]\\
+  $\vee$   & \lstinline/||/ 
 \end{tabular}
 \end{center}
 
@@ -140,5 +138,5 @@ Important observations:
   \item $\otimes$ is an element of language \emph{syntax}, while $\oplus$ is its interpretation in the meta-language of
   semanic description (simpler: in the language of interpreter implementation).
   \item This concrete semantics is \emph{strict}: for a binary operator both its arguments are evaluated unconditionally; thus,
-  for example, \lstinline|1 !! x| is undefined in empty state.
+  for example, \lstinline|1$\,\vee\,$x| is undefined in empty state.
 \end{enumerate}
