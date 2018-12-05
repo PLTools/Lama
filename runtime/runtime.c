@@ -8,7 +8,7 @@
 # include <sys/mman.h>
 # include <assert.h>
 
-# define DEBUG_PRINT 1
+// # define DEBUG_PRINT 1
 
 # define STRING_TAG 0x00000001
 # define ARRAY_TAG  0x00000003
@@ -184,8 +184,10 @@ extern void* Barray (int n, ...) {
   va_list args;
   int i = 1;
   data *r = NULL;
+#ifdef DEBUG_PRINT
   printf ("Barray: create n = %d\n", n);
   fflush(stdout);
+#endif
   r = (data*) alloc (sizeof(int) * (n+1));
 
   r->tag = ARRAY_TAG | (n << 3);
@@ -544,8 +546,10 @@ extern size_t * gc_copy (size_t *obj) {
   }
 
   if (IS_FORWARD_PTR(d->tag)) {
+#ifdef DEBUG_PRINT
     printf ("gc_copy: IS_FORWARD_PTR: return! %x\n", (size_t *) d->tag);
     fflush(stdout);
+#endif
     return (size_t *) d->tag;
   }
 
@@ -555,8 +559,10 @@ extern size_t * gc_copy (size_t *obj) {
 #endif
   switch (TAG(d->tag)) {
     case ARRAY_TAG:
+#ifdef DEBUG_PRINT
       printf ("gc_copy:array_tag; len =  %zu\n", LEN(d->tag));
       fflush(stdout);
+#endif
       current += (LEN(d->tag) + 1) * sizeof (int);
       *copy = d->tag;
       copy++;
@@ -564,8 +570,10 @@ extern size_t * gc_copy (size_t *obj) {
       copy_elements (copy, obj, LEN(d->tag));
       break;
     case STRING_TAG:
+#ifdef DEBUG_PRINT
       printf ("gc_copy:string_tag \n");
       current += (LEN(d->tag) + 1) * sizeof (int);
+#endif
       *copy = d->tag;
       copy++;
       d->tag = (int) copy;
