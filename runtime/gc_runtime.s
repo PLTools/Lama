@@ -6,7 +6,8 @@ printf_format4:		.string	"EAX: %lx\n"
 printf_format5:		.string	"LOL\n"
 __gc_stack_bottom:	.long	0
 __gc_stack_top:	        .long	0
-	
+
+			.globl	__pre_gc
 			.globl	L__gc_init
 			.globl	__gc_root_scan_stack
 			.extern	init_pool
@@ -17,13 +18,26 @@ L__gc_init:		movl	%esp, __gc_stack_bottom
 			call	init_pool
 			ret
 
+__pre_gc:
+	movl	%ebp, __gc_stack_top
+	ret
+	
 __gc_root_scan_stack:
 	pushl	%ebp
 	movl	%esp, %ebp
 	pushl	%ebx
 	pushl	%edx
-			movl	%esp, __gc_stack_top
-			movl	%esp, %eax
+
+//	pushl	__gc_stack_top
+//	call 	Lwrite2
+//	addl	$4, %esp
+//	pushl	__gc_stack_bottom
+//	call 	Lwrite2
+//	addl	$4, %esp
+
+//			movl	%esp, __gc_stack_top
+//			movl	%esp, %eax
+			movl	__gc_stack_top, %eax
 			jmp 	next
 
 loop:

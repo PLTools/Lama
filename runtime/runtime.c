@@ -182,8 +182,11 @@ extern void* Bstringval (void *p) {
 
 extern void* Barray (int n, ...) {
   va_list args;
-  int i;
-  data *r = (data*) alloc (sizeof(int) * (n+1));
+  int i = 1;
+  data *r = NULL;
+  printf ("Barray: create n = %d\n", n);
+  fflush(stdout);
+  r = (data*) alloc (sizeof(int) * (n+1));
 
   r->tag = ARRAY_TAG | (n << 3);
   
@@ -207,9 +210,9 @@ extern void* Bsexp (int n, ...) {
   data   *d    = (sexp*) BOX(NULL);
 
 #ifdef DEBUG_PRINT
-  printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+2));
+  printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+1));
 #endif
-  r = (sexp*) alloc (sizeof(int) * (n+2));
+  r = (sexp*) alloc (sizeof(int) * (n+1));
   d = &(r->contents);
     
   d->tag = SEXP_TAG | ((n-1) << 3);
@@ -357,12 +360,20 @@ extern int Lwrite (int n) {
   return 0;
 }
 
+extern int Lwrite2 (size_t* n) {
+  printf ("%x\n", n);
+  fflush (stdout);
+
+  return 0;
+}
+
 /* GC starts here */
 
 extern const size_t __gc_data_end, __gc_data_start;
 extern size_t __gc_stack_bottom, __gc_stack_top;
 
 extern void L__gc_init ();
+extern void __pre_gc ();
 
 extern void __gc_root_scan_stack ();
 
@@ -440,14 +451,66 @@ static void __gc_swap_spaces (void) {
 
 extern size_t * gc_copy (size_t *obj);
 
+/* static void copy_elements (size_t *where, size_t *from, int len) { */
+/*   int  i = 0; */
+/*   void * p = NULL; */
+/*   for (i = 0; i < len; i++) { */
+/*     size_t elem = from[i]; */
+/*     // if (UNBOXED(elem)) *++where = elem; */
+/*     if (!IS_VALID_HEAP_POINTER(elem)) *++where = elem; */
+/*     else { */
+/*       // *++where = gc_copy ((size_t*) elem); */
+/*       p = gc_copy ((size_t*) elem); */
+/*       printf ("copy_elements: fix %x --> %x\n", *where, p); */
+/*       *where = p; */
+/*       where ++; */
+/*     } */
+/*   } */
+/* } */
+
 static void copy_elements (size_t *where, size_t *from, int len) {
   int  i = 0;
+  void * p = NULL;
   for (i = 0; i < len; i++) {
     size_t elem = from[i];
     // if (UNBOXED(elem)) *++where = elem;
-    if (!IS_VALID_HEAP_POINTER(elem)) *++where = elem;
-    else *++where = gc_copy ((size_t*) elem);
+    if (!IS_VALID_HEAP_POINTER(elem)) {
+      // *++where = elem;
+      *where = elem;
+      where++;
+    }
+    else {
+      // *++where = gc_copy ((size_t*) elem);
+      p = gc_copy ((size_t*) elem);
+      *where = p;
+#ifdef DEBUG_PRINT
+      printf ("copy_elements: fix %x: %x\n", from, *where);
+#endif
+      where ++;
+    }
   }
+}
+
+static void extend_spaces (void) {
+  /* void *from_e = mmap(from_space.end, SPACE_SIZE, PROT_READ | PROT_WRITE, */
+  /* 			  MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0); */
+  /* void *to_e   = mmap(to_space.end  , SPACE_SIZE, PROT_READ | PROT_WRITE, */
+  /* 			  MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0); */
+  void *p1 = mremap(from_space.begin, SPACE_SIZE, 2*SPACE_SIZE, 0);
+  void *p2 = mremap(to_space.begin  , SPACE_SIZE, 2*SPACE_SIZE, 0);
+  if (p1   == MAP_FAILED || p2 == MAP_FAILED) {
+    perror("EROOR: extend_spaces: mmap failed\n");
+    exit(7);
+  }
+#ifdef DEBUG_PRINT
+  printf ("extend: %x %x %x %x\n", p1, p2, from_space.begin, to_space.begin);
+  printf ("extend: %x %x %x\n", from_space.end, to_space.end, current);
+#endif
+  from_space.end  += SPACE_SIZE;
+  to_space.end    += SPACE_SIZE;
+  SPACE_SIZE      += SPACE_SIZE;
+  from_space.size =  SPACE_SIZE;
+  to_space.size   =  SPACE_SIZE;
 }
 
 extern size_t * gc_copy (size_t *obj) {
@@ -476,10 +539,15 @@ extern size_t * gc_copy (size_t *obj) {
 #endif
     perror("ERROR: gc_copy: out-of-space\n");
     exit (6);
+    //    extend_spaces ();
+    //    assert (IN_PASSIVE_SPACE(current));
   }
 
-  if (IS_FORWARD_PTR(d->tag))
+  if (IS_FORWARD_PTR(d->tag)) {
+    printf ("gc_copy: IS_FORWARD_PTR: return! %x\n", (size_t *) d->tag);
+    fflush(stdout);
     return (size_t *) d->tag;
+  }
 
   copy = current;
 #ifdef DEBUG_PRINT
@@ -487,13 +555,16 @@ extern size_t * gc_copy (size_t *obj) {
 #endif
   switch (TAG(d->tag)) {
     case ARRAY_TAG:
+      printf ("gc_copy:array_tag; len =  %zu\n", LEN(d->tag));
+      fflush(stdout);
       current += (LEN(d->tag) + 1) * sizeof (int);
       *copy = d->tag;
       copy++;
-      copy_elements (copy, obj, LEN(d->tag));
       d->tag = (int) copy;
+      copy_elements (copy, obj, LEN(d->tag));
       break;
     case STRING_TAG:
+      printf ("gc_copy:string_tag \n");
       current += (LEN(d->tag) + 1) * sizeof (int);
       *copy = d->tag;
       copy++;
@@ -515,7 +586,8 @@ extern size_t * gc_copy (size_t *obj) {
       *copy   = s->contents.tag;
       copy++;
       i = LEN(s->contents.tag);
-      s->contents.tag = (int) copy;
+      // s->contents.tag = (int) copy;
+      d->tag = (int) copy;
       copy_elements (copy, obj, i);
       break;
   default:
@@ -527,15 +599,19 @@ extern size_t * gc_copy (size_t *obj) {
     exit(5);
   }
 #ifdef DEBUG_PRINT
-  printf("gc_copy: %x -> %x\n", objj, newobjj);
+  printf("gc_copy: %x (%x) -> %x (%x)\n", obj, objj, copy, newobjj);
   fflush(stdout);
 #endif
   return copy;
 }
 
 extern void __gc_test_and_copy_root (size_t ** root) {
-  if (IS_VALID_HEAP_POINTER(*root))
+  if (IS_VALID_HEAP_POINTER(*root)) {
+#ifdef DEBUG_PRINT
+    printf ("__gc_test_and_copy_root: root %x %x\n", root, *root);
+#endif
     *root = gc_copy (*root);
+  }
 }
 
 extern void __gc_root_scan_data (void) {
@@ -575,6 +651,9 @@ static void * gc (size_t size) {
 	 current, to_space.begin, to_space.end, from_space.begin, from_space.end);
 #endif
   __gc_root_scan_data  ();
+#ifdef DEBUG_PRINT
+  printf("gc: data is scanned\n");
+#endif
   __gc_root_scan_stack ();
   if (!IN_PASSIVE_SPACE(current)) {
     perror ("ASSERT: !IN_PASSIVE_SPACE(current)\n");
@@ -582,8 +661,17 @@ static void * gc (size_t size) {
   }
 
   if (current + size >= to_space.end) {
-    perror ("ERROR: gc: out of memory\n");
-    exit(4);
+#ifdef DEBUG_PRINT
+    printf ("gc pre-extend_spaces : %x %x %x \n", current, size, to_space.end);
+#endif
+    extend_spaces ();
+#ifdef DEBUG_PRINT
+    printf ("gc post-extend_spaces: %x %x %x \n", current, size, to_space.end);
+#endif
+    assert (IN_PASSIVE_SPACE(current));
+    assert (current + size < to_space.end);
+    //    perror ("ERROR: gc: out of memory\n");
+    //    exit(4);
   }
 
   __gc_swap_spaces ();
@@ -607,5 +695,6 @@ static void * alloc (size_t size) {
 #ifdef DEBUG_PRINT
   printf("alloc: call gc: %zu\n", size);
 #endif
+  __pre_gc () ;
   return gc (size);
 }
