@@ -53,10 +53,14 @@ With the relation ``$\Rightarrow$'' defined we can abbreviate the ``surface'' se
 
 
 \begin{figure}[t]
+\arraycolsep=10pt
 \[\trans{\inbr{\sigma,\, \iota,\, o}}{\llang{x := $\;\;e$}}{\inbr{\sigma\,[x\gets\sembr{e}_{\mathscr E}\;\sigma],\, \iota,\, o}}\ruleno{Assign}\]
 \[\trans{\inbr{\sigma,\, z\iota,\, o}}{\llang{read ($x$)}}{\inbr{\sigma\,[x\gets z],\, \iota,\, o}}\ruleno{Read}\]
 \[\trans{\inbr{\sigma,\, \iota,\, o}}{\llang{write ($e$)}}{\inbr{\sigma,\, \iota,\, o(\sembr{e}_{\mathscr E}\;\sigma)}}\ruleno{Write}\]
-\[\trule{\trans{c_1}{S_1}{c^\prime},\;\trans{c^\prime}{S_2}{c_2}}{\trans{c_1}{S_1\llang{;}S_2}{c_2}}\ruleno{Seq}\]
+\[\trule{\begin{array}{cc}
+            \trans{c_1}{S_1}{c^\prime} & \trans{c^\prime}{S_2}{c_2}
+         \end{array}}
+        {\trans{c_1}{S_1\llang{;}S_2}{c_2}}\ruleno{Seq}\]
 \caption{Big-step operational semantics for statements}
 \label{bs_stmt}
 \end{figure}

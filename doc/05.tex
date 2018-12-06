@@ -110,9 +110,14 @@ propagate this environment, adding $\withenv{\Gamma}{...}$ for each transition `
 need now is to describe the rule for procedure calls:
 
 \[
-\trule{\withenv{\Gamma}{\trans{\inbr{\primi{enter}{\sigma\,(\bar{a}@\bar{l})[\overline{a\gets\sembr{e}\sigma}]},\,i,\,o}}{S}{\inbr{\sigma^\prime,\,i^\prime,\,o^\prime}}}}
-      {\withenv{\Gamma}{\trans{\inbr{\sigma,\,i,\,o}}{f (\bar{e})}{\inbr{\primi{leave}{\sigma^\prime\,\sigma},\,i^\prime,o^\prime}}}}
-     \ruleno{Call$_{bs}$}
+\arraycolsep=10pt
+\trule{\begin{array}{cc}
+          \llang{fun $\;f\;$ ($\bar{a}$) local $\;\bar{l}\;$ \{$S$\}}=\Gamma\,f &
+          \withenv{\Gamma}{\trans{\inbr{\primi{enter}{\sigma\,(\bar{a}\bar{l})[\overline{a\gets\sembr{e}\sigma}]},\,\iota,\,o}}{S}{\inbr{\sigma^\prime,\,\iota^\prime,\,o^\prime}}}
+       \end{array}
+      }
+      {\withenv{\Gamma}{\trans{\inbr{\sigma,\,\iota,\,o}}{f (\bar{e})}{\inbr{\primi{leave}{\sigma^\prime\,\sigma},\,\iota^\prime,o^\prime}}}}
+     \ruleno{Call}
 \]
 
 where $\Gamma\,f = \llang{fun $\;f\;$ ($\bar{a}$) local $\;\bar{l}\;$ \{$S$\}}$.

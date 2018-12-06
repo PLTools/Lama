@@ -68,9 +68,10 @@ On expression level, abstractly/concretely:
 The semantics of enriched expressions is modified as follows. First, we add two additional premises to the rule for binary operators:
 
 \setsubarrow{_{\mathscr E}}
-\[\trule{\begin{array}{ccc}
-            \withenv{\Phi}{\trans{c}{A}{c^\prime}} &\phantom{XXXXX}& \withenv{\Phi}{\trans{c^\prime}{B}{c^{\prime\prime}}}\\
-            \primi{val}{c^\prime}\in\mathbb Z      &               & \primi{val}{c^{\prime\prime}}\in\mathbb Z
+\arraycolsep=10pt
+\[\trule{\begin{array}{cc}
+            \withenv{\Phi}{\trans{c}{A}{c^\prime}} & \withenv{\Phi}{\trans{c^\prime}{B}{c^{\prime\prime}}}\\
+            \primi{val}{c^\prime}\in\mathbb Z      & \primi{val}{c^{\prime\prime}}\in\mathbb Z
           \end{array}
         }
         {\withenv{\Phi}{\trans{c}{A\otimes B}{\primi{ret}{c^{\prime\prime}\;(\primi{val}{c^\prime}\oplus \primi{val}{c^{\prime\prime}})}}}}
@@ -81,11 +82,12 @@ These two premises ensure that both operand expressions are evaluated into integ
 kinds of expressions (see Figure~\ref{array_expressions}).
 
 \begin{figure}
-  \[\trule{\begin{array}{ccc}
-             \withenv{\Phi}{\trans{c}{e}{c^\prime}} &\phantom{XXXX} &\withenv{\Phi}{\trans{c^\prime}{j}{c^{\prime\prime}}}\\
-             l=\primi{val}{c^\prime}                &               &j=\primi{val}{c^{\prime\prime}}\\
-             l\in\mathscr L                       &                &j\in\mathbb N\\
-             (n,\,f)=\primi{mem}{l}               &                &j<n
+  \arraycolsep=10pt  
+  \[\trule{\begin{array}{cc}
+             \withenv{\Phi}{\trans{c}{e}{c^\prime}} &\withenv{\Phi}{\trans{c^\prime}{j}{c^{\prime\prime}}}\\
+             l=\primi{val}{c^\prime}                &j=\primi{val}{c^{\prime\prime}}\\
+             l\in\mathscr L                       &j\in\mathbb N\\
+             (n,\,f)=\primi{mem}{l}               &j<n
            \end{array}}
           {\withenv{\Phi}{\trans{c}{e\,\mathtt{[}j\mathtt{]}}{\primi{ret}{c^{\prime\prime}(f\;j)}}}}
           \ruleno{ArrayElement}
@@ -125,13 +127,14 @@ On statement level, we add the single construct:
 This construct is interpreted as an assignment to an element of an array. The semantics of this construct is described by the following rule:
 \[
 \trule{\setsubarrow{_{\mathscr E}}
-       \begin{array}{ccccc}
-         \withenv{\Phi}{\trans{c}{e}{c^\prime}} & \phantom{XXX} & \withenv{\Phi}{\trans{c^\prime}{j}{c^{\prime\prime}}} & \phantom{XXX} & \withenv{\Phi}{\trans{c^{\prime\prime}}{g}{\inbr{s,\mu,l_m,i,o,v}}}\\
-            l=\primi{val}{c^\prime}             &               & i=\primi{val}{c^{\prime\prime}}                      &               & \\
-            l\in\mathscr L                     &               &  i\in\mathbb N                                   &               & \\[3mm]
-            \multicolumn{5}{c}{(n,\,f)=\mu\;l}\\
-            \multicolumn{5}{c}{i<n}\\
-            \multicolumn{5}{c}{\setsubarrow{}\withenv{\llang{skip},\,\Phi}{\trans{\inbr{s,\,\mu\,[l\gets (n,\,f\,[i\gets x])],\,l_m,\,i,\,o,\,\hbox{---}}}{K}{\widetilde{c}}}}
+       \arraycolsep=10pt    
+       \begin{array}{ccc}
+         \withenv{\Phi}{\trans{c}{e}{c^\prime}} & \withenv{\Phi}{\trans{c^\prime}{j}{c^{\prime\prime}}} & \withenv{\Phi}{\trans{c^{\prime\prime}}{g}{\inbr{s,\mu,l_m,i,o,v}}}\\
+            l=\primi{val}{c^\prime}             & i=\primi{val}{c^{\prime\prime}}                     & \\
+            l\in\mathscr L                     &  i\in\mathbb N                                   & \\[3mm]
+            \multicolumn{3}{c}{(n,\,f)=\mu\;l}\\
+            \multicolumn{3}{c}{i<n}\\
+            \multicolumn{3}{c}{\setsubarrow{}\withenv{\llang{skip},\,\Phi}{\trans{\inbr{s,\,\mu\,[l\gets (n,\,f\,[i\gets x])],\,l_m,\,i,\,o,\,\hbox{---}}}{K}{\widetilde{c}}}}
        \end{array}
       }
       {\setsubarrow{}\withenv{K,\,\Phi}{\trans{c}{e\mathtt{[}j\mathtt{]}\llang{:=}g}{\widetilde{c}}}}

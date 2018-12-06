@@ -26,33 +26,33 @@ In the concrete syntax for the constructs we add the closing keywords ``\llang{i
 \begin{figure}[t]
 \arraycolsep=10pt
 %\def\arraystretch{2.9}
-\[\trans{c}{\llang{skip}}{c}\ruleno{Skip$_{bs}$}\]\vskip2mm
+\[\trans{c}{\llang{skip}}{c}\ruleno{Skip}\]\vskip2mm
 \[
 \trule{\begin{array}{cc}
-          \sembr{e}\;s\ne 0 & \trans{c}{\mbox{$S_1$}}{c^\prime}
+          \sembr{e}\;\sigma\ne 0 & \trans{c}{\mbox{$S_1$}}{c^\prime}
        \end{array}}
-      {\trans{c=\inbr{s, \_, \_}}{\llang{if $\;e\;$ then $\;S_1\;$ else $\;S_2\;$}}{c^\prime}}
-      \ruleno{If-True$_{bs}$}
+      {\trans{c=\inbr{\sigma,\, \_,\, \_}}{\llang{if $\;e\;$ then $\;S_1\;$ else $\;S_2\;$}}{c^\prime}}
+      \ruleno{If-True}
 \]\vskip2mm
 \[
 \trule{\begin{array}{cc}
-          \sembr{e}\;s=0 & \trans{c}{\mbox{$S_1$}}{c^\prime}
+          \sembr{e}\;\sigma=0 & \trans{c}{\mbox{$S_1$}}{c^\prime}
        \end{array}}
-      {\trans{c=\inbr{s, \_, \_}}{\llang{if $\;e\;$ then $\;S_1\;$ else $\;S_2\;$}}{c^\prime}}
-      \ruleno{If-False$_{bs}$}
+      {\trans{c=\inbr{\sigma,\, \_,\, \_}}{\llang{if $\;e\;$ then $\;S_1\;$ else $\;S_2\;$}}{c^\prime}}
+      \ruleno{If-False}
 \]\vskip3mm
 \[
 \trule{\begin{array}{ccc}
-         {\sembr{e}\;s\ne 0} & \trans{c}{\llang{$S$}}{c^\prime} & \trans{c^\prime}{\llang{while $\;e\;$ do $\;S\;$}}{c^{\prime\prime}}\\
+         {\sembr{e}\;\sigma\ne 0} & \trans{c}{\llang{$S$}}{c^\prime} & \trans{c^\prime}{\llang{while $\;e\;$ do $\;S\;$}}{c^{\prime\prime}}\\
        \end{array}
       }
-      {\trans{c=\inbr{s, \_, \_}}{\llang{while $\;e\;$ do $\;S\;$}}{c^{\prime\prime}}}
-      \ruleno{While-True$_{bs}$}
+      {\trans{c=\inbr{\sigma,\, \_,\, \_}}{\llang{while $\;e\;$ do $\;S\;$}}{c^{\prime\prime}}}
+      \ruleno{While-True}
 \]\vskip3mm
 \[
-\trule{\sembr{e}\;s=0}
-      {\trans{c=\inbr{s, \_, \_}}{\llang{while $\;e\;$ do $\;S\;$}}{c}}
-      \ruleno{While-False$_{bs}$}
+\trule{\sembr{e}\;\sigma=0}
+      {\trans{c=\inbr{\sigma,\, \_,\, \_}}{\llang{while $\;e\;$ do $\;S\;$}}{c}}
+      \ruleno{While-False}
 \]
 \caption{Big-step operational semantics for control flow statements}
 \label{bs_stmt_cf}
