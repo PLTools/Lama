@@ -91,9 +91,10 @@ static void extendStringBuf () {
 }
 
 static void printStringBuf (char *fmt, ...) {
-  va_list args;
-  int     written, rest;
-  char   *buf;
+  va_list args    = (va_list) BOX(NULL);
+  int     written = 0,
+          rest    = 0;
+  char   *buf     = (char*) BOX(NULL);
 
  again:
   va_start (args, fmt);
@@ -110,9 +111,11 @@ static void printStringBuf (char *fmt, ...) {
 }
 
 static void printValue (void *p) {
+  data *a = (data*) BOX(NULL);
+  int i   = BOX(0);
   if (UNBOXED(p)) printStringBuf ("%d", UNBOX(p));
   else {
-    data *a = TO_DATA(p);
+    a = TO_DATA(p);
 
     switch (TAG(a->tag)) {      
     case STRING_TAG:
@@ -121,7 +124,7 @@ static void printValue (void *p) {
       
     case ARRAY_TAG:
       printStringBuf ("[");
-      for (int i = 0; i < LEN(a->tag); i++) {
+      for (i = 0; i < LEN(a->tag); i++) {
         printValue ((void*)((int*) a->contents)[i]);
 	if (i != LEN(a->tag) - 1) printStringBuf (", ");
       }
@@ -132,7 +135,7 @@ static void printValue (void *p) {
       printStringBuf ("`%s", de_hash (TO_SEXP(p)->tag));
       if (LEN(a->tag)) {
 	printStringBuf (" (");
-	for (int i = 0; i < LEN(a->tag); i++) {
+	for (i = 0; i < LEN(a->tag); i++) {
 	  printValue ((void*)((int*) a->contents)[i]);
 	  if (i != LEN(a->tag) - 1) printStringBuf (", ");
 	}
@@ -147,7 +150,8 @@ static void printValue (void *p) {
 }
 
 extern void* Belem (void *p, int i) {
-  data *a = TO_DATA(p);
+  data *a = (data *)BOX(NULL);
+  a = TO_DATA(p);
   i = UNBOX(i);
   
   if (TAG(a->tag) == STRING_TAG) {
@@ -158,8 +162,10 @@ extern void* Belem (void *p, int i) {
 }
 
 extern void* Bstring (void *p) {
-  int n = strlen (p);
+  int n   = BOX(0);
   data *r = NULL;
+
+  n = strlen (p);
   r = (data*) alloc (n + 1 + sizeof (int));
 
   r->tag = STRING_TAG | (n << 3);
@@ -169,7 +175,7 @@ extern void* Bstring (void *p) {
 }
 
 extern void* Bstringval (void *p) {
-  void *s;
+  void *s = BOX(NULL);
   
   createStringBuf ();
   printValue (p);
@@ -182,9 +188,10 @@ extern void* Bstringval (void *p) {
 }
 
 extern void* Barray (int n, ...) {
-  va_list args;
-  int i = 1;
-  data *r = NULL;
+  va_list args = (va_list) BOX (NULL);
+  int     i    = BOX(0),
+          ai   = BOX(0);
+  data    *r   = (data*) BOX (NULL);
 #ifdef DEBUG_PRINT
   printf ("Barray: create n = %d\n", n);
   fflush(stdout);
@@ -195,8 +202,8 @@ extern void* Barray (int n, ...) {
   
   va_start(args, n);
   
-  for (i=0; i<n; i++) {
-    int ai = va_arg(args, int);
+  for (i = 0; i<n; i++) {
+    ai = va_arg(args, int);
     ((int*)r->contents)[i] = ai; 
   }
   
@@ -206,11 +213,11 @@ extern void* Barray (int n, ...) {
 }
 
 extern void* Bsexp (int n, ...) {
-  va_list args = (va_list) BOX(NULL);
+  va_list args = (va_list) BOX (NULL);
   int     i    = BOX(0);
   int     ai   = BOX(0);
-  sexp   *r    = (sexp*) BOX(NULL);
-  data   *d    = (sexp*) BOX(NULL);
+  sexp   *r    = (sexp*) BOX (NULL);
+  data   *d    = (sexp*) BOX (NULL);
 
 #ifdef DEBUG_PRINT
   printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+1));
@@ -234,22 +241,26 @@ extern void* Bsexp (int n, ...) {
 }
 
 extern int Btag (void *d, int t, int n) {
-  data *r = TO_DATA(d);
+  data *r = (data*) BOX (NULL);
+  r = TO_DATA(d);
   return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t && LEN(r->tag) == n);
 }
 
 extern int Barray_patt (void *d, int n) {
+  data *r = BOX(NULL);
   if (UNBOXED(d)) return BOX(0);
   else {
-    data *r = TO_DATA(d);
+    r = TO_DATA(d);
     return BOX(TAG(r->tag) == ARRAY_TAG && LEN(r->tag) == n);
   }
 }
 
 extern int Bstring_patt (void *x, void *y) {
+  data *rx = (data *) BOX (NULL),
+       *ry = (data *) BOX (NULL);
   if (UNBOXED(x)) return BOX(0);
   else {
-    data *rx = TO_DATA(x), *ry = TO_DATA(y);
+    rx = TO_DATA(x); ry = TO_DATA(y);
 
     if (TAG(rx->tag) != STRING_TAG) return BOX(0);
     
@@ -284,13 +295,13 @@ extern int Bsexp_tag_patt (void *x) {
 }
 
 extern void Bsta (int n, int v, void *s, ...) {
-  va_list args;
-  int i, k;
-  data *a;
+  va_list args = (va_list) BOX (NULL);
+  int i = 0, k = 0;
+  data *a = (data*) BOX (NULL);
   
   va_start(args, s);
 
-  for (i=0; i<n-1; i++) {
+  for (i = 0; i < n-1; i++) {
     k = UNBOX(va_arg(args, int));
     s = ((int**) s) [k];
   }
@@ -307,7 +318,7 @@ extern int Lraw (int x) {
 }
 
 extern void Lprintf (char *s, ...) {
-  va_list args;
+  va_list args = (va_list) BOX (NULL);
 
   va_start (args, s);
   vprintf  (s, args); // vprintf (char *, va_list) <-> printf (char *, ...) 
@@ -315,10 +326,14 @@ extern void Lprintf (char *s, ...) {
 }
 
 extern void* Lstrcat (void *a, void *b) {
-  data *da = TO_DATA(a);
-  data *db = TO_DATA(b);
-  
-  data *d  = (data *) alloc (sizeof(int) + LEN(da->tag) + LEN(db->tag) + 1);
+  data *da = (data*) BOX (NULL);
+  data *db = (data*) BOX (NULL);
+  data *d  = (data*) BOX (NULL);
+
+  da = TO_DATA(a);
+  db = TO_DATA(b);
+
+  d  = (data *) alloc (sizeof(int) + LEN(da->tag) + LEN(db->tag) + 1);
 
   d->tag = LEN(da->tag) + LEN(db->tag);
 
@@ -329,7 +344,7 @@ extern void* Lstrcat (void *a, void *b) {
 }
 
 extern void Lfprintf (FILE *f, char *s, ...) {
-  va_list args;
+  va_list args = (va_list) BOX (NULL);
 
   va_start (args, s);
   vfprintf (f, s, args);
@@ -346,7 +361,7 @@ extern void Lfclose (FILE *f) {
    
 /* Lread is an implementation of the "read" construct */
 extern int Lread () {
-  int result;
+  int result = BOX(0);
 
   printf ("> "); 
   fflush (stdout);
@@ -472,7 +487,7 @@ extern size_t * gc_copy (size_t *obj);
 /* } */
 
 static void copy_elements (size_t *where, size_t *from, int len) {
-  int  i = 0;
+  int    i = 0;
   void * p = NULL;
   for (i = 0; i < len; i++) {
     size_t elem = from[i];
