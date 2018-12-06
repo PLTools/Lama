@@ -159,7 +159,8 @@ extern void* Belem (void *p, int i) {
 
 extern void* Bstring (void *p) {
   int n = strlen (p);
-  data *r = (data*) alloc (n + 1 + sizeof (int));
+  data *r = NULL;
+  r = (data*) alloc (n + 1 + sizeof (int));
 
   r->tag = STRING_TAG | (n << 3);
   strncpy (r->contents, p, n + 1);
@@ -569,17 +570,21 @@ extern size_t * gc_copy (size_t *obj) {
       d->tag = (int) copy;
       copy_elements (copy, obj, LEN(d->tag));
       break;
+
     case STRING_TAG:
 #ifdef DEBUG_PRINT
-      printf ("gc_copy:string_tag \n");
-      current += (LEN(d->tag) + 1) * sizeof (int);
+      printf ("gc_copy:string_tag; len = %d\n", LEN(d->tag) + 1);
+      fflush(stdout);
 #endif
+      //      current += (LEN(d->tag) + 1) * sizeof (int);
+      current += LEN(d->tag) * sizeof(char) + sizeof (int);
       *copy = d->tag;
       copy++;
       d->tag = (int) copy;
       strcpy (&copy[1], (char*) obj);
       break;
-    case SEXP_TAG  :
+
+  case SEXP_TAG  :
       s = TO_SEXP(obj);
 #ifdef DEBUG_PRINT
       objj = s;
@@ -598,6 +603,7 @@ extern size_t * gc_copy (size_t *obj) {
       d->tag = (int) copy;
       copy_elements (copy, obj, i);
       break;
+
   default:
 #ifdef DEBUG_PRINT
     printf ("ERROR: gc_copy: weird tag: %x", TAG(d->tag));
@@ -607,7 +613,7 @@ extern size_t * gc_copy (size_t *obj) {
     exit(5);
   }
 #ifdef DEBUG_PRINT
-  printf("gc_copy: %x (%x) -> %x (%x)\n", obj, objj, copy, newobjj);
+  printf("gc_copy: %x (%x) -> %x (%x); new-current = %x\n", obj, objj, copy, newobjj, current);
   fflush(stdout);
 #endif
   return copy;
