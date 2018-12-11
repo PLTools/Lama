@@ -7,19 +7,127 @@ printf_format5:		.string	"LOL\n"
 __gc_stack_bottom:	.long	0
 __gc_stack_top:	        .long	0
 
+			.globl	__set_w2
+			.globl	__alloc_w1
+			.globl	__alloc_w2
 			.globl	__pre_gc
 			.globl	L__gc_init
 			.globl	__gc_root_scan_stack
 			.extern	init_pool
 			.extern	__gc_test_and_copy_root
 			.text
+
+__set_w2:
+	pushl	%ebp
+	movl	%esp, %ebp
+	pushl	%ecx
+	pushl	%edx
+
+	movl	8(%ebp), %ecx
+	movl	12(%ebp), %edx
+	subl	$8, %ecx
+	movl	%edx, (%ecx)
+
+	movl	$0, %eax
+	pushl	%ecx
+	pushl	%edx
+
+	movl	%ebp, %esp 
+	popl	%ebp
+	ret
+
+__alloc_w2:
+	pushl	%ebp
+	movl	%esp, %ebp
+	pushl	%ebx
+	pushl	%ecx
+	pushl	%edx
+	pushl	%esi
+	pushl	%edi
+	
+	movl	8(%ebp), %edx
+
+	pushl	%edx
+	call	alloc
+	addl	$4, %esp
+
+		pushl	$1
+		pushl	$1
+		pushl	$1
+		pushl	$1
+		pushl	$1
+		addl	$20, %esp
+
+	movl	12(%ebp), %ecx
+	addl	$4, %eax
+	movl	%ecx, (%eax)
+	addl	$4, %eax
+
+	popl	%ebx
+	popl	%ecx
+	popl	%edx
+	popl	%esi
+	popl	%edi
+
+	movl	%ebp, %esp 
+	popl	%ebp
+	ret
+
+__alloc_w1:
+	pushl	%ebp
+	movl	%esp, %ebp
+	pushl	%ebx
+	pushl	%ecx
+	pushl	%edx
+	pushl	%esi
+	pushl	%edi
+
+	movl	4(%ebp), %edx
+
+	pushl	%edx
+	call	alloc
+
+		pushl	$1
+		pushl	$1
+		pushl	$1
+		pushl	$1
+		pushl	$1
+		addl	$20, %esp
+
+	movl	8(%ebp), %ecx
+	movl	%ecx, (%eax)
+	addl	$4, %eax
+
+	popl	%ebx
+	popl	%ecx
+	popl	%edx
+	popl	%esi
+	popl	%edi
+
+	movl	%ebp, %esp 
+	popl	%ebp
+	ret
+
 L__gc_init:		movl	%esp, __gc_stack_bottom
 			addl	$4, __gc_stack_bottom
 			call	init_pool
 			ret
 
 __pre_gc:
-	movl	%ebp, __gc_stack_top
+	//	movl	%ebp, __gc_stack_top
+	//	ret
+	
+	// pushl	%eax
+	// movl	(%ebp), %eax
+	// movl	%eax, __gc_stack_top
+	// popl	%eax
+
+	pushl	%eax
+	movl	(%ebp), %eax
+	addl	$4, %eax
+	movl	%eax, __gc_stack_top
+	popl	%eax
+	
 	ret
 	
 __gc_root_scan_stack:

@@ -8,7 +8,7 @@
 # include <sys/mman.h>
 # include <assert.h>
 
-// # define DEBUG_PRINT 1
+# define DEBUG_PRINT 1
 
 # define STRING_TAG 0x00000001
 # define ARRAY_TAG  0x00000003
@@ -34,17 +34,20 @@ typedef struct {
   data contents; 
 } sexp; 
 
-static void* alloc (size_t);
+extern void* alloc (size_t);
 
 extern int Blength (void *p) {
-  data *a = TO_DATA(p);
+  data *a = (char*) BOX (NULL);
+  a = TO_DATA(p);
   return BOX(LEN(a->tag));
 }
 
 char* de_hash (int n) {
-  static char *chars = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNJPQRSTUVWXYZ";
-  static char buf[6];
-  char *p = &buf[5];
+  static char *chars = (char*) BOX (NULL);
+  static char buf[6] = {0,0,0,0,0,0};
+  char *p = (char*) BOX (NULL);
+  chars =  "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNJPQRSTUVWXYZ";
+  p = &buf[5];
 
 #ifdef DEBUG_PRINT
   printf ("de_hash: tag: %d\n", n);
@@ -161,10 +164,21 @@ extern void* Belem (void *p, int i) {
   return (void*) ((int*) a->contents)[i];
 }
 
+
+
+
+extern void* __alloc_w1 (size_t size, int tag);
+extern void* __alloc_w2 (size_t size, int tag);
+extern void* __set_w2   (void   *p  , int tag);
+
+
+
 extern void* Bstring (void *p) {
   int n   = BOX(0);
   data *r = NULL;
 
+  __pre_gc () ;
+  
   n = strlen (p);
   r = (data*) alloc (n + 1 + sizeof (int));
 
@@ -173,6 +187,19 @@ extern void* Bstring (void *p) {
   
   return r->contents;
 }
+/* extern void* Bstring (void *p) { */
+/*   int n   = BOX(0); */
+/*   void *r = NULL; */
+
+/*   printf ("BSTRING!\n"); */
+  
+/*   n = strlen (p); */
+/*   r = __alloc_w1  (n + 1 + sizeof (int), STRING_TAG | (n << 3)); */
+
+/*   strncpy (r, p, n + 1); */
+  
+/*   return r; */
+/* } */
 
 extern void* Bstringval (void *p) {
   void *s = BOX(NULL);
@@ -192,6 +219,9 @@ extern void* Barray (int n, ...) {
   int     i    = BOX(0),
           ai   = BOX(0);
   data    *r   = (data*) BOX (NULL);
+
+  __pre_gc () ;
+
 #ifdef DEBUG_PRINT
   printf ("Barray: create n = %d\n", n);
   fflush(stdout);
@@ -212,32 +242,62 @@ extern void* Barray (int n, ...) {
   return r->contents;
 }
 
+/* extern void* Bsexp (int n, ...) { */
+/*   va_list args = (va_list) BOX (NULL); */
+/*   int     i    = BOX(0); */
+/*   int     ai   = BOX(0); */
+/*   sexp   *r    = (sexp*) BOX (NULL); */
+/*   data   *d    = (sexp*) BOX (NULL); */
+
+/*   __pre_gc () ; */
+  
+/* #ifdef DEBUG_PRINT */
+/*   printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+1)); */
+/* #endif */
+/*   r = (sexp*) alloc (sizeof(int) * (n+1)); */
+/*   d = &(r->contents); */
+    
+/*   d->tag = SEXP_TAG | ((n-1) << 3); */
+  
+/*   va_start(args, n); */
+  
+/*   for (i=0; i<n-1; i++) { */
+/*     ai = va_arg(args, int); */
+/*     ((int*)d->contents)[i] = ai; */
+/*   } */
+
+/*   r->tag = va_arg(args, int); */
+/*   va_end(args); */
+
+/*   return d->contents; */
+/* } */
 extern void* Bsexp (int n, ...) {
   va_list args = (va_list) BOX (NULL);
   int     i    = BOX(0);
-  int     ai   = BOX(0);
-  sexp   *r    = (sexp*) BOX (NULL);
-  data   *d    = (sexp*) BOX (NULL);
+  int     ai   = BOX(0), tag = BOX(0);
+  void    *r    = (void*) BOX (NULL);
+  size_t  size = sizeof(int) * (n+1);
+  //  printf("Bsexp: allocate %zu!\n", size);
 
-#ifdef DEBUG_PRINT
-  printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+1));
-#endif
-  r = (sexp*) alloc (sizeof(int) * (n+1));
-  d = &(r->contents);
-    
-  d->tag = SEXP_TAG | ((n-1) << 3);
+  __pre_gc ();
+  
+  tag = SEXP_TAG | ((n-1) << 3);
+  r = __alloc_w2 (size, tag);
+  //  Lwrite(r);
+  // d = &(r->contents);
+  //  d->tag = SEXP_TAG | ((n-1) << 3);
   
   va_start(args, n);
   
-  for (i=0; i<n-1; i++) {
+  for (i = 0; i < n-1; i++) {
     ai = va_arg(args, int);
-    ((int*)d->contents)[i] = ai; 
+    ((int*)r)[i] = ai;
   }
 
-  r->tag = va_arg(args, int);
+  __set_w2 (r, va_arg(args, int));
   va_end(args);
 
-  return d->contents;
+  return r;
 }
 
 extern int Btag (void *d, int t, int n) {
@@ -333,6 +393,8 @@ extern void* Lstrcat (void *a, void *b) {
   da = TO_DATA(a);
   db = TO_DATA(b);
 
+  __pre_gc () ;
+  
   d  = (data *) alloc (sizeof(int) + LEN(da->tag) + LEN(db->tag) + 1);
 
   d->tag = LEN(da->tag) + LEN(db->tag);
@@ -550,7 +612,7 @@ extern size_t * gc_copy (size_t *obj) {
     return obj;
   }
 
-  if (!IN_PASSIVE_SPACE(current)) {
+  if (!IN_PASSIVE_SPACE(current) && current != to_space.end) {
 #ifdef DEBUG_PRINT
     printf("ERROR: gc_copy: out-of-space %x %x %x\n", current, to_space.begin, to_space.end);
     fflush(stdout);
@@ -705,11 +767,11 @@ static void * gc (size_t size) {
 
   __gc_swap_spaces ();
   from_space.current = current + size;
-  return current;
+  return (void *) current;
 }
 
-static void * alloc (size_t size) {
-  void * p = BOX(NULL);
+extern void * alloc (size_t size) {
+  void * p = (void*)BOX(NULL);
   if (from_space.current + size < from_space.end) {
 #ifdef DEBUG_PRINT
     printf("alloc: current: %x %zu", from_space.current, size);
@@ -724,6 +786,6 @@ static void * alloc (size_t size) {
 #ifdef DEBUG_PRINT
   printf("alloc: call gc: %zu\n", size);
 #endif
-  __pre_gc () ;
+  //  __pre_gc () ;
   return gc (size);
 }
