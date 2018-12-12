@@ -54,6 +54,7 @@ type instr =
 (* arithmetic correction: or 0x0001                     *) | Or1   of opnd
 (* arithmetic correction: shl 1                         *) | Sal1  of opnd
 (* arithmetic correction: shr 1                         *) | Sar1  of opnd
+                                                           | Repmovsl 
                                                                                                                                    
 (* Instruction printer *)
 let show instr =
@@ -93,6 +94,7 @@ let show instr =
   | Or1    s           -> Printf.sprintf "\torl\t$0x0001,\t%s" (opnd s)
   | Sal1   s           -> Printf.sprintf "\tsall\t%s" (opnd s)
   | Sar1   s           -> Printf.sprintf "\tsarl\t%s" (opnd s)
+  | Repmovsl           -> Printf.sprintf "\trep movsl\t"
                                          
 (* Opening stack machine to use instructions without fully qualified names *)
 open SM
@@ -290,14 +292,20 @@ let compile env code =
                      
           | BEGIN (f, a, l) ->
              let env = env#enter f a l in
-             env, [Push ebp; Mov (esp, ebp); Binop ("-", M ("$" ^ env#lsize), esp)]
+             env, [Push ebp; Mov (esp, ebp); Binop ("-", M ("$" ^ env#lsize), esp);
+                        Mov (esp, edi);
+	                Mov (M "$filler", esi);
+	                Mov (M ("$" ^ (env#allocated_size)), ecx);
+	                Repmovsl
+                  ]
                             
           | END ->             
-             env, [Label env#epilogue;
+             env#endfunc, [Label env#epilogue;
                    Mov (ebp, esp);
                    Pop ebp;
                    Ret;
-                   Meta (Printf.sprintf "\t.set\t%s,\t%d" env#lsize (env#allocated * word_size))
+                   Meta (Printf.sprintf "\t.set\t%s,\t%d" env#lsize (env#allocated * word_size));
+                   Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated)
                   ]
                     
           | RET b ->
@@ -388,6 +396,14 @@ class env =
     val fname       = ""      (* function name                     *)
     val stackmap    = M.empty (* labels to stack map               *)
     val barrier     = false   (* barrier condition                 *)
+    val max_locals_size = 0
+
+    method max_locals_size = max_locals_size
+      
+    method endfunc =
+      if stack_slots > max_locals_size
+      then {< max_locals_size = stack_slots >}
+      else self
                         
     method show_stack =
       GT.show(list) (GT.show(opnd)) stack
@@ -481,7 +497,9 @@ class env =
     method strings = M.bindings stringm
 
     (* gets a number of stack positions allocated *)
-    method allocated = stack_slots                                
+    method allocated = stack_slots
+
+    method allocated_size = Printf.sprintf "LS%s_SIZE" fname
                                 
     (* enters a function *)
     method enter f a l =
@@ -532,12 +550,14 @@ let genasm (ds, stmt) =
       ((LABEL "main") :: (BEGIN ("main", [], [])) :: SM.compile (ds, stmt))
   in
   let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
-  let data = [Meta "\t.data"; Meta (Printf.sprintf "\t.globl\t%s" gc_start); Meta (Printf.sprintf "\t.globl\t%s" gc_end)] @
+  let data = [Meta "\t.data";
+              Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size);
+              Meta (Printf.sprintf "\t.globl\t%s" gc_start); Meta (Printf.sprintf "\t.globl\t%s" gc_end)] @
              [Meta (Printf.sprintf "%s:" gc_start)] @
              (List.map (fun s      -> Meta (Printf.sprintf "%s:\t.int\t1"         s  )) env#globals) @
              [Meta (Printf.sprintf "%s:" gc_end)] @
              (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings)
-  in 
+  in
   let asm = Buffer.create 1024 in
   List.iter
     (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show i))
