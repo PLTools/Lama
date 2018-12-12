@@ -7,144 +7,56 @@ printf_format5:		.string	"LOL\n"
 __gc_stack_bottom:	.long	0
 __gc_stack_top:	        .long	0
 
-			.globl	__set_w2
-			.globl	__alloc_w1
-			.globl	__alloc_w2
 			.globl	__pre_gc
+			.globl	__post_gc
 			.globl	L__gc_init
 			.globl	__gc_root_scan_stack
 			.extern	init_pool
-			.extern	__gc_test_and_copy_root
+			.extern	gc_test_and_copy_root
 			.text
-
-__set_w2:
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	%ecx
-	pushl	%edx
-
-	movl	8(%ebp), %ecx
-	movl	12(%ebp), %edx
-	subl	$8, %ecx
-	movl	%edx, (%ecx)
-
-	movl	$0, %eax
-	pushl	%ecx
-	pushl	%edx
-
-	movl	%ebp, %esp 
-	popl	%ebp
-	ret
-
-__alloc_w2:
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	%ebx
-	pushl	%ecx
-	pushl	%edx
-	pushl	%esi
-	pushl	%edi
-	
-	movl	8(%ebp), %edx
-
-	pushl	%edx
-	call	alloc
-	addl	$4, %esp
-
-		pushl	$1
-		pushl	$1
-		pushl	$1
-		pushl	$1
-		pushl	$1
-		addl	$20, %esp
-
-	movl	12(%ebp), %ecx
-	addl	$4, %eax
-	movl	%ecx, (%eax)
-	addl	$4, %eax
-
-	popl	%ebx
-	popl	%ecx
-	popl	%edx
-	popl	%esi
-	popl	%edi
-
-	movl	%ebp, %esp 
-	popl	%ebp
-	ret
-
-__alloc_w1:
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	%ebx
-	pushl	%ecx
-	pushl	%edx
-	pushl	%esi
-	pushl	%edi
-
-	movl	4(%ebp), %edx
-
-	pushl	%edx
-	call	alloc
-
-		pushl	$1
-		pushl	$1
-		pushl	$1
-		pushl	$1
-		pushl	$1
-		addl	$20, %esp
-
-	movl	8(%ebp), %ecx
-	movl	%ecx, (%eax)
-	addl	$4, %eax
-
-	popl	%ebx
-	popl	%ecx
-	popl	%edx
-	popl	%esi
-	popl	%edi
-
-	movl	%ebp, %esp 
-	popl	%ebp
-	ret
 
 L__gc_init:		movl	%esp, __gc_stack_bottom
 			addl	$4, __gc_stack_bottom
 			call	init_pool
 			ret
 
+	// if __gc_stack_top is equal to 0
+	// then set __gc_stack_top to %ebp
+	// else return
 __pre_gc:
-	//	movl	%ebp, __gc_stack_top
-	//	ret
-	
-	// pushl	%eax
-	// movl	(%ebp), %eax
-	// movl	%eax, __gc_stack_top
-	// popl	%eax
+			pushl	%eax
+			movl	__gc_stack_top, %eax
+			cmpl	$0, %eax
+			jne	__pre_gc_2
+			movl	%ebp, %eax
+			// addl	$8, %eax
+			movl	%eax, __gc_stack_top
+__pre_gc_2:
+			popl	%eax
+			ret
 
-	pushl	%eax
-	movl	(%ebp), %eax
-	addl	$4, %eax
-	movl	%eax, __gc_stack_top
-	popl	%eax
+	// if __gc_stack_top has been set by the caller
+	//   (i.e. it is equal to its %ebp)
+	// then set __gc_stack_top to 0
+	// else return
+__post_gc:
+			pushl	%eax
+			movl	__gc_stack_top, %eax
+			cmpl	%eax, %ebp
+			jnz	__post_gc2
+			movl	$0, __gc_stack_top
+__post_gc2:
+			popl	%eax
+			ret
 	
-	ret
-	
+	// Scan stack for roots
+	// strting from __gc_stack_top
+	// till __gc_stack_bottom
 __gc_root_scan_stack:
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	%ebx
-	pushl	%edx
-
-//	pushl	__gc_stack_top
-//	call 	Lwrite2
-//	addl	$4, %esp
-//	pushl	__gc_stack_bottom
-//	call 	Lwrite2
-//	addl	$4, %esp
-
-//			movl	%esp, __gc_stack_top
-//			movl	%esp, %eax
+			pushl	%ebp
+			movl	%esp, %ebp
+			pushl	%ebx
+			pushl	%edx
 			movl	__gc_stack_top, %eax
 			jmp 	next
 
@@ -184,9 +96,8 @@ loop2:
 			jnz     next
 gc_run_t:
 			pushl 	%eax
-//			pushl	(%eax)
   			pushl	%eax
-      			call	__gc_test_and_copy_root
+      			call	gc_test_and_copy_root
         		addl	$4, %esp
 			popl	%eax
 

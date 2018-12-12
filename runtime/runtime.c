@@ -8,7 +8,7 @@
 # include <sys/mman.h>
 # include <assert.h>
 
-# define DEBUG_PRINT 1
+// # define DEBUG_PRINT 1
 
 # define STRING_TAG 0x00000001
 # define ARRAY_TAG  0x00000003
@@ -164,15 +164,6 @@ extern void* Belem (void *p, int i) {
   return (void*) ((int*) a->contents)[i];
 }
 
-
-
-
-extern void* __alloc_w1 (size_t size, int tag);
-extern void* __alloc_w2 (size_t size, int tag);
-extern void* __set_w2   (void   *p  , int tag);
-
-
-
 extern void* Bstring (void *p) {
   int n   = BOX(0);
   data *r = NULL;
@@ -184,25 +175,16 @@ extern void* Bstring (void *p) {
 
   r->tag = STRING_TAG | (n << 3);
   strncpy (r->contents, p, n + 1);
+
+  __post_gc();
   
   return r->contents;
 }
-/* extern void* Bstring (void *p) { */
-/*   int n   = BOX(0); */
-/*   void *r = NULL; */
-
-/*   printf ("BSTRING!\n"); */
-  
-/*   n = strlen (p); */
-/*   r = __alloc_w1  (n + 1 + sizeof (int), STRING_TAG | (n << 3)); */
-
-/*   strncpy (r, p, n + 1); */
-  
-/*   return r; */
-/* } */
 
 extern void* Bstringval (void *p) {
   void *s = BOX(NULL);
+
+  __pre_gc () ;
   
   createStringBuf ();
   printValue (p);
@@ -210,6 +192,8 @@ extern void* Bstringval (void *p) {
   s = Bstring (stringBuf.contents);
   
   deleteStringBuf ();
+
+  __post_gc ();
 
   return s;
 }
@@ -220,8 +204,8 @@ extern void* Barray (int n, ...) {
           ai   = BOX(0);
   data    *r   = (data*) BOX (NULL);
 
-  __pre_gc () ;
-
+  __pre_gc ();
+  
 #ifdef DEBUG_PRINT
   printf ("Barray: create n = %d\n", n);
   fflush(stdout);
@@ -239,65 +223,42 @@ extern void* Barray (int n, ...) {
   
   va_end(args);
 
+  __post_gc();
+
   return r->contents;
 }
 
-/* extern void* Bsexp (int n, ...) { */
-/*   va_list args = (va_list) BOX (NULL); */
-/*   int     i    = BOX(0); */
-/*   int     ai   = BOX(0); */
-/*   sexp   *r    = (sexp*) BOX (NULL); */
-/*   data   *d    = (sexp*) BOX (NULL); */
-
-/*   __pre_gc () ; */
-  
-/* #ifdef DEBUG_PRINT */
-/*   printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+1)); */
-/* #endif */
-/*   r = (sexp*) alloc (sizeof(int) * (n+1)); */
-/*   d = &(r->contents); */
-    
-/*   d->tag = SEXP_TAG | ((n-1) << 3); */
-  
-/*   va_start(args, n); */
-  
-/*   for (i=0; i<n-1; i++) { */
-/*     ai = va_arg(args, int); */
-/*     ((int*)d->contents)[i] = ai; */
-/*   } */
-
-/*   r->tag = va_arg(args, int); */
-/*   va_end(args); */
-
-/*   return d->contents; */
-/* } */
 extern void* Bsexp (int n, ...) {
   va_list args = (va_list) BOX (NULL);
   int     i    = BOX(0);
-  int     ai   = BOX(0), tag = BOX(0);
-  void    *r    = (void*) BOX (NULL);
-  size_t  size = sizeof(int) * (n+1);
-  //  printf("Bsexp: allocate %zu!\n", size);
+  int     ai   = BOX(0);
+  size_t * p   = NULL;
+  sexp   *r    = (sexp*) BOX (NULL);
+  data   *d    = (sexp*) BOX (NULL);
 
-  __pre_gc ();
+  __pre_gc () ;
   
-  tag = SEXP_TAG | ((n-1) << 3);
-  r = __alloc_w2 (size, tag);
-  //  Lwrite(r);
-  // d = &(r->contents);
-  //  d->tag = SEXP_TAG | ((n-1) << 3);
+#ifdef DEBUG_PRINT
+  printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+1));
+#endif
+  r = (sexp*) alloc (sizeof(int) * (n+1));
+  d = &(r->contents);
+    
+  d->tag = SEXP_TAG | ((n-1) << 3);
   
   va_start(args, n);
   
-  for (i = 0; i < n-1; i++) {
+  for (i=0; i<n-1; i++) {
     ai = va_arg(args, int);
-    ((int*)r)[i] = ai;
+    ((int*)d->contents)[i] = ai;
   }
 
-  __set_w2 (r, va_arg(args, int));
+  r->tag = va_arg(args, int);
   va_end(args);
 
-  return r;
+  __post_gc();
+
+  return d->contents;
 }
 
 extern int Btag (void *d, int t, int n) {
@@ -402,6 +363,8 @@ extern void* Lstrcat (void *a, void *b) {
   strcpy (d->contents, da->contents);
   strcat (d->contents, db->contents);
 
+  __post_gc();
+  
   return d->contents;
 }
 
@@ -440,51 +403,15 @@ extern int Lwrite (int n) {
   return 0;
 }
 
-extern int Lwrite2 (size_t* n) {
-  printf ("%x\n", n);
-  fflush (stdout);
-
-  return 0;
-}
-
 /* GC starts here */
 
 extern const size_t __gc_data_end, __gc_data_start;
-extern size_t __gc_stack_bottom, __gc_stack_top;
 
 extern void L__gc_init ();
 extern void __pre_gc ();
+extern void __post_gc ();
 
 extern void __gc_root_scan_stack ();
-
-
-/* extern const void * __gc_data_end, * __gc_data_start; */
-
-/* extern void __gc_root_scan_data () { */
-/*   void * p = &__gc_data_start; */
-
-/*   printf ("Start, end: %d, %d\n", &__gc_data_start, &__gc_data_end); */
-  
-/*   while (p != &__gc_data_end) { */
-/*     if (!UNBOXED(* (size_t *) p)) printf ("Root: %d\n", p); */
-/*     p = p + sizeof(size_t); */
-/*   } */
-/* } */
-
-extern char __executable_start;
-extern char __etext;
-
-/* extern void Ltest () { */
-/*   printf("\n"); */
-/*   printf("STA 0x%lx\n", (unsigned long)&__executable_start); */
-/*   printf("END 0x%lx\n", (unsigned long)&__etext); */
-/*   __gc_root_scan_data (); */
-/*   __gc_root_scan_stack (); */
-
-/*   //  printf("STA 0x%lx\n", (unsigned long)&__executable_start); */
-/*   //  printf("END 0x%lx\n", (unsigned long)&__etext); */
-/*   //  printf("RET 0x%lx\n\n", __builtin_return_address(0)); */
-/* } */
 
 /* ======================================== */
 /*           Mark-and-copy                  */
@@ -510,7 +437,7 @@ static void swap (size_t ** a, size_t ** b) {
   *b = t;
 }
 
-static void __gc_swap_spaces (void) {
+static void gc_swap_spaces (void) {
   swap (&from_space.begin, &to_space.begin);
   swap (&from_space.end  , &to_space.end  );
   from_space.current = current;
@@ -531,36 +458,16 @@ static void __gc_swap_spaces (void) {
 
 extern size_t * gc_copy (size_t *obj);
 
-/* static void copy_elements (size_t *where, size_t *from, int len) { */
-/*   int  i = 0; */
-/*   void * p = NULL; */
-/*   for (i = 0; i < len; i++) { */
-/*     size_t elem = from[i]; */
-/*     // if (UNBOXED(elem)) *++where = elem; */
-/*     if (!IS_VALID_HEAP_POINTER(elem)) *++where = elem; */
-/*     else { */
-/*       // *++where = gc_copy ((size_t*) elem); */
-/*       p = gc_copy ((size_t*) elem); */
-/*       printf ("copy_elements: fix %x --> %x\n", *where, p); */
-/*       *where = p; */
-/*       where ++; */
-/*     } */
-/*   } */
-/* } */
-
 static void copy_elements (size_t *where, size_t *from, int len) {
   int    i = 0;
   void * p = NULL;
   for (i = 0; i < len; i++) {
     size_t elem = from[i];
-    // if (UNBOXED(elem)) *++where = elem;
     if (!IS_VALID_HEAP_POINTER(elem)) {
-      // *++where = elem;
       *where = elem;
       where++;
     }
     else {
-      // *++where = gc_copy ((size_t*) elem);
       p = gc_copy ((size_t*) elem);
       *where = p;
 #ifdef DEBUG_PRINT
@@ -572,15 +479,11 @@ static void copy_elements (size_t *where, size_t *from, int len) {
 }
 
 static void extend_spaces (void) {
-  /* void *from_e = mmap(from_space.end, SPACE_SIZE, PROT_READ | PROT_WRITE, */
-  /* 			  MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0); */
-  /* void *to_e   = mmap(to_space.end  , SPACE_SIZE, PROT_READ | PROT_WRITE, */
-  /* 			  MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0); */
   void *p1 = mremap(from_space.begin, SPACE_SIZE, 2*SPACE_SIZE, 0);
   void *p2 = mremap(to_space.begin  , SPACE_SIZE, 2*SPACE_SIZE, 0);
   if (p1   == MAP_FAILED || p2 == MAP_FAILED) {
     perror("EROOR: extend_spaces: mmap failed\n");
-    exit(7);
+    exit (1);
   }
 #ifdef DEBUG_PRINT
   printf ("extend: %x %x %x %x\n", p1, p2, from_space.begin, to_space.begin);
@@ -618,9 +521,7 @@ extern size_t * gc_copy (size_t *obj) {
     fflush(stdout);
 #endif
     perror("ERROR: gc_copy: out-of-space\n");
-    exit (6);
-    //    extend_spaces ();
-    //    assert (IN_PASSIVE_SPACE(current));
+    exit (1);
   }
 
   if (IS_FORWARD_PTR(d->tag)) {
@@ -644,8 +545,9 @@ extern size_t * gc_copy (size_t *obj) {
       current += (LEN(d->tag) + 1) * sizeof (int);
       *copy = d->tag;
       copy++;
+      i = LEN(d->tag);
       d->tag = (int) copy;
-      copy_elements (copy, obj, LEN(d->tag));
+      copy_elements (copy, obj, i);
       break;
 
     case STRING_TAG:
@@ -653,7 +555,6 @@ extern size_t * gc_copy (size_t *obj) {
       printf ("gc_copy:string_tag; len = %d\n", LEN(d->tag) + 1);
       fflush(stdout);
 #endif
-      //      current += (LEN(d->tag) + 1) * sizeof (int);
       current += LEN(d->tag) * sizeof(char) + sizeof (int);
       *copy = d->tag;
       copy++;
@@ -676,7 +577,6 @@ extern size_t * gc_copy (size_t *obj) {
       *copy   = s->contents.tag;
       copy++;
       i = LEN(s->contents.tag);
-      // s->contents.tag = (int) copy;
       d->tag = (int) copy;
       copy_elements (copy, obj, i);
       break;
@@ -687,7 +587,7 @@ extern size_t * gc_copy (size_t *obj) {
     fflush(stdout);
 #endif
     perror ("ERROR: gc_copy: weird tag");
-    exit(5);
+    exit (1);
   }
 #ifdef DEBUG_PRINT
   printf("gc_copy: %x (%x) -> %x (%x); new-current = %x\n", obj, objj, copy, newobjj, current);
@@ -696,19 +596,19 @@ extern size_t * gc_copy (size_t *obj) {
   return copy;
 }
 
-extern void __gc_test_and_copy_root (size_t ** root) {
+extern void gc_test_and_copy_root (size_t ** root) {
   if (IS_VALID_HEAP_POINTER(*root)) {
 #ifdef DEBUG_PRINT
-    printf ("__gc_test_and_copy_root: root %x %x\n", root, *root);
+    printf ("gc_test_and_copy_root: root %x %x\n", root, *root);
 #endif
     *root = gc_copy (*root);
   }
 }
 
-extern void __gc_root_scan_data (void) {
+extern void gc_root_scan_data (void) {
   size_t * p = &__gc_data_start;
   while  (p != &__gc_data_end) {
-    __gc_test_and_copy_root (p);
+    gc_test_and_copy_root (p);
     p++;
   }
 }
@@ -721,7 +621,7 @@ extern void init_pool (void) {
   if (to_space.begin   == MAP_FAILED ||
       from_space.begin == MAP_FAILED) {
     perror("EROOR: init_pool: mmap failed\n");
-    exit(1);
+    exit (1);
   }
   from_space.current = from_space.begin;
   from_space.end     = from_space.begin + SPACE_SIZE;
@@ -738,17 +638,17 @@ static int free_pool (pool * p) {
 static void * gc (size_t size) {
   current = to_space.begin;
 #ifdef DEBUG_PRINT
-  printf("gc: current: %x; to_space.b = %x; to_space.e = %x; f_space.b = %x; f_space.e = %x\n",
+  printf("\ngc: current: %x; to_space.b = %x; to_space.e = %x; f_space.b = %x; f_space.e = %x\n",
 	 current, to_space.begin, to_space.end, from_space.begin, from_space.end);
 #endif
-  __gc_root_scan_data  ();
+  gc_root_scan_data  ();
 #ifdef DEBUG_PRINT
   printf("gc: data is scanned\n");
 #endif
   __gc_root_scan_stack ();
   if (!IN_PASSIVE_SPACE(current)) {
     perror ("ASSERT: !IN_PASSIVE_SPACE(current)\n");
-    exit(1);
+    exit (1);
   }
 
   if (current + size >= to_space.end) {
@@ -761,12 +661,14 @@ static void * gc (size_t size) {
 #endif
     assert (IN_PASSIVE_SPACE(current));
     assert (current + size < to_space.end);
-    //    perror ("ERROR: gc: out of memory\n");
-    //    exit(4);
   }
 
-  __gc_swap_spaces ();
+  gc_swap_spaces ();
   from_space.current = current + size;
+#ifdef DEBUG_PRINT
+    printf ("gc: end: (allocate!) return %x; from_space.current %x; from_space.end \n\n",
+	    current, from_space.current, from_space.end);
+#endif
   return (void *) current;
 }
 
@@ -786,6 +688,5 @@ extern void * alloc (size_t size) {
 #ifdef DEBUG_PRINT
   printf("alloc: call gc: %zu\n", size);
 #endif
-  //  __pre_gc () ;
   return gc (size);
 }
