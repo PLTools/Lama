@@ -654,7 +654,7 @@ static void * gc (size_t size) {
     exit (1);
   }
 
-  if (current + size >= to_space.end) {
+  while (current + size >= to_space.end) {
 #ifdef DEBUG_PRINT
     printf ("gc pre-extend_spaces : %x %x %x \n", current, size, to_space.end);
 #endif
@@ -662,9 +662,9 @@ static void * gc (size_t size) {
 #ifdef DEBUG_PRINT
     printf ("gc post-extend_spaces: %x %x %x \n", current, size, to_space.end);
 #endif
-    assert (IN_PASSIVE_SPACE(current));
-    assert (current + size < to_space.end);
   }
+  assert (IN_PASSIVE_SPACE(current));
+  assert (current + size < to_space.end);
 
   gc_swap_spaces ();
   from_space.current = current + size;
