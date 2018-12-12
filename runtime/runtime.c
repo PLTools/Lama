@@ -228,6 +228,10 @@ extern void* Barray (int n, ...) {
   return r->contents;
 }
 
+extern int __IS_VALID_HEAP_POINTER(size_t *p);
+extern int __IN_PASSIVE_SPACE(size_t * p);
+extern int __IS_FORWARD_PTR(size_t * p);
+
 extern void* Bsexp (int n, ...) {
   va_list args = (va_list) BOX (NULL);
   int     i    = BOX(0);
@@ -243,6 +247,7 @@ extern void* Bsexp (int n, ...) {
 #endif
   r = (sexp*) alloc (sizeof(int) * (n+1));
   d = &(r->contents);
+  r->tag = 0;
     
   d->tag = SEXP_TAG | ((n-1) << 3);
   
@@ -250,6 +255,13 @@ extern void* Bsexp (int n, ...) {
   
   for (i=0; i<n-1; i++) {
     ai = va_arg(args, int);
+    
+    p = (size_t*) ai;
+    if (!UNBOXED(p) && __IN_PASSIVE_SPACE(p) && __IS_FORWARD_PTR((size_t*)*(p-1))){
+      printf ("Bsexp: %p\n", p);
+      fflush(stdout);
+    }
+      
     ((int*)d->contents)[i] = ai;
   }
 
@@ -456,6 +468,16 @@ static void gc_swap_spaces (void) {
 # define IS_FORWARD_PTR(p)			\
   (!UNBOXED(p) && IN_PASSIVE_SPACE(p))
 
+int __IS_VALID_HEAP_POINTER(size_t *p) {
+  return IS_VALID_HEAP_POINTER(p);
+}
+int __IN_PASSIVE_SPACE(size_t * p) {
+  return IN_PASSIVE_SPACE(p);
+}
+int __IS_FORWARD_PTR(size_t * p) {
+  return IS_FORWARD_PTR(p);
+}
+ 
 extern size_t * gc_copy (size_t *obj);
 
 static void copy_elements (size_t *where, size_t *from, int len) {
@@ -559,7 +581,7 @@ extern size_t * gc_copy (size_t *obj) {
       *copy = d->tag;
       copy++;
       d->tag = (int) copy;
-      strcpy (&copy[1], (char*) obj);
+      strcpy (&copy[0], (char*) obj);
       break;
 
   case SEXP_TAG  :
