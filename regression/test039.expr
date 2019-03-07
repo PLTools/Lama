@@ -28,4 +28,3 @@ write (find (t, 6));
 write (find (t, 3));
 write (find (t, 2));
 write (find (t, 1))
-

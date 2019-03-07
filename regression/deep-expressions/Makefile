@@ -12,4 +12,5 @@ $(TESTS): %: %.expr
 	@cat $@.input | $(RC) -s $< > $@.log && diff $@.log orig/$@.log
 
 clean:
-	rm -f *.log *.s *~ $(TESTS)
+	rm -f *.log *.s *~
+	find . -maxdepth 1 -type f -not -name '*.*' -not -name 'Makefile' -delete

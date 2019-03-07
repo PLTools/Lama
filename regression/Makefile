@@ -12,4 +12,7 @@ $(TESTS): %: %.expr
 	@cat $@.input | $(RC) -s $< > $@.log && diff $@.log orig/$@.log
 
 clean:
-	rm -f test*.log *.s *~ $(TESTS)
+	$(RM) test*.log *.s *~ $(TESTS)
+	$(MAKE) clean -C expressions
+	$(MAKE) clean -C deep-expressions
+	$(MAKE) clean -C x86only

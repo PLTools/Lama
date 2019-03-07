@@ -1,0 +1,22 @@
+fun f () local b {
+  b := 7;
+  test ();
+  b := y;
+  test ();
+  b := 9;
+  test ();
+  return 0
+}
+
+--x := 0;
+--y := 0;
+--z := 0;
+--t := 0;
+--test ();
+y := "abc";
+test ();
+t := [];
+test ();
+t := 0;
+test ();
+f ()
