@@ -1,10 +1,10 @@
 fun zip (x) {
-  case x of `pair (x, y) ->
+  case x of Pair (x, y) ->
     case x of
-      `nil          -> return `nil
-    | `cons (x, xs) -> case y of
-                         `nil -> return `nil
-  		       | `cons (y, ys) -> return `cons (`pair (x, y), zip (`pair (xs, ys)))
+      Nil          -> return Nil
+    | Cons (x, xs) -> case y of
+                         Nil -> return Nil
+  		       | Cons (y, ys) -> return Cons (Pair (x, y), zip (Pair (xs, ys)))
 		       esac
     esac
   esac
@@ -12,26 +12,26 @@ fun zip (x) {
 
 fun unzip (x) {
   case x of
-    `nil                     -> return `pair (`nil, `nil)
-  | `cons (`pair (x, y), tl) ->
+    Nil                    -> return Pair (Nil, Nil)
+  | Cons (Pair (x, y), tl) ->
        case unzip (tl) of
-         `pair (xs, ys) -> return `pair (`cons (x, xs), `cons (y, ys))
+         Pair (xs, ys) -> return Pair (Cons (x, xs), Cons (y, ys))
        esac
   esac
 }
 
 fun printList (l) {
   case l of
-    `nil -> skip
-  | `cons (x, xs) -> write (x); printList (xs)
+    Nil -> skip
+  | Cons (x, xs) -> write (x); printList (xs)
   esac
 }
 
 z := read ();
 
-x := `cons (1, `cons (2, `cons (3, `nil)));
-y := `cons (100, `cons (200, `cons (300, `nil)));
+x := Cons (1, Cons (2, Cons (3, Nil)));
+y := Cons (100, Cons (200, Cons (300, Nil)));
 
-case unzip (zip (`pair (x, y))) of
-  `pair (x, y) -> printList (x); printList (y)
+case unzip (zip (Pair (x, y))) of
+  Pair (x, y) -> printList (x); printList (y)
 esac

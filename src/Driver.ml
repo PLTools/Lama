@@ -1,23 +1,27 @@
 open Ostap
 
 let parse infile =
-  let s = Util.read infile in
+  let s   = Util.read infile in
+  let kws = [
+    "skip";
+    "if"; "then"; "else"; "elif"; "fi";
+    "while"; "do"; "od";
+    "repeat"; "until";
+    "for";
+    "fun"; "local"; "return";
+    "length";
+    "string";
+    "case"; "of"; "esac"; "when";
+    "boxed"; "unboxed"; "string"; "sexp"; "array"]
+  in
   Util.parse
     (object
        inherit Matcher.t s
        inherit Util.Lexers.decimal s
        inherit Util.Lexers.string s
        inherit Util.Lexers.char   s
-       inherit Util.Lexers.ident ["skip";
-                                  "if"; "then"; "else"; "elif"; "fi";
-                                  "while"; "do"; "od";
-                                  "repeat"; "until";
-                                  "for";
-                                  "fun"; "local"; "return";
-                                  "length";
-                                  "string";
-                                  "case"; "of"; "esac"; "when";
-                                  "boxed"; "unboxed"; "string"; "sexp"; "array"] s
+       inherit Util.Lexers.lident kws s
+       inherit Util.Lexers.uident kws s
        inherit Util.Lexers.skip [
 	 Matcher.Skip.whitespaces " \t\n";
 	 Matcher.Skip.lineComment "--";

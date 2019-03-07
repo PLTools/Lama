@@ -1,17 +1,17 @@
 fun insert (t, x) {
   case t of
-    `leaf           -> return `node (x, `leaf, `leaf)
-  | `node (y, l, r) -> if x > y
-                          then return `node (y, insert (l, x), r)
-			  else return `node (y, l, insert (r, x))
+    Leaf           -> return Node (x, Leaf, Leaf)
+  | Node (y, l, r) -> if x > y
+                          then return Node (y, insert (l, x), r)
+			  else return Node (y, l, insert (r, x))
 		       fi
   esac
 }
 
 fun find (t, x) {
   case t of
-    `leaf           -> return 0
-  | `node (y, l, r) -> if x == y then return 1
+    Leaf           -> return 0
+  | Node (y, l, r) -> if x == y then return 1
 		       elif x > y then return find (l, x)
 		                  else return find (r, x)
 		       fi
@@ -20,7 +20,7 @@ fun find (t, x) {
 
 n := read ();
 
-t := insert (insert (insert (insert (`leaf, 5), 4), 6), 3);
+t := insert (insert (insert (insert (Leaf, 5), 4), 6), 3);
 
 write (find (t, 5));
 write (find (t, 4));

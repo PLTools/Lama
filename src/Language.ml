@@ -46,7 +46,7 @@ module Value =
       | Array  a    -> let n = Array.length a in
                        append "["; Array.iteri (fun i a -> (if i > 0 then append ", "); inner a) a; append "]"
       | Sexp (t, a) -> let n = List.length a in
-                       append "`"; append t; (if n > 0 then (append " ("; List.iteri (fun i a -> (if i > 0 then append ", "); inner a) a; append ")"))
+                       append t; (if n > 0 then (append " ("; List.iteri (fun i a -> (if i > 0 then append ", "); inner a) a; append ")"))
       in
       inner v;
       Bytes.of_string @@ Buffer.contents buf
@@ -132,7 +132,7 @@ module Builtin =
                     )         
     | ".length"     -> (st, i, o, Some (Value.of_int (match List.hd args with Value.Sexp (_, a) -> List.length a | Value.Array a -> Array.length a | Value.String s -> Bytes.length s)))
     | ".array"      -> (st, i, o, Some (Value.of_array @@ Array.of_list args))
-    | ".stringval"  -> let [a]    = args in (st, i, o, Some (Value.of_string @@ Value.string_val a))
+    | ".stringval"  -> let [a] = args in (st, i, o, Some (Value.of_string @@ Value.string_val a))
 
   end
     
@@ -240,7 +240,8 @@ module Expr =
          
     (* Expression parser. You can use the following terminals:
 
-         IDENT   --- a non-empty identifier a-zA-Z[a-zA-Z0-9_]* as a string
+         LIDENT  --- a non-empty identifier a-z[a-zA-Z0-9_]* as a string
+         UIDENT  --- a non-empty identifier A-Z[a-zA-Z0-9_]* as a string
          DECIMAL --- a decimal constant [0-9]+ as a string                                                                                                                  
     *)
     ostap (                                      
@@ -268,12 +269,12 @@ module Expr =
       primary: b:base is:(-"[" i:parse -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str})) *
                            {List.fold_left (fun b -> function `Elem i -> Elem (b, i) | `Len -> Length b | `Str -> StringVal b) b is}; 
       base:
-        n:DECIMAL                                         {Const n}  
-      | s:STRING                                          {String (String.sub s 1 (String.length s - 2))}
-      | c:CHAR                                            {Const  (Char.code c)}
-      | "[" es:!(Util.list0)[parse] "]"                   {Array es}
-      | "`" t:IDENT args:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match args with None -> [] | Some args -> args)}
-      | x:IDENT s:("(" args:!(Util.list0)[parse] ")"      {Call (x, args)} | empty {Var x}) {s}
+        n:DECIMAL                                      {Const n}  
+      | s:STRING                                       {String (String.sub s 1 (String.length s - 2))}
+      | c:CHAR                                         {Const  (Char.code c)}
+      | "[" es:!(Util.list0)[parse] "]"                {Array es}
+      | t:UIDENT args:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match args with None -> [] | Some args -> args)}
+      | x:LIDENT s:("(" args:!(Util.list0)[parse] ")"  {Call (x, args)} | empty {Var x}) {s}
       | -"(" parse -")" 
     )
     
@@ -306,17 +307,17 @@ module Stmt =
         ostap (
           parse:
             %"_" {Wildcard}
-          | "`" t:IDENT ps:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match ps with None -> [] | Some ps -> ps)}
-          | "[" ps:(!(Util.list0)[parse]) "]"               {Array ps}
-          | x:IDENT y:(-"@" parse)?                         {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
-          | c:DECIMAL                                       {Const c}
-          | s:STRING                                        {String (String.sub s 1 (String.length s - 2))}
-          | c:CHAR                                          {Const  (Char.code c)}
-          | "#" %"boxed"                                    {Boxed}
-          | "#" %"unboxed"                                  {UnBoxed}
-          | "#" %"string"                                   {StringTag}
-          | "#" %"sexp"                                     {SexpTag}
-          | "#" %"array"                                    {ArrayTag}
+          | t:UIDENT ps:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match ps with None -> [] | Some ps -> ps)}
+          | "[" ps:(!(Util.list0)[parse]) "]"            {Array ps}
+          | x:LIDENT y:(-"@" parse)?                     {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
+          | c:DECIMAL                                    {Const c}
+          | s:STRING                                     {String (String.sub s 1 (String.length s - 2))}
+          | c:CHAR                                       {Const  (Char.code c)}
+          | "#" %"boxed"                                 {Boxed}
+          | "#" %"unboxed"                               {UnBoxed}
+          | "#" %"string"                                {StringTag}
+          | "#" %"sexp"                                  {SexpTag}
+          | "#" %"array"                                 {ArrayTag}
         )
 
         let vars p = transform(t) (fun f -> object inherit [string list, _] @t[foldl] f method c_Named s _ name p = name :: f s p end) [] p 
@@ -437,7 +438,7 @@ module Stmt =
       | %"repeat" s:parse %"until" e:!(Expr.parse)  {Repeat (s, e)}
       | %"return" e:!(Expr.parse)?                  {Return e}
       | %"case" e:!(Expr.parse) %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse)] %"esac" {Case (e, bs)}
-      | x:IDENT 
+      | x:LIDENT 
            s:(is:(-"[" !(Expr.parse) -"]")* ":=" e   :!(Expr.parse) {Assign (x, is, e)}    | 
               "("  args:!(Util.list0)[Expr.parse] ")" {Call   (x, args)}
              ) {s}
@@ -453,8 +454,8 @@ module Definition =
     type t = string * (string list * string list * Stmt.t)
 
     ostap (
-      arg  : IDENT;
-      parse: %"fun" name:IDENT "(" args:!(Util.list0 arg) ")"
+      arg  : LIDENT;
+      parse: %"fun" name:LIDENT "(" args:!(Util.list0 arg) ")"
          locs:(%"local" !(Util.list arg))?
         "{" body:!(Stmt.parse) "}" {
         (name, (args, (match locs with None -> [] | Some l -> l), body))

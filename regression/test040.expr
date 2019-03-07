@@ -1,15 +1,15 @@
 fun f (x) {
   case x of
-    `a -> write (1)
-  | `b -> write (2)
-  | `c -> write (3)
+    A -> write (1)
+  | B -> write (2)
+  | C -> write (3)
   | _  -> write (4)
   esac
 }
 
 x := read ();
 
-f (`a);
-f (`b);
-f (`c);
-f (`d)
+f (A);
+f (B);
+f (C);
+f (D)
