@@ -134,17 +134,39 @@ static void printValue (void *p) {
       printStringBuf ("]");
       break;
       
-    case SEXP_TAG:
-      printStringBuf ("%s", de_hash (TO_SEXP(p)->tag));
-      if (LEN(a->tag)) {
-	printStringBuf (" (");
-	for (i = 0; i < LEN(a->tag); i++) {
-	  printValue ((void*)((int*) a->contents)[i]);
-	  if (i != LEN(a->tag) - 1) printStringBuf (", ");
+    case SEXP_TAG: {
+      char * tag = de_hash (TO_SEXP(p)->tag);
+      
+      if (strcmp (tag, "cons") == 0) {
+	data *b = a;
+	
+	printStringBuf ("{");
+
+	while (LEN(a->tag)) {
+	  printValue ((void*)((int*) b->contents)[0]);
+	  b = (data*)((int*) b->contents)[1];
+	  if (! UNBOXED(b)) {
+	    printStringBuf (", ");
+	    b = TO_DATA(b);
+	  }
+	  else break;
 	}
-	printStringBuf (")");
+	
+	printStringBuf ("}");
       }
-      break;
+      else {
+	printStringBuf ("%s", tag);
+	if (LEN(a->tag)) {
+	  printStringBuf (" (");
+	  for (i = 0; i < LEN(a->tag); i++) {
+	    printValue ((void*)((int*) a->contents)[i]);
+	    if (i != LEN(a->tag) - 1) printStringBuf (", ");
+	  }
+	  printStringBuf (")");
+	}
+      }
+    }
+    break;
       
     default:
       printStringBuf ("*** invalid tag: %x ***", TAG(a->tag));
@@ -485,7 +507,7 @@ static void extend_spaces (void) {
   void *p1 = mremap(from_space.begin, SPACE_SIZE, 2*SPACE_SIZE, 0);
   void *p2 = mremap(to_space.begin  , SPACE_SIZE, 2*SPACE_SIZE, 0);
   if (p1   == MAP_FAILED || p2 == MAP_FAILED) {
-    perror("EROOR: extend_spaces: mmap failed\n");
+    perror("ERROR: extend_spaces: mmap failed\n");
     exit (1);
   }
 #ifdef DEBUG_PRINT
@@ -623,7 +645,7 @@ extern void init_pool (void) {
 			  MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
   if (to_space.begin   == MAP_FAILED ||
       from_space.begin == MAP_FAILED) {
-    perror("EROOR: init_pool: mmap failed\n");
+    perror("ERROR: init_pool: mmap failed\n");
     exit (1);
   }
   from_space.current = from_space.begin;

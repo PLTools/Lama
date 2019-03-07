@@ -46,7 +46,21 @@ module Value =
       | Array  a    -> let n = Array.length a in
                        append "["; Array.iteri (fun i a -> (if i > 0 then append ", "); inner a) a; append "]"
       | Sexp (t, a) -> let n = List.length a in
-                       append t; (if n > 0 then (append " ("; List.iteri (fun i a -> (if i > 0 then append ", "); inner a) a; append ")"))
+                       if t = "cons"
+                       then (
+                         append "{";
+                         let rec inner_list = function
+                         | []                    -> ()
+                         | [x; Int 0]            -> inner x
+                         | [x; Sexp ("cons", a)] -> inner x; append ", "; inner_list a  
+                         in inner_list a;
+                         append "}"
+                       )
+                       else (
+                         append t;
+                         (if n > 0 then (append " ("; List.iteri (fun i a -> (if i > 0 then append ", "); inner a) a;
+                                         append ")"))
+                       )
       in
       inner v;
       Bytes.of_string @@ Buffer.contents buf
@@ -252,17 +266,19 @@ module Expr =
                                        List.map (fun s -> ostap(- $(s)),
                                                           (fun x y ->
                                                              match s with
+                                                             | ":"  -> Sexp ("cons", [x; y])
                                                              | "++" -> Call ("strcat", [x; y])
                                                              | _    -> Binop (s, x, y)
                                                           )
                                          ) s
                         ) 
-              [|                
-		`Lefta, ["!!"];
-		`Lefta, ["&&"];
-		`Nona , ["=="; "!="; "<="; "<"; ">="; ">"];
-		`Lefta, ["++"; "+" ; "-"];
-		`Lefta, ["*" ; "/"; "%"];
+              [|
+                `Righta, [":"];  
+		`Lefta , ["!!"];
+		`Lefta , ["&&"];
+		`Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
+		`Lefta , ["++"; "+" ; "-"];
+		`Lefta , ["*" ; "/"; "%"];
               |] 
 	     )
 	     primary); 
@@ -273,6 +289,10 @@ module Expr =
       | s:STRING                                       {String (String.sub s 1 (String.length s - 2))}
       | c:CHAR                                         {Const  (Char.code c)}
       | "[" es:!(Util.list0)[parse] "]"                {Array es}
+      | "{" es:!(Util.list0)[parse] "}"                {match es with
+                                                        | [] -> Const 0
+                                                        | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0)  
+                                                       }
       | t:UIDENT args:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match args with None -> [] | Some args -> args)}
       | x:LIDENT s:("(" args:!(Util.list0)[parse] ")"  {Call (x, args)} | empty {Var x}) {s}
       | -"(" parse -")" 
@@ -305,10 +325,23 @@ module Stmt =
 
         (* Pattern parser *)                                 
         ostap (
-          parse:
-            %"_" {Wildcard}
+          parse: 
+	  !(Ostap.Util.expr 
+             (fun x -> x)
+	     (Array.map (fun (a, s) ->
+                  a, 
+                  List.map (fun s -> ostap(- $(s)), (fun x y -> Sexp ("cons", [x; y]))) s) 
+              [|`Righta, [":"]|] 
+	     )
+	     primary);          
+          primary:
+            %"_"                                         {Wildcard}
           | t:UIDENT ps:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match ps with None -> [] | Some ps -> ps)}
           | "[" ps:(!(Util.list0)[parse]) "]"            {Array ps}
+          | "{" ps:(!(Util.list0)[parse]) "}"            {match ps with
+                                                          | [] -> UnBoxed
+                                                          | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) ps UnBoxed
+                                                         }
           | x:LIDENT y:(-"@" parse)?                     {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
           | c:DECIMAL                                    {Const c}
           | s:STRING                                     {String (String.sub s 1 (String.length s - 2))}
@@ -318,6 +351,7 @@ module Stmt =
           | "#" %"string"                                {StringTag}
           | "#" %"sexp"                                  {SexpTag}
           | "#" %"array"                                 {ArrayTag}
+          | -"(" parse -")"
         )
 
         let vars p = transform(t) (fun f -> object inherit [string list, _] @t[foldl] f method c_Named s _ name p = name :: f s p end) [] p 
