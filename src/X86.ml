@@ -570,5 +570,5 @@ let build prog name =
   Printf.fprintf outf "%s" (genasm prog);
   close_out outf;
   let inc = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
-  Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s/gc_runtime.o %s/runtime.o %s.s" name inc inc name)
+  Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s.s %s/runtime.a" name name inc)
  
