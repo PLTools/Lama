@@ -214,18 +214,18 @@ let compile (defs, p) =
         (List.rev bindings)
       ) @
     [DROP; ENTER (List.map fst bindings)]
-  and expr = function
+  and generic_expr f = function
   | Expr.Var    x         -> [LD x]
   | Expr.Const  n         -> [CONST n]
   | Expr.String s         -> [STRING s]
-  | Expr.Binop (op, x, y) -> expr x @ expr y @ [BINOP op]
-  | Expr.Call  (f, args)  -> call f args false
-  | Expr.Array  xs        -> List.flatten (List.map expr xs) @ [CALL (".array", List.length xs, false)]
-  | Expr.Sexp (t, xs)     -> List.flatten (List.map expr xs) @ [SEXP (t, List.length xs)]
-  | Expr.Elem (a, i)      -> expr a @ expr i @ [CALL (".elem", 2, false)]
-  | Expr.Length e         -> expr e @ [CALL (".length", 1, false)]
-  | Expr.StringVal e      -> expr e @ [CALL (".stringval", 1, false)]
-  in
+  | Expr.Binop (op, x, y) -> generic_expr f x @ generic_expr f y @ [BINOP op]
+  | Expr.Call  (fn, args) -> call fn args f
+  | Expr.Array  xs        -> List.flatten (List.map (generic_expr f) xs) @ [CALL (".array", List.length xs, f)]
+  | Expr.Sexp (t, xs)     -> List.flatten (List.map (generic_expr f) xs) @ [SEXP (t, List.length xs)]
+  | Expr.Elem (a, i)      -> generic_expr f a @ generic_expr f i @ [CALL (".elem", 2, f)]
+  | Expr.Length e         -> generic_expr f e @ [CALL (".length", 1, f)]
+  | Expr.StringVal e      -> generic_expr f e @ [CALL (".stringval", 1, f)]
+  and expr e = generic_expr false e in
   let rec compile_stmt l env = function  
   | Stmt.Assign (x, [], e)  -> env, false, expr e @ [ST x]
   | Stmt.Assign (x, is, e)  -> env, false, List.flatten (List.map expr (is @ [e])) @ [STA (x, List.length is)]
@@ -250,8 +250,12 @@ let compile (defs, p) =
                                let check, env = env#get_label in
                                let env  , flag, body = compile_stmt check env s in
                                env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ (expr c) @ [CJMP ("z", loop)]
-                                                                                                                     
+
+
+  | Stmt.Expr    e          -> env, false, generic_expr true e
+                             (*
   | Stmt.Call   (f, args)   -> env, false, call f args true
+                              *)
                                                          
   | Stmt.Return e           -> env, false, (match e with Some e -> expr e | None -> []) @ [RET (e <> None)]
 

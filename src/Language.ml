@@ -282,8 +282,18 @@ module Expr =
               |] 
 	     )
 	     primary); 
-      primary: b:base is:(-"[" i:parse -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str})) *
-                           {List.fold_left (fun b -> function `Elem i -> Elem (b, i) | `Len -> Length b | `Str -> StringVal b) b is}; 
+      primary: b:base is:(-"[" i:parse -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f})) * {
+        List.fold_left
+          (fun b ->
+            function
+            | `Elem i -> Elem (b, i)
+            | `Len    -> Length b
+            | `Str    -> StringVal b
+            | `Post f -> Call (f, [b])
+          )
+          b
+          is
+      }; 
       base:
         n:DECIMAL                                      {Const n}  
       | s:STRING                                       {String (String.sub s 1 (String.length s - 2))}
@@ -368,7 +378,7 @@ module Stmt =
     (* loop with a post-condition       *) | Repeat of t * Expr.t
     (* pattern-matching                 *) | Case   of Expr.t * (Pattern.t * t) list
     (* return statement                 *) | Return of Expr.t option
-    (* call a procedure                 *) | Call   of string * Expr.t list 
+    (* call a procedure                 *) | Expr   of Expr.t  
     (* leave a scope                    *) | Leave  with show
                                                                                    
     (* Statement evaluator
@@ -408,7 +418,10 @@ module Stmt =
                               else eval env conf (seq stmt k) s
       | Repeat (s, e)      -> eval env conf (seq (While (Expr.Binop ("==", e, Expr.Const 0), s)) k) s
       | Return  e          -> (match e with None -> (st, i, o, None) | Some e -> Expr.eval env conf e)
+      | Expr    e          -> eval env (Expr.eval env conf e) k Skip
+(*                            
       | Call   (f, args)   -> eval env (Expr.eval env conf (Expr.Call (f, args))) k Skip
+ *)                            
       | Case   (e, bs)     ->
           let (_, _, _, Some v) as conf' = Expr.eval env conf e in
           let rec branch ((st, i, o, _) as conf) = function
@@ -473,9 +486,13 @@ module Stmt =
       | %"return" e:!(Expr.parse)?                  {Return e}
       | %"case" e:!(Expr.parse) %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse)] %"esac" {Case (e, bs)}
       | x:LIDENT 
-           s:(is:(-"[" !(Expr.parse) -"]")* ":=" e   :!(Expr.parse) {Assign (x, is, e)}    | 
-              "("  args:!(Util.list0)[Expr.parse] ")" {Call   (x, args)}
+            s:(is:(-"[" !(Expr.parse) -"]")* ":=" e :!(Expr.parse) {Assign (x, is, e)}
+(*
+               | 
+              "("  args:!(Util.list0)[Expr.parse] ")"             {Call   (x, args)}                
+ *)
              ) {s}
+      | e:!(Expr.parse) {Expr e}
     )
       
   end
