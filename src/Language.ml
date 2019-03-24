@@ -7,6 +7,10 @@ open GT
 open Ostap
 open Combinators
 
+exception Semantic_error of string
+                          
+let unquote s = String.sub s 1 (String.length s - 2)
+              
 (* Values *)
 module Value =
   struct
@@ -259,30 +263,12 @@ module Expr =
          DECIMAL --- a decimal constant [0-9]+ as a string                                                                                                                  
     *)
     ostap (                                      
-      parse: 
+      parse[infix]: 
 	  !(Ostap.Util.expr 
              (fun x -> x)
-	     (Array.map (fun (a, s) -> a, 
-                                       List.map (fun s -> ostap(- $(s)),
-                                                          (fun x y ->
-                                                             match s with
-                                                             | ":"  -> Sexp ("cons", [x; y])
-                                                             | "++" -> Call ("strcat", [x; y])
-                                                             | _    -> Binop (s, x, y)
-                                                          )
-                                         ) s
-                        ) 
-              [|
-                `Righta, [":"];  
-		`Lefta , ["!!"];
-		`Lefta , ["&&"];
-		`Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
-		`Lefta , ["++"; "+" ; "-"];
-		`Lefta , ["*" ; "/"; "%"];
-              |] 
-	     )
-	     primary); 
-      primary: b:base is:(-"[" i:parse -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f})) * {
+             (Array.map (fun (a, l) -> a, List.map (fun (s, f) -> ostap (- $(s)), f) l) infix)
+	     (primary infix)); 
+      primary[infix]: b:base[infix] is:(-"[" i:parse[infix] -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f})) * {
         List.fold_left
           (fun b ->
             function
@@ -294,22 +280,107 @@ module Expr =
           b
           is
       }; 
-      base:
-        n:DECIMAL                                      {Const n}  
-      | s:STRING                                       {String (String.sub s 1 (String.length s - 2))}
-      | c:CHAR                                         {Const  (Char.code c)}
-      | "[" es:!(Util.list0)[parse] "]"                {Array es}
-      | "{" es:!(Util.list0)[parse] "}"                {match es with
-                                                        | [] -> Const 0
-                                                        | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0)  
-                                                       }
-      | t:UIDENT args:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match args with None -> [] | Some args -> args)}
-      | x:LIDENT s:("(" args:!(Util.list0)[parse] ")"  {Call (x, args)} | empty {Var x}) {s}
-      | -"(" parse -")" 
+      base[infix]:
+        n:DECIMAL                                            {Const n}  
+      | s:STRING                                             {String (unquote s)}
+      | c:CHAR                                               {Const  (Char.code c)}
+      | "[" es:!(Util.list0)[parse infix] "]"                {Array es}
+      | "{" es:!(Util.list0)[parse infix] "}"                {match es with
+                                                              | [] -> Const 0
+                                                              | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0)  
+                                                             }
+      | t:UIDENT args:(-"(" !(Util.list)[parse infix] -")")? {Sexp (t, match args with None -> [] | Some args -> args)}
+      | x:LIDENT s:("(" args:!(Util.list0)[parse infix] ")"  {Call (x, args)} | empty {Var x}) {s}
+      | -"(" parse[infix] -")" 
     )
     
   end
-                    
+
+(* Infix helpers *)
+module Infix =
+  struct
+
+    type t = ([`Lefta | `Righta | `Nona] * (string * (Expr.t -> Expr.t -> Expr.t)) list) array
+           
+    let name infix =
+      let b = Buffer.create 64 in
+      Buffer.add_string b "__Infix_";
+      Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
+      Buffer.contents b
+      
+    let default : t =
+      Array.map (fun (a, s) ->
+        a, 
+        List.map (fun s -> s,
+                           (fun x y ->
+                              match s with
+                              | ":"  -> Expr.Sexp ("cons", [x; y])
+                              | "++" -> Expr.Call ("strcat", [x; y])
+                              | _    -> Expr.Binop (s, x, y)
+                           )
+          ) s
+      ) 
+      [|
+        `Righta, [":"];  
+	`Lefta , ["!!"];
+	`Lefta , ["&&"];
+	`Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
+	`Lefta , ["++"; "+" ; "-"];
+	`Lefta , ["*" ; "/"; "%"];
+      |]     
+
+    exception Break of [`Ok of t | `Fail of string]
+            
+    let find_op infix op cb ce =
+      try
+        Array.iteri (fun i (_, l) -> if List.exists (fun (s, _) -> s = op) l then raise (Break (cb i))) infix;
+        ce ()
+      with Break x -> x
+
+    let no_op op coord = `Fail (Printf.sprintf "infix ``%s'' not found in the scope at %s" op (Msg.Coord.toString coord))
+
+    let sem name x y = Expr.Call (name, [x; y])
+                     
+    let at coord op newp name infix =
+      find_op infix op
+        (fun i ->
+          `Ok (Array.init (Array.length infix)
+                 (fun j ->
+                   if j = i
+                   then let (a, l) = infix.(i) in (a, (newp, sem name) :: l)
+                   else infix.(j)
+            ))
+        )
+        (fun _ -> no_op op coord)
+
+    let before coord op newp ass name infix =
+      find_op infix op
+        (fun i ->
+          `Ok (Array.init (1 + Array.length infix)
+                 (fun j ->
+                   if j < i
+                   then infix.(j)
+                   else if j = i then (ass, [newp, sem name])
+                   else infix.(j-1)
+                 ))
+        )
+        (fun _ -> no_op op coord)
+      
+    let after coord op newp ass name infix =
+      find_op infix op
+        (fun i ->
+          `Ok (Array.init (1 + Array.length infix)
+                 (fun j ->
+                   if j <= i
+                   then infix.(j)
+                   else if j = i+1 then (ass, [newp, sem name])
+                   else infix.(j-1)
+                 ))
+        )
+        (fun _ -> no_op op coord)
+                                
+  end
+
 (* Simple statements: syntax and sematics *)
 module Stmt =
   struct
@@ -354,7 +425,7 @@ module Stmt =
                                                          }
           | x:LIDENT y:(-"@" parse)?                     {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
           | c:DECIMAL                                    {Const c}
-          | s:STRING                                     {String (String.sub s 1 (String.length s - 2))}
+          | s:STRING                                     {String (unquote s)}
           | c:CHAR                                       {Const  (Char.code c)}
           | "#" %"boxed"                                 {Boxed}
           | "#" %"unboxed"                               {UnBoxed}
@@ -419,9 +490,6 @@ module Stmt =
       | Repeat (s, e)      -> eval env conf (seq (While (Expr.Binop ("==", e, Expr.Const 0), s)) k) s
       | Return  e          -> (match e with None -> (st, i, o, None) | Some e -> Expr.eval env conf e)
       | Expr    e          -> eval env (Expr.eval env conf e) k Skip
-(*                            
-      | Call   (f, args)   -> eval env (Expr.eval env conf (Expr.Call (f, args))) k Skip
- *)                            
       | Case   (e, bs)     ->
           let (_, _, _, Some v) as conf' = Expr.eval env conf e in
           let rec branch ((st, i, o, _) as conf) = function
@@ -461,15 +529,15 @@ module Stmt =
            
     (* Statement parser *)
     ostap (
-      parse:
-        s:stmt ";" ss:parse {Seq (s, ss)}
-      | stmt;
-      stmt:
+      parse[infix]:
+        s:stmt[infix] ";" ss:parse[infix] {Seq (s, ss)}
+      | stmt[infix];
+      stmt[infix]:
         %"skip" {Skip}
-      | %"if" e:!(Expr.parse)
-	  %"then" the:parse 
-          elif:(%"elif" !(Expr.parse) %"then" parse)*
-	  els:(%"else" parse)? 
+      | %"if" e:!(Expr.parse infix)
+	  %"then" the:parse[infix] 
+          elif:(%"elif" !(Expr.parse infix) %"then" parse[infix])*
+	  els:(%"else" parse[infix])? 
         %"fi" {
           If (e, the, 
 	         List.fold_right 
@@ -478,21 +546,17 @@ module Stmt =
 		   (match els with None -> Skip | Some s -> s)
           )
         }
-      | %"while" e:!(Expr.parse) %"do" s:parse %"od"{While (e, s)}
-      | %"for" i:parse "," c:!(Expr.parse) "," s:parse %"do" b:parse %"od" {
+      | %"while" e:!(Expr.parse infix) %"do" s:parse[infix] %"od"{While (e, s)}
+      | %"for" i:parse[infix] "," c:!(Expr.parse infix) "," s:parse[infix] %"do" b:parse[infix] %"od" {
 	  Seq (i, While (c, Seq (b, s)))
         }
-      | %"repeat" s:parse %"until" e:!(Expr.parse)  {Repeat (s, e)}
-      | %"return" e:!(Expr.parse)?                  {Return e}
-      | %"case" e:!(Expr.parse) %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse)] %"esac" {Case (e, bs)}
+      | %"repeat" s:parse[infix] %"until" e:!(Expr.parse infix)  {Repeat (s, e)}
+      | %"return" e:!(Expr.parse infix)?                  {Return e}
+      | %"case" e:!(Expr.parse infix) %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse[infix])] %"esac" {Case (e, bs)}
       | x:LIDENT 
-            s:(is:(-"[" !(Expr.parse) -"]")* ":=" e :!(Expr.parse) {Assign (x, is, e)}
-(*
-               | 
-              "("  args:!(Util.list0)[Expr.parse] ")"             {Call   (x, args)}                
- *)
+            s:(is:(-"[" !(Expr.parse infix) -"]")* ":=" e :!(Expr.parse infix) {Assign (x, is, e)}
              ) {s}
-      | e:!(Expr.parse) {Expr e}
+      | e:!(Expr.parse infix) {Expr e}
     )
       
   end
@@ -505,11 +569,25 @@ module Definition =
     type t = string * (string list * string list * Stmt.t)
 
     ostap (
-      arg  : LIDENT;
-      parse: %"fun" name:LIDENT "(" args:!(Util.list0 arg) ")"
-         locs:(%"local" !(Util.list arg))?
-        "{" body:!(Stmt.parse) "}" {
-        (name, (args, (match locs with None -> [] | Some l -> l), body))
+      arg : LIDENT;
+      position[ass][coord][newp]:
+        %"at" s:STRING {Infix.at coord (unquote s) newp}
+      | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord (unquote s) newp ass};
+      head[infix]:
+        %"fun" name:LIDENT {name, infix}
+      | ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
+        l:$ op:(s:STRING {unquote s})
+        md:position[ass][l#coord][op] {
+          let name = Infix.name op in
+          match md name infix with
+          | `Ok infix' -> name, infix'
+          | `Fail msg  -> raise (Semantic_error msg)
+        };      
+      parse[infix]:
+        <(name, infix')> : head[infix] "(" args:!(Util.list0 arg) ")"
+           locs:(%"local" !(Util.list arg))?
+        "{" body:!(Stmt.parse infix') "}" {
+        (name, (args, (match locs with None -> [] | Some l -> l), body)), infix'
       }
     )
 
@@ -547,4 +625,9 @@ let eval (defs, body) i =
   o
 
 (* Top-level parser *)
-let parse = ostap (!(Definition.parse)* !(Stmt.parse))
+ostap (
+  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Stmt.parse infix') {defs, body};
+  definitions[infix]:
+    <(def, infix')> : !(Definition.parse infix) <(defs, infix'')> : definitions[infix'] {def::defs, infix''}
+  | empty {[], infix}
+)

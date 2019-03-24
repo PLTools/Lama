@@ -1,0 +1,39 @@
+infix "===" at "==" (v1, v2) local s1, s2, i {
+  s1 := v1.string;
+  s2 := v2.string;
+
+  if s1.length == s2.length
+  then
+    for i := 0, i < s1.length, i := i + 1
+    do
+      if s1[i] != s2[i] then return 0 fi  
+    od;
+    return 1
+  else return 0
+  fi
+}
+
+infix "?" before "+" (v, l) {
+  case l of
+   {}      -> return 0
+  | h : tl -> if h === v then return 1 else return v ? tl fi
+  esac
+}
+
+infix "+++" at "+" (l1, l2) {
+  case l1 of
+    {}     -> return l2
+  | h : tl -> return h : tl +++ l2
+  esac
+}
+
+n := read ();
+
+write ({1, 2, 3} === {1, 2, 3});
+write ({1, 2, 3} === {1, 2, 4});
+write (1+2 ? {1, 2, 3});
+write (1*3+2 ? {1, 2, 3});
+write (1*3+2 ? {1, 2, 5});
+write (8*4 ? {1, 2, 3} +++ {5, 7, 32, 6})
+
+
