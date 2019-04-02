@@ -12,9 +12,9 @@ fun find (t, x) {
   case t of
     Leaf           -> return 0
   | Node (y, l, r) -> if x == y then return 1
-		       elif x > y then return find (l, x)
-		                  else return find (r, x)
-		       fi
+		      elif x > y then return find (l, x)
+		                 else return find (r, x)
+		      fi
   esac
 }
 

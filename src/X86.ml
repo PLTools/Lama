@@ -539,13 +539,9 @@ class env =
 *)
 let genasm (ds, stmt) =
   let stmt =
-    Language.Stmt.Seq (
-        Language.Stmt.Expr (Language.Expr.Call ("__gc_init", [])),
-        Language.Stmt.Seq (stmt, Language.Stmt.Return (Some (Language.Expr.Call ("raw", [Language.Expr.Const 0]))))
-        (*
-        Language.Stmt.Call ("__gc_init", []),
-        Language.Stmt.Seq (stmt, Language.Stmt.Return (Some (Language.Expr.Call ("raw", [Language.Expr.Const 0]))))
-        *)
+    Language.Expr.Seq (
+        Language.Expr.Call (Language.Expr.Var "__gc_init", []),
+        Language.Expr.Seq (stmt, Language.Expr.Return (Some (Language.Expr.Call (Language.Expr.Var "raw", [Language.Expr.Const 0]))))        
       )
   in
   let env, code =

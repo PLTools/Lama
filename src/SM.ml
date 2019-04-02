@@ -38,7 +38,7 @@ let print_prg p = List.iter (fun i -> Printf.printf "%s\n" (show(insn) i)) p
 (* The type for the stack machine configuration: control stack, stack and configuration from statement
    interpreter
 *)
-type config = (prg * State.t) list * Value.t list * Expr.config
+type config = (prg * State.t) list * Value.t list * ( State.t * int list * int list) (*Expr.config*)
 
 (* Stack machine interpreter
 
@@ -66,7 +66,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     | LD x                    -> eval env (cstack, State.eval st x :: stack, c) prg'
     | ST x                    -> let z::stack' = stack in eval env (cstack, stack', (State.update x z st, i, o)) prg'
     | STA (x, n)              -> let v::is, stack' = split (n+1) stack in
-                                 eval env (cstack, stack', (Language.Stmt.update st x v (List.rev is), i, o)) prg'
+                                 eval env (cstack, stack', c (* (Language.Stmt.update st x v (List.rev is), i, o) *)) prg'
     | LABEL  _                -> eval env conf prg'
     | JMP    l                -> eval env conf (env#labeled l)
     | CJMP  (c, l)            -> let x::stack' = stack in eval env (cstack, stack', (st, i, o)) (if (c = "z" && Value.to_int x = 0) || (c = "nz" && Value.to_int x <> 0) then env#labeled l else prg')
@@ -85,7 +85,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     | SWAP                    -> let x::y::stack' = stack in
                                  eval env (cstack, y::x::stack', c) prg'
     | TAG (t, n)              -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp (t', a) when t' = t && List.length a = n -> 1 | _ -> 0) :: stack', c) prg'
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp (t', a) when t' = t && Array.length a = n -> 1 | _ -> 0) :: stack', c) prg'
     | ARRAY n                 -> let x::stack' = stack in
                                  eval env (cstack, (Value.of_int @@ match x with Value.Array a when Array.length a = n -> 1 | _ -> 0) :: stack', c) prg'
     | PATT StrCmp             -> let x::y::stack' = stack in
@@ -128,8 +128,8 @@ let run p i =
          method builtin (cstack, stack, (st, i, o)) f n p =
            let f = match f.[0] with 'L' -> String.sub f 1 (String.length f - 1) | _ -> f in
            let args, stack' = split n stack in
-           let (st, i, o, r) = Language.Builtin.eval (st, i, o, None) (List.rev args) f in
-           let stack'' = if p then stack' else let Some r = r in r::stack' in
+           let (st, i, o, r) = Language.Builtin.eval (st, i, o, []) (List.rev args) f in
+           let stack'' = if p then stack' else let [r] = r in r::stack' in
            (*Printf.printf "Builtin:\n";*)
            (cstack, stack'', (st, i, o))
        end
@@ -146,28 +146,29 @@ let run p i =
    Takes a program in the source language and returns an equivalent program for the
    stack machine
 *)
-let compile (defs, p) =
+let compile (defs, p) = invalid_arg ""
+(*                      
   let label s = "L" ^ s in
   let rec call f args p =
     let args_code = List.concat @@ List.map expr args in
     args_code @ [CALL (label f, List.length args, p)]
   and pattern env lfalse = function
-  | Stmt.Pattern.Wildcard        -> env, false, [DROP]
-  | Stmt.Pattern.Named   (_, p)  -> pattern env lfalse p
-  | Stmt.Pattern.Const   c       -> env, true, [CONST c; BINOP "=="; CJMP ("z", lfalse)]
-  | Stmt.Pattern.String  s       -> env, true, [STRING s; PATT StrCmp; CJMP ("z", lfalse)]
-  | Stmt.Pattern.ArrayTag        -> env, true, [PATT Array; CJMP ("z", lfalse)]
-  | Stmt.Pattern.StringTag       -> env, true, [PATT String; CJMP ("z", lfalse)]
-  | Stmt.Pattern.SexpTag         -> env, true, [PATT Sexp; CJMP ("z", lfalse)]
-  | Stmt.Pattern.UnBoxed         -> env, true, [PATT UnBoxed; CJMP ("z", lfalse)]
-  | Stmt.Pattern.Boxed           -> env, true, [PATT Boxed; CJMP ("z", lfalse)]
-  | Stmt.Pattern.Array    ps     ->
+  | Pattern.Wildcard        -> env, false, [DROP]
+  | Pattern.Named   (_, p)  -> pattern env lfalse p
+  | Pattern.Const   c       -> env, true, [CONST c; BINOP "=="; CJMP ("z", lfalse)]
+  | Pattern.String  s       -> env, true, [STRING s; PATT StrCmp; CJMP ("z", lfalse)]
+  | Pattern.ArrayTag        -> env, true, [PATT Array; CJMP ("z", lfalse)]
+  | Pattern.StringTag       -> env, true, [PATT String; CJMP ("z", lfalse)]
+  | Pattern.SexpTag         -> env, true, [PATT Sexp; CJMP ("z", lfalse)]
+  | Pattern.UnBoxed         -> env, true, [PATT UnBoxed; CJMP ("z", lfalse)]
+  | Pattern.Boxed           -> env, true, [PATT Boxed; CJMP ("z", lfalse)]
+  | Pattern.Array    ps     ->
      let lhead, env   = env#get_label in
      let ldrop, env   = env#get_label in
      let tag          = [DUP; ARRAY (List.length ps); CJMP ("nz", lhead); LABEL ldrop; DROP; JMP lfalse; LABEL lhead] in
      let code, env    = pattern_list lhead ldrop env ps in
      env, true, tag @ code @ [DROP]
-  | Stmt.Pattern.Sexp    (t, ps) ->
+  | Pattern.Sexp    (t, ps) ->
      let lhead, env   = env#get_label in
      let ldrop, env   = env#get_label in
      let tag          = [DUP; TAG (t, List.length ps); CJMP ("nz", lhead); LABEL ldrop; DROP; JMP lfalse; LABEL lhead] in
@@ -186,9 +187,9 @@ let compile (defs, p) =
     List.flatten (List.rev code), env            
   and bindings p =
     let bindings =
-      transform(Stmt.Pattern.t)
+      transform(Pattern.t)
         (fun fself ->
-           object inherit [int list, (string * int list) list, _] @Stmt.Pattern.t 
+           object inherit [int list, (string * int list) list, _] @Pattern.t 
              method c_Wildcard  path _      = []
              method c_Named     path _ s p  = [s, path] @ fself path p
              method c_Sexp      path _ x ps = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
@@ -315,3 +316,4 @@ let compile (defs, p) =
   let _, flag, code = compile_stmt lend env p in
   (if flag then code @ [LABEL lend] else code) @ [END] @ (List.concat def_code) 
 
+ *)

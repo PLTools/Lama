@@ -38,7 +38,7 @@ case 1 of
 | a@3 -> write (a)
 | a@2 -> write (a)
 | a@1 -> write (a)
-| a@0 -> write (a) 
+| a@0 -> write (a)
 esac;
 
 case A (1, 2, 3) of
