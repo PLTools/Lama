@@ -19,7 +19,7 @@ module Value =
     @type t =
     | Empty
     | Var    of string
-    | Elem   of t * int
+    | Elem   of t * int 
     | Int    of int
     | String of bytes
     | Array  of t array
@@ -49,7 +49,12 @@ module Value =
 
     let update_string s i x = Bytes.set s i x; s 
     let update_array  a i x = a.(i) <- x; a
-                                          
+
+    let update_elem x i v =
+      match x with
+      | Sexp (_, a) | Array a -> ignore (update_array a i v)
+      | String a -> ignore (update_string a i (Char.chr @@ to_int v))
+      
     let string_val v =
       let buf      = Buffer.create 128 in
       let append s = Buffer.add_string buf s in
@@ -148,7 +153,7 @@ module Builtin =
       
     let eval (st, i, o, vs) args = function
     | "read"     -> (match i with z::i' -> (st, i', o, (Value.of_int z)::vs) | _ -> failwith "Unexpected end of input")
-    | "write"    -> (st, i, o @ [Value.to_int @@ List.hd args], vs)
+    | "write"    -> (st, i, o @ [Value.to_int @@ List.hd args], (*Value.Empty ::*) vs)
     | ".elem"    -> let [b; j] = args in
                     (st, i, o, let i = Value.to_int j in
                                (match b with
@@ -265,13 +270,8 @@ module Expr =
     let update st x v =
       match x with
       | Value.Var x       -> State.update x v st
-      | Value.Elem (x, i) ->
-         (match x with
-          | Value.Sexp (_, a) | Value.Array a -> ignore (Value.update_array a i v)
-          | Value.String a -> ignore (Value.update_string a i (Char.chr @@ Value.to_int v))
-         );
-         st      
-    
+      | Value.Elem (x, i) -> Value.update_elem x i v; st
+                             
     (* Expression evaluator
 
           val eval : env -> config -> k -> t -> config
@@ -315,7 +315,6 @@ module Expr =
     | n -> fun h::tl -> let tl', rest = take (n-1) tl in h :: tl', rest
 
     let rec eval env ((st, i, o, vs) as conf) k expr =
-      (*Printf.printf "eval: %s\n" (show(list) (show(Value.t)) vs); flush stdout; *)
       match expr with
       | Control f ->
          let s, conf' = f conf in

@@ -174,7 +174,8 @@ let compile env code =
 	      | S _ | M _ -> [Mov (env'#loc x, eax); Mov (eax, s)]
 	      | _         -> [Mov (env'#loc x, s)]
 	     )
-               
+
+             (* TODO
           | STA (x, n) ->
              let s, env = (env#variable x)#allocate in
              let push =
@@ -192,7 +193,8 @@ let compile env code =
               | S _ | M _ -> [Mov (s, eax); Mov (eax, env'#loc x)]
               | _         -> [Mov (s, env'#loc x)]
 	     )
-               
+              *)
+             
           | BINOP op ->
 	     let x, y, env' = env#pop2 in
              env'#push y,
@@ -313,7 +315,7 @@ let compile env code =
              then let x, env = env#pop in env, [Mov (x, eax); Jmp env#epilogue]
              else env, [Jmp env#epilogue]
              
-          | CALL (f, n, p) -> call env f n p
+          | CALL (f, n) -> call env f n (* p *) false (* TODO!!! *)
 
           | SEXP (t, n) ->
              let s, env = env#allocate in
