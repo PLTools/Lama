@@ -11,16 +11,16 @@ open Language
 (* put a string on the stack                 *) | STRING  of string
 (* create an S-expression                    *) | SEXP    of string * int
 (* load a variable to the stack              *) | LD      of string
-(* load a variable address to the stack      *) | LDA     of string                                                           
+(* load a variable address to the stack      *) | LDA     of string
 (* store a value into a reference            *) | ST
-(* store a value into array/sexp/string      *) | STA                                                
+(* store a value into array/sexp/string      *) | STA                                  
 (* a label                                   *) | LABEL   of string
 (* unconditional jump                        *) | JMP     of string
 (* conditional jump                          *) | CJMP    of string * string
 (* begins procedure definition               *) | BEGIN   of string * string list * string list
 (* end procedure definition                  *) | END
 (* calls a function/procedure                *) | CALL    of string * int 
-(* returns from a function                   *) | RET     of bool
+(* returns from a function                   *) | RET     
 (* drops the top element off                 *) | DROP
 (* duplicates the top element                *) | DUP
 (* swaps two top elements                    *) | SWAP
@@ -67,8 +67,8 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
                                  eval env (cstack, (Value.sexp s @@ List.rev vs)::stack', c) prg'
     | LD x                    -> eval env (cstack, State.eval st x :: stack, c) prg'
     | LDA x                   -> eval env (cstack, (Value.Var x) :: stack, c) prg'
-    | ST                      -> let z::r::stack' = stack in eval env (cstack, stack', (Expr.update st r z, i, o)) prg'                                                           
-    | STA                     -> let v::j::x::stack' = stack in eval env (cstack, stack', (Expr.update st (Value.Elem (x, Value.to_int j)) v, i, o)) prg'
+    | ST                      -> let z::r::stack' = stack in eval env (cstack, z::stack', (Expr.update st r z, i, o)) prg'
+    | STA                     -> let v::j::x::stack' = stack in eval env (cstack, v::stack', (Expr.update st (Value.Elem (x, Value.to_int j)) v, i, o)) prg'
     | LABEL  _                -> eval env conf prg'
     | JMP    l                -> eval env conf (env#labeled l)
     | CJMP  (c, l)            -> let x::stack' = stack in eval env (cstack, stack', (st, i, o)) (if (c = "z" && Value.to_int x = 0) || (c = "nz" && Value.to_int x <> 0) then env#labeled l else prg')
@@ -78,10 +78,16 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     | BEGIN (_, args, locals) -> let vs, stack' = split (List.length args) stack in
                                  let state      = List.combine args @@ List.rev vs in
                                  eval env (cstack, stack', (List.fold_left (fun s (x, v) -> State.update x v s) (State.enter st (args @ locals)) state, i, o)) prg'
-    | END | RET _             -> (match cstack with
+    | END                     -> (match cstack with
+                                  | (prg', st')::cstack' -> eval env (cstack', Value.Empty :: stack, (State.leave st st', i, o)) prg'
+                                  | []                   -> conf
+                                 )
+  
+    | RET                     -> (match cstack with
                                   | (prg', st')::cstack' -> eval env (cstack', stack, (State.leave st st', i, o)) prg'
                                   | []                   -> conf
                                  )
+                               
     | DROP                    -> eval env (cstack, List.tl stack, c) prg'
     | DUP                     -> eval env (cstack, List.hd stack :: stack, c) prg'
     | SWAP                    -> let x::y::stack' = stack in
@@ -132,7 +138,7 @@ let run p i =
            let args, stack' = split n stack in
            let (st, i, o, r) = Language.Builtin.eval (st, i, o, []) (List.rev args) f in
            (*Printf.printf "Builtin:\n";*)
-           (cstack, (match r with [r] -> r::stack' | _ -> stack'), (st, i, o))
+           (cstack, (match r with [r] -> r::stack' | _ -> Value.Empty :: stack'), (st, i, o))
        end
       )
       ([], [], (State.empty, i, []))
@@ -222,6 +228,11 @@ let compile (defs, p) =
      let env, flag2, s2 = compile_list l   env es in
      add_code (env, flag1, s1) les flag2 s2
   and compile_expr l env = function
+  | Expr.Unit               -> env, false, [CONST 0]
+                               
+  | Expr.Ignore   s         -> let ls, env = env#get_label in
+                               add_code (compile_expr ls env s) ls false [DROP]                             
+
   | Expr.ElemRef (x, i)     -> compile_list l env [x; i]                               
   | Expr.Var      x         -> env, false, [LD x]
   | Expr.Ref      x         -> env, false, [LDA x]
@@ -278,9 +289,9 @@ let compile (defs, p) =
                                env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("z", loop)]
 
   | Expr.Return (Some e)    -> let lret, env = env#get_label in
-                               add_code (compile_expr lret env e) lret false [RET true]
+                               add_code (compile_expr lret env e) lret false [RET]
                                
-  | Expr.Return None        -> env, false, [RET false]
+  | Expr.Return None        -> env, false, [CONST 0; RET]
 
   | Expr.Leave              -> env, false, [LEAVE]
                                              

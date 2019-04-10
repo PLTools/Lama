@@ -69,4 +69,4 @@ case [1, 2, 3] of
 | [a, b, c] -> write (a); write (b); write (c)
 esac;
 
-print_list (collect_ints ([1, 2, 3, [4, 5, 6, Cons (1, 2, 3)]]))
+print_list (collect_ints ([1, 2, 3, [4, 5, 6, Cons (1, 2, 3)]])) 

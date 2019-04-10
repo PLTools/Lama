@@ -339,7 +339,7 @@ extern int Bsexp_tag_patt (void *x) {
   
   return BOX(TAG(TO_DATA(x)->tag) == SEXP_TAG);
 }
-
+/*
 extern void Bsta (int n, int v, void *s, ...) {
   va_list args = (va_list) BOX (NULL);
   int i = 0, k = 0;
@@ -357,6 +357,11 @@ extern void Bsta (int n, int v, void *s, ...) {
   
   if (TAG(a->tag) == STRING_TAG)((char*) s)[k] = (char) UNBOX(v);
   else ((int*) s)[k] = v;
+}
+*/
+extern void Bsta (void *v, int i, void *x) {
+  if (TAG(TO_DATA(x)->tag) == STRING_TAG)((char*) x)[UNBOX(i)] = (char) UNBOX(v);
+  else ((int*) x)[UNBOX(i)] = v;
 }
 
 extern int Lraw (int x) {

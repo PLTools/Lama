@@ -13,10 +13,11 @@ let word_size = 4;;
 
 (* We need to distinguish the following operand types: *)
 @type opnd = 
-| R of int     (* hard register                    *)
-| S of int     (* a position on the hardware stack *)
-| M of string  (* a named memory location          *)
-| L of int     (* an immediate operand             *)
+| R of int    (* hard register                    *)
+| S of int    (* a position on the hardware stack *)
+| M of string (* a named memory location          *)
+| L of int    (* an immediate operand             *)
+| I of opnd   (* an indirect operand              *)      
 with show
 
 let show_opnd = show(opnd)
@@ -33,29 +34,29 @@ let esp = R 7
 
 (* Now x86 instruction (we do not need all of them): *)
 type instr =
-(* copies a value from the first to the second operand  *) | Mov   of opnd * opnd
-(* makes a binary operation; note, the first operand    *) | Binop of string * opnd * opnd
-(* designates x86 operator, not the source language one *)
-(* x86 integer division, see instruction set reference  *) | IDiv  of opnd
-(* see instruction set reference                        *) | Cltd
-(* sets a value from flags; the first operand is the    *) | Set   of string * string
-(* suffix, which determines the value being set, the    *)                     
-(* the second --- (sub)register name                    *)
-(* pushes the operand on the hardware stack             *) | Push  of opnd
-(* pops from the hardware stack to the operand          *) | Pop   of opnd
-(* call a function by a name                            *) | Call  of string
-(* returns from a function                              *) | Ret
-(* a label in the code                                  *) | Label of string
-(* a conditional jump                                   *) | CJmp  of string * string
-(* a non-conditional jump                               *) | Jmp   of string
-(* directive                                            *) | Meta  of string
+(* copies a value from the first to the second operand   *) | Mov   of opnd * opnd
+(* loads an address of the first operand into the second *) | Lea   of opnd * opnd
+(* makes a binary operation; note, the first operand     *) | Binop of string * opnd * opnd
+(* designates x86 operator, not the source language one  *)
+(* x86 integer division, see instruction set reference   *) | IDiv  of opnd
+(* see instruction set reference                         *) | Cltd
+(* sets a value from flags; the first operand is the     *) | Set   of string * string
+(* suffix, which determines the value being set, the     *)                     
+(* the second --- (sub)register name                     *)
+(* pushes the operand on the hardware stack              *) | Push  of opnd
+(* pops from the hardware stack to the operand           *) | Pop   of opnd
+(* call a function by a name                             *) | Call  of string
+(* returns from a function                               *) | Ret
+(* a label in the code                                   *) | Label of string
+(* a conditional jump                                    *) | CJmp  of string * string
+(* a non-conditional jump                                *) | Jmp   of string
+(* directive                                             *) | Meta  of string
 
-(* arithmetic correction: decrement                     *) | Dec   of opnd
-(* arithmetic correction: or 0x0001                     *) | Or1   of opnd
-(* arithmetic correction: shl 1                         *) | Sal1  of opnd
-(* arithmetic correction: shr 1                         *) | Sar1  of opnd
-                                                           | Repmovsl 
-                                                                                                                                   
+(* arithmetic correction: decrement                      *) | Dec   of opnd
+(* arithmetic correction: or 0x0001                      *) | Or1   of opnd
+(* arithmetic correction: shl 1                          *) | Sal1  of opnd
+(* arithmetic correction: shr 1                          *) | Sar1  of opnd
+                                                            | Repmovsl                                                             
 (* Instruction printer *)
 let show instr =
   let binop = function
@@ -68,13 +69,14 @@ let show instr =
   | "cmp" -> "cmpl"
   | _     -> failwith "unknown binary operator"
   in
-  let opnd = function
+  let rec opnd = function
   | R i -> regs.(i)
   | S i -> if i >= 0
            then Printf.sprintf "-%d(%%ebp)" ((i+1) * word_size)
            else Printf.sprintf "%d(%%ebp)"  (8+(-i-1) * word_size)
   | M x -> x
   | L i -> Printf.sprintf "$%d" i
+  | I x -> Printf.sprintf "(%s)" (opnd x)
   in
   match instr with
   | Cltd               -> "\tcltd"
@@ -82,6 +84,7 @@ let show instr =
   | IDiv   s1          -> Printf.sprintf "\tidivl\t%s"     (opnd s1)
   | Binop (op, s1, s2) -> Printf.sprintf "\t%s\t%s,\t%s"   (binop op) (opnd s1) (opnd s2)
   | Mov   (s1, s2)     -> Printf.sprintf "\tmovl\t%s,\t%s" (opnd s1) (opnd s2)
+  | Lea   (x,  y)      -> Printf.sprintf "\tleal\t%s,\t%s" (opnd x) (opnd y)
   | Push   s           -> Printf.sprintf "\tpushl\t%s"     (opnd s)
   | Pop    s           -> Printf.sprintf "\tpopl\t%s"      (opnd s)
   | Ret                -> "\tret"
@@ -107,7 +110,7 @@ open SM
    of x86 instructions
 *)
 let compile env code =
-  (*SM.print_prg code;*)
+  SM.print_prg code;
   flush stdout;
   let suffix = function
   | "<"  -> "l"
@@ -129,25 +132,20 @@ let compile env code =
         List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
       in
       let env, code =
-        if n = 0
-        then env, pushr @ [Call f] @ (List.rev popr)
-        else
-          let rec push_args env acc = function
-          | 0 -> env, acc
-          | n -> let x, env = env#pop in
-                 push_args env ((Push x)::acc) (n-1)
-          in
-          let env, pushs = push_args env [] n in
-          let pushs      =
-            match f with
-            | "Barray" -> List.rev @@ (Push (L n)) :: pushs
-            | "Bsexp"  -> List.rev @@ (Push (L n)) :: pushs
-            | "Bsta"   ->
-                 let x::v::is = List.rev pushs in               
-                 is @ [x; v] @ [Push (L (n-2))]
-            | _  -> List.rev pushs 
-          in
-          env, pushr @ pushs @ [Call f; Binop ("+", L (4 * List.length pushs), esp)] @ (List.rev popr)
+        let rec push_args env acc = function
+        | 0 -> env, acc
+        | n -> let x, env = env#pop in
+               push_args env ((Push x)::acc) (n-1)
+        in
+        let env, pushs = push_args env [] n in
+        let pushs      =
+          match f with
+          | "Barray" -> List.rev @@ (Push (L n)) :: pushs
+          | "Bsexp"  -> List.rev @@ (Push (L n)) :: pushs
+          | "Bsta"   -> pushs
+          | _        -> List.rev pushs 
+        in
+        env, pushr @ pushs @ [Call f; Binop ("+", L (4 * List.length pushs), esp)] @ (List.rev popr)
       in
       (if p then env, code else let y, env = env#allocate in env, code @ [Mov (eax, y)])
     in
@@ -166,6 +164,14 @@ let compile env code =
              let l, env = env#allocate in
              let env, call = call env ".string" 1 false in
              (env, Mov (M ("$" ^ s), l) :: call)
+
+          | LDA x ->
+             let s, env' = (env#variable x)#allocate in
+             env',
+             (match s with
+	      | S _ | M _ -> [Lea (env'#loc x, eax); Mov (eax, s)]
+	      | _         -> [Lea (env'#loc x, s)]
+             )
              
 	  | LD x ->
              let s, env' = (env#variable x)#allocate in
@@ -174,26 +180,17 @@ let compile env code =
 	      | S _ | M _ -> [Mov (env'#loc x, eax); Mov (eax, s)]
 	      | _         -> [Mov (env'#loc x, s)]
 	     )
-
-             (* TODO
-          | STA (x, n) ->
-             let s, env = (env#variable x)#allocate in
-             let push =
-               match s with
-               | S _ | M _ -> [Mov (env#loc x, eax); Mov (eax, s)]
-	       | _         -> [Mov (env#loc x, s)]
-             in
-             let env, code = call env ".sta" (n+2) true in
-             env, push @ code
+             
+          | STA ->
+             call env ".sta" 3 true
                            
-	  | ST x ->
-	     let s, env' = (env#variable x)#pop in
+	  | ST ->
+             let v, x, env' = env#pop2 in
              env',
-             (match s with
-              | S _ | M _ -> [Mov (s, eax); Mov (eax, env'#loc x)]
-              | _         -> [Mov (s, env'#loc x)]
-	     )
-              *)
+             (match x with
+              | S _ | M _ -> [Mov (v, edx); Mov (x, eax); Mov (edx, I eax)]
+              | _         -> [Mov (v, eax); Mov (eax, I x)]
+             )
              
           | BINOP op ->
 	     let x, y, env' = env#pop2 in
@@ -310,12 +307,11 @@ let compile env code =
                    Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated)
                   ]
                     
-          | RET b ->
-             if b
-             then let x, env = env#pop in env, [Mov (x, eax); Jmp env#epilogue]
-             else env, [Jmp env#epilogue]
+          | RET ->             
+             let x, env = env#pop in
+             env, [Mov (x, eax); Jmp env#epilogue]
              
-          | CALL (f, n) -> call env f n (* p *) false (* TODO!!! *)
+          | CALL (f, n) -> call env f n (f <> "Lraw" && f <> "Lcollect_ints" && f <> "Lcollect_ints_acc" && f <> "Lread" && f <> ".elem" && f <> ".array" && f <> ".length") 
 
           | SEXP (t, n) ->
              let s, env = env#allocate in

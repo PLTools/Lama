@@ -16,14 +16,14 @@ infix "===" at "==" (v1, v2) local s1, s2, i {
 infix "?" before "+" (v, l) {
   case l of
    {}      -> return 0
-  | h : tl -> if h === v then return 1 else return v ? tl fi
+  | h : tl -> if h === v then return 1 else return (v ? tl) fi
   esac
 }
 
 infix "+++" at "+" (l1, l2) {
   case l1 of
     {}     -> return l2
-  | h : tl -> return h : tl +++ l2
+  | h : tl -> return (h : tl +++ l2)
   esac
 }
 
@@ -35,5 +35,3 @@ write (1+2 ? {1, 2, 3});
 write (1*3+2 ? {1, 2, 3});
 write (1*3+2 ? {1, 2, 5});
 write (8*4 ? {1, 2, 3} +++ {5, 7, 32, 6})
-
-

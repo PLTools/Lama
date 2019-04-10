@@ -7,6 +7,6 @@ repeat
   s := s * n;
   n := n - 1
   
-until n == 0;
+until (n == 0);
 
 write (s)

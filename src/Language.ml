@@ -153,7 +153,7 @@ module Builtin =
       
     let eval (st, i, o, vs) args = function
     | "read"     -> (match i with z::i' -> (st, i', o, (Value.of_int z)::vs) | _ -> failwith "Unexpected end of input")
-    | "write"    -> (st, i, o @ [Value.to_int @@ List.hd args], (*Value.Empty ::*) vs)
+    | "write"    -> (st, i, o @ [Value.to_int @@ List.hd args], Value.Empty :: vs)
     | ".elem"    -> let [b; j] = args in
                     (st, i, o, let i = Value.to_int j in
                                (match b with
@@ -254,6 +254,8 @@ module Expr =
     (* loop with a post-condition *) | Repeat    of t * t
     (* pattern-matching           *) | Case      of t * (Pattern.t * t) list
     (* return statement           *) | Return    of t option
+    (* ignore a value             *) | Ignore    of t
+    (* unit value                 *) | Unit
     (* leave a scope              *) | Leave  
     (* intrinsic (for evaluation) *) | Intrinsic of (config -> config)
     (* control (for control flow) *) | Control   of (config -> t * config)
@@ -316,6 +318,8 @@ module Expr =
 
     let rec eval env ((st, i, o, vs) as conf) k expr =
       match expr with
+      | Unit     -> eval env (st, i, o, Value.Empty :: vs) Skip k
+      | Ignore s -> eval env conf k (schedule_list [s; Intrinsic (fun (st, i, o, vs) -> (st, i, o, List.tl vs))])
       | Control f ->
          let s, conf' = f conf in
          eval env conf' k s
@@ -348,7 +352,7 @@ module Expr =
                                                                                   env#definition env f (List.rev es) (st, i, o, vs'))]))
       | Leave  -> eval env (State.drop st, i, o, vs) Skip k 
       | Assign (x, e)  ->
-         eval env conf k (schedule_list [x; e; Intrinsic (fun (st, i, o, v::x::vs) -> (update st x v, i, o, vs))])
+         eval env conf k (schedule_list [x; e; Intrinsic (fun (st, i, o, v::x::vs) -> (update st x v, i, o, v::vs))])
       | Seq (s1, s2) ->
          eval env conf (seq s2 k) s1
       | Skip ->
@@ -411,7 +415,39 @@ module Expr =
     | If   (e, t1, t2) -> If (e, propagate_ref t1, propagate_ref t2)
     | Case (e, bs)     -> Case (e, List.map (fun (p, e) -> p, propagate_ref e) bs)
     | _                -> raise (Semantic_error "not a destination")
-        
+
+    (* Balance values *)
+    let rec balance_value = function 
+    | Array     es        -> Array     (List.map balance_value es)
+    | Sexp      (s, es)   -> Sexp      (s, List.map balance_value es)
+    | Binop     (o, l, r) -> Binop     (o, balance_value l, balance_value r)
+    | Elem      (b, i)    -> Elem      (balance_value b, balance_value i)
+    | ElemRef   (b, i)    -> ElemRef   (balance_value b, balance_value i)
+    | Length    x         -> Length    (balance_value x)
+    | StringVal x         -> StringVal (balance_value x)
+    | Call      (f, es)   -> Call      (balance_value f, List.map balance_value es)
+    | Assign    (d, s)    -> Assign    (balance_value d, balance_value s)
+    | Seq       (l, r)    -> Seq       (balance_void l, balance_value r)
+    | If        (c, t, e) -> If        (balance_value c, balance_value t, balance_value e)
+    | Case      (e, ps)   -> Case      (balance_value e, List.map (fun (p, e) -> p, balance_value e) ps)
+
+    | Return    _  
+    | While     _  
+    | Repeat    _  
+    | Skip        -> raise (Semantic_error "missing value")
+
+    | e                   -> e
+    and balance_void = function
+    | If     (c, t, e) -> If     (balance_value c, balance_void t, balance_void e)
+    | Seq    (l, r)    -> Seq    (balance_void l, balance_void r)
+    | Case   (e, ps)   -> Case   (balance_value e, List.map (fun (p, e) -> p, balance_void e) ps)
+    | While  (e, s)    -> While  (balance_value e, balance_void s)
+    | Repeat (s, e)    -> Repeat (balance_void s, balance_value e)
+    | Return (Some e)  -> Return (Some (balance_value e))
+    | Return None      -> Return None
+    | Skip             -> Skip 
+    | e                -> Ignore (balance_value e)
+
     ostap (
       parse[infix]: h:basic[infix] t:(-";" parse[infix])? {match t with None -> h | Some t -> Seq (h, t)};
       basic[infix]: 
@@ -588,7 +624,7 @@ module Definition =
         <(name, infix')> : head[infix] "(" args:!(Util.list0 arg) ")"
            locs:(%"local" !(Util.list arg))?
         "{" body:!(Expr.parse infix') "}" {
-        (name, (args, (match locs with None -> [] | Some l -> l), body)), infix'
+        (name, (args, (match locs with None -> [] | Some l -> l), Expr.balance_void body)), infix'
       }
     )
 
@@ -616,7 +652,7 @@ let eval (defs, body) i =
              let xs, locs, s       = snd @@ M.find f m in
              let st'               = List.fold_left (fun st (x, a) -> State.update x a st) (State.enter st (xs @ locs)) (List.combine xs args) in
              let st'', i', o', vs' = Expr.eval env (st', i, o, []) Skip s in
-             (State.leave st'' st, i', o', match vs' with [v] -> v::vs | _ -> vs)
+             (State.leave st'' st, i', o', match vs' with [v] -> v::vs | _ -> Value.Empty :: vs)
            with Not_found -> Builtin.eval conf args f
        end)
       (State.empty, i, [], [])
@@ -627,7 +663,7 @@ let eval (defs, body) i =
 
 (* Top-level parser *)
 ostap (
-  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Expr.parse infix') {defs, body};
+  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Expr.parse infix') {defs, Expr.balance_void body};
   definitions[infix]:
     <(def, infix')> : !(Definition.parse infix) <(defs, infix'')> : definitions[infix'] {def::defs, infix''}
   | empty {[], infix}

@@ -13,4 +13,4 @@ elif n == 4 then write (3)
 
   n := n - 1
 
-until n == 0
+until (n == 0)

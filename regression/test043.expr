@@ -1,7 +1,7 @@
 fun sum (x) {
   case x of
     Nil          -> return 0
-  | Cons (x, tl) -> return x + sum (tl)
+  | Cons (x, tl) -> return (x + sum (tl))
   esac
 }
 

@@ -3,6 +3,6 @@ s := 0;
 repeat
   n := read ();
   s := s + n
-until n == 0;
+until (n == 0);
 
 write (s)  
