@@ -180,11 +180,20 @@ let compile env code =
 	      | S _ | M _ -> [Mov (env'#loc x, eax); Mov (eax, s)]
 	      | _         -> [Mov (env'#loc x, s)]
 	     )
+
+          | ST x ->              
+	     let env' = env#variable x in
+             let s    = env'#peek      in
+             env',
+             (match s with
+              | S _ | M _ -> [Mov (s, eax); Mov (eax, env'#loc x)]
+              | _         -> [Mov (s, env'#loc x)]
+	     )
              
           | STA ->
              call env ".sta" 3
                            
-	  | ST ->
+	  | STI ->
              let v, x, env' = env#pop2 in
              env'#push x,
              (match x with

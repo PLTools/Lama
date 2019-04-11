@@ -12,7 +12,8 @@ open Language
 (* create an S-expression                    *) | SEXP    of string * int
 (* load a variable to the stack              *) | LD      of string
 (* load a variable address to the stack      *) | LDA     of string
-(* store a value into a reference            *) | ST
+(* store a value into a variable             *) | ST      of string
+(* store a value into a reference            *) | STI
 (* store a value into array/sexp/string      *) | STA                                  
 (* a label                                   *) | LABEL   of string
 (* unconditional jump                        *) | JMP     of string
@@ -67,7 +68,8 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
                                  eval env (cstack, (Value.sexp s @@ List.rev vs)::stack', c) prg'
     | LD x                    -> eval env (cstack, State.eval st x :: stack, c) prg'
     | LDA x                   -> eval env (cstack, (Value.Var x) :: stack, c) prg'
-    | ST                      -> let z::r::stack' = stack in eval env (cstack, z::stack', (Expr.update st r z, i, o)) prg'
+    | ST  x                   -> let z::stack' = stack in eval env (cstack, z::stack', (State.update x z st, i, o)) prg'
+    | STI                     -> let z::r::stack' = stack in eval env (cstack, z::stack', (Expr.update st r z, i, o)) prg'
     | STA                     -> let v::j::x::stack' = stack in eval env (cstack, v::stack', (Expr.update st (Value.Elem (x, Value.to_int j)) v, i, o)) prg'
     | LABEL  _                -> eval env conf prg'
     | JMP    l                -> eval env conf (env#labeled l)
@@ -259,9 +261,12 @@ let compile (defs, p) =
                                
   | Expr.StringVal e        -> let lsv, env = env#get_label in
                                add_code (compile_expr lsv env e) lsv false [CALL (".stringval", 1)]
-      
+
   | Expr.Assign (x, e)      -> let lassn, env = env#get_label in
-                               add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> ST]
+                               (match x with
+                               | Expr.Ref x -> add_code (compile_expr lassn env e) lassn false [ST x]
+                               | _          -> add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]
+                               )
                              
   | Expr.Skip               -> env, false, []
 
