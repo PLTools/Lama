@@ -110,7 +110,7 @@ open SM
    of x86 instructions
 *)
 let compile env code =
-  SM.print_prg code;
+  (* SM.print_prg code; *)
   flush stdout;
   let suffix = function
   | "<"  -> "l"
@@ -124,7 +124,7 @@ let compile env code =
   let rec compile' env scode =    
     let on_stack = function S _ -> true | _ -> false in
     let mov x s = if on_stack x && on_stack s then [Mov (x, eax); Mov (eax, s)] else [Mov (x, s)]  in
-    let call env f n p =
+    let call env f n =
       let f =
         match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
       in
@@ -147,7 +147,7 @@ let compile env code =
         in
         env, pushr @ pushs @ [Call f; Binop ("+", L (4 * List.length pushs), esp)] @ (List.rev popr)
       in
-      (if p then env, code else let y, env = env#allocate in env, code @ [Mov (eax, y)])
+      let y, env = env#allocate in env, code @ [Mov (eax, y)]
     in
     match scode with
     | [] -> env, []
@@ -162,7 +162,7 @@ let compile env code =
           | STRING s ->
              let s, env = env#string s in
              let l, env = env#allocate in
-             let env, call = call env ".string" 1 false in
+             let env, call = call env ".string" 1 in
              (env, Mov (M ("$" ^ s), l) :: call)
 
           | LDA x ->
@@ -182,15 +182,15 @@ let compile env code =
 	     )
              
           | STA ->
-             call env ".sta" 3 true
+             call env ".sta" 3
                            
 	  | ST ->
              let v, x, env' = env#pop2 in
-             env',
+             env'#push x,
              (match x with
-              | S _ | M _ -> [Mov (v, edx); Mov (x, eax); Mov (edx, I eax)]
-              | _         -> [Mov (v, eax); Mov (eax, I x)]
-             )
+              | S _ | M _ -> [Mov (v, edx); Mov (x, eax); Mov (edx, I eax); Mov (edx, x)]
+              | _         -> [Mov (v, eax); Mov (eax, I x); Mov (eax, x)]
+             ) 
              
           | BINOP op ->
 	     let x, y, env' = env#pop2 in
@@ -290,6 +290,7 @@ let compile env code =
               env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, l)]
                      
           | BEGIN (f, a, l) ->
+             env#assert_empty_stack;
              let env = env#enter f a l in
              env, [Push ebp; Mov (esp, ebp); Binop ("-", M ("$" ^ env#lsize), esp);
                         Mov (esp, edi);
@@ -311,11 +312,11 @@ let compile env code =
              let x, env = env#pop in
              env, [Mov (x, eax); Jmp env#epilogue]
              
-          | CALL (f, n) -> call env f n (f <> "Lraw" && f <> "Lcollect_ints" && f <> "Lcollect_ints_acc" && f <> "Lread" && f <> ".elem" && f <> ".array" && f <> ".length") 
+          | CALL (f, n) -> call env f n
 
           | SEXP (t, n) ->
              let s, env = env#allocate in
-             let env, code = call env ".sexp" (n+1) false in
+             let env, code = call env ".sexp" (n+1) in
              env, [Mov (L env#hash t, s)] @ code
 
           | DROP ->
@@ -333,15 +334,15 @@ let compile env code =
           | TAG (t, n) ->
              let s1, env = env#allocate in
              let s2, env = env#allocate in
-             let env, code = call env ".tag" 3 false in
+             let env, code = call env ".tag" 3 in
              env, [Mov (L env#hash t, s1); Mov (L n, s2)] @ code
 
           | ARRAY n ->
              let s, env    = env#allocate in
-             let env, code = call env ".array_patt" 2 false in
+             let env, code = call env ".array_patt" 2 in
              env, [Mov (L n, s)] @ code
 
-          | PATT StrCmp -> call env ".string_patt" 2 false
+          | PATT StrCmp -> call env ".string_patt" 2
 
           | PATT patt ->
              call env
@@ -351,7 +352,7 @@ let compile env code =
                 | Array   -> ".array_tag_patt"
                 | String  -> ".string_tag_patt"
                 | Sexp    -> ".sexp_tag_patt"
-               ) 1 false
+               ) 1
                
           | ENTER xs ->             
              let env, code =
@@ -416,6 +417,9 @@ class env =
         ) locals;
       Printf.printf "END LOCALS\n"
 
+    (* Assert empty stack *)
+    method assert_empty_stack = assert (stack = [])
+                              
     (* check barrier condition *)
     method is_barrier = barrier
 
@@ -538,7 +542,7 @@ class env =
 let genasm (ds, stmt) =
   let stmt =
     Language.Expr.Seq (
-        Language.Expr.Call (Language.Expr.Var "__gc_init", []),
+        Language.Expr.Ignore (Language.Expr.Call (Language.Expr.Var "__gc_init", [])),
         Language.Expr.Seq (stmt, Language.Expr.Return (Some (Language.Expr.Call (Language.Expr.Var "raw", [Language.Expr.Const 0]))))        
       )
   in

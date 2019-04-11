@@ -6,5 +6,5 @@ lists := [
 ];
 
 for i := 0, i<lists.length, i:=i+1 do
-  printf ("%s\n", lists[i].string)
+ printf ("%s\n", lists[i].string)
 od
