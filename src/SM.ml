@@ -263,10 +263,10 @@ let compile (defs, p) =
                                add_code (compile_expr lsv env e) lsv false [CALL (".stringval", 1)]
 
   | Expr.Assign (x, e)      -> let lassn, env = env#get_label in
-                               (match x with
+                               (*(match x with
                                | Expr.Ref x -> add_code (compile_expr lassn env e) lassn false [ST x]
-                               | _          -> add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]
-                               )
+                                                   | _          ->*) add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]
+                               (*--) *)
                              
   | Expr.Skip               -> env, false, []
 
