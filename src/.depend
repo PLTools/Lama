@@ -1,0 +1,8 @@
+Driver.cmo : X86.cmo SM.cmo Language.cmo
+Driver.cmx : X86.cmx SM.cmx Language.cmx
+Language.cmo :
+Language.cmx :
+SM.cmo : Language.cmo
+SM.cmx : Language.cmx
+X86.cmo : SM.cmo Language.cmo
+X86.cmx : SM.cmx Language.cmx

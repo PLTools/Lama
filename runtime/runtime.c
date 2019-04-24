@@ -8,7 +8,24 @@
 # include <sys/mman.h>
 # include <assert.h>
 
-// # define DEBUG_PRINT 1
+# define DEBUG_PRINT 1
+/* GC pool structure and data; declared here in order to allow debug print */
+typedef struct {
+  size_t * begin;
+  size_t * end;
+  size_t * current;
+  size_t   size;
+} pool;
+
+static pool from_space;
+static pool to_space;
+size_t      *current;
+/* end */
+
+/* GC extern invariant for built-in functions */
+extern void __pre_gc ();
+extern void __post_gc ();
+/* end */
 
 # define STRING_TAG 0x00000001
 # define ARRAY_TAG  0x00000003
@@ -19,6 +36,9 @@
 
 # define TO_DATA(x) ((data*)((char*)(x)-sizeof(int)))
 # define TO_SEXP(x) ((sexp*)((char*)(x)-2*sizeof(int)))
+
+//new
+# define GET_TAG_FROM_SEXP(x) (LEN(x))
 
 # define UNBOXED(x) (((int) (x)) & 0x0001)
 # define UNBOX(x)   (((int) (x)) >> 1)
@@ -48,17 +68,10 @@ char* de_hash (int n) {
   char *p = (char*) BOX (NULL);
   chars =  "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNJPQRSTUVWXYZ";
   p = &buf[5];
-
-#ifdef DEBUG_PRINT
-  printf ("de_hash: tag: %d\n", n);
-#endif
   
   *p-- = 0;
 
   while (n != 0) {
-#ifdef DEBUG_PRINT
-    printf ("char: %c\n", chars [n & 0x003F]);
-#endif
     *p-- = chars [n & 0x003F];
     n = n >> 6;
   }
@@ -135,7 +148,8 @@ static void printValue (void *p) {
       break;
       
     case SEXP_TAG: {
-      char * tag = de_hash (TO_SEXP(p)->tag);
+      // char * tag = de_hash (TO_SEXP(p)->tag);
+      char * tag = de_hash (GET_TAG_FROM_SEXP(TO_SEXP(p)->tag));
       
       if (strcmp (tag, "cons") == 0) {
 	data *b = a;
@@ -279,6 +293,10 @@ extern void* Bsexp (int n, ...) {
   }
 
   r->tag = va_arg(args, int);
+
+  // new line (next)
+  r->tag = SEXP_TAG | ((r->tag) << 3);
+  
   va_end(args);
 
   __post_gc();
@@ -289,7 +307,8 @@ extern void* Bsexp (int n, ...) {
 extern int Btag (void *d, int t, int n) {
   data *r = (data*) BOX (NULL);
   r = TO_DATA(d);
-  return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t && LEN(r->tag) == n);
+  return BOX(TAG(r->tag) == SEXP_TAG &&
+	     GET_TAG_FROM_SEXP(TO_SEXP(d)->tag) == t && LEN(r->tag) == n);
 }
 
 extern int Barray_patt (void *d, int n) {
@@ -421,28 +440,16 @@ extern int Lwrite (int n) {
 extern const size_t __gc_data_end, __gc_data_start;
 
 extern void L__gc_init ();
-extern void __pre_gc ();
-extern void __post_gc ();
-
 extern void __gc_root_scan_stack ();
+extern void __gc_trace_registers ();
 
 /* ======================================== */
 /*           Mark-and-copy                  */
 /* ======================================== */
 
 static size_t SPACE_SIZE = 128;
+// static size_t SPACE_SIZE = 1280;
 # define POOL_SIZE (2*SPACE_SIZE)
-
-typedef struct {
-  size_t * begin;
-  size_t * end;
-  size_t * current;
-  size_t   size;
-} pool;
-
-static pool     from_space;
-static pool     to_space;
-size_t * current;
 
 static void swap (size_t ** a, size_t ** b) {
   size_t * t = *a;
@@ -492,19 +499,23 @@ static void copy_elements (size_t *where, size_t *from, int len) {
 }
 
 static void extend_spaces (void) {
-  void *p1 = mremap(from_space.begin, SPACE_SIZE, 2*SPACE_SIZE, 0);
-  void *p2 = mremap(to_space.begin  , SPACE_SIZE, 2*SPACE_SIZE, 0);
-  if (p1   == MAP_FAILED || p2 == MAP_FAILED) {
-    perror("ERROR: extend_spaces: mmap failed\n");
+  void *p1 = (void *) BOX (NULL), *p2 = (void *) BOX (NULL);
+  size_t old_space_size = SPACE_SIZE        * sizeof(size_t),
+         new_space_size = (SPACE_SIZE << 1) * sizeof(size_t);
+  p1 = mremap(from_space.begin, old_space_size, new_space_size, 0);
+  p2 = mremap(to_space.begin  , old_space_size, new_space_size, 0);
+  if (p1 == MAP_FAILED || p2 == MAP_FAILED) {
+    perror("EROOR: extend_spaces: mmap failed\n");
     exit (1);
   }
 #ifdef DEBUG_PRINT
-  printf ("extend: %x %x %x %x\n", p1, p2, from_space.begin, to_space.begin);
-  printf ("extend: %x %x %x\n", from_space.end, to_space.end, current);
+  printf ("extend: %p %p %p %p\n", p1, p2, from_space.begin, to_space.begin);
+  printf ("extend: %p %p %p\n"   , from_space.end, to_space.end, current);
+  fflush (stdout);
 #endif
   from_space.end  += SPACE_SIZE;
   to_space.end    += SPACE_SIZE;
-  SPACE_SIZE      += SPACE_SIZE;
+  SPACE_SIZE      =  SPACE_SIZE << 1;
   from_space.size =  SPACE_SIZE;
   to_space.size   =  SPACE_SIZE;
 }
@@ -627,14 +638,14 @@ extern void gc_root_scan_data (void) {
 }
 
 extern void init_pool (void) {
-  from_space.begin = mmap(NULL, SPACE_SIZE, PROT_READ | PROT_WRITE,
-			  MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
-  to_space.begin   = mmap(NULL, SPACE_SIZE, PROT_READ | PROT_WRITE,
-			  MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
-  if (to_space.begin   == MAP_FAILED ||
-      from_space.begin == MAP_FAILED) {
-    perror("ERROR: init_pool: mmap failed\n");
-    exit (1);
+  size_t space_size = SPACE_SIZE * sizeof(size_t);
+  from_space.begin = mmap (NULL, space_size, PROT_READ | PROT_WRITE,
+			   MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
+  to_space.begin   = mmap (NULL, space_size, PROT_READ | PROT_WRITE,
+			   MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
+  if (to_space.begin == MAP_FAILED || from_space.begin == MAP_FAILED) {
+    perror ("EROOR: init_pool: mmap failed\n");
+    exit   (1);
   }
   from_space.current = from_space.begin;
   from_space.end     = from_space.begin + SPACE_SIZE;
@@ -658,6 +669,7 @@ static void * gc (size_t size) {
 #ifdef DEBUG_PRINT
   printf("gc: data is scanned\n");
 #endif
+  __gc_trace_registers ();
   __gc_root_scan_stack ();
   if (!IN_PASSIVE_SPACE(current)) {
     perror ("ASSERT: !IN_PASSIVE_SPACE(current)\n");
@@ -685,6 +697,71 @@ static void * gc (size_t size) {
   return (void *) current;
 }
 
+static void printFromSpace (void) {
+  size_t * cur = from_space.begin, *tmp = NULL;
+  data   * d   = NULL;
+  sexp   * s   = NULL;
+  size_t   len = 0;
+#ifdef DEBUG_PRINT
+  printf ("\nHEAP SNAPSHOT\n===================\n");
+  printf ("f_begin = %p, f_end = %p,\n", from_space.begin, from_space.end);
+  while (cur < from_space.current) {
+    printf ("data at %p", cur);
+    d  = (data *) cur;
+
+    switch (TAG(d->tag)) {
+
+    case STRING_TAG:
+      printf ("(=>%p): STRING\n\t%s\n", d->contents, d->contents);
+      len = LEN(d->tag) + 1;
+      fflush (stdout);
+      break;
+
+    case ARRAY_TAG:
+      printf ("(=>%p): ARRAY\n\t", d->contents);
+      len = LEN(d->tag);
+      for (int i = 0; i < len; i++) {
+	int elem = ((int*)d->contents)[i];
+	if (UNBOXED(elem)) printf ("%d ", elem);
+	else printf ("%p ", elem);
+      }
+      len += 1;
+      printf ("\n");
+      fflush (stdout);
+      break;
+
+    case SEXP_TAG:
+      s = (sexp *) d;
+      d = (data *) &(s->contents);
+      char * tag = de_hash (GET_TAG_FROM_SEXP(s->tag));
+      printf ("(=>%p): SEXP\n\ttag(%s) ", s->contents.contents, tag);
+      len = LEN(d->tag);
+      tmp = (s->contents.contents);
+      for (int i = 0; i < len; i++) {
+	int elem = ((int*)tmp)[i];
+	if (UNBOXED(elem)) printf ("%d ", UNBOX(elem));
+	else printf ("%p ", elem);
+      }
+      len += 2;
+      printf ("\n");
+      fflush (stdout);
+      break;
+
+    case 0:
+      printf ("\nprintFromSpace: end!\n===================\n\n");
+      return;
+
+    default:
+      printf ("\nprintFromSpace: ERROR: bad tag %d", TAG(d->tag));
+      fflush (stdout);
+      exit   (1);
+    }
+    cur += len * sizeof(int);
+    printf ("len = %zu, new cur = %p\n", len, cur);
+  }
+#endif
+}
+
 extern void * alloc (size_t size) {
   void * p = (void*)BOX(NULL);
   if (from_space.current + size < from_space.end) {
@@ -700,6 +777,13 @@ extern void * alloc (size_t size) {
   }
 #ifdef DEBUG_PRINT
   printf("alloc: call gc: %zu\n", size);
+  fflush (stdout);
 #endif
-  return gc (size);
+  printFromSpace();
+  p = gc (size);
+#ifdef DEBUG_PRINT
+  printf("gc END\n\n");
+#endif
+  printFromSpace();
+  return p;
 }

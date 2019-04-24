@@ -11,6 +11,7 @@ __gc_stack_top:	        .long	0
 			.globl	__post_gc
 			.globl	L__gc_init
 			.globl	__gc_root_scan_stack
+	.globl __gc_trace_registers
 			.extern	init_pool
 			.extern	gc_test_and_copy_root
 			.text
@@ -112,3 +113,19 @@ returnn:
 			movl	%ebp, %esp 
 			popl	%ebp
 			ret
+
+
+
+
+__gc_trace_registers:
+	pushl %ebp
+	movl  %esp, %ebp
+	
+	pushl %ebx
+	call	gc_test_and_copy_root
+	popl %ebx
+
+	movl %ebp, %esp
+	popl %ebp
+	ret
+	
