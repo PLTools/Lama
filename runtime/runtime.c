@@ -8,7 +8,7 @@
 # include <sys/mman.h>
 # include <assert.h>
 
-# define DEBUG_PRINT 1
+// # define DEBUG_PRINT 1
 /* GC pool structure and data; declared here in order to allow debug print */
 typedef struct {
   size_t * begin;
@@ -441,7 +441,6 @@ extern const size_t __gc_data_end, __gc_data_start;
 
 extern void L__gc_init ();
 extern void __gc_root_scan_stack ();
-extern void __gc_trace_registers ();
 
 /* ======================================== */
 /*           Mark-and-copy                  */
@@ -608,14 +607,14 @@ extern size_t * gc_copy (size_t *obj) {
   default:
 #ifdef DEBUG_PRINT
     printf ("ERROR: gc_copy: weird tag: %x", TAG(d->tag));
-    fflush(stdout);
+    fflush (stdout);
 #endif
     perror ("ERROR: gc_copy: weird tag");
-    exit (1);
+    exit   (1);
   }
 #ifdef DEBUG_PRINT
-  printf("gc_copy: %x (%x) -> %x (%x); new-current = %x\n", obj, objj, copy, newobjj, current);
-  fflush(stdout);
+  printf ("gc_copy: %x (%x) -> %x (%x); new-current = %x\n", obj, objj, copy, newobjj, current);
+  fflush (stdout);
 #endif
   return copy;
 }
@@ -623,10 +622,14 @@ extern size_t * gc_copy (size_t *obj) {
 extern void gc_test_and_copy_root (size_t ** root) {
   if (IS_VALID_HEAP_POINTER(*root)) {
 #ifdef DEBUG_PRINT
-    printf ("gc_test_and_copy_root: root %x %x\n", root, *root);
+    printf ("gc_test_and_copy_root: root %p %p\n", root, *root);
+    fflush (stdout);
 #endif
     *root = gc_copy (*root);
   }
+/* #ifdef DEBUG_PRINT */
+/*   else { printf ("gc_test_and_copy_root: NOT A PTR  %p %p\n", root, *root); fflush (stdout); } */
+/* #endif */
 }
 
 extern void gc_root_scan_data (void) {
