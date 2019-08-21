@@ -316,13 +316,16 @@ extern void* Bsexp (int n, ...) {
 
 extern int Btag (void *d, int t, int n) {
   data *r = (data *) BOX (NULL);
-  r = TO_DATA(d);
+  if (UNBOXED(d)) return BOX(0);
+  else {
+    r = TO_DATA(d);
 #ifndef DEBUG_PRINT
-  return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t && LEN(r->tag) == n);
+    return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t && LEN(r->tag) == n);
 #else
-  return BOX(TAG(r->tag) == SEXP_TAG &&
+    return BOX(TAG(r->tag) == SEXP_TAG &&
 	     GET_SEXP_TAG(TO_SEXP(d)->tag) == t && LEN(r->tag) == n);
 #endif
+  }
 }
 
 extern int Barray_patt (void *d, int n) {
