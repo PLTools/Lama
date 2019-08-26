@@ -66,7 +66,7 @@ char* de_hash (int n) {
   static char *chars = (char*) BOX (NULL);
   static char buf[6] = {0,0,0,0,0,0};
   char *p = (char *) BOX (NULL);
-  chars =  "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNJPQRSTUVWXYZ";
+  chars =  "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   p = &buf[5];
 
 #ifdef DEBUG_PRINT
