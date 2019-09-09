@@ -1,4 +1,116 @@
-x := read ();
-y := read ();
-z := x*y*3;
-write (z)
+fun foo (p1, p2, p3) {
+    return p1
+}
+
+fun f1 (p1, p2, p3) local p4, p5 {
+    p4 := {};
+    while (1) do
+        case p2[p3[0]] of
+             A (a, b) ->
+                p5 := foo(p3, p2, a);
+                p4 := p5 : p4;
+                foo(p3, b, p5)
+            |B (a, b) ->
+                case P(foo(p3, p2, a), foo(p3, p2, b)) of
+                     P (L (a), L (b)) -> p5 := L (a + b)
+                    |P (a, b)         -> p5 := foo(p3, a, b)
+                esac;
+                p4 := p5 : p4;
+                foo(p3, b, p5)
+            |C (a, b) ->
+                case P(foo(p3, p2, a), foo(p3, p2, b)) of
+                     P (L (a), L (b)) -> p5 := L (a - b)
+                    |P (a, b)         -> p5 := foo(p3, a, b)
+                esac;
+                p4 := p5 : p4;
+                foo(p3, b, p5)
+            |D (a) ->
+                p5 := foo(p3, p2, a);
+                p4 := p5 : p4;
+                case p3[1][7] of
+                    L (m) -> p3[1][7] := L (m + 1);
+                             p3[2][m + 1] := p5
+                esac
+            |E ->
+                return p4
+            |a -> skip
+        esac
+    od;
+    return p4
+}
+
+fun f2 (p1, p2, p3) local p4, p5 {
+    p4 := {};
+    while (1) do
+        case p2[p3[0]] of
+             A (a, b) ->
+                p5 := foo(p3, p2, a);
+                p4 := p5 : p4;
+                foo(p3, b, p5)
+            |B (a, b) ->
+                case P(foo(p3, p2, a), foo(p3, p2, b)) of
+                     P (L (a), L (b)) -> p5 := L (a + b)
+                    |P (a, b)         -> p5 := foo(p3, a, b)
+                esac;
+                p4 := p5 : p4;
+                foo(p3, b, p5)
+            |C (a, b) ->
+                case P(foo(p3, p2, a), foo(p3, p2, b)) of
+                     P (L (a), L (b)) -> p5 := L (a - b)
+                    |P (a, b)         -> p5 := foo(p3, a, b)
+                esac;
+                p4 := p5 : p4;
+                foo(p3, b, p5)
+            |D (a) ->
+                p5 := foo(p3, p2, a);
+                p4 := p5 : p4;
+                case p3[1][7] of
+                    L (m) -> p3[1][7] := L (m + 1);
+                             p3[2][m + 1] := p5
+                esac
+            |E ->
+                return p4
+            |a -> skip
+        esac
+    od;
+    return p4
+}
+
+fun f3 (p1, p2, p3) local p4, p5 {
+    p4 := {};
+    while (1) do
+        case p2[p3[0]] of
+             A (a, b) ->
+                p5 := foo(p3, p2, a);
+                p4 := p5 : p4;
+                foo(p3, b, p5)
+            |B (a, b) ->
+                case P(foo(p3, p2, a), foo(p3, p2, b)) of
+                     P (L (a), L (b)) -> p5 := L (a + b)
+                    |P (a, b)         -> p5 := foo(p3, a, b)
+                esac;
+                p4 := p5 : p4;
+                foo(p3, b, p5)
+            |C (a, b) ->
+                case P(foo(p3, p2, a), foo(p3, p2, b)) of
+                     P (L (a), L (b)) -> p5 := L (a - b)
+                    |P (a, b)         -> p5 := foo(p3, a, b)
+                esac;
+                p4 := p5 : p4;
+                foo(p3, b, p5)
+            |D (a) ->
+                p5 := foo(p3, p2, a);
+                p4 := p5 : p4;
+                case p3[1][7] of
+                    L (m) -> p3[1][7] := L (m + 1);
+                             p3[2][m + 1] := p5
+                esac
+            |E ->
+                return p4
+            |a -> skip
+        esac
+    od;
+    return p4
+}
+
+write(7)

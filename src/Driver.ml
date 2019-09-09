@@ -30,7 +30,7 @@ let parse infile =
        ] s
      end
     )
-    (ostap (!(Language.parse Language.Expr.defaultInfix) -EOF))
+    (ostap (!(Language.parse Language.Infix.default)  -EOF))
 
 let main =
   try
