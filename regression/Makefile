@@ -1,8 +1,8 @@
-TESTS=$(basename $(wildcard test*.expr))
+TESTS=$(basename $(wildcard test001*.expr))
 
 RC=../src/rc.opt
 
-.PHONY: check $(TESTS) 
+.PHONY: check $(TESTS)
 
 check: $(TESTS)
 

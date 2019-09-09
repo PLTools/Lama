@@ -412,6 +412,39 @@ module Expr =
         *, /, %              --- multiplication, division, reminder
     *)
 
+    (* semantics for infixes creaed in runtime *)
+    let sem s = (fun x atr y -> ignore atr (Call (Var s, [x; y]))), (fun _ -> Val, Val)
+
+    (* Expression parser. You can use the following terminals:
+
+         LIDENT  --- a non-empty identifier a-z[a-zA-Z0-9_]* as a string
+         UIDENT  --- a non-empty identifier A-Z[a-zA-Z0-9_]* as a string
+         DECIMAL --- a decimal constant [0-9]+ as a string
+    *)
+
+    let default =
+      Array.map (fun (a, s) ->
+        a,
+        List.map (fun s -> s,
+                           (fun x atr y -> ignore atr (
+                              match s with
+                              | ":"  -> Sexp   ("cons", [x; y])
+                              | "++" -> Call   (Var "strcat", [x; y])
+                              | ":=" -> Assign (x, y)
+                              | _    -> Binop  (s, x, y))
+                           )
+          ) s
+      )
+      [|
+        `Righta, [":="];
+        `Righta, [":"];
+        `Lefta , ["!!"];
+        `Lefta , ["&&"];
+        `Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
+        `Lefta , ["++"; "+" ; "-"];
+        `Lefta , ["*" ; "/"; "%"];
+      |]
+
     let sem_init s = (fun x atr y ->
       ignore atr (
          match s with
@@ -421,8 +454,8 @@ module Expr =
          | _ -> Binop  (s, x, y)
       )), (fun _ -> (if s = ":=" then Reff else Val), Val)
 
-    let defaultInfix : (t, atr) Util.Infix.t =
-        fst (Array.fold_left
+    let defaultInfix : unit -> (t, atr, 'm, 'stream, 'b, 'c) Util.Infix.t = fun () ->
+        let infix = fst (Array.fold_left
           (fun (infix, prev) (a, s) ->
             let fstOp = List.hd s in
             let newInfix = match Util.Infix.after (0, 0) prev fstOp a (sem_init fstOp) infix with `Ok t -> t in
@@ -437,23 +470,66 @@ module Expr =
             `Lefta , ["++"; "+" ; "-"];
             `Lefta , ["*" ; "/"; "%"];
           |]
+        ) in Util.Infix.setArr infix default
+
+    let left  f c x a y = f (c x) a y
+    let right f c x a y = c (f x a y)
+
+    let expr f infix opnd atr =
+
+      let default =
+        Array.map (fun (a, s) ->
+          let g = match a with `Lefta | `Nona -> left | `Righta -> right in
+          let l = List.map (fun s -> s,
+                             ((fun x atr y -> ignore atr (
+                                match s with
+                                | ":"  -> Sexp   ("cons", [x; y])
+                                | "++" -> Call   (Var "strcat", [x; y])
+                                | ":=" -> Assign (x, y)
+                                | _    -> Binop  (s, x, y))
+                             ), (fun _ -> (if s = ":=" then Reff else Val), Val))
+            ) s in
+          a,
+          (snd (snd (List.hd l)),
+          (altl (List.map (fun (oper, (sema, _)) -> ostap (- $(oper) {g sema})) l),
+          l))
         )
+        [|
+          `Righta, [":="];
+          `Righta, [":"];
+          `Lefta , ["!!"];
+          `Lefta , ["&&"];
+          `Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
+          `Lefta , ["++"; "+" ; "-"];
+          `Lefta , ["*" ; "/"; "%"];
+        |]
+      in
+      let ops = Util.Infix.createArray infix in
+      if Array.length ops != Array.length default then failwith (Printf.sprintf "I said so: %d %s" (Array.length ops) (Array.fold_left (fun s (_, (_, (_, l))) -> s ^ (fst (List.hd l))) "" ops));
+      let atrr i atr = snd (fst (snd ops.(i)) atr) in
+      let atrl i atr = fst (fst (snd ops.(i)) atr) in
+      let n      = Array.length ops  in
+      let op   i = fst (snd (snd ops.(i))) in
+      let nona i = fst ops.(i) = `Nona in
+      let id   x = x                 in
+      let ostap (
+        inner[l][c][atr]: f[ostap (
+          {n = l                } => x:opnd[atr] {c x}
+        | {n > l && not (nona l)} => (-x:inner[l+1][id][atrl l atr] -o:op[l] y:inner[l][o c x atr][atrr l atr] |
+                                       x:inner[l+1][id][atr] {c x})
+        | {n > l && nona l} => (x:inner[l+1][id][atrl l atr] o:op[l] y:inner[l+1][id][atrr l atr] {c (o id x atr y)} |
+                                x:inner[l+1][id][atr] {c x})
+          )]
+      )
+      in
+      ostap (inner[0][id][atr])
 
-    (* semantics for infixes creaed in runtime *)
-    let sem s = (fun x atr y -> ignore atr (Call (Var s, [x; y]))), (fun _ -> Val, Val)
-
-    (* Expression parser. You can use the following terminals:
-
-         LIDENT  --- a non-empty identifier a-z[a-zA-Z0-9_]* as a string
-         UIDENT  --- a non-empty identifier A-Z[a-zA-Z0-9_]* as a string
-         DECIMAL --- a decimal constant [0-9]+ as a string
-    *)
 
     ostap (
       parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)}
                          | basic[infix][atr];
 
-      basic[infix][atr]: !(Ostap.Util.newexpr (fun x -> x) (infix) (primary infix) atr);
+      basic[infix][atr]: !(expr (fun x -> x) (infix) (primary infix) atr);
 
       primary[infix][atr]:
         b:base[infix][Val] is:(-"[" i:parse[infix][Val] -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f}))+
@@ -533,8 +609,6 @@ module Expr =
 
   end
 
-
-
 (* Function and procedure definitions *)
 module Definition =
   struct
@@ -600,7 +674,7 @@ let eval (defs, body) i =
 
 (* Top-level parser *)
 ostap (
-  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Expr.parse infix' Void) {defs, body};
+  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Expr.parse (infix') Void) {defs, body};
   definitions[infix]:
     <(def, infix')> : !(Definition.parse infix) <(defs, infix'')> : definitions[infix'] {def::defs, infix''}
   | empty {[], infix}
