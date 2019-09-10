@@ -260,6 +260,14 @@ module Expr =
     (* intrinsic (for evaluation) *) | Intrinsic of (config -> config)
     (* control (for control flow) *) | Control   of (config -> t * config)
 
+    (* Reff : parsed expression should return value Reff (look for ":=");
+       Val : -//- returns simple value;
+       Void : parsed expression should not return any value;  *)
+    type atr = Reff | Void | Val
+    let notRef  x = match x with Reff -> false | _ -> true
+    let isVoid  x = match x with Void -> true  | _ -> false
+    let isValue x = match x with Void -> false | _ -> true       (* functions for handling atribute *)
+
     (* Available binary operators:
         !!                   --- disjunction
         &&                   --- conjunction
@@ -448,107 +456,143 @@ module Expr =
     | Skip             -> Skip
     | e                -> Ignore (balance_value e)
 
+  (* places ignore if expression should be void *)
+  let ignore atr expr = if isVoid atr then Ignore expr else expr
+
+  (* semantics for infixes creaed in runtime *)
+  let sem s = (fun x atr y -> ignore atr (Call (Var s, [x; y]))), (fun _ -> Val, Val)
+
+  let sem_init s = fun x atr y ->
+    ignore atr (
+       match s with
+       | ":"  -> Sexp   ("cons", [x; y])
+       | "++" -> Call   (Var "strcat", [x; y])
+       | ":=" -> Assign (x, y)
+       | _ -> Binop  (s, x, y)
+    )
+
     (* ======= *)
 
-    let left  f c x y = f (c x) y
-    let right f c x y = c (f x y)
+    let left  f c x a y = f (c x) a y
+    let right f c x a y = c (f x a y)
 
-    let expr f ops opnd =
+    let expr f ops opnd atr =
       let ops =
         Array.map
-          (fun (assoc, list) ->
+          (fun (assoc, (atrs, list)) ->
             let g = match assoc with `Lefta | `Nona -> left | `Righta -> right in
-            assoc = `Nona, altl (List.map (fun (oper, sema) -> ostap (!(oper) {g sema})) list)
+            assoc = `Nona, (atrs, altl (List.map (fun (oper, sema) -> ostap (!(oper) {g sema})) list))
           )
           ops
       in
-      let n      = Array.length ops in
-      let op   i = snd ops.(i)      in
+      let atrr i atr = snd (fst (snd ops.(i)) atr) in
+      let atrl i atr = fst (fst (snd ops.(i)) atr) in
+      let n      = Array.length ops  in
+      let op   i = snd (snd ops.(i)) in
       let nona i = fst ops.(i)      in
       let id   x = x                in
       let ostap (
-              inner[l][c]: f[ostap (
-              {n = l                } => x:opnd {c x}
-            | {n > l && not (nona l)} => x:inner[l+1][id] b:(-o:op[l] inner[l][o c x])? {
-                                                                                                 match b with None -> c x | Some x -> x
-                                                                                               }
-                               | {n > l && nona l} => x:inner[l+1][id] b:(op[l] inner[l+1][id])? {
-                                                            c (match b with None -> x | Some (o, y) -> o id x y)
-                })]
-            )
+        inner[l][c][atr]: f[ostap (
+          {n = l                } => x:opnd[atr] {c x}
+        | {n > l && not (nona l)} => (-x:inner[l+1][id][atrl l atr] -o:op[l] y:inner[l][o c x atr][atrr l atr] |
+                                       x:inner[l+1][id][atr] {c x})
+        | {n > l && nona l} => (x:inner[l+1][id][atrl l atr] o:op[l] y:inner[l+1][id][atrr l atr] {c (o id x atr y)} |
+                                x:inner[l+1][id][atr] {c x})
+          )]
+      )
       in
-      ostap (inner[0][id])
+      ostap (inner[0][id][atr])
 
     (* ======= *)
-
     ostap (
-      parse[infix]: h:basic[infix] t:(-";" parse[infix])? {match t with None -> h | Some t -> Seq (h, t)};
-      basic[infix]:
-	  !(expr
-             (fun x -> x)
-             (Array.map (fun (a, l) -> a, List.map (fun (s, f) -> ostap (- $(s)), f) l) infix)
-	     (primary infix));
-      primary[infix]:
-        b:base[infix] is:(-"[" i:parse[infix] -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f})) * {
-        List.fold_left
-          (fun b ->
-            function
-            | `Elem i -> Elem (b, i)
-            | `Len    -> Length b
-            | `Str    -> StringVal b
-            | `Post f -> Call (Var f, [b])
-          )
-          b
-          is
-      };
-      base[infix]:
-        n:DECIMAL                                            {Const n}
-      | s:STRING                                             {String (unquote s)}
-      | c:CHAR                                               {Const  (Char.code c)}
-      | "[" es:!(Util.list0)[parse infix] "]"                {Array es}
-      | "{" es:!(Util.list0)[parse infix] "}"                {match es with
-                                                              | [] -> Const 0
-                                                              | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0)
-                                                             }
-      | t:UIDENT args:(-"(" !(Util.list)[parse infix] -")")? {Sexp (t, match args with None -> [] | Some args -> args)}
-      | x:LIDENT s:("(" args:!(Util.list0)[parse infix] ")"  {Call (Var x, args)} | empty {Var x}) {s}
+      parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)}
+                         | basic[infix][atr];
 
-      | %"skip"                                              {Skip}
+      basic[infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, f) -> ostap (- $(s)), f) l)) infix) (primary infix) atr);
 
-      | %"if" e:!(parse infix)
-	%"then" the:parse[infix]
-          elif:(%"elif" parse[infix] %"then" parse[infix])*
-	  els:(%"else" parse[infix])?
-        %"fi" {
-          If (e, the,
-	         List.fold_right
-		   (fun (e, t) elif -> If (e, t, elif))
-		   elif
-		   (match els with None -> Skip | Some s -> s)
-          )
+      primary[infix][atr]:
+        b:base[infix][Val] is:(-"[" i:parse[infix][Val] -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f}))+
+        => {match (List.hd (List.rev is)), atr with
+            | `Elem i, Reff -> true
+            |  _,      Reff -> false
+            |  _,      _    -> true} =>
+        {
+          let lastElem = List.hd (List.rev is) in
+          let is = List.rev (List.tl (List.rev is)) in
+          let b =
+            List.fold_left
+              (fun b ->
+                function
+                | `Elem i -> Elem (b, i)
+                | `Len    -> Length b
+                | `Str    -> StringVal b
+                | `Post f -> Call (Var f, [b])
+              )
+              b
+              is
+          in
+          let res = match lastElem, atr with
+                    | `Elem i, Reff -> ElemRef (b, i)
+                    | `Elem i,  _   -> Elem (b, i)
+                    | `Len,     _   -> Length b
+                    | `Str,     _   -> StringVal b
+                    | `Post f,  _   -> Call (Var f, [b])
+          in
+          ignore atr res
         }
+        | base[infix][atr];
+      base[infix][atr]:
+        n:DECIMAL                                 => {notRef atr} => {ignore atr (Const n)}
+      | s:STRING                                  => {notRef atr} => {ignore atr (String (unquote s))}
+      | c:CHAR                                    => {notRef atr} => {ignore atr (Const  (Char.code c))}
+      | "[" es:!(Util.list0)[parse infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
+      | "{" es:!(Util.list0)[parse infix Val] "}" => {notRef atr} => {ignore atr (match es with
+                                                                                  | [] -> Const 0
+                                                                                  | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0))
+                                                                     }
+      | t:UIDENT args:(-"(" !(Util.list)[parse infix Val] -")")? => {notRef atr} => {ignore atr (Sexp (t, match args with
+                                                                                                          | None -> []
+                                                                                                          | Some args -> args))
+                                                                                    }
+      | x:LIDENT s:(  "(" args:!(Util.list0)[parse infix Val] ")" => {notRef atr} => {Call (Var x, args)}
+                    | empty {if notRef atr then Var x else Ref x})   {ignore atr s}
 
-      | %"while" e:parse[infix] %"do" s:parse[infix] %"od" {While (e, s)}
+      | {isVoid atr} => %"skip"                                      {Skip}
 
-      | %"for" i:parse[infix] "," c:parse[infix] "," s:parse[infix] %"do" b:parse[infix] %"od" {
-	  Seq (i, While (c, Seq (b, s)))
-                                                                                            }
+      | %"if" e:!(parse infix Val) %"then" the:parse[infix][atr]
+                             elif:(%"elif" parse[infix][Val] %"then" parse[infix][atr])*
+                                   %"else" els:parse[infix][atr] %"fi"
+                                                                     {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif els)}
+      | %"if" e:!(parse infix Val) %"then" the:parse[infix][Void]
+                             elif:(%"elif" parse[infix][Val] %"then" parse[infix][atr])*
+                             => {isVoid atr} => %"fi"
+                                                                     {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif Skip)}
 
-      | %"repeat" s:parse[infix] %"until" e:basic[infix]  {Repeat (s, e)}
-      | %"return" e:basic[infix]?                         {Return e}
+      | %"while" e:parse[infix][Val] %"do" s:parse[infix][Void]
+                                            => {isVoid atr} => %"od" {While (e, s)}
 
-      | %"case" e:parse[infix] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse[infix])] %"esac" {Case (e, bs)}
+      | %"for" i:parse[infix][Void] "," c:parse[infix][Val] "," s:parse[infix][Void] %"do" b:parse[infix][Void] => {isVoid atr} => %"od"
+                                                                     {Seq (i, While (c, Seq (b, s)))}
 
-      | -"(" parse[infix] -")"
+      | %"repeat" s:parse[infix][Void] %"until" e:basic[infix][Val]
+                                                  => {isVoid atr} => {Repeat (s, e)}
+      | %"return" e:basic[infix][Val]?            => {isVoid atr} => {Return e}
+
+      | %"case" e:parse[infix][Val] %"of" bs:!(Util.listBy1)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse[infix][atr])] %"esac"
+                                                                     {Case (e, bs)}
+      | %"case" e:parse[infix][Val] %"of" bs:(!(Pattern.parse) -"->" parse[infix][Void]) => {isVoid atr} => %"esac"
+                                                                     {Case (e, [bs])}
+
+      | -"(" parse[infix][atr] -")"
     )
 
-  end
+    end
 
 (* Infix helpers *)
 module Infix =
   struct
 
-    type t = ([`Lefta | `Righta | `Nona] * (string * (Expr.t -> Expr.t -> Expr.t)) list) array
+    type t = ([`Lefta | `Righta | `Nona] * ((Expr.atr -> (Expr.atr * Expr.atr)) * ((string * (Expr.t -> Expr.atr -> Expr.t -> Expr.t)) list))) array
 
     let name infix =
       let b = Buffer.create 64 in
@@ -559,15 +603,8 @@ module Infix =
     let default : t =
       Array.map (fun (a, s) ->
         a,
-        List.map (fun s -> s,
-                           (fun x y ->
-                              match s with
-                              | ":"  -> Expr.Sexp   ("cons", [x; y])
-                              | "++" -> Expr.Call   (Var "strcat", [x; y])
-                              | ":=" -> Expr.Assign (Expr.propagate_ref x, y)
-                              | _    -> Expr.Binop  (s, x, y)
-                           )
-          ) s
+        ((fun _ -> (if (List.hd s) = ":=" then Expr.Reff else Expr.Val), Expr.Val),
+        List.map (fun s -> s, Expr.sem_init s) s)
       )
       [|
         `Righta, [":="];
@@ -583,47 +620,45 @@ module Infix =
 
     let find_op infix op cb ce =
       try
-        Array.iteri (fun i (_, l) -> if List.exists (fun (s, _) -> s = op) l then raise (Break (cb i))) infix;
+        Array.iteri (fun i (_, (_, l)) -> if List.exists (fun (s, _) -> s = op) l then raise (Break (cb i))) infix;
         ce ()
       with Break x -> x
 
     let no_op op coord = `Fail (Printf.sprintf "infix ``%s'' not found in the scope at %s" op (Msg.Coord.toString coord))
 
-    let sem name x y = Expr.Call (Var name, [x; y])
-
-    let at coord op newp name infix =
+    let at coord op newp (sem, _) infix =
       find_op infix op
         (fun i ->
           `Ok (Array.init (Array.length infix)
                  (fun j ->
                    if j = i
-                   then let (a, l) = infix.(i) in (a, (newp, sem name) :: l)
+                   then let (a, (atr, l)) = infix.(i) in (a, (atr, ((newp, sem) :: l)))
                    else infix.(j)
             ))
         )
         (fun _ -> no_op op coord)
 
-    let before coord op newp ass name infix =
+    let before coord op newp ass (sem, atr) infix =
       find_op infix op
         (fun i ->
           `Ok (Array.init (1 + Array.length infix)
                  (fun j ->
                    if j < i
                    then infix.(j)
-                   else if j = i then (ass, [newp, sem name])
+                   else if j = i then (ass, (atr, [newp, sem]))
                    else infix.(j-1)
                  ))
         )
         (fun _ -> no_op op coord)
 
-    let after coord op newp ass name infix =
+    let after coord op newp ass (sem, atr) infix =
       find_op infix op
         (fun i ->
           `Ok (Array.init (1 + Array.length infix)
                  (fun j ->
                    if j <= i
                    then infix.(j)
-                   else if j = i+1 then (ass, [newp, sem name])
+                   else if j = i+1 then (ass, (atr, [newp, sem]))
                    else infix.(j-1)
                  ))
         )
@@ -649,15 +684,15 @@ module Definition =
         l:$ op:(s:STRING {unquote s})
         md:position[ass][l#coord][op] {
           let name = Infix.name op in
-          match md name infix with
+          match md (Expr.sem name) infix with
           | `Ok infix' -> name, infix'
           | `Fail msg  -> raise (Semantic_error msg)
       };
       parse[infix]:
         <(name, infix')> : head[infix] "(" args:!(Util.list0 arg) ")"
            locs:(%"local" !(Util.list arg))?
-        "{" body:!(Expr.parse infix') "}" {
-        (name, (args, (match locs with None -> [] | Some l -> l), Expr.balance_void body)), infix'
+        "{" body:!(Expr.parse infix' Void) "}" {
+        (name, (args, (match locs with None -> [] | Some l -> l), body)), infix'
       }
     )
 
@@ -696,7 +731,7 @@ let eval (defs, body) i =
 
 (* Top-level parser *)
 ostap (
-  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Expr.parse infix') {defs, Expr.balance_void body};
+  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Expr.parse infix' Void) {defs, body};
   definitions[infix]:
     <(def, infix')> : !(Definition.parse infix) <(defs, infix'')> : definitions[infix'] {def::defs, infix''}
   | empty {[], infix}
