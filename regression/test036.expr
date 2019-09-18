@@ -1,4 +1,5 @@
-fun printAS (x) local i, j {
+fun printAS (x) {
+  local i, j;
   for i := 0, i<x.length, i:=i+1 do
     for j := 0, j<x[i].length, j:=j+1 do
       write (x[i][j])

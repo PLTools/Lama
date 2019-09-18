@@ -33,13 +33,14 @@ let parse infile =
     (ostap (!(Language.parse Language.Infix.default)  -EOF))
 
 let main =
-  try
+  (*  try*)
     let interpret  = Sys.argv.(1) = "-i"  in
     let stack      = Sys.argv.(1) = "-s"  in
     let to_compile = not (interpret || stack) in
     let infile     = Sys.argv.(if not to_compile then 2 else 1) in
     match (try parse infile with Language.Semantic_error msg -> `Fail msg) with
     | `Ok prog ->
+       let prog : Language.t = prog in
        if to_compile
        then
          let basename = Filename.chop_suffix infile ".expr" in
@@ -60,5 +61,6 @@ let main =
 	 in
 	 List.iter (fun i -> Printf.printf "%d\n" i) output
     | `Fail er -> Printf.eprintf "Error: %s\n" er
-  with Invalid_argument _ ->
+(*  with Invalid_argument _ ->
     Printf.printf "Usage: rc [-i | -s] <input file.expr>\n"
+ *)

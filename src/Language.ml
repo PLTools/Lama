@@ -256,6 +256,7 @@ module Expr =
     (* return statement           *) | Return    of t option
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
+    (* entering the scope         *) | Scope     of string list * t
     (* leave a scope              *) | Leave
     (* intrinsic (for evaluation) *) | Intrinsic of (config -> config)
     (* control (for control flow) *) | Control   of (config -> t * config)
@@ -264,6 +265,7 @@ module Expr =
        Val : -//- returns simple value;
        Void : parsed expression should not return any value;  *)
     type atr = Reff | Void | Val
+                           
     let notRef  x = match x with Reff -> false | _ -> true
     let isVoid  x = match x with Void -> true  | _ -> false
     let isValue x = match x with Void -> false | _ -> true       (* functions for handling atribute *)
@@ -326,8 +328,12 @@ module Expr =
 
     let rec eval env ((st, i, o, vs) as conf) k expr =
       match expr with
-      | Unit     -> eval env (st, i, o, Value.Empty :: vs) Skip k
-      | Ignore s -> eval env conf k (schedule_list [s; Intrinsic (fun (st, i, o, vs) -> (st, i, o, List.tl vs))])
+      | Scope (vars, body) ->
+          eval env (State.push st State.undefined vars, i, o, vs) k (Seq (body, Leave))
+      | Unit ->
+         eval env (st, i, o, Value.Empty :: vs) Skip k
+      | Ignore s ->
+         eval env conf k (schedule_list [s; Intrinsic (fun (st, i, o, vs) -> (st, i, o, List.tl vs))])
       | Control f ->
          let s, conf' = f conf in
          eval env conf' k s
@@ -505,13 +511,13 @@ module Expr =
 
     (* ======= *)
     ostap (
-      parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)}
-                         | basic[infix][atr];
+      parse[def][infix][atr]: h:basic[def][infix][Void] -";" t:parse[def][infix][atr] {Seq (h, t)}
+                              | basic[def][infix][atr];
 
-      basic[infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, f) -> ostap (- $(s)), f) l)) infix) (primary infix) atr);
+      basic[def][infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, f) -> ostap (- $(s)), f) l)) infix) (primary def infix) atr);
 
-      primary[infix][atr]:
-        b:base[infix][Val] is:(-"[" i:parse[infix][Val] -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f}))+
+      primary[def][infix][atr]:
+        b:base[def][infix][Val] is:(-"[" i:parse[def][infix][Val] -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f}))+
         => {match (List.hd (List.rev is)), atr with
             | `Elem i, Reff -> true
             |  _,      Reff -> false
@@ -540,50 +546,64 @@ module Expr =
           in
           ignore atr res
         }
-        | base[infix][atr];
-      base[infix][atr]:
+        | base[def][infix][atr];
+      base[def][infix][atr]:
         n:DECIMAL                                 => {notRef atr} => {ignore atr (Const n)}
       | s:STRING                                  => {notRef atr} => {ignore atr (String (unquote s))}
       | c:CHAR                                    => {notRef atr} => {ignore atr (Const  (Char.code c))}
-      | "[" es:!(Util.list0)[parse infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
-      | "{" es:!(Util.list0)[parse infix Val] "}" => {notRef atr} => {ignore atr (match es with
-                                                                                  | [] -> Const 0
-                                                                                  | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0))
-                                                                     }
-      | t:UIDENT args:(-"(" !(Util.list)[parse infix Val] -")")? => {notRef atr} => {ignore atr (Sexp (t, match args with
-                                                                                                          | None -> []
-                                                                                                          | Some args -> args))
-                                                                                    }
-      | x:LIDENT s:(  "(" args:!(Util.list0)[parse infix Val] ")" => {notRef atr} => {Call (Var x, args)}
-                    | empty {if notRef atr then Var x else Ref x})   {ignore atr s}
+      | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
+      | "{" <(d, infix')> : def[infix] expr:parse[def][infix][atr] "}" => {notRef atr} => {
+         ignore atr (
+           let vars, body =
+             List.fold_left
+               (fun (vs, bd) -> function
+                | (name, `Local value) -> name :: vs, (match value with None -> bd | Some v -> Seq (Assign (Var name, v), bd))
+                | _                    -> invalid_arg "function"
+               )
+               ([], expr)
+               d
+           in
+           Scope (vars, body)
+         )
+      }
+      | "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} => {ignore atr (match es with
+                                                                                      | [] -> Const 0
+                                                                                      | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0))
+                                                                         }
+      | t:UIDENT args:(-"(" !(Util.list)[parse def infix Val] -")")? => {notRef atr} => {ignore atr (Sexp (t, match args with
+                                                                                                              | None -> []
+                                                                                                              | Some args -> args))
+                                                                                        }
+      | x:LIDENT s:(  "(" args:!(Util.list0)[parse def infix Val] ")" => {notRef atr} => {Call (Var x, args)}
+                        | empty {if notRef atr then Var x else Ref x})   {ignore atr s}
 
       | {isVoid atr} => %"skip"                                      {Skip}
 
-      | %"if" e:!(parse infix Val) %"then" the:parse[infix][atr]
-                             elif:(%"elif" parse[infix][Val] %"then" parse[infix][atr])*
-                                   %"else" els:parse[infix][atr] %"fi"
+      | %"if" e:parse[def][infix][Val] %"then" the:parse[def][infix][atr]
+                                elif:(%"elif" parse[def][infix][Val] %"then" parse[def][infix][atr])*
+                                   %"else" els:parse[def][infix][atr] %"fi"
                                                                      {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif els)}
-      | %"if" e:!(parse infix Val) %"then" the:parse[infix][Void]
-                             elif:(%"elif" parse[infix][Val] %"then" parse[infix][atr])*
+      | %"if" e:parse[def][infix][Val] %"then" the:parse[def][infix][Void]
+                             elif:(%"elif" parse[def][infix][Val] %"then" parse[def][infix][atr])*
                              => {isVoid atr} => %"fi"
                                                                      {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif Skip)}
 
-      | %"while" e:parse[infix][Val] %"do" s:parse[infix][Void]
+      | %"while" e:parse[def][infix][Val] %"do" s:parse[def][infix][Void]
                                             => {isVoid atr} => %"od" {While (e, s)}
 
-      | %"for" i:parse[infix][Void] "," c:parse[infix][Val] "," s:parse[infix][Void] %"do" b:parse[infix][Void] => {isVoid atr} => %"od"
+      | %"for" i:parse[def][infix][Void] "," c:parse[def][infix][Val] "," s:parse[def][infix][Void] %"do" b:parse[def][infix][Void] => {isVoid atr} => %"od"
                                                                      {Seq (i, While (c, Seq (b, s)))}
 
-      | %"repeat" s:parse[infix][Void] %"until" e:basic[infix][Val]
+      | %"repeat" s:parse[def][infix][Void] %"until" e:basic[def][infix][Val]
                                                   => {isVoid atr} => {Repeat (s, e)}
-      | %"return" e:basic[infix][Val]?            => {isVoid atr} => {Return e}
+      | %"return" e:basic[def][infix][Val]?            => {isVoid atr} => {Return e}
 
-      | %"case" e:parse[infix][Val] %"of" bs:!(Util.listBy1)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse[infix][atr])] %"esac"
+      | %"case" e:parse[def][infix][Val] %"of" bs:!(Util.listBy1)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse[def][infix][atr])] %"esac"
                                                                      {Case (e, bs)}
-      | %"case" e:parse[infix][Val] %"of" bs:(!(Pattern.parse) -"->" parse[infix][Void]) => {isVoid atr} => %"esac"
+      | %"case" e:parse[def][infix][Val] %"of" bs:(!(Pattern.parse) -"->" parse[def][infix][Void]) => {isVoid atr} => %"esac"
                                                                      {Case (e, [bs])}
 
-      | -"(" parse[infix][atr] -")"
+      | -"(" parse[def][infix][atr] -")"
     )
 
     end
@@ -670,9 +690,9 @@ module Infix =
 module Definition =
   struct
 
-    (* The type for a definition: name, argument list, local variables, body *)
-    type t = string * (string list * string list * Expr.t)
-
+    (* The type for a definition: aither a function/infix, or a local variable *)
+    type t = string * [`Fun of string list * Expr.t | `Local of Expr.t option]
+      
     ostap (
       arg : LIDENT;
       position[ass][coord][newp]:
@@ -688,11 +708,12 @@ module Definition =
           | `Ok infix' -> name, infix'
           | `Fail msg  -> raise (Semantic_error msg)
       };
-      parse[infix]:
-        <(name, infix')> : head[infix] "(" args:!(Util.list0 arg) ")"
-           locs:(%"local" !(Util.list arg))?
-        "{" body:!(Expr.parse infix' Void) "}" {
-        (name, (args, (match locs with None -> [] | Some l -> l), body)), infix'
+      local_var[infix][expr][def]: name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {name, `Local value};
+      parse[infix][expr][def]:
+        %"local" locs:!(Util.list (local_var infix expr def)) ";" {locs, infix}
+      | <(name, infix')> : head[infix] "(" args:!(Util.list0 arg) ")"
+         body:expr[def][infix'][Expr.Void] {
+           [(name, `Fun (args, body))], infix'
       }
     )
 
@@ -709,16 +730,16 @@ type t = Definition.t list * Expr.t
 
    Takes a program and its input stream, and returns the output stream
 *)
-let eval (defs, body) i =
+let eval ((defs, body) : t) i =
   let module M = Map.Make (String) in
-  let m          = List.fold_left (fun m ((name, _) as def) -> M.add name def m) M.empty defs in
+  let m          = List.fold_left (fun m ((name, proc) as def) -> match proc with `Fun (args, stmt) -> M.add name (name, (args, stmt)) m | _ -> m) M.empty defs in
   let _, _, o, _ =
     Expr.eval
       (object
          method definition env f args ((st, i, o, vs) as conf) =
            try
-             let xs, locs, s       = snd @@ M.find f m in
-             let st'               = List.fold_left (fun st (x, a) -> State.update x a st) (State.enter st (xs @ locs)) (List.combine xs args) in
+             let xs, s             = snd @@ M.find f m in
+             let st'               = List.fold_left (fun st (x, a) -> State.update x a st) (State.enter st xs) (List.combine xs args) in
              let st'', i', o', vs' = Expr.eval env (st', i, o, []) Skip s in
              (State.leave st'' st, i', o', match vs' with [v] -> v::vs | _ -> Value.Empty :: vs)
            with Not_found -> Builtin.eval conf args f
@@ -731,8 +752,8 @@ let eval (defs, body) i =
 
 (* Top-level parser *)
 ostap (
-  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Expr.parse infix' Void) {defs, body};
+  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Expr.parse definitions infix' Expr.Void) {(defs : Definition.t list), body};
   definitions[infix]:
-    <(def, infix')> : !(Definition.parse infix) <(defs, infix'')> : definitions[infix'] {def::defs, infix''}
+    <(def, infix')> : !(Definition.parse infix Expr.parse definitions) <(defs, infix'')> : definitions[infix'] {def @ defs, infix''}
   | empty {[], infix}
 )

@@ -1,3 +1,4 @@
+local x, y, z;
 read (x);
 read (y);
 z := x*y*3;

@@ -333,11 +333,16 @@ let compile (defs, p) =
      in
      env, true, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] 
   in
-  let compile_def env (name, (args, locals, stmt)) =
+  let compile_def env (name, def) =
+    let args, stmt =
+      match def with
+      | `Fun (args, stmt) -> args, stmt
+      | _ -> invalid_arg "local definition"
+    in
     let lend, env       = env#get_label in
     let env, flag, code = compile_expr lend env stmt in
     env,
-    [LABEL name; BEGIN (name, args, locals)] @
+    [LABEL name; BEGIN (name, args, [])] @
     code @
     (if flag then [LABEL lend] else []) @
     [END]
