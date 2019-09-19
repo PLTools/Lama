@@ -556,7 +556,7 @@ module Expr =
            let vars, body =
              List.fold_left
                (fun (vs, bd) -> function
-                | (name, `Variable value) -> name :: vs, (match value with None -> bd | Some v -> Seq (Assign (Var name, v), bd))
+                | (name, `Variable value) -> name :: vs, (match value with None -> bd | Some v -> Seq (Assign (Ref name, v), bd))
                 | _                       -> invalid_arg "function"
                )
                ([], expr)
