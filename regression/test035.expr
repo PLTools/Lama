@@ -1,4 +1,5 @@
-fun printArray (x) local elem {
+fun printArray (x) {
+  local elem;
   if x.length == 0 then return fi;
   for i:=0, i<x.length, i:=i+1 do
     write (x[i])

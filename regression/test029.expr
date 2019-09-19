@@ -1,4 +1,5 @@
-fun fib (n) local r {
+fun fib (n) {
+  local r;
   if n <= 1
   then result := 1
   else

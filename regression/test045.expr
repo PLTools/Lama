@@ -1,4 +1,5 @@
-fun printString (s) local i {  
+fun printString (s) {
+  local i;
   for i := 0, i < s.length, i := i + 1 do
     write (s[i])
   od

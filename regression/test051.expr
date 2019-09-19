@@ -12,7 +12,8 @@ fun print_list (l) {
   esac
 }
 
-fun array_to_list (a) local l, i {
+fun array_to_list (a) {
+  local l, i;
   l := {};
   for i := a.length, i > 0, i := i-1 do
     l := a[i-1] : l

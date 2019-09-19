@@ -1,4 +1,5 @@
-fun sort (x) local i, j, y, n {
+fun sort (x) {
+  local i, j, y, n;
   n := x.length;
   
   if n == 0 then return x fi;

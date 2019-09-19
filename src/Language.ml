@@ -259,7 +259,7 @@ module Expr =
     (* entering the scope         *) | Scope     of string list * t
     (* leave a scope              *) | Leave
     (* intrinsic (for evaluation) *) | Intrinsic of (config -> config)
-    (* control (for control flow) *) | Control   of (config -> t * config)
+    (* control (for control flow) *) | Control   of (config -> t * config) 
 
     (* Reff : parsed expression should return value Reff (look for ":=");
        Val : -//- returns simple value;
@@ -553,18 +553,16 @@ module Expr =
       | c:CHAR                                    => {notRef atr} => {ignore atr (Const  (Char.code c))}
       | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
       | "{" <(d, infix')> : def[infix] expr:parse[def][infix][atr] "}" => {notRef atr} => {
-         ignore atr (
            let vars, body =
              List.fold_left
                (fun (vs, bd) -> function
-                | (name, `Local value) -> name :: vs, (match value with None -> bd | Some v -> Seq (Assign (Var name, v), bd))
-                | _                    -> invalid_arg "function"
+                | (name, `Variable value) -> name :: vs, (match value with None -> bd | Some v -> Seq (Assign (Var name, v), bd))
+                | _                       -> invalid_arg "function"
                )
                ([], expr)
                d
            in
            Scope (vars, body)
-         )
       }
       | "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} => {ignore atr (match es with
                                                                                       | [] -> Const 0
@@ -691,7 +689,7 @@ module Definition =
   struct
 
     (* The type for a definition: aither a function/infix, or a local variable *)
-    type t = string * [`Fun of string list * Expr.t | `Local of Expr.t option]
+    type t = string * [`Fun of string list * Expr.t | `Variable of Expr.t option]
       
     ostap (
       arg : LIDENT;
@@ -708,9 +706,9 @@ module Definition =
           | `Ok infix' -> name, infix'
           | `Fail msg  -> raise (Semantic_error msg)
       };
-      local_var[infix][expr][def]: name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {name, `Local value};
-      parse[infix][expr][def]:
-        %"local" locs:!(Util.list (local_var infix expr def)) ";" {locs, infix}
+      local_var[infix][expr][def]: name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {name, `Variable value};
+      parse[kind][infix][expr][def]:
+        kind locs:!(Util.list (local_var infix expr def)) ";" {locs, infix}
       | <(name, infix')> : head[infix] "(" args:!(Util.list0 arg) ")"
          body:expr[def][infix'][Expr.Void] {
            [(name, `Fun (args, body))], infix'
@@ -752,8 +750,10 @@ let eval ((defs, body) : t) i =
 
 (* Top-level parser *)
 ostap (
-  parse[infix]: <(defs, infix')> : definitions[infix] body:!(Expr.parse definitions infix' Expr.Void) {(defs : Definition.t list), body};
-  definitions[infix]:
-    <(def, infix')> : !(Definition.parse infix Expr.parse definitions) <(defs, infix'')> : definitions[infix'] {def @ defs, infix''}
+  parse[infix]: <(defs, infix')> : definitions[global][infix] body:!(Expr.parse (definitions local) infix' Expr.Void) {(defs : Definition.t list), body};
+  local: %"local";
+  global: %"global";
+  definitions[kind][infix]:
+    <(def, infix')> : !(Definition.parse kind infix Expr.parse (definitions local)) <(defs, infix'')> : definitions[kind][infix'] {def @ defs, infix''}
   | empty {[], infix}
 )
