@@ -1,3 +1,5 @@
+global x, y, i, j;
+
 fun printAS (x) {
   local i, j;
   for i := 0, i<x.length, i:=i+1 do

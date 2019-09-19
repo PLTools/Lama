@@ -1,3 +1,5 @@
+global n, x, y;
+
 n := read ();
 x := [1];
 y := [x, x];

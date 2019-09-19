@@ -1,3 +1,5 @@
+global n, k, res;
+
 n := 2;
 k := 10;
 res := 1;

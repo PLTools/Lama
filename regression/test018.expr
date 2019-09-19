@@ -1,3 +1,5 @@
+global n, c, p, cc, q, i, m, d;
+
 n := read ();
 
 c := 1;

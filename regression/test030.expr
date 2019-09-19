@@ -1,3 +1,5 @@
+global n, i;
+
 fun fib (n) {
   if n <= 1
   then return 1

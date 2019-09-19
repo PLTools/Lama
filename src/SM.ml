@@ -143,7 +143,7 @@ let run p i =
            (cstack, (match r with [r] -> r::stack' | _ -> Value.Empty :: stack'), (st, i, o))
        end
       )
-      ([], [], (State.empty, i, []))
+      ([], [], (State.global [] (* TODO! *), i, []))
       p
   in
   o

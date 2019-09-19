@@ -1,3 +1,5 @@
+global n, fib_1, fib_2, fib, i;
+
 n := read ();
 
 i     := 2;

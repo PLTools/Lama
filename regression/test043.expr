@@ -1,3 +1,5 @@
+global x;
+
 fun sum (x) {
   case x of
     Nil          -> return 0

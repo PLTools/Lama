@@ -1,3 +1,5 @@
+global n, x, i;
+
 fun printArray (x) {
   local elem;
   if x.length == 0 then return fi;

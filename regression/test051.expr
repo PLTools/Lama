@@ -1,3 +1,5 @@
+global n;
+
 fun sum (l) {
   case l of
     {}    -> return 0

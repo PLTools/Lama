@@ -1,3 +1,5 @@
+global x;
+
 fun test (n, m) {
   local i, s;
   s := 0;

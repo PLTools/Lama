@@ -1,3 +1,5 @@
+global i, n, result;
+
 fun fib (n) {
   local r;
   if n <= 1

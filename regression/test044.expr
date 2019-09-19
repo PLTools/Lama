@@ -1,3 +1,5 @@
+global x, y, z;
+
 fun zip (x) {
   case x of Pair (x, y) ->
     case x of

@@ -1,3 +1,5 @@
+global n, x, i;
+
 fun sort (x) {
   local i, j, y, n;
   n := x.length;

@@ -1,3 +1,5 @@
+global n, i, result;
+
 fun fact (n) {
   if n <= 1
   then result := 1

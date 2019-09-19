@@ -1,3 +1,5 @@
+global s, n;
+
 s := 0;
 
 repeat

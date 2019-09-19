@@ -1,3 +1,5 @@
+global n, y, y2, t;
+
 fun test (n, m) {
   local i, s;
   s := 0;

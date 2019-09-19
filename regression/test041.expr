@@ -1,3 +1,5 @@
+global x;
+
 fun f (a) {
   case a of
     A (x, y, z) -> write (x + y + z)

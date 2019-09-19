@@ -1,3 +1,5 @@
+global n, x, i;
+
 fun printString (x) {
   for i:=0, i<x.length, i:=i+1 do
     write (x[i])    

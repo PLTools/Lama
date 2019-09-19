@@ -1,3 +1,5 @@
+global x, y, z;
+
 x := read (); 
 y := read (); 
 z := y*y; 

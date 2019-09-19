@@ -1,3 +1,5 @@
+global n, x, y;
+
 fun append (x, y) {
     case x of
       Nil         -> return y

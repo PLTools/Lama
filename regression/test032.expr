@@ -1,3 +1,5 @@
+global x, m, n;
+
 fun ack (m, n) {
   if m == 0 then return (n+1)
   elif m > 0 && n == 0 then return ack (m-1, 1)

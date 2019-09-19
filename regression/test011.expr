@@ -1,3 +1,5 @@
+global x;
+
 x:=0;
 if x
 then write(1)

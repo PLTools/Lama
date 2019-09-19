@@ -1,3 +1,5 @@
+global n;
+
 fun hd (l) {
   case l of
     h : _ -> return h

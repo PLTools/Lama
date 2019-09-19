@@ -1,3 +1,5 @@
+global n, t;
+
 fun insert (t, x) {
   case t of
     Leaf           -> return Node (x, Leaf, Leaf)

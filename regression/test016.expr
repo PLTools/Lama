@@ -1,3 +1,5 @@
+global s, n;
+
 n := read ();
 
 s := 1;

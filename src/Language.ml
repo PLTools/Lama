@@ -91,7 +91,7 @@ module State =
 
     (* State: global state, local state, scope variables *)
     type t =
-    | G of (string -> Value.t)
+    | G of string list * (string -> Value.t)
     | L of string list * (string -> Value.t) * t
 
     (* Undefined state *)
@@ -101,14 +101,17 @@ module State =
     let bind x v s = fun y -> if x = y then v else s y
 
     (* Empty state *)
-    let empty = G undefined
+    let global vars = G (vars, undefined)
 
     (* Update: non-destructively "modifies" the state s by binding the variable x
        to value v and returns the new state w.r.t. a scope
     *)
     let update x v s =
       let rec inner = function
-      | G s -> G (bind x v s)
+      | G (scope, s) ->
+         if not (List.mem x scope)
+         then invalid_arg (Printf.sprintf "undefined variable %s" x)
+         else G (scope, bind x v s)
       | L (scope, s, enclosing) ->
          if List.mem x scope then L (scope, bind x v s, enclosing) else L (scope, s, inner enclosing)
       in
@@ -117,7 +120,7 @@ module State =
     (* Evals a variable in a state w.r.t. a scope *)
     let rec eval s x =
       match s with
-      | G s -> s x
+      | G (_, s) -> s x
       | L (scope, s, enclosing) -> if List.mem x scope then s x else eval enclosing x
 
     (* Creates a new scope, based on a given state *)
@@ -730,7 +733,7 @@ type t = Definition.t list * Expr.t
 *)
 let eval ((defs, body) : t) i =
   let module M = Map.Make (String) in
-  let m          = List.fold_left (fun m ((name, proc) as def) -> match proc with `Fun (args, stmt) -> M.add name (name, (args, stmt)) m | _ -> m) M.empty defs in
+  let m, gvars = List.fold_left (fun (m, gv) ((name, proc) as def) -> match proc with `Fun (args, stmt) -> M.add name (name, (args, stmt)) m, gv | _ -> m, name::gv) (M.empty, []) defs in
   let _, _, o, _ =
     Expr.eval
       (object
@@ -742,7 +745,7 @@ let eval ((defs, body) : t) i =
              (State.leave st'' st, i', o', match vs' with [v] -> v::vs | _ -> Value.Empty :: vs)
            with Not_found -> Builtin.eval conf args f
        end)
-      (State.empty, i, [], [])
+      (State.global gvars, i, [], [])
       Skip
       body
   in

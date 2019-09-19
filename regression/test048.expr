@@ -1,3 +1,5 @@
+global n, y;
+
 fun test (n, m) {
   local i, s;
   write (n);

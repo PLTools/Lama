@@ -1,3 +1,5 @@
+global n;
+
 infix "===" at "==" (v1, v2) {
   local s1, s2, i;
   
