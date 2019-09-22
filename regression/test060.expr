@@ -1,0 +1,17 @@
+fun f (l) {
+  infix "===" at "==" (a, b) {
+    return a == b
+  }
+
+  case l of
+    {}         -> return 1
+  | {_}        -> return 1
+  | a : b : tl -> return a === b && f (b : tl)
+  esac
+}
+
+write (f ({}));
+write (f ({1}));
+write (f ({1, 1}));
+write (f ({1, 1, 1}));
+write (f ({1, 2, 1}))

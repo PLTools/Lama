@@ -431,7 +431,7 @@ module Expr =
                 let st'                = List.fold_left (fun st (x, a) -> State.update x a st) (State.enter st (List.map (fun x -> x, true) args)) (List.combine args es) in
                 let st'', i', o', vs'' = eval env (st', i, o, []) Skip body in
                 (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')                      
-             | _ -> invalid_arg "callee did not evaluate to a function"
+             | _ -> invalid_arg (Printf.sprintf "callee did not evaluate to a function: %s" (show(Value.t) (fun _ -> "<expr>") f))
             ))]))
         
       | Leave  -> eval env (State.drop st, i, o, vs) Skip k
@@ -588,9 +588,12 @@ module Expr =
       basic[def][infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, f) -> ostap (- $(s)), f) l)) infix) (primary def infix) atr);
 
       primary[def][infix][atr]:
-        b:base[def][infix][Val] is:(-"[" i:parse[def][infix][Val] -"]" {`Elem i} | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f}))+
+        b:base[def][infix][Val] is:(  "[" i:parse[def][infix][Val] "]"                     {`Elem i}
+                                    | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f})
+                                    | "(" args:!(Util.list0)[parse def infix Val] ")"      {`Call args}  
+                                   )+
         => {match (List.hd (List.rev is)), atr with
-            | `Elem i, Reff -> true
+            | `Elem i, Reff -> true            
             |  _,      Reff -> false
             |  _,      _    -> true} =>
         {
@@ -600,10 +603,11 @@ module Expr =
             List.fold_left
               (fun b ->
                 function
-                | `Elem i -> Elem (b, i)
-                | `Len    -> Length b
-                | `Str    -> StringVal b
-                | `Post f -> Call (Var f, [b])
+                | `Elem i    -> Elem (b, i)
+                | `Len       -> Length b
+                | `Str       -> StringVal b
+                | `Post f    -> Call (Var f, [b])
+                | `Call args -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args)) 
               )
               b
               is
@@ -614,6 +618,7 @@ module Expr =
                     | `Len,     _   -> Length b
                     | `Str,     _   -> StringVal b
                     | `Post f,  _   -> Call (Var f, [b])
+                    | `Call args, _ -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args))
           in
           ignore atr res
         }
@@ -632,10 +637,9 @@ module Expr =
                                                                                                               | None -> []
                                                                                                               | Some args -> args))
                                                                                         }
-      | x:LIDENT s:(  "(" args:!(Util.list0)[parse def infix Val] ")" => {notRef atr} => {Call (Var x, args)}
-                        | empty {if notRef atr then Var x else Ref x})   {ignore atr s}
+      | x:LIDENT {if notRef atr then Var x else Ref x}                 
 
-      | {isVoid atr} => %"skip"                                      {Skip}
+      | {isVoid atr} => %"skip" {Skip}
 
       | %"if" e:parse[def][infix][Val] %"then" the:scope[`Local][def][infix][atr][parse def]
                                 elif:(%"elif" parse[def][infix][Val] %"then" scope[`Local][def][infix][atr][parse def])*
