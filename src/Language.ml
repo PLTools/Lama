@@ -16,14 +16,16 @@ let unquote s = String.sub s 1 (String.length s - 2)
 module Value =
   struct
 
-    @type t =
+    @type 'a t =
     | Empty
-    | Var    of string
-    | Elem   of t * int
-    | Int    of int
-    | String of bytes
-    | Array  of t array
-    | Sexp   of string * t array
+    | Var     of string
+    | Elem    of 'a t * int
+    | Int     of int
+    | String  of bytes
+    | Array   of 'a t array
+    | Sexp    of string * 'a t array
+    | Fun     of string list * 'a
+    | Builtin of string
     with show
 
     let to_int = function
@@ -85,75 +87,14 @@ module Value =
 
   end
 
-(* States *)
-module State =
-  struct
-
-    (* State: global state, local state, scope variables *)
-    type t =
-    | G of string list * (string -> Value.t)
-    | L of string list * (string -> Value.t) * t
-
-    (* Undefined state *)
-    let undefined x = failwith (Printf.sprintf "Undefined variable: %s" x)
-
-    (* Bind a variable to a value in a state *)
-    let bind x v s = fun y -> if x = y then v else s y
-
-    (* Empty state *)
-    let global vars = G (vars, undefined)
-
-    (* Update: non-destructively "modifies" the state s by binding the variable x
-       to value v and returns the new state w.r.t. a scope
-    *)
-    let update x v s =
-      let rec inner = function
-      | G (scope, s) ->
-         if not (List.mem x scope)
-         then invalid_arg (Printf.sprintf "undefined variable %s" x)
-         else G (scope, bind x v s)
-      | L (scope, s, enclosing) ->
-         if List.mem x scope then L (scope, bind x v s, enclosing) else L (scope, s, inner enclosing)
-      in
-      inner s
-
-    (* Evals a variable in a state w.r.t. a scope *)
-    let rec eval s x =
-      match s with
-      | G (_, s) -> s x
-      | L (scope, s, enclosing) -> if List.mem x scope then s x else eval enclosing x
-
-    (* Creates a new scope, based on a given state *)
-    let rec enter st xs =
-      match st with
-      | G _         -> L (xs, undefined, st)
-      | L (_, _, e) -> enter e xs
-
-    (* Drops a scope *)
-    let leave st st' =
-      let rec get = function
-      | G _ as st -> st
-      | L (_, _, e) -> get e
-      in
-      let g = get st in
-      let rec recurse = function
-      | L (scope, s, e) -> L (scope, s, recurse e)
-      | G _             -> g
-      in
-      recurse st'
-
-    (* Push a new local scope *)
-    let push st s xs = L (xs, s, st)
-
-    (* Drop a local scope *)
-    let drop (L (_, _, e)) = e
-
-  end
-
 (* Builtins *)
 module Builtin =
   struct
 
+    let list        = ["read"; "write"; ".elem"; ".length"; ".array"; ".stringval"]
+    let bindings () = List.map (fun name -> name, Value.Builtin name) list
+    let names       = List.map (fun name -> name, false) list
+                 
     let eval (st, i, o, vs) args = function
     | "read"     -> (match i with z::i' -> (st, i', o, (Value.of_int z)::vs) | _ -> failwith "Unexpected end of input")
     | "write"    -> (st, i, o @ [Value.to_int @@ List.hd args], Value.Empty :: vs)
@@ -169,6 +110,100 @@ module Builtin =
     | ".array"      -> (st, i, o, (Value.of_array @@ Array.of_list args)::vs)
     | ".stringval"  -> let [a] = args in (st, i, o, (Value.of_string @@ Value.string_val a)::vs)
 
+  end
+
+(* States *)
+module State =
+  struct
+
+    (* State: global state, local state, scope variables *)
+    type 'a t =
+    | I
+    | G of (string * bool) list * (string -> 'a Value.t)
+    | L of (string * bool) list * (string -> 'a Value.t) * 'a t
+      
+    (* Undefined state *)
+    let undefined x = failwith (Printf.sprintf "Undefined variable: %s" x)
+
+    (* Create a state from bindings list *)
+    let from_list l = fun x -> try List.assoc x l with Not_found -> invalid_arg (Printf.sprintf "undefined variable %s" x)
+                             
+    (* Bind a variable to a value in a state *)
+    let bind x v s = fun y -> if x = y then v else s y
+
+    (* empty state *)
+    let empty = I
+
+    (* initialize empty state *)
+    let init st vars list =
+      match st with
+      | I -> G (vars @ Builtin.names, List.fold_left (fun s (name, value) -> bind name value s) (from_list list) (Builtin.bindings ()))
+      | _ -> invalid_arg "state already initialzied"
+    
+    (* Scope operation: checks if a name is in a scope *)
+    let in_scope x s = List.exists (fun (y, _) -> y = x) s
+
+    (* Scope operation: checks if a name designates variable *)
+    let is_var x s = try List.assoc x s with Not_found -> false
+                    
+    (* Update: non-destructively "modifies" the state s by binding the variable x
+       to value v and returns the new state w.r.t. a scope
+    *)
+    let update x v s =      
+      let rec inner = function
+      | I -> invalid_arg "uninitialized state"
+      | G (scope, s) ->
+         if is_var x scope
+         then G (scope, bind x v s)
+         else invalid_arg (Printf.sprintf "name %s is undefined or does not designate a variable" x)
+      | L (scope, s, enclosing) ->
+         if in_scope x scope
+         then if is_var x scope
+              then L (scope, bind x v s, enclosing)
+              else invalid_arg (Printf.sprintf "name %s does not designate a variable" x)
+         else L (scope, s, inner enclosing)
+      in
+      inner s      
+
+    (* Evals a variable in a state w.r.t. a scope *)
+    let rec eval s x =
+      match s with
+      | I                       -> invalid_arg "uninitialized state"           
+      | G (_, s)                -> s x
+      | L (scope, s, enclosing) -> if in_scope x scope then s x else eval enclosing x
+
+    (* Creates a new scope, based on a given state *)
+    let rec enter st xs =
+      match st with
+      | I           -> invalid_arg "uninitialized state"                   
+      | G _         -> L (xs, undefined, st)
+      | L (_, _, e) -> enter e xs
+
+    (* Drops a scope *)
+    let leave st st' =
+      let rec get = function
+      | I           -> invalid_arg "uninitialized state"
+      | G _ as st   -> st
+      | L (_, _, e) -> get e
+      in
+      let g = get st in
+      let rec recurse = function
+      | I               -> invalid_arg "uninitialized state"
+      | L (scope, s, e) -> L (scope, s, recurse e)
+      | G _             -> g
+      in
+      recurse st'
+
+    (* Push a new local scope *)
+    let push st s xs = L (xs, s, st)
+
+    (* Drop a local scope *)
+    let drop (L (_, _, e)) = e
+
+    (* Observe a variable in a state and print it to stderr *)
+    let observe st x =
+      Printf.eprintf "%s=%s\n%!" x (try show (Value.t) (fun _ -> "<expr>") @@ eval st x with _ -> "undefined")
+      
   end
 
 (* Patterns *)
@@ -231,7 +266,7 @@ module Expr =
     (* The type of configuration: a state, an input stream, an output stream,
        and a stack of values
     *)
-    type config = State.t * int list * int list * Value.t list
+    type 'a config = 'a State.t * int list * int list * 'a Value.t list
 
     (* The type for expressions. Note, in regular OCaml there is no "@type..."
        notation, it came from GT.
@@ -259,10 +294,10 @@ module Expr =
     (* return statement           *) | Return    of t option
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
-    (* entering the scope         *) | Scope     of string list * t
+    (* entering the scope         *) | Scope     of [`Global | `Local] * (string * [`Fun of string list * t | `Variable of t option]) list * t
     (* leave a scope              *) | Leave
-    (* intrinsic (for evaluation) *) | Intrinsic of (config -> config)
-    (* control (for control flow) *) | Control   of (config -> t * config) 
+    (* intrinsic (for evaluation) *) | Intrinsic of (t config -> t config)
+    (* control (for control flow) *) | Control   of (t config -> t * t config) 
 
     (* Reff : parsed expression should return value Reff (look for ":=");
        Val : -//- returns simple value;
@@ -282,10 +317,11 @@ module Expr =
     *)
 
     (* Update state *)
-    let update st x v =
+    let update st x v =      
       match x with
       | Value.Var x       -> State.update x v st
       | Value.Elem (x, i) -> Value.update_elem x i v; st
+      | _                 -> invalid_arg (Printf.sprintf "invalid value %s in update" @@ show(Value.t) (fun _ -> "<expr>") x)
 
     (* Expression evaluator
 
@@ -330,9 +366,29 @@ module Expr =
     | n -> fun h::tl -> let tl', rest = take (n-1) tl in h :: tl', rest
 
     let rec eval env ((st, i, o, vs) as conf) k expr =
+      let print_values vs =
+        Printf.eprintf "Values:\n%!";
+        List.iter (fun v -> Printf.eprintf "%s\n%!" @@ show(Value.t) (fun _ -> "<expr>") v) vs;
+        Printf.eprintf "End Values\n%!"        
+      in
       match expr with
-      | Scope (vars, body) ->
-          eval env (State.push st State.undefined vars, i, o, vs) k (Seq (body, Leave))
+      | Scope (kind, defs, body) ->
+         let vars, body, bnds =
+           List.fold_left
+             (fun (vs, bd, bnd) -> function
+              | (name, `Variable value) -> (name, true) :: vs, (match value with None -> bd | Some v -> Seq (Assign (Ref name, v), bd)), bnd
+              | (name, `Fun (args, b))  -> (name, false) :: vs, bd, (name, Value.Fun (args, b)) :: bnd
+             )
+             ([], body, [])
+             (List.rev defs)
+         in
+         eval env
+           ((match kind with
+             | `Local  -> State.push st (State.from_list bnds) vars
+             | `Global -> State.init st vars bnds
+            ), i, o, vs)
+           k
+           (match kind with `Global -> body | `Local -> Seq (body, Leave))
       | Unit ->
          eval env (st, i, o, Value.Empty :: vs) Skip k
       | Ignore s ->
@@ -353,20 +409,31 @@ module Expr =
       | Ref x ->
          eval env (st, i, o, (Value.Var x) :: vs) Skip k
       | Array xs ->
-         eval env conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in env#definition env ".array" (List.rev es) (st, i, o, vs'))]))
+         eval env conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in Builtin.eval (st, i, o, vs') (List.rev es) ".array")]))
       | Sexp (t, xs) ->
          eval env conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in (st, i, o, Value.Sexp (t, Array.of_list (List.rev es)) :: vs'))]))
       | Binop (op, x, y) ->
          eval env conf k (schedule_list [x; y; Intrinsic (fun (st, i, o, y::x::vs) -> (st, i, o, (Value.of_int @@ to_func op (Value.to_int x) (Value.to_int y)) :: vs))])
       | Elem (b, i) ->
-         eval env conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> env#definition env ".elem" [b; j] (st, i, o, vs))])
+         eval env conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> Builtin.eval (st, i, o, vs) [b; j] ".elem")])
       | ElemRef (b, i) ->
          eval env conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> (st, i, o, (Value.Elem (b, Value.to_int j))::vs))])
       | Length e ->
-         eval env conf k (schedule_list [e; Intrinsic (fun (st, i, o, v::vs) -> env#definition env ".length" [v] (st, i, o, vs))])
-      | Call (Var f, args) ->
-         eval env conf k (schedule_list (args @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length args) vs in
-                                                                                  env#definition env f (List.rev es) (st, i, o, vs'))]))
+         eval env conf k (schedule_list [e; Intrinsic (fun (st, i, o, v::vs) -> Builtin.eval (st, i, o, vs) [v] ".length")])
+      | Call (f, args) ->
+         eval env conf k (schedule_list (f :: args @ [Intrinsic (fun (st, i, o, vs) ->
+            let es, vs' = take (List.length args + 1) vs in
+            let f :: es = List.rev es in
+            (match f with
+             | Value.Builtin name ->
+                Builtin.eval (st, i, o, vs') es name
+             | Value.Fun (args, body) ->
+                let st'                = List.fold_left (fun st (x, a) -> State.update x a st) (State.enter st (List.map (fun x -> x, true) args)) (List.combine args es) in
+                let st'', i', o', vs'' = eval env (st', i, o, []) Skip body in
+                (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')                      
+             | _ -> invalid_arg "callee did not evaluate to a function"
+            ))]))
+        
       | Leave  -> eval env (State.drop st, i, o, vs) Skip k
       | Assign (x, e)  ->
          eval env conf k (schedule_list [x; e; Intrinsic (fun (st, i, o, v::x::vs) -> (update st x v, i, o, v::vs))])
@@ -383,7 +450,7 @@ module Expr =
       | Return e -> (match e with None -> (st, i, o, []) | Some e -> eval env (st, i, o, []) Skip e)
       | Case (e, bs)->
          let rec branch ((st, i, o, v::vs) as conf) = function
-         | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) v))
+         | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") v))
          | (patt, body)::tl ->
              let rec match_patt patt v st =
                let update x v = function
@@ -413,7 +480,7 @@ module Expr =
              in
              match match_patt patt v (Some State.undefined) with
              | None     -> branch conf tl
-             | Some st' -> eval env (State.push st st' (Pattern.vars patt), i, o, vs) k (Seq (body, Leave))
+             | Some st' -> eval env (State.push st st' (List.map (fun x -> x, false) @@ Pattern.vars patt), i, o, vs) k (Seq (body, Leave))
          in
          eval env conf Skip (schedule_list [e; Intrinsic (fun conf -> branch conf bs)])
 
@@ -516,6 +583,7 @@ module Expr =
     ostap (
       parse[def][infix][atr]: h:basic[def][infix][Void] -";" t:parse[def][infix][atr] {Seq (h, t)}
                               | basic[def][infix][atr];
+      scope[kind][def][infix][atr][e]: <(d, infix')> : def[infix] expr:e[infix'][atr] {Scope (kind, d, expr)};
 
       basic[def][infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, f) -> ostap (- $(s)), f) l)) infix) (primary def infix) atr);
 
@@ -555,18 +623,7 @@ module Expr =
       | s:STRING                                  => {notRef atr} => {ignore atr (String (unquote s))}
       | c:CHAR                                    => {notRef atr} => {ignore atr (Const  (Char.code c))}
       | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
-      | "{" <(d, infix')> : def[infix] expr:parse[def][infix][atr] "}" => {notRef atr} => {
-           let vars, body =
-             List.fold_left
-               (fun (vs, bd) -> function
-                | (name, `Variable value) -> name :: vs, (match value with None -> bd | Some v -> Seq (Assign (Ref name, v), bd))
-                | _                       -> invalid_arg "function"
-               )
-               ([], expr)
-               d
-           in
-           Scope (vars, body)
-      }
+      | -"{" scope[`Local][def][infix][atr][parse def] -"}" 
       | "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} => {ignore atr (match es with
                                                                                       | [] -> Const 0
                                                                                       | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0))
@@ -580,22 +637,22 @@ module Expr =
 
       | {isVoid atr} => %"skip"                                      {Skip}
 
-      | %"if" e:parse[def][infix][Val] %"then" the:parse[def][infix][atr]
-                                elif:(%"elif" parse[def][infix][Val] %"then" parse[def][infix][atr])*
-                                   %"else" els:parse[def][infix][atr] %"fi"
+      | %"if" e:parse[def][infix][Val] %"then" the:scope[`Local][def][infix][atr][parse def]
+                                elif:(%"elif" parse[def][infix][Val] %"then" scope[`Local][def][infix][atr][parse def])*
+                                   %"else" els:scope[`Local][def][infix][atr][parse def] %"fi"
                                                                      {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif els)}
-      | %"if" e:parse[def][infix][Val] %"then" the:parse[def][infix][Void]
-                             elif:(%"elif" parse[def][infix][Val] %"then" parse[def][infix][atr])*
+      | %"if" e:parse[def][infix][Val] %"then" the:scope[`Local][def][infix][Void][parse def]
+                             elif:(%"elif" parse[def][infix][Val] %"then" scope[`Local][def][infix][atr][parse def])*
                              => {isVoid atr} => %"fi"
                                                                      {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif Skip)}
 
-      | %"while" e:parse[def][infix][Val] %"do" s:parse[def][infix][Void]
+      | %"while" e:parse[def][infix][Val] %"do" s:scope[`Local][def][infix][Void][parse def]
                                             => {isVoid atr} => %"od" {While (e, s)}
 
-      | %"for" i:parse[def][infix][Void] "," c:parse[def][infix][Val] "," s:parse[def][infix][Void] %"do" b:parse[def][infix][Void] => {isVoid atr} => %"od"
+      | %"for" i:parse[def][infix][Void] "," c:parse[def][infix][Val] "," s:parse[def][infix][Void] %"do" b:scope[`Local][def][infix][Void][parse def] => {isVoid atr} => %"od"
                                                                      {Seq (i, While (c, Seq (b, s)))}
 
-      | %"repeat" s:parse[def][infix][Void] %"until" e:basic[def][infix][Val]
+      | %"repeat" s:scope[`Local][def][infix][Void][parse def] %"until" e:basic[def][infix][Val]
                                                   => {isVoid atr} => {Repeat (s, e)}
       | %"return" e:basic[def][infix][Val]?            => {isVoid atr} => {Return e}
 
@@ -731,32 +788,16 @@ type t = Definition.t list * Expr.t
 
    Takes a program and its input stream, and returns the output stream
 *)
-let eval ((defs, body) : t) i =
-  let module M = Map.Make (String) in
-  let m, gvars = List.fold_left (fun (m, gv) ((name, proc) as def) -> match proc with `Fun (args, stmt) -> M.add name (name, (args, stmt)) m, gv | _ -> m, name::gv) (M.empty, []) defs in
-  let _, _, o, _ =
-    Expr.eval
-      (object
-         method definition env f args ((st, i, o, vs) as conf) =
-           try
-             let xs, s             = snd @@ M.find f m in
-             let st'               = List.fold_left (fun st (x, a) -> State.update x a st) (State.enter st xs) (List.combine xs args) in
-             let st'', i', o', vs' = Expr.eval env (st', i, o, []) Skip s in
-             (State.leave st'' st, i', o', match vs' with [v] -> v::vs | _ -> Value.Empty :: vs)
-           with Not_found -> Builtin.eval conf args f
-       end)
-      (State.global gvars, i, [], [])
-      Skip
-      body
-  in
+let eval expr i =
+  let _, _, o, _ = Expr.eval (object end) (State.empty, i, [], []) Skip expr in
   o
 
 (* Top-level parser *)
 ostap (
-  parse[infix]: <(defs, infix')> : definitions[global][infix] body:!(Expr.parse (definitions local) infix' Expr.Void) {(defs : Definition.t list), body};
-  local: %"local";
-  global: %"global";
+  parse[infix]: !(Expr.scope `Global (definitions global) infix Expr.Void (Expr.parse (definitions local)));
+  local: %"local" {`Local};
+  global: %"global" {`Global};
   definitions[kind][infix]:
-    <(def, infix')> : !(Definition.parse kind infix Expr.parse (definitions local)) <(defs, infix'')> : definitions[kind][infix'] {def @ defs, infix''}
+    <(def, infix')> : !(Definition.parse kind infix Expr.basic (definitions local)) <(defs, infix'')> : definitions[kind][infix'] {def @ defs, infix''}
   | empty {[], infix}
 )

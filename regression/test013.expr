@@ -1,6 +1,4 @@
-global n;
-
-n := read ();
+global n = read ();
 
 repeat
   

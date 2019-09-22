@@ -25,4 +25,4 @@ i := -1;
 
 while n := s[i := i + 1]; n == 1 !! n == 2 !! n == 3 do
   write (n)
-od	
+od

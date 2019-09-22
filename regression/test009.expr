@@ -1,10 +1,8 @@
-global n, k, res;
+global n = 2, k = 10;
 
-n := 2;
-k := 10;
-res := 1;
+{local res = 1;
 while k > 0 do
   res := res * n;
   k := k - 1
 od;
-write(res)
+write(res)}

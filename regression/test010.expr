@@ -1,11 +1,11 @@
-global i, s, j;
+global i, s;
 
 i := 0;
 s := 0; 
 
 while i < 100
 do
-    j := 0;
+    local j = 0;
 
     while j < 100
     do   

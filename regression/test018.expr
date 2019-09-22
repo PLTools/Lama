@@ -1,4 +1,4 @@
-global n, c, p, cc, q, i, m, d;
+global n, c, p, q, i, m, d;
 
 n := read ();
 
@@ -7,7 +7,7 @@ p := 2;
 
 while c do
 
-  cc := 1;
+  local cc = 1;
 
   while cc do
     q := 2;
@@ -17,8 +17,7 @@ while c do
       q := q + 1
     od;
 
-    if cc then cc := 0 else p := p + 1; cc := 1 fi
-   
+    if cc then cc := 0 else p := p + 1; cc := 1 fi   
   od;
 
   d := p;

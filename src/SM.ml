@@ -40,7 +40,7 @@ let print_prg p = List.iter (fun i -> Printf.printf "%s\n" (show(insn) i)) p
 (* The type for the stack machine configuration: control stack, stack and configuration from statement
    interpreter
 *)
-type config = (prg * State.t) list * Value.t list * (State.t * int list * int list) 
+type config = (prg * Expr.t State.t) list * Expr.t Value.t list * (Expr.t State.t * int list * int list) 
 
 (* Stack machine interpreter
 
@@ -79,7 +79,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
                                  else eval env (env#builtin conf f n) prg'
     | BEGIN (_, args, locals) -> let vs, stack' = split (List.length args) stack in
                                  let state      = List.combine args @@ List.rev vs in
-                                 eval env (cstack, stack', (List.fold_left (fun s (x, v) -> State.update x v s) (State.enter st (args @ locals)) state, i, o)) prg'
+                                 eval env (cstack, stack', (List.fold_left (fun s (x, v) -> State.update x v s) (State.enter st (Obj.magic (args @ locals))) state, i, o)) prg' (* TODO *)
     | END                     -> (match cstack with
                                   | (prg', st')::cstack' -> eval env (cstack', Value.Empty :: stack, (State.leave st st', i, o)) prg'
                                   | []                   -> conf
@@ -111,7 +111,7 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
     | PATT UnBoxed            -> let x::stack' = stack in
                                  eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 1 | _ -> 0) :: stack', c) prg'
     | ENTER xs                -> let vs, stack' = split (List.length xs) stack in
-                                 eval env (cstack, stack', (State.push st (List.fold_left (fun s (x, v) -> State.bind x v s) State.undefined (List.combine xs vs)) xs, i, o)) prg'
+                                 eval env (cstack, stack', (State.push st (List.fold_left (fun s (x, v) -> State.bind x v s) State.undefined (List.combine xs vs)) (Obj.magic xs), i, o)) prg' (* TODO *)
     | LEAVE                   -> eval env (cstack, stack, (State.drop st, i, o)) prg'
    ) 
 
@@ -143,7 +143,7 @@ let run p i =
            (cstack, (match r with [r] -> r::stack' | _ -> Value.Empty :: stack'), (st, i, o))
        end
       )
-      ([], [], (State.global [] (* TODO! *), i, []))
+      ([], [], (State.empty (* TODO! *), i, []))
       p
   in
   o

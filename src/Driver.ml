@@ -40,11 +40,10 @@ let main =
     let infile     = Sys.argv.(if not to_compile then 2 else 1) in
     match (try parse infile with Language.Semantic_error msg -> `Fail msg) with
     | `Ok prog ->
-       let prog : Language.t = prog in
        if to_compile
        then
          let basename = Filename.chop_suffix infile ".expr" in
-         ignore @@ X86.build prog basename
+         (* ignore @@ X86.build prog basename *) (* TODO! *) ()
        else
 	 let rec read acc =
 	   try
@@ -57,7 +56,7 @@ let main =
 	 let output =
 	   if interpret
 	   then Language.eval prog input
-	   else SM.run (SM.compile prog) input
+	   else [] (* SM.run (SM.compile prog) input *) (* TODO! *)
 	 in
 	 List.iter (fun i -> Printf.printf "%d\n" i) output
     | `Fail er -> Printf.eprintf "Error: %s\n" er
