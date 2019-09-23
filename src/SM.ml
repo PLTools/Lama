@@ -40,7 +40,7 @@ let print_prg p = List.iter (fun i -> Printf.printf "%s\n" (show(insn) i)) p
 (* The type for the stack machine configuration: control stack, stack and configuration from statement
    interpreter
 *)
-type config = (prg * Expr.t State.t) list * Expr.t Value.t list * (Expr.t State.t * int list * int list) 
+type config = (prg * Expr.t State.t) list * (Expr.t, Expr.t State.t) Value.t list * (Expr.t State.t * int list * int list) 
 
 (* Stack machine interpreter
 

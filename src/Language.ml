@@ -16,15 +16,15 @@ let unquote s = String.sub s 1 (String.length s - 2)
 module Value =
   struct
 
-    @type 'a t =
+    @type ('a, 'b) t =
     | Empty
     | Var     of string
-    | Elem    of 'a t * int
+    | Elem    of ('a, 'b) t * int
     | Int     of int
     | String  of bytes
-    | Array   of 'a t array
-    | Sexp    of string * 'a t array
-    | Fun     of string list * 'a
+    | Array   of ('a, 'b) t array
+    | Sexp    of string * ('a, 'b) t array
+    | Closure of string list * 'a * 'b
     | Builtin of string
     with show
 
@@ -119,8 +119,8 @@ module State =
     (* State: global state, local state, scope variables *)
     type 'a t =
     | I
-    | G of (string * bool) list * (string -> 'a Value.t)
-    | L of (string * bool) list * (string -> 'a Value.t) * 'a t
+    | G of (string * bool) list * (string -> ('a, 'a t) Value.t)
+    | L of (string * bool) list * (string -> ('a, 'a t) Value.t) * 'a t
       
     (* Undefined state *)
     let undefined x = failwith (Printf.sprintf "Undefined variable: %s" x)
@@ -172,13 +172,6 @@ module State =
       | G (_, s)                -> s x
       | L (scope, s, enclosing) -> if in_scope x scope then s x else eval enclosing x
 
-    (* Creates a new scope, based on a given state *)
-    let rec enter st xs =
-      match st with
-      | I           -> invalid_arg "uninitialized state"                   
-      | G _         -> L (xs, undefined, st)
-      | L (_, _, e) -> enter e xs
-
     (* Drops a scope *)
     let leave st st' =
       let rec get = function
@@ -188,11 +181,18 @@ module State =
       in
       let g = get st in
       let rec recurse = function
-      | I               -> invalid_arg "uninitialized state"
+      | I               -> g 
       | L (scope, s, e) -> L (scope, s, recurse e)
       | G _             -> g
       in
       recurse st'
+
+    (* Creates a new scope, based on a given state *)
+    let rec enter st xs =
+      match st with
+      | I           -> invalid_arg "uninitialized state"                   
+      | G _         -> L (xs, undefined, st)
+      | L (_, _, e) -> enter e xs
 
     (* Push a new local scope *)
     let push st s xs = L (xs, s, st)
@@ -202,7 +202,7 @@ module State =
 
     (* Observe a variable in a state and print it to stderr *)
     let observe st x =
-      Printf.eprintf "%s=%s\n%!" x (try show (Value.t) (fun _ -> "<expr>") @@ eval st x with _ -> "undefined")
+      Printf.eprintf "%s=%s\n%!" x (try show (Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") @@ eval st x with _ -> "undefined")
       
   end
 
@@ -266,7 +266,7 @@ module Expr =
     (* The type of configuration: a state, an input stream, an output stream,
        and a stack of values
     *)
-    type 'a config = 'a State.t * int list * int list * 'a Value.t list
+    type 'a config = 'a State.t * int list * int list * ('a, 'a State.t) Value.t list
 
     (* The type for expressions. Note, in regular OCaml there is no "@type..."
        notation, it came from GT.
@@ -321,7 +321,7 @@ module Expr =
       match x with
       | Value.Var x       -> State.update x v st
       | Value.Elem (x, i) -> Value.update_elem x i v; st
-      | _                 -> invalid_arg (Printf.sprintf "invalid value %s in update" @@ show(Value.t) (fun _ -> "<expr>") x)
+      | _                 -> invalid_arg (Printf.sprintf "invalid value %s in update" @@ show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") x)
 
     (* Expression evaluator
 
@@ -368,7 +368,7 @@ module Expr =
     let rec eval env ((st, i, o, vs) as conf) k expr =
       let print_values vs =
         Printf.eprintf "Values:\n%!";
-        List.iter (fun v -> Printf.eprintf "%s\n%!" @@ show(Value.t) (fun _ -> "<expr>") v) vs;
+        List.iter (fun v -> Printf.eprintf "%s\n%!" @@ show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v) vs;
         Printf.eprintf "End Values\n%!"        
       in
       match expr with
@@ -377,7 +377,7 @@ module Expr =
            List.fold_left
              (fun (vs, bd, bnd) -> function
               | (name, `Variable value) -> (name, true) :: vs, (match value with None -> bd | Some v -> Seq (Assign (Ref name, v), bd)), bnd
-              | (name, `Fun (args, b))  -> (name, false) :: vs, bd, (name, Value.Fun (args, b)) :: bnd
+              | (name, `Fun (args, b))  -> (name, false) :: vs, bd, (name, Value.Closure (args, b, st)) :: bnd
              )
              ([], body, [])
              (List.rev defs)
@@ -427,11 +427,11 @@ module Expr =
             (match f with
              | Value.Builtin name ->
                 Builtin.eval (st, i, o, vs') es name
-             | Value.Fun (args, body) ->
-                let st'                = List.fold_left (fun st (x, a) -> State.update x a st) (State.enter st (List.map (fun x -> x, true) args)) (List.combine args es) in
+             | Value.Closure (args, body, closure) ->
+                let st' = State.push (State.leave st closure) (State.from_list @@ List.combine args es) (List.map (fun x -> x, true) args) in
                 let st'', i', o', vs'' = eval env (st', i, o, []) Skip body in
                 (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')                      
-             | _ -> invalid_arg (Printf.sprintf "callee did not evaluate to a function: %s" (show(Value.t) (fun _ -> "<expr>") f))
+             | _ -> invalid_arg (Printf.sprintf "callee did not evaluate to a function: %s" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") f))
             ))]))
         
       | Leave  -> eval env (State.drop st, i, o, vs) Skip k
@@ -450,7 +450,7 @@ module Expr =
       | Return e -> (match e with None -> (st, i, o, []) | Some e -> eval env (st, i, o, []) Skip e)
       | Case (e, bs)->
          let rec branch ((st, i, o, v::vs) as conf) = function
-         | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") v))
+         | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v))
          | (patt, body)::tl ->
              let rec match_patt patt v st =
                let update x v = function

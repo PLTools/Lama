@@ -1,0 +1,10 @@
+fun plus (x) {
+  fun f (y) {
+    return x + y
+  }
+
+  return f
+}
+
+write (plus(5)(6));
+write (plus(8)(10))
