@@ -1,0 +1,9 @@
+fun traverse (l) {
+  case l of
+    {} -> skip
+  | (f@#fun) : tl -> f (); traverse (tl)
+  | _ : tl -> traverse (tl)
+  esac
+}
+
+traverse ({1, fun () write(100), 2, 3, 4, 5, fun () write (200), 6, 7})
