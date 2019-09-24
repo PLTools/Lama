@@ -195,17 +195,18 @@ let compile (defs, p) =
       transform(Pattern.t)
         (fun fself ->
            object inherit [int list, _, (string * int list) list] @Pattern.t 
-             method c_Wildcard  path _      = []
-             method c_Named     path _ s p  = [s, path] @ fself path p
-             method c_Sexp      path _ x ps = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
-             method c_UnBoxed   _ _         = []
-             method c_StringTag _ _         = []
-             method c_String    _ _ _       = []
-             method c_SexpTag   _ _         = []
-             method c_Const     _ _ _       = []
-             method c_Boxed     _ _         = []
-             method c_ArrayTag  _ _         = []
-             method c_Array     path _ ps   = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
+             method c_Wildcard   path _      = []
+             method c_Named      path _ s p  = [s, path] @ fself path p
+             method c_Sexp       path _ x ps = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps
+             method c_UnBoxed    _ _         = []
+             method c_StringTag  _ _         = []
+             method c_String     _ _ _       = []
+             method c_SexpTag    _ _         = []
+             method c_Const      _ _ _       = []
+             method c_Boxed      _ _         = []
+             method c_ArrayTag   _ _         = []
+             method c_ClosureTag _ _         = []
+             method c_Array      path _ ps   = List.concat @@ List.mapi (fun i p -> fself (path @ [i]) p) ps                                            
            end)
         []
         p

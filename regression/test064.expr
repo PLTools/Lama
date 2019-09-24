@@ -1,0 +1,3 @@
+infixr "++" at "+" (a, b) {return a+b}
+
+write (infix "++" (2, 3))

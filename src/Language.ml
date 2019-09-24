@@ -223,6 +223,7 @@ module Pattern =
     (* any string value *) | StringTag
     (* any sexp value   *) | SexpTag
     (* any array value  *) | ArrayTag
+    (* any closure      *) | ClosureTag
     with show, foldl
 
     (* Pattern parser *)
@@ -253,6 +254,7 @@ module Pattern =
       | "#" %"string"                                {StringTag}
       | "#" %"sexp"                                  {SexpTag}
       | "#" %"array"                                 {ArrayTag}
+      | "#" %"fun"                                   {ClosureTag}
       | -"(" parse -")"
     )
 
@@ -295,6 +297,7 @@ module Expr =
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
     (* entering the scope         *) | Scope     of [`Global | `Local] * (string * [`Fun of string list * t | `Variable of t option]) list * t
+    (* lambda expression          *) | Lambda    of string list * t
     (* leave a scope              *) | Leave
     (* intrinsic (for evaluation) *) | Intrinsic of (t config -> t config)
     (* control (for control flow) *) | Control   of (t config -> t * t config) 
@@ -358,6 +361,12 @@ module Expr =
 
     let seq x = function Skip -> x | y -> Seq (x, y)
 
+    let infix_name infix =
+      let b = Buffer.create 64 in
+      Buffer.add_string b "__Infix_";
+      Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
+      Buffer.contents b
+
     let schedule_list h::tl =
       List.fold_left seq h tl
 
@@ -372,6 +381,8 @@ module Expr =
         Printf.eprintf "End Values\n%!"        
       in
       match expr with
+      | Lambda (args, body) ->
+         eval env (st, i, o, Value.Closure (args, body, st) ::vs) Skip k        
       | Scope (kind, defs, body) ->
          let vars, body, bnds =
            List.fold_left
@@ -470,6 +481,7 @@ module Expr =
                | Pattern.Boxed       , Value.Sexp  (_, _)
                | Pattern.StringTag   , Value.String _
                | Pattern.ArrayTag    , Value.Array  _
+               | Pattern.ClosureTag  , Value.Closure _                                           
                | Pattern.SexpTag     , Value.Sexp  (_, _)                                                  -> st
                | _                                                                                         -> None
              and match_list ps vs s =
@@ -627,6 +639,8 @@ module Expr =
         n:DECIMAL                                 => {notRef atr} => {ignore atr (Const n)}
       | s:STRING                                  => {notRef atr} => {ignore atr (String (unquote s))}
       | c:CHAR                                    => {notRef atr} => {ignore atr (Const  (Char.code c))}
+      | %"infix" s:STRING                         => {notRef atr} => {ignore atr (Var (infix_name @@ unquote s))}
+      | %"fun" "(" args:!(Util.list0)[ostap (STRING)] ")" body:parse[def][infix][Void]  => {notRef atr} => {ignore atr (Lambda (args, body))}
       | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
       | -"{" scope[`Local][def][infix][atr][parse def] -"}" 
       | "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} => {ignore atr (match es with
@@ -675,12 +689,6 @@ module Infix =
   struct
 
     type t = ([`Lefta | `Righta | `Nona] * ((Expr.atr -> (Expr.atr * Expr.atr)) * ((string * (Expr.t -> Expr.atr -> Expr.t -> Expr.t)) list))) array
-
-    let name infix =
-      let b = Buffer.create 64 in
-      Buffer.add_string b "__Infix_";
-      Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
-      Buffer.contents b
 
     let default : t =
       Array.map (fun (a, s) ->
@@ -765,7 +773,7 @@ module Definition =
       | ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
         l:$ op:(s:STRING {unquote s})
         md:position[ass][l#coord][op] {
-          let name = Infix.name op in
+          let name = Expr.infix_name op in
           match md (Expr.sem name) infix with
           | `Ok infix' -> name, infix'
           | `Fail msg  -> raise (Semantic_error msg)

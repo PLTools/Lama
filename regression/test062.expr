@@ -1,0 +1,20 @@
+fun a (x, y) {
+  local a = x + y, b = x - y;
+  {
+   local f = fun () {
+     write (x);
+     write (y);
+     write (a);
+     write (b)
+   };
+
+   a := 100;
+   b := 200;
+   x := 800;
+   y := 1000;
+   
+   return f
+  }
+}
+
+a (5, 7) ()
