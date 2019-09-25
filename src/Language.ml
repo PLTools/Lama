@@ -374,7 +374,7 @@ module Expr =
     | 0 -> fun rest  -> [], rest
     | n -> fun h::tl -> let tl', rest = take (n-1) tl in h :: tl', rest
 
-    let rec eval env ((st, i, o, vs) as conf) k expr =
+    let rec eval ((st, i, o, vs) as conf) k expr =
       let print_values vs =
         Printf.eprintf "Values:\n%!";
         List.iter (fun v -> Printf.eprintf "%s\n%!" @@ show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v) vs;
@@ -382,7 +382,7 @@ module Expr =
       in
       match expr with
       | Lambda (args, body) ->
-         eval env (st, i, o, Value.Closure (args, body, st) ::vs) Skip k        
+         eval (st, i, o, Value.Closure (args, body, st) ::vs) Skip k        
       | Scope (kind, defs, body) ->
          let vars, body, bnds =
            List.fold_left
@@ -393,7 +393,7 @@ module Expr =
              ([], body, [])
              (List.rev defs)
          in
-         eval env
+         eval
            ((match kind with
              | `Local  -> State.push st (State.from_list bnds) vars
              | `Global -> State.init st vars bnds
@@ -401,38 +401,38 @@ module Expr =
            k
            (match kind with `Global -> body | `Local -> Seq (body, Leave))
       | Unit ->
-         eval env (st, i, o, Value.Empty :: vs) Skip k
+         eval (st, i, o, Value.Empty :: vs) Skip k
       | Ignore s ->
-         eval env conf k (schedule_list [s; Intrinsic (fun (st, i, o, vs) -> (st, i, o, List.tl vs))])
+         eval conf k (schedule_list [s; Intrinsic (fun (st, i, o, vs) -> (st, i, o, List.tl vs))])
       | Control f ->
          let s, conf' = f conf in
-         eval env conf' k s
+         eval conf' k s
       | Intrinsic f ->
-         eval env (f conf) Skip k
+         eval (f conf) Skip k
       | Const n ->
-         eval env (st, i, o, (Value.of_int n) :: vs) Skip k
+         eval (st, i, o, (Value.of_int n) :: vs) Skip k
       | String s ->
-         eval env (st, i, o, (Value.of_string @@ Bytes.of_string s) :: vs) Skip k
+         eval (st, i, o, (Value.of_string @@ Bytes.of_string s) :: vs) Skip k
       | StringVal s ->
-         eval env conf k (schedule_list [s; Intrinsic (fun (st, i, o, s::vs) -> (st, i, o, (Value.of_string @@ Value.string_val s)::vs))])
+         eval conf k (schedule_list [s; Intrinsic (fun (st, i, o, s::vs) -> (st, i, o, (Value.of_string @@ Value.string_val s)::vs))])
       | Var x ->
-         eval env (st, i, o, (State.eval st x) :: vs) Skip k
+         eval (st, i, o, (State.eval st x) :: vs) Skip k
       | Ref x ->
-         eval env (st, i, o, (Value.Var x) :: vs) Skip k
+         eval (st, i, o, (Value.Var x) :: vs) Skip k
       | Array xs ->
-         eval env conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in Builtin.eval (st, i, o, vs') (List.rev es) ".array")]))
+         eval conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in Builtin.eval (st, i, o, vs') (List.rev es) ".array")]))
       | Sexp (t, xs) ->
-         eval env conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in (st, i, o, Value.Sexp (t, Array.of_list (List.rev es)) :: vs'))]))
+         eval conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in (st, i, o, Value.Sexp (t, Array.of_list (List.rev es)) :: vs'))]))
       | Binop (op, x, y) ->
-         eval env conf k (schedule_list [x; y; Intrinsic (fun (st, i, o, y::x::vs) -> (st, i, o, (Value.of_int @@ to_func op (Value.to_int x) (Value.to_int y)) :: vs))])
+         eval conf k (schedule_list [x; y; Intrinsic (fun (st, i, o, y::x::vs) -> (st, i, o, (Value.of_int @@ to_func op (Value.to_int x) (Value.to_int y)) :: vs))])
       | Elem (b, i) ->
-         eval env conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> Builtin.eval (st, i, o, vs) [b; j] ".elem")])
+         eval conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> Builtin.eval (st, i, o, vs) [b; j] ".elem")])
       | ElemRef (b, i) ->
-         eval env conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> (st, i, o, (Value.Elem (b, Value.to_int j))::vs))])
+         eval conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> (st, i, o, (Value.Elem (b, Value.to_int j))::vs))])
       | Length e ->
-         eval env conf k (schedule_list [e; Intrinsic (fun (st, i, o, v::vs) -> Builtin.eval (st, i, o, vs) [v] ".length")])
+         eval conf k (schedule_list [e; Intrinsic (fun (st, i, o, v::vs) -> Builtin.eval (st, i, o, vs) [v] ".length")])
       | Call (f, args) ->
-         eval env conf k (schedule_list (f :: args @ [Intrinsic (fun (st, i, o, vs) ->
+         eval conf k (schedule_list (f :: args @ [Intrinsic (fun (st, i, o, vs) ->
             let es, vs' = take (List.length args + 1) vs in
             let f :: es = List.rev es in
             (match f with
@@ -440,25 +440,25 @@ module Expr =
                 Builtin.eval (st, i, o, vs') es name
              | Value.Closure (args, body, closure) ->
                 let st' = State.push (State.leave st closure) (State.from_list @@ List.combine args es) (List.map (fun x -> x, true) args) in
-                let st'', i', o', vs'' = eval env (st', i, o, []) Skip body in
+                let st'', i', o', vs'' = eval (st', i, o, []) Skip body in
                 (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')                      
              | _ -> invalid_arg (Printf.sprintf "callee did not evaluate to a function: %s" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") f))
             ))]))
         
-      | Leave  -> eval env (State.drop st, i, o, vs) Skip k
+      | Leave  -> eval (State.drop st, i, o, vs) Skip k
       | Assign (x, e)  ->
-         eval env conf k (schedule_list [x; e; Intrinsic (fun (st, i, o, v::x::vs) -> (update st x v, i, o, v::vs))])
+         eval conf k (schedule_list [x; e; Intrinsic (fun (st, i, o, v::x::vs) -> (update st x v, i, o, v::vs))])
       | Seq (s1, s2) ->
-         eval env conf (seq s2 k) s1
+         eval conf (seq s2 k) s1
       | Skip ->
-         (match k with Skip -> conf | _ -> eval env conf Skip k)
+         (match k with Skip -> conf | _ -> eval conf Skip k)
       | If (e, s1, s2) ->
-         eval env conf k (schedule_list [e; Control (fun (st, i, o, e::vs) -> (if Value.to_int e <> 0 then s1 else s2), (st, i, o, vs))])
+         eval conf k (schedule_list [e; Control (fun (st, i, o, e::vs) -> (if Value.to_int e <> 0 then s1 else s2), (st, i, o, vs))])
       | While (e, s) ->
-         eval env conf k (schedule_list [e; Control (fun (st, i, o, e::vs) -> (if Value.to_int e <> 0 then seq s expr else Skip), (st, i, o, vs))])
+         eval conf k (schedule_list [e; Control (fun (st, i, o, e::vs) -> (if Value.to_int e <> 0 then seq s expr else Skip), (st, i, o, vs))])
       | Repeat (s, e) ->
-         eval env conf (seq (While (Binop ("==", e, Const 0), s)) k) s
-      | Return e -> (match e with None -> (st, i, o, []) | Some e -> eval env (st, i, o, []) Skip e)
+         eval conf (seq (While (Binop ("==", e, Const 0), s)) k) s
+      | Return e -> (match e with None -> (st, i, o, []) | Some e -> eval (st, i, o, []) Skip e)
       | Case (e, bs)->
          let rec branch ((st, i, o, v::vs) as conf) = function
          | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v))
@@ -492,9 +492,9 @@ module Expr =
              in
              match match_patt patt v (Some State.undefined) with
              | None     -> branch conf tl
-             | Some st' -> eval env (State.push st st' (List.map (fun x -> x, false) @@ Pattern.vars patt), i, o, vs) k (Seq (body, Leave))
+             | Some st' -> eval (State.push st st' (List.map (fun x -> x, false) @@ Pattern.vars patt), i, o, vs) k (Seq (body, Leave))
          in
-         eval env conf Skip (schedule_list [e; Intrinsic (fun conf -> branch conf bs)])
+         eval conf Skip (schedule_list [e; Intrinsic (fun conf -> branch conf bs)])
 
     (* Expression parser. You can use the following terminals:
 
@@ -801,7 +801,7 @@ type t = Definition.t list * Expr.t
    Takes a program and its input stream, and returns the output stream
 *)
 let eval expr i =
-  let _, _, o, _ = Expr.eval (object end) (State.empty, i, [], []) Skip expr in
+  let _, _, o, _ = Expr.eval (State.empty, i, [], []) Skip expr in
   o
 
 (* Top-level parser *)
