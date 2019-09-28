@@ -134,12 +134,6 @@ module State =
     (* empty state *)
     let empty = I
 
-    (* initialize empty state *)
-    let init st vars list =
-      match st with
-      | I -> G (vars @ Builtin.names, List.fold_left (fun s (name, value) -> bind name value s) (from_list list) (Builtin.bindings ()))
-      | _ -> invalid_arg "state already initialzied"
-    
     (* Scope operation: checks if a name is in a scope *)
     let in_scope x s = List.exists (fun (y, _) -> y = x) s
 
@@ -195,10 +189,13 @@ module State =
       | L (_, _, e) -> enter e xs
 
     (* Push a new local scope *)
-    let push st s xs = L (xs, s, st)
+    let push st s xs =
+      match st with
+      | I -> G (xs @ Builtin.names, List.fold_left (fun s (name, value) -> bind name value s) s (Builtin.bindings ()))
+      | _ -> L (xs, s, st)
 
     (* Drop a local scope *)
-    let drop (L (_, _, e)) = e
+    let drop = function L (_, _, e) -> e | G _ -> I
 
     (* Observe a variable in a state and print it to stderr *)
     let observe st x =
@@ -296,7 +293,7 @@ module Expr =
     (* return statement           *) | Return    of t option
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
-    (* entering the scope         *) | Scope     of [`Global | `Local] * (string * [`Fun of string list * t | `Variable of t option]) list * t
+    (* entering the scope         *) | Scope     of (string * [`Fun of string list * t | `Variable of t option]) list * t
     (* lambda expression          *) | Lambda    of string list * t
     (* leave a scope              *) | Leave
     (* intrinsic (for evaluation) *) | Intrinsic of (t config -> t config)
@@ -383,7 +380,7 @@ module Expr =
       match expr with
       | Lambda (args, body) ->
          eval (st, i, o, Value.Closure (args, body, st) ::vs) Skip k        
-      | Scope (kind, defs, body) ->
+      | Scope (defs, body) ->
          let vars, body, bnds =
            List.fold_left
              (fun (vs, bd, bnd) -> function
@@ -393,13 +390,7 @@ module Expr =
              ([], body, [])
              (List.rev defs)
          in
-         eval
-           ((match kind with
-             | `Local  -> State.push st (State.from_list bnds) vars
-             | `Global -> State.init st vars bnds
-            ), i, o, vs)
-           k
-           (match kind with `Global -> body | `Local -> Seq (body, Leave))
+         eval (State.push st (State.from_list bnds) vars, i, o, vs) k (Seq (body, Leave))
       | Unit ->
          eval (st, i, o, Value.Empty :: vs) Skip k
       | Ignore s ->
@@ -595,7 +586,7 @@ module Expr =
     ostap (
       parse[def][infix][atr]: h:basic[def][infix][Void] -";" t:parse[def][infix][atr] {Seq (h, t)}
                               | basic[def][infix][atr];
-      scope[kind][def][infix][atr][e]: <(d, infix')> : def[infix] expr:e[infix'][atr] {Scope (kind, d, expr)};
+      scope[def][infix][atr][e]: <(d, infix')> : def[infix] expr:e[infix'][atr] {Scope (d, expr)};
 
       basic[def][infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, f) -> ostap (- $(s)), f) l)) infix) (primary def infix) atr);
 
@@ -642,7 +633,7 @@ module Expr =
       | %"infix" s:STRING                         => {notRef atr} => {ignore atr (Var (infix_name @@ unquote s))}
       | %"fun" "(" args:!(Util.list0)[ostap (STRING)] ")" body:parse[def][infix][Void]  => {notRef atr} => {ignore atr (Lambda (args, body))}
       | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
-      | -"{" scope[`Local][def][infix][atr][parse def] -"}" 
+      | -"{" scope[def][infix][atr][parse def] -"}" 
       | "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} => {ignore atr (match es with
                                                                                       | [] -> Const 0
                                                                                       | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0))
@@ -655,22 +646,22 @@ module Expr =
 
       | {isVoid atr} => %"skip" {Skip}
 
-      | %"if" e:parse[def][infix][Val] %"then" the:scope[`Local][def][infix][atr][parse def]
-                                elif:(%"elif" parse[def][infix][Val] %"then" scope[`Local][def][infix][atr][parse def])*
-                                   %"else" els:scope[`Local][def][infix][atr][parse def] %"fi"
+      | %"if" e:parse[def][infix][Val] %"then" the:scope[def][infix][atr][parse def]
+                                elif:(%"elif" parse[def][infix][Val] %"then" scope[def][infix][atr][parse def])*
+                                   %"else" els:scope[def][infix][atr][parse def] %"fi"
                                                                      {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif els)}
-      | %"if" e:parse[def][infix][Val] %"then" the:scope[`Local][def][infix][Void][parse def]
-                             elif:(%"elif" parse[def][infix][Val] %"then" scope[`Local][def][infix][atr][parse def])*
+      | %"if" e:parse[def][infix][Val] %"then" the:scope[def][infix][Void][parse def]
+                             elif:(%"elif" parse[def][infix][Val] %"then" scope[def][infix][atr][parse def])*
                              => {isVoid atr} => %"fi"
                                                                      {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif Skip)}
 
-      | %"while" e:parse[def][infix][Val] %"do" s:scope[`Local][def][infix][Void][parse def]
+      | %"while" e:parse[def][infix][Val] %"do" s:scope[def][infix][Void][parse def]
                                             => {isVoid atr} => %"od" {While (e, s)}
 
-      | %"for" i:parse[def][infix][Void] "," c:parse[def][infix][Val] "," s:parse[def][infix][Void] %"do" b:scope[`Local][def][infix][Void][parse def] => {isVoid atr} => %"od"
+      | %"for" i:parse[def][infix][Void] "," c:parse[def][infix][Val] "," s:parse[def][infix][Void] %"do" b:scope[def][infix][Void][parse def] => {isVoid atr} => %"od"
                                                                      {Seq (i, While (c, Seq (b, s)))}
 
-      | %"repeat" s:scope[`Local][def][infix][Void][parse def] %"until" e:basic[def][infix][Val]
+      | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val]
                                                   => {isVoid atr} => {Repeat (s, e)}
       | %"return" e:basic[def][infix][Val]?            => {isVoid atr} => {Return e}
 
@@ -806,7 +797,7 @@ let eval expr i =
 
 (* Top-level parser *)
 ostap (
-  parse[infix]: !(Expr.scope `Global (definitions global) infix Expr.Void (Expr.parse (definitions local)));
+  parse[infix]: !(Expr.scope (definitions global) infix Expr.Void (Expr.parse (definitions local)));
   local: %"local" {`Local};
   global: %"global" {`Global};
   definitions[kind][infix]:

@@ -155,8 +155,26 @@ let run p i =
    Takes a program in the source language and returns an equivalent program for the
    stack machine
 *)
-let compile (defs, p) =
-  let label s = "L" ^ s in
+  
+let label s = "L" ^ s 
+
+class env =
+object (self : 'self)
+  val label_index = 0
+  val scope_index = 0
+  val globals     = ([] : string list)  
+            
+  method get_label = (label @@ string_of_int label_index), {< label_index = label_index + 1 >}
+                   
+  method push_scope (k : [`Global | `Local]) = self
+             
+  method pop_scope (k : [`Global | `Local]) = self
+             
+  method add_var (k : [`Global | `Local]) (name : string) = match k with `Global -> self | `Local -> self
+  method add_fun (k : [`Global | `Local]) (name : string) = match k with `Global -> self | `Local -> self
+end
+  
+let compile p =
   let rec pattern env lfalse = function
   | Pattern.Wildcard        -> env, false, [DROP]
   | Pattern.Named   (_, p)  -> pattern env lfalse p
@@ -231,6 +249,23 @@ let compile (defs, p) =
      let env, flag2, s2 = compile_list l   env es in
      add_code (env, flag1, s1) les flag2 s2
   and compile_expr l env = function
+    | Expr.Scope (ds, e)   ->
+       let k = `Global in
+     let env = env#push_scope k in
+     let env, e =
+       List.fold_left
+         (fun (env, e) ->
+           function
+           | name, `Fun _             -> env#add_fun k name, e 
+           | name, `Variable None     -> env#add_var k name, e
+           | name, `Variable (Some v) -> env#add_var k name, Expr.Seq (Expr.Assign (Expr.Ref name, v), e)
+         )
+         (env, e)
+         ds
+     in
+     let env, flag, code = compile_expr l env e in
+     env#pop_scope k, flag, code
+ 
   | Expr.Unit               -> env, false, [CONST 0]
                                
   | Expr.Ignore   s         -> let ls, env = env#get_label in
@@ -264,10 +299,7 @@ let compile (defs, p) =
                                add_code (compile_expr lsv env e) lsv false [CALL (".stringval", 1)]
 
   | Expr.Assign (x, e)      -> let lassn, env = env#get_label in
-                               add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]
-                               (* (match x with
-                                *  | Expr.Ref x -> add_code (compile_expr lassn env e) lassn false [ST x]
-                                *  | _          -> add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]) *)
+                               add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]                              
                              
   | Expr.Skip               -> env, false, []
 
@@ -334,12 +366,7 @@ let compile (defs, p) =
      in
      env, true, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] 
   in
-  let compile_def env (name, def) =
-    let args, stmt =
-      match def with
-      | `Fun (args, stmt) -> args, stmt
-      | _ -> invalid_arg "local definition"
-    in
+  let compile_fundef env (name, args, stmt) =
     let lend, env       = env#get_label in
     let env, flag, code = compile_expr lend env stmt in
     env,
@@ -348,18 +375,7 @@ let compile (defs, p) =
     (if flag then [LABEL lend] else []) @
     [END]
   in
-  let env =
-    object
-      val ls = 0
-      method get_label = (label @@ string_of_int ls), {< ls = ls + 1 >}
-    end
-  in
-  let env, def_code =
-    List.fold_left
-      (fun (env, code) (name, others) -> let env, code' = compile_def env (label name, others) in env, code'::code)
-      (env, [])
-      defs
-  in
+  let env       = new env in
   let lend, env = env#get_label in
   let _, flag, code = compile_expr lend env p in
-  (if flag then code @ [LABEL lend] else code) @ [END] @ (List.concat def_code) 
+  (if flag then code @ [LABEL lend] else code) @ [END] 

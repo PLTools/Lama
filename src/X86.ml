@@ -558,7 +558,7 @@ let genasm (ds, stmt) =
   let env, code =
     compile
       (new env)
-      ((LABEL "main") :: (BEGIN ("main", [], [])) :: SM.compile (ds, stmt))
+      ((LABEL "main") :: (BEGIN ("main", [], [])) :: [] (* TODO! SM.compile (ds, stmt) *))
   in
   let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
   let data = [Meta "\t.data";
