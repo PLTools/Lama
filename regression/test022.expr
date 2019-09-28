@@ -1,4 +1,4 @@
-global n, fib_1, fib_2, fib, i;
+local n, fib_1, fib_2, fib, i;
 
 n := read ();
 

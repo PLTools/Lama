@@ -1,4 +1,4 @@
-global x;
+local x;
 
 fun printString (s) {
   local i;

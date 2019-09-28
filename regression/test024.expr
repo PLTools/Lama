@@ -6,7 +6,7 @@ fun test2 (b) {
   a := b
 }
 
-global x, a, b;
+local x, a, b;
 
 x := read ();
 

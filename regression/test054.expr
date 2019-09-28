@@ -1,4 +1,4 @@
-global x, y, z, s, i, n;
+local x, y, z, s, i, n;
 
 x := y := z := 105;
 

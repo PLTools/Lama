@@ -1,4 +1,4 @@
-global n;
+local n;
 
 fun collect_ints_acc (v, tail) {
   local i;

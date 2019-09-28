@@ -1,4 +1,4 @@
-global x, m, n;
+local x, m, n;
 
 fun ack (m, n) {
   if m == 0 then return (n+1)

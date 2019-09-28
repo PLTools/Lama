@@ -119,8 +119,8 @@ module State =
     (* State: global state, local state, scope variables *)
     type 'a t =
     | I
-    | G of (string * bool) list * (string -> ('a, 'a t) Value.t)
-    | L of (string * bool) list * (string -> ('a, 'a t) Value.t) * 'a t
+    | G of (string * bool) list * (string -> 'a)
+    | L of (string * bool) list * (string -> 'a) * 'a t
       
     (* Undefined state *)
     let undefined x = failwith (Printf.sprintf "Undefined variable: %s" x)
@@ -265,7 +265,8 @@ module Expr =
     (* The type of configuration: a state, an input stream, an output stream,
        and a stack of values
     *)
-    type 'a config = 'a State.t * int list * int list * ('a, 'a State.t) Value.t list
+    type 'a value  = ('a, 'a value State.t) Value.t
+    type 'a config = 'a value State.t * int list * int list * 'a value list
 
     (* The type for expressions. Note, in regular OCaml there is no "@type..."
        notation, it came from GT.
@@ -770,8 +771,8 @@ module Definition =
           | `Fail msg  -> raise (Semantic_error msg)
       };
       local_var[infix][expr][def]: name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {name, `Variable value};
-      parse[kind][infix][expr][def]:
-        kind locs:!(Util.list (local_var infix expr def)) ";" {locs, infix}
+      parse[infix][expr][def]:
+        %"local" locs:!(Util.list (local_var infix expr def)) ";" {locs, infix}
       | <(name, infix')> : head[infix] "(" args:!(Util.list0 arg) ")"
          body:expr[def][infix'][Expr.Void] {
            [(name, `Fun (args, body))], infix'
@@ -797,10 +798,8 @@ let eval expr i =
 
 (* Top-level parser *)
 ostap (
-  parse[infix]: !(Expr.scope (definitions global) infix Expr.Void (Expr.parse (definitions local)));
-  local: %"local" {`Local};
-  global: %"global" {`Global};
-  definitions[kind][infix]:
-    <(def, infix')> : !(Definition.parse kind infix Expr.basic (definitions local)) <(defs, infix'')> : definitions[kind][infix'] {def @ defs, infix''}
+  parse[infix]: !(Expr.scope definitions infix Expr.Void (Expr.parse definitions));
+  definitions[infix]:
+    <(def, infix')> : !(Definition.parse infix Expr.basic definitions) <(defs, infix'')> : definitions[infix'] {def @ defs, infix''}
   | empty {[], infix}
 )

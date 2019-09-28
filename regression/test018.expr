@@ -1,4 +1,4 @@
-global n, c, p, q, i, m, d;
+local n, c, p, q, i, m, d;
 
 n := read ();
 

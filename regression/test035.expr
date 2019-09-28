@@ -1,4 +1,4 @@
-global n, x, i;
+local n, x, i;
 
 fun printArray (x) {
   local elem;

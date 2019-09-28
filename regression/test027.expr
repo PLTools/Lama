@@ -1,4 +1,4 @@
-global x, a, b, c;
+local x, a, b, c;
 
 fun print () {
   write (a);

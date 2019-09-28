@@ -1,4 +1,4 @@
-global n = 2, k = 10;
+local n = 2, k = 10;
 
 {local res = 1;
 while k > 0 do

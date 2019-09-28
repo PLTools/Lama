@@ -1,4 +1,4 @@
-global x, y, z;
+local x, y, z;
 
 fun zip (x) {
   case x of Pair (x, y) ->

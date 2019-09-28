@@ -1,4 +1,4 @@
-global x;
+local x;
 
 x:=0;
 if x

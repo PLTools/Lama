@@ -1,4 +1,4 @@
-global s, n, p;
+local s, n, p;
 
 s := 0;
 n := read ();

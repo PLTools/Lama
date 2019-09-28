@@ -1,4 +1,4 @@
-global n = read ();
+local n = read ();
 
 repeat
   

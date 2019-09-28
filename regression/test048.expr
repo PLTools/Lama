@@ -1,4 +1,4 @@
-global n, y;
+local n, y;
 
 fun test (n, m) {
   local i, s;

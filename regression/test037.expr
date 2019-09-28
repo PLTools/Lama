@@ -1,4 +1,4 @@
-global n, x, i;
+local n, x, i;
 
 fun sort (x) {
   local i, j, y, n;

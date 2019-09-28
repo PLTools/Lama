@@ -1,4 +1,4 @@
-global x, y, i, j;
+local x, y, i, j;
 
 fun printAS (x) {
   local i, j;

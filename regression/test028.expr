@@ -1,4 +1,4 @@
-global n, i, result;
+local n, i, result;
 
 fun fact (n) {
   if n <= 1

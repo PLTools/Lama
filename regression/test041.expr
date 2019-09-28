@@ -1,4 +1,4 @@
-global x;
+local x;
 
 fun f (a) {
   case a of

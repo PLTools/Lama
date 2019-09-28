@@ -1,4 +1,4 @@
-global x;
+local x;
 
 fun sum (x) {
   case x of

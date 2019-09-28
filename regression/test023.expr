@@ -1,4 +1,4 @@
-global s, n;
+local s, n;
 
 s := 0;
 

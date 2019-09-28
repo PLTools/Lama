@@ -1,4 +1,4 @@
-global i, n, result;
+local i, n, result;
 
 fun fib (n) {
   local r;

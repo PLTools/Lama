@@ -8,7 +8,7 @@ let parse infile =
     "while"; "do"; "od";
     "repeat"; "until";
     "for";
-    "fun"; "local"; "return"; "global";
+    "fun"; "local"; "return"; 
     "length";
     "string";
     "case"; "of"; "esac"; "when";
