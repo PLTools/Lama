@@ -9,8 +9,8 @@ check: $(TESTS)
 $(TESTS): %: %.expr
 	@echo $@
 #	@$(RC) $< && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log
-	cat $@.input | $(RC) -i $< > $@.log && diff $@.log orig/$@.log; true
-#	@cat $@.input | $(RC) -s $< > $@.log && diff $@.log orig/$@.log
+	cat $@.input | $(RC) -i $< > $@.log && diff $@.log orig/$@.log
+	@cat $@.input | $(RC) -s $< 2> /dev/null > $@.log && diff $@.log orig/$@.log; true
 
 clean:
 	$(RM) test*.log *.s *~ $(TESTS)

@@ -3,24 +3,24 @@ open Language
 
 (* The type for patters *)
 @type patt = StrCmp | String | Array | Sexp | Boxed | UnBoxed with show
-                                                                          
+
 (* The type for the stack machine instructions *)
 @type insn =
 (* binary operator                           *) | BINOP   of string
 (* put a constant on the stack               *) | CONST   of int
 (* put a string on the stack                 *) | STRING  of string
 (* create an S-expression                    *) | SEXP    of string * int
-(* load a variable to the stack              *) | LD      of string
-(* load a variable address to the stack      *) | LDA     of string
-(* store a value into a variable             *) | ST      of string
+(* load a variable to the stack              *) | LD      of Value.designation
+(* load a variable address to the stack      *) | LDA     of Value.designation
+(* store a value into a variable             *) | ST      of Value.designation
 (* store a value into a reference            *) | STI
 (* store a value into array/sexp/string      *) | STA                                  
 (* a label                                   *) | LABEL   of string
 (* unconditional jump                        *) | JMP     of string
 (* conditional jump                          *) | CJMP    of string * string
-(* begins procedure definition               *) | BEGIN   of string * string list * string list
+(* begins procedure definition               *) | BEGIN   of string * int * int
 (* end procedure definition                  *) | END
-(* calls a function/procedure                *) | CALL    of string * int 
+(* calls a function/procedure                *) | CALL    of int 
 (* returns from a function                   *) | RET     
 (* drops the top element off                 *) | DROP
 (* duplicates the top element                *) | DUP
@@ -28,19 +28,32 @@ open Language
 (* checks the tag and arity of S-expression  *) | TAG     of string * int
 (* checks the tag and size of array          *) | ARRAY   of int
 (* checks various patterns                   *) | PATT    of patt
-(* enters a scope                            *) | ENTER   of string list
-(* leaves a scope                            *) | LEAVE
 with show
                                                    
 (* The type for the stack machine program *)
-type prg = insn list
+@type prg = insn list with show
 
-let print_prg p = List.iter (fun i -> Printf.printf "%s\n" (show(insn) i)) p
-                            
-(* The type for the stack machine configuration: control stack, stack and configuration from statement
-   interpreter
+let print_prg p = List.iter (fun i -> Printf.eprintf "%s\n%!" (show(insn) i)) p;;
+
+(* Values *)
+@type value = (string, value array) Value.t with show
+      
+(* Local state of the SM *)
+@type local = { args : value array; locals : value array; closure : value array } with show
+
+(* Global state of the SM *)
+@type global = (string, value) arrow 
+
+(* Control stack *)
+@type control = (prg * local) list with show
+
+(* Data stack *)
+@type stack = value list with show
+           
+(* The type for the stack machine configuration: control stack, stack, global and local states, 
+   input and output streams
 *)
-type config = (prg * Expr.t State.t) list * (Expr.t, Expr.t State.t) Value.t list * (Expr.t State.t * int list * int list) 
+type config = control * stack * global * local * int list * int list 
 
 (* Stack machine interpreter
 
@@ -55,65 +68,96 @@ let split n l =
   | n -> let h::tl = rest in unzip (h::taken, tl) (n-1)
   in
   unzip ([], l) n
-          
-let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
- (*Printf.printf "Stack: %s\n" (show(list) (show(Value.t)) stack); *)
+
+let update glob loc z = function
+| Value.Global x -> State.bind x z glob
+| Value.Local  i -> loc.locals.(i) <- z; glob
+| Value.Arg    i -> loc.args.(i) <- z; glob
+| Value.Access i -> loc.closure.(i) <- z; glob 
+
+let print_stack memo s =
+  Printf.eprintf "Memo %!";
+  List.iter (fun v -> Printf.eprintf "%s " @@ show(value) v) s;
+  Printf.eprintf "\n%!"
+
+let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = function
 | [] -> conf
-| insn :: prg' ->
+| insn :: prg' -> 
    (match insn with
-    | BINOP  op               -> let y::x::stack' = stack in eval env (cstack, (Value.of_int @@ Expr.to_func op (Value.to_int x) (Value.to_int y)) :: stack', c) prg'
-    | CONST i                 -> eval env (cstack, (Value.of_int i)::stack, c) prg'
-    | STRING s                -> eval env (cstack, (Value.of_string @@ Bytes.of_string s)::stack, c) prg'
+    | BINOP  op               -> let y::x::stack' = stack in eval env (cstack, (Value.of_int @@ Expr.to_func op (Value.to_int x) (Value.to_int y)) :: stack', glob, loc, i, o) prg'
+    | CONST n                 -> eval env (cstack, (Value.of_int n)::stack, glob, loc, i, o) prg'
+    | STRING s                -> eval env (cstack, (Value.of_string @@ Bytes.of_string s)::stack, glob, loc, i, o) prg'
     | SEXP (s, n)             -> let vs, stack' = split n stack in                                 
-                                 eval env (cstack, (Value.sexp s @@ List.rev vs)::stack', c) prg'
-    | LD x                    -> eval env (cstack, State.eval st x :: stack, c) prg'
-    | LDA x                   -> eval env (cstack, (Value.Var x) :: stack, c) prg'
-    | ST  x                   -> let z::stack' = stack in eval env (cstack, z::stack', (State.update x z st, i, o)) prg'
-    | STI                     -> let z::r::stack' = stack in eval env (cstack, z::stack', (Expr.update st r z, i, o)) prg'
-    | STA                     -> let v::j::x::stack' = stack in eval env (cstack, v::stack', (Expr.update st (Value.Elem (x, Value.to_int j)) v, i, o)) prg'
+                                 eval env (cstack, (Value.sexp s @@ List.rev vs)::stack', glob, loc, i, o) prg'
+    | LD x                    -> eval env (cstack, (match x with
+                                                    | Value.Global x -> glob x
+                                                    | Value.Local  i -> loc.locals.(i)
+                                                    | Value.Arg    i -> loc.args.(i)
+                                                    | Value.Access i -> loc.closure.(i)) :: stack, glob, loc, i, o) prg'
+
+    | LDA x                   -> eval env (cstack, (Value.Var x) :: stack, glob, loc, i, o) prg'
+ 
+    | ST  x                   -> let z::stack' = stack in
+                                 eval env (cstack, z::stack', update glob loc z x, loc, i, o) prg'
+                                 
+    | STI                     -> let z::(Value.Var r)::stack' = stack in 
+                                 eval env (cstack, z::stack', update glob loc z r, loc, i, o) prg'
+
+    | STA                     -> let v::j::x::stack' = stack in
+                                 Value.update_elem x (Value.to_int j) v;
+                                 eval env (cstack, v::stack', glob, loc, i, o) prg'
+                                 
     | LABEL  _                -> eval env conf prg'
     | JMP    l                -> eval env conf (env#labeled l)
-    | CJMP  (c, l)            -> let x::stack' = stack in eval env (cstack, stack', (st, i, o)) (if (c = "z" && Value.to_int x = 0) || (c = "nz" && Value.to_int x <> 0) then env#labeled l else prg')
-    | CALL  (f, n)            -> if env#is_label f
-                                 then eval env ((prg', st)::cstack, stack, c) (env#labeled f)
-                                 else eval env (env#builtin conf f n) prg'
-    | BEGIN (_, args, locals) -> let vs, stack' = split (List.length args) stack in
-                                 let state      = List.combine args @@ List.rev vs in
-                                 eval env (cstack, stack', (List.fold_left (fun s (x, v) -> State.update x v s) (State.enter st (Obj.magic (args @ locals))) state, i, o)) prg' (* TODO *)
+    | CJMP  (c, l)            -> let x::stack' = stack in
+                                 eval env (cstack, stack', glob, loc, i, o) (if (c = "z" && Value.to_int x = 0) || (c = "nz" && Value.to_int x <> 0) then env#labeled l else prg')
+                                 
+    | CALL   n                -> let vs, stack' = split (n+1) stack in
+                                 let f::args    = List.rev vs   in
+                                 let args       = List.rev args in
+                                 (match f with
+                                  | Value.Builtin f         -> eval env (env#builtin f args ((cstack, stack', glob, loc, i, o) : config)) prg'
+                                  | Value.Closure (_, f, _) -> eval env ((prg', loc)::cstack, stack, glob, loc, i, o) (env#labeled f)
+                                 )
+                               
+    | BEGIN (_, args, locals) -> let vs, stack' = split (args+1) stack in
+                                 let _ :: aargs = List.rev vs in
+                                 let aargs      = aargs       in
+                                 eval env (cstack, stack', glob, {args    = Array.init args (fun i -> List.nth aargs i);
+                                                                  locals  = Array.init locals (fun _ -> Value.Empty);
+                                                                  closure = [||]}, i, o) prg'
+                                 
     | END                     -> (match cstack with
-                                  | (prg', st')::cstack' -> eval env (cstack', Value.Empty :: stack, (State.leave st st', i, o)) prg'
-                                  | []                   -> conf
+                                  | (prg', loc')::cstack' -> eval env (cstack', Value.Empty :: stack, glob, loc', i, o) prg'
+                                  | []                    -> conf
                                  )
   
     | RET                     -> (match cstack with
-                                  | (prg', st')::cstack' -> eval env (cstack', stack, (State.leave st st', i, o)) prg'
-                                  | []                   -> conf
+                                  | (prg', loc')::cstack' -> eval env (cstack', stack, glob, loc', i, o) prg'
+                                  | []                    -> conf
                                  )
                                
-    | DROP                    -> eval env (cstack, List.tl stack, c) prg'
-    | DUP                     -> eval env (cstack, List.hd stack :: stack, c) prg'
+    | DROP                    -> eval env (cstack, List.tl stack, glob, loc, i, o) prg'
+    | DUP                     -> eval env (cstack, List.hd stack :: stack, glob, loc, i, o) prg'
     | SWAP                    -> let x::y::stack' = stack in
-                                 eval env (cstack, y::x::stack', c) prg'
+                                 eval env (cstack, y::x::stack', glob, loc, i, o) prg'
     | TAG (t, n)              -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp (t', a) when t' = t && Array.length a = n -> 1 | _ -> 0) :: stack', c) prg'
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp (t', a) when t' = t && Array.length a = n -> 1 | _ -> 0) :: stack', glob, loc, i, o) prg'
     | ARRAY n                 -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Array a when Array.length a = n -> 1 | _ -> 0) :: stack', c) prg'
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Array a when Array.length a = n -> 1 | _ -> 0) :: stack', glob, loc, i, o) prg'
     | PATT StrCmp             -> let x::y::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x, y with (Value.String xs, Value.String ys) when xs = ys -> 1 | _ -> 0) :: stack', c) prg'                                      
+                                 eval env (cstack, (Value.of_int @@ match x, y with (Value.String xs, Value.String ys) when xs = ys -> 1 | _ -> 0) :: stack', glob, loc, i, o) prg'               
     | PATT Array              -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Array _ -> 1 | _ -> 0) :: stack', c) prg'
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Array _ -> 1 | _ -> 0) :: stack', glob, loc, i, o) prg'
     | PATT String             -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.String _ -> 1 | _ -> 0) :: stack', c) prg'
+                                 eval env (cstack, (Value.of_int @@ match x with Value.String _ -> 1 | _ -> 0) :: stack', glob, loc, i, o) prg'
     | PATT Sexp               -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp _ -> 1 | _ -> 0) :: stack', c) prg'
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Sexp _ -> 1 | _ -> 0) :: stack', glob, loc, i, o) prg'
     | PATT Boxed              -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 0 | _ -> 1) :: stack', c) prg'
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 0 | _ -> 1) :: stack', glob, loc, i, o) prg'
     | PATT UnBoxed            -> let x::stack' = stack in
-                                 eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 1 | _ -> 0) :: stack', c) prg'
-    | ENTER xs                -> let vs, stack' = split (List.length xs) stack in
-                                 eval env (cstack, stack', (State.push st (List.fold_left (fun s (x, v) -> State.bind x v s) State.undefined (List.combine xs vs)) (Obj.magic xs), i, o)) prg' (* TODO *)
-    | LEAVE                   -> eval env (cstack, stack, (State.drop st, i, o)) prg'
-   ) 
+                                 eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 1 | _ -> 0) :: stack', glob, loc, i, o) prg'
+   )
 
 (* Top-level evaluation
 
@@ -121,32 +165,29 @@ let rec eval env ((cstack, stack, ((st, i, o) as c)) as conf) = function
 
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
-let run p i =
+let run p i = 
   (* print_prg p; *)
   let module M = Map.Make (String) in
-  let rec make_map m = function
-  | []              -> m
-  | (LABEL l) :: tl -> make_map (M.add l tl m) tl
-  | _ :: tl         -> make_map m tl
+  let rec make_env (m, s) = function
+  | []              -> (m, s)
+  | (LABEL l) :: tl -> make_env (M.add l tl m, State.bind l (Value.Closure ([], l, [||])) s) tl
+  | _ :: tl         -> make_env (m, s) tl
   in
-  let m = make_map M.empty p in
-  let (_, _, (_, _, o)) =
+  let m, glob = make_env (M.empty, State.undefined) p in
+  let (_, _, _, _, i, o) =
     eval
-      (object
+      object
          method is_label l = M.mem l m
          method labeled l = M.find l m
-         method builtin (cstack, stack, (st, i, o)) f n =
+         method builtin f args ((cstack, stack, glob, loc, i, o) as conf : config) = 
            let f = match f.[0] with 'L' -> String.sub f 1 (String.length f - 1) | _ -> f in
-           let args, stack' = split n stack in
-           let (st, i, o, r) = Language.Builtin.eval (st, i, o, []) (List.rev args) f in
-           (*Printf.printf "Builtin:\n";*)
-           (cstack, (match r with [r] -> r::stack' | _ -> Value.Empty :: stack'), (st, i, o))
-       end
-      )
-      ([], [], (State.empty (* TODO! *), i, []))
+           let (st, i, o, r) = Language.Builtin.eval (State.I, i, o, []) (List.map Obj.magic @@ List.rev args) f in
+           (cstack, (match r with [r] -> (Obj.magic r)::stack | _ -> Value.Empty :: stack), glob, loc, i, o)
+       end      
+      ([], [Value.Closure ([], "main", [||])], (List.fold_left (fun s (name, value) -> State.bind name value s) glob (Builtin.bindings ())), {locals=[||]; args=[||]; closure=[||]}, i, [])
       p
   in
-  o
+  o 
 
 (* Stack machine compiler
 
@@ -154,24 +195,97 @@ let run p i =
 
    Takes a program in the source language and returns an equivalent program for the
    stack machine
-*)
-  
-let label s = "L" ^ s 
+*)  
+let label s         = "L" ^ s
+let scope_label i s = label s ^ "_" ^ string_of_int i
 
+let check_name_and_add names name mut =
+  if List.exists (fun (n, _) -> n = name) names
+  then invalid_arg (Printf.sprintf "name %s is already defined in the scope\n" name)
+  else (name, mut) :: names
+  
 class env =
 object (self : 'self)
   val label_index = 0
   val scope_index = 0
-  val globals     = ([] : string list)  
+  val local_index = 0
+  val arg_index   = 0
+  val nlocals     = 0
+  val st          = (State.I : Value.designation State.t)
+  val fundefs     = ([] : (string * string list * Expr.t * Value.designation State.t) list)
             
   method get_label = (label @@ string_of_int label_index), {< label_index = label_index + 1 >}
-                   
-  method push_scope (k : [`Global | `Local]) = self
-             
-  method pop_scope (k : [`Global | `Local]) = self
-             
-  method add_var (k : [`Global | `Local]) (name : string) = match k with `Global -> self | `Local -> self
-  method add_fun (k : [`Global | `Local]) (name : string) = match k with `Global -> self | `Local -> self
+
+  method nargs   = arg_index
+  method nlocals = nlocals
+                     
+  method push_scope = {<
+    scope_index = scope_index + 1;
+    st = match st with
+         | State.I -> State.G (Builtin.names, List.fold_left (fun s (name, value) -> State.bind name (Value.Global name) s) State.undefined (Builtin.bindings ()))
+         | _       -> State.L ([], State.undefined, st)
+  >}
+                    
+  method pop_scope =
+    match st with
+    | State.G _ -> {< st = State.I >}
+    | State.L (xs, _, x) -> {< st = x; local_index = local_index - List.length xs >}
+
+  method init_fun_scope (st' : Value.designation State.t) =
+   {< st = st'; arg_index = 0; local_index = 0; nlocals = 0 >} # push_scope
+           
+  method add_arg (name : string) = {<
+    st = (match st with
+          | State.I | State.G _ ->
+             invalid_arg "wrong scope in add_arg"
+          | State.L (names, s, p) ->
+             State.L (check_name_and_add names name true, State.bind name (Value.Arg arg_index) s, p));
+    arg_index = arg_index + 1 
+  >}
+                                 
+  method add_name (name : string) (mut : bool) = {<
+    st = (match st with
+          | State.I ->
+             invalid_arg "uninitialized scope"
+          | State.G (names, s)    ->
+             State.G (check_name_and_add names name mut, State.bind name (Value.Global name) s)
+          | State.L (names, s, p) ->
+             State.L (check_name_and_add names name mut, State.bind name (Value.Local local_index) s, p));
+    local_index = (match st with State.L _ -> local_index + 1 | _ -> local_index);
+    nlocals     = (match st with State.L _ -> max (local_index + 1) nlocals | _ -> nlocals) 
+  >}
+
+  method fun_internal_name (name : string) =
+    (match st with State.G _ -> label | _ -> scope_label scope_index) name 
+    
+  method add_fun_name (name : string) =
+    let name' = self#fun_internal_name name in
+    let st'   =
+      match st with
+      | State.I ->
+         invalid_arg "uninitialized scope"
+      | State.G (names, s) ->
+         State.G (check_name_and_add names name false, State.bind name (Value.Global name') s)
+      | State.L (names, s, p) ->
+         State.L (check_name_and_add names name false, State.bind name (Value.Global name') s, p)        
+    in
+    {<
+      st = st'
+    >}
+    
+  method add_fun (name : string) (args : string list) (body : Expr.t) =
+    let name' = self#fun_internal_name name in
+    {<
+      fundefs = (name', args, body, st) :: fundefs
+    >}
+
+  method lookup name = State.eval st name    
+    
+  method next_definition =
+    match fundefs with
+    | [] -> None
+    | (name, args, body, st) :: rest -> Some ({< fundefs = rest>}, (name, args, body, st))
+    
 end
   
 let compile p =
@@ -202,13 +316,13 @@ let compile p =
       List.fold_left
         (fun (i, env, code) p ->
            let env, _, pcode = pattern env ldrop p in
-           i+1, env, ([DUP; CONST i; CALL (".elem", 2)] @ pcode) :: code
+           i+1, env, ([DUP; LD (Value.Global ".elem"); SWAP; CONST i; CALL 2] @ pcode) :: code
         )
         (0, env, [])
         ps
     in
     List.flatten (List.rev code), env            
-  and bindings p =
+  and bindings env p =
     let bindings =
       transform(Pattern.t)
         (fun fself ->
@@ -229,16 +343,19 @@ let compile p =
         []
         p
     in
-    List.concat 
-      (List.map
-        (fun (name, path) ->
-           [DUP] @
-           List.concat (List.map (fun i -> [CONST i; CALL (".elem", 2)]) path) @
-           [SWAP]
+    let env, code =
+      List.fold_left
+        (fun (env, acc) (name, path) ->
+           let env = env#add_name name true in
+           env,
+           ([DUP] @
+            List.concat (List.map (fun i -> [LD (Value.Global ".elem"); SWAP; CONST i; CALL 2]) path) @
+            [ST (env#lookup name); DROP]) :: acc
         )
+        (env, [])
         (List.rev bindings)
-      ) @
-    [DROP; ENTER (List.map fst bindings)]
+    in      
+    env, (List.flatten code) @ [DROP]
   and add_code (env, flag, s) l f s' = env, f, s @ (if flag then [LABEL l] else []) @ s'
   and compile_list l env = function
   | []    -> env, false, []
@@ -249,22 +366,22 @@ let compile p =
      let env, flag2, s2 = compile_list l   env es in
      add_code (env, flag1, s1) les flag2 s2
   and compile_expr l env = function
-    | Expr.Scope (ds, e)   ->
-       let k = `Global in
-     let env = env#push_scope k in
-     let env, e =
+  | Expr.Scope (ds, e)  ->
+     let env = env#push_scope in
+     let env, e, funs =
        List.fold_left
-         (fun (env, e) ->
+         (fun (env, e, funs) ->
            function
-           | name, `Fun _             -> env#add_fun k name, e 
-           | name, `Variable None     -> env#add_var k name, e
-           | name, `Variable (Some v) -> env#add_var k name, Expr.Seq (Expr.Assign (Expr.Ref name, v), e)
+           | name, `Fun (args, b)     -> env#add_fun_name name, e, (name, args, b) :: funs
+           | name, `Variable None     -> env#add_name name true, e, funs
+           | name, `Variable (Some v) -> env#add_name name true, Expr.Seq (Expr.Ignore (Expr.Assign (Expr.Ref name, v)), e), funs
          )
-         (env, e)
-         ds
+         (env, e, [])
+         (List.rev ds)
      in
+     let env = List.fold_left (fun env (name, args, b) -> env#add_fun name args b) env funs in
      let env, flag, code = compile_expr l env e in
-     env#pop_scope k, flag, code
+     env#pop_scope, flag, code
  
   | Expr.Unit               -> env, false, [CONST 0]
                                
@@ -272,31 +389,30 @@ let compile p =
                                add_code (compile_expr ls env s) ls false [DROP]                             
 
   | Expr.ElemRef (x, i)     -> compile_list l env [x; i]                               
-  | Expr.Var      x         -> env, false, [LD x]
-  | Expr.Ref      x         -> env, false, [LDA x]
+  | Expr.Var      x         -> env, false, [LD (env#lookup x)]
+  | Expr.Ref      x         -> env, false, [LDA (env#lookup x)]
   | Expr.Const    n         -> env, false, [CONST n]
   | Expr.String   s         -> env, false, [STRING s]
   | Expr.Binop (op, x, y)   -> let lop, env = env#get_label in
                                add_code (compile_list lop env [x; y]) lop false [BINOP op]
                                  
-  | Expr.Call  (f, args)    -> let Expr.Var fn = f in
-                               let lcall, env = env#get_label in
-                               add_code (compile_list lcall env args) lcall false [CALL (label fn, List.length args)]
+  | Expr.Call  (f, args)    -> let lcall, env = env#get_label in
+                               add_code (compile_list lcall env (f :: args)) lcall false [CALL (List.length args)]                               
                                     
   | Expr.Array  xs          -> let lar, env = env#get_label in
-                               add_code (compile_list lar env xs) lar false [CALL (".array", List.length xs)]
+                               add_code (compile_list lar env ((Expr.Var ".array") :: xs)) lar false [CALL (List.length xs)]
                                
   | Expr.Sexp (t, xs)       -> let lsexp, env = env#get_label in
                                add_code (compile_list lsexp env xs) lsexp false [SEXP (t, List.length xs)]
                              
   | Expr.Elem (a, i)        -> let lelem, env = env#get_label in
-                               add_code (compile_list lelem env [a; i]) lelem false [CALL (".elem", 2)]
+                               add_code (compile_list lelem env [Expr.Var ".elem"; a; i]) lelem false [CALL 2]
                                
   | Expr.Length e           -> let llen, env = env#get_label in
-                               add_code (compile_expr llen env e) llen false [CALL (".length", 1)]
+                               add_code (compile_list llen env [Expr.Var ".length"; e]) llen false [CALL 1]
                                
   | Expr.StringVal e        -> let lsv, env = env#get_label in
-                               add_code (compile_expr lsv env e) lsv false [CALL (".stringval", 1)]
+                               add_code (compile_list lsv env [Expr.Var ".stringval"; e]) lsv false [CALL 1]
 
   | Expr.Assign (x, e)      -> let lassn, env = env#get_label in
                                add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]                              
@@ -331,17 +447,20 @@ let compile p =
                                
   | Expr.Return None        -> env, false, [CONST 0; RET]
 
-  | Expr.Leave              -> env, false, [LEAVE]
+  | Expr.Leave              -> env, false, []
                                              
   | Expr.Case (e, [p, s]) ->
      let lexp , env          = env#get_label in
      let ldrop, env          = env#get_label in
      let env, fe     , se    = compile_expr lexp env e in
      let env, ldrop' , pcode = pattern env ldrop p in
-     let env, ldrop'', scode = compile_expr ldrop env (Expr.Seq (s, Expr.Leave))  in
+     let env                 = env#push_scope in
+     let env, bindcode       = bindings env p in
+     let env, ldrop'', scode = compile_expr ldrop env s in
+     let env                 = env#pop_scope in
      if ldrop' || ldrop''
-     then env, true , se @ (if fe then [LABEL lexp] else []) @ [DUP] @ pcode @ bindings p @ scode @ [JMP l; LABEL ldrop; DROP]
-     else env, false, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ pcode @ bindings p @ scode 
+     then env, true , se @ (if fe then [LABEL lexp] else []) @ [DUP] @ pcode @ bindcode @ scode @ [JMP l; LABEL ldrop; DROP]
+     else env, false, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ pcode @ bindcode @ scode 
                                     
   | Expr.Case (e, brs) ->
      let n         = List.length brs - 1 in
@@ -358,24 +477,37 @@ let compile p =
                  else env#get_label, [JMP l]
                in
                let env, lfalse', pcode = pattern env lfalse p in
-               let env, l'     , scode = compile_expr l env (Expr.Seq (s, Expr.Leave)) in
-               (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l; DUP]) @ pcode @ bindings p @ scode @ jmp) :: code, lfalse')
+               let env                 = env#push_scope in
+               let env, bindcode       = bindings env p in
+               let env, l'     , scode = compile_expr l env s in
+               let env                 = env#pop_scope in
+               (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l; DUP]) @ pcode @ bindcode @ scode @ jmp) :: code, lfalse')
              else acc
          )
          (env, None, 0, [], true) brs
      in
      env, true, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] 
   in
-  let compile_fundef env (name, args, stmt) =
+  let compile_fundef env (name, args, stmt, st) =
+    let env             = env#init_fun_scope st in
+    let env             = List.fold_left (fun env arg -> env#add_arg arg) env args in 
     let lend, env       = env#get_label in
-    let env, flag, code = compile_expr lend env stmt in
-    env,
-    [LABEL name; BEGIN (name, args, [])] @
+    let env, flag, code = compile_expr lend env stmt in    
+    env#pop_scope,
+    [LABEL name; BEGIN (name, env#nargs, env#nlocals)] @
     code @
     (if flag then [LABEL lend] else []) @
     [END]
   in
-  let env       = new env in
-  let lend, env = env#get_label in
-  let _, flag, code = compile_expr lend env p in
-  (if flag then code @ [LABEL lend] else code) @ [END] 
+  let rec compile_fundefs acc env =
+    match env#next_definition with
+    | None            -> List.flatten @@ List.rev acc
+    | Some (env, def) ->
+       let env, code = compile_fundef env def in
+       compile_fundefs (code :: acc) env
+  in
+  let env             = new env in
+  let lend, env       = env#get_label in
+  let env, flag, code = compile_expr lend env p in
+  let prg = compile_fundefs [[BEGIN ("main", 0, env#nlocals)] @(if flag then code @ [LABEL lend] else code) @ [END]] env in
+  print_prg prg; prg

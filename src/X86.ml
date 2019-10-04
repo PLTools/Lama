@@ -120,7 +120,7 @@ let compile env code =
   | ">=" -> "ge"
   | ">"  -> "g"
   | _    -> failwith "unknown operator"
-  in
+  in (*
   let rec compile' env scode =
     let on_stack = function S _ -> true | _ -> false in
     let mov x s = if on_stack x && on_stack s then [Mov (x, eax); Mov (eax, s)] else [Mov (x, s)]  in
@@ -380,7 +380,8 @@ let compile env code =
 	env'', [Meta (Printf.sprintf "# %s / % s" (GT.show(SM.insn) instr) stack)] @ code' @ code''
   in
   compile' env code
-
+      *) invalid_arg "not implemented"
+  
 (* A set of strings *)
 module S = Set.Make (String)
 
@@ -558,7 +559,7 @@ let genasm (ds, stmt) =
   let env, code =
     compile
       (new env)
-      ((LABEL "main") :: (BEGIN ("main", [], [])) :: [] (* TODO! SM.compile (ds, stmt) *))
+      ((LABEL "main") :: (BEGIN ("main", 0, 0)) :: [] (* TODO! SM.compile (ds, stmt) *))
   in
   let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
   let data = [Meta "\t.data";

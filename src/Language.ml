@@ -16,9 +16,17 @@ let unquote s = String.sub s 1 (String.length s - 2)
 module Value =
   struct
 
+    (* The type for name designation: global or local variable, argument, reference to closure, etc. *)
+    @type designation =
+    | Global of string
+    | Local  of int
+    | Arg    of int
+    | Access of int
+    with show   
+
     @type ('a, 'b) t =
     | Empty
-    | Var     of string
+    | Var     of designation
     | Elem    of ('a, 'b) t * int
     | Int     of int
     | String  of bytes
@@ -320,7 +328,7 @@ module Expr =
     (* Update state *)
     let update st x v =      
       match x with
-      | Value.Var x       -> State.update x v st
+      | Value.Var (Value.Global x) -> State.update x v st
       | Value.Elem (x, i) -> Value.update_elem x i v; st
       | _                 -> invalid_arg (Printf.sprintf "invalid value %s in update" @@ show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") x)
 
@@ -385,7 +393,7 @@ module Expr =
          let vars, body, bnds =
            List.fold_left
              (fun (vs, bd, bnd) -> function
-              | (name, `Variable value) -> (name, true) :: vs, (match value with None -> bd | Some v -> Seq (Assign (Ref name, v), bd)), bnd
+              | (name, `Variable value) -> (name, true) :: vs, (match value with None -> bd | Some v -> Seq (Ignore (Assign (Ref name, v)), bd)), bnd
               | (name, `Fun (args, b))  -> (name, false) :: vs, bd, (name, Value.Closure (args, b, st)) :: bnd
              )
              ([], body, [])
@@ -410,7 +418,7 @@ module Expr =
       | Var x ->
          eval (st, i, o, (State.eval st x) :: vs) Skip k
       | Ref x ->
-         eval (st, i, o, (Value.Var x) :: vs) Skip k
+         eval (st, i, o, (Value.Var (Value.Global x)) :: vs) Skip k
       | Array xs ->
          eval conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in Builtin.eval (st, i, o, vs') (List.rev es) ".array")]))
       | Sexp (t, xs) ->
