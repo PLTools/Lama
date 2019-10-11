@@ -41,10 +41,13 @@ let main =
     match (try parse infile with Language.Semantic_error msg -> `Fail msg) with
     | `Ok prog ->
        if to_compile
-       then
+       then (
          let basename = Filename.chop_suffix infile ".expr" in
          (* ignore @@ X86.build prog basename *) (* TODO! *) ()
-       else
+       )
+       else (
+         (* Printf.printf "Program:\n%s\n" (GT.show(Language.Expr.t) prog);*)
+         (*Format.printf "Program\n%s\n%!" (HTML.toHTML ((GT.html(Language.Expr.t)) prog));*)
 	 let rec read acc =
 	   try
 	     let r = read_int () in
@@ -59,6 +62,7 @@ let main =
 	   else SM.run (SM.compile prog) input
 	 in
 	 List.iter (fun i -> Printf.printf "%d\n" i) output
+       )
     | `Fail er -> Printf.eprintf "Error: %s\n" er
 (*  with Invalid_argument _ ->
     Printf.printf "Usage: rc [-i | -s] <input file.expr>\n"

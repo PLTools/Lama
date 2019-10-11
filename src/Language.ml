@@ -2,6 +2,7 @@
    The library provides "@type ..." syntax extension and plugins like show, etc.
 *)
 module OrigList = List
+
 open GT
 
 (* Opening a library for combinator-based syntax analysis *)
@@ -22,7 +23,8 @@ module Value =
     | Local  of int
     | Arg    of int
     | Access of int
-    with show   
+    | Fun    of string
+    with show,html   
 
     @type ('a, 'b) t =
     | Empty
@@ -33,8 +35,9 @@ module Value =
     | Array   of ('a, 'b) t array
     | Sexp    of string * ('a, 'b) t array
     | Closure of string list * 'a * 'b
+    | FunRef  of string * string list * 'a * int
     | Builtin of string
-    with show
+    with show,html
 
     let to_int = function
     | Int n -> n
@@ -125,11 +128,30 @@ module State =
   struct
 
     (* State: global state, local state, scope variables *)
-    type 'a t =
+    @type 'a t =
     | I
-    | G of (string * bool) list * (string -> 'a)
-    | L of (string * bool) list * (string -> 'a) * 'a t
-      
+    | G of (string * bool) list * (string, 'a) arrow
+    | L of (string * bool) list * (string, 'a) arrow * 'a t
+    with show,html
+
+    (* Get the depth level of a state *)
+    let rec level = function
+    | I            -> 0
+    | G _          -> 1
+    | L (_, _, st) -> 1 + level st
+
+    (* Prune state to a certain level *)
+    let prune st n =
+      let rec inner n st =
+        match st with
+        | I              -> st, 0
+        | G (xs, s)      -> st, 1
+        | L (xs, s, st') ->
+           let st'', l = inner n st' in
+           (if l >= n then st'' else st), l+1
+      in
+      fst @@ inner n st
+                    
     (* Undefined state *)
     let undefined x = failwith (Printf.sprintf "Undefined variable: %s" x)
 
@@ -229,7 +251,7 @@ module Pattern =
     (* any sexp value   *) | SexpTag
     (* any array value  *) | ArrayTag
     (* any closure      *) | ClosureTag
-    with show, foldl
+    with show, foldl, html
 
     (* Pattern parser *)
     ostap (
@@ -273,13 +295,12 @@ module Expr =
     (* The type of configuration: a state, an input stream, an output stream,
        and a stack of values
     *)
-    type 'a value  = ('a, 'a value State.t) Value.t
-    type 'a config = 'a value State.t * int list * int list * 'a value list
-
+    @type 'a value  = ('a, 'a value State.t) Value.t with show,html
+    @type 'a config = 'a value State.t * int list * int list * 'a value list with show,html
     (* The type for expressions. Note, in regular OCaml there is no "@type..."
        notation, it came from GT.
     *)
-    type t =
+    @type t =
     (* integer constant           *) | Const     of int
     (* array                      *) | Array     of t list
     (* string                     *) | String    of string
@@ -302,11 +323,13 @@ module Expr =
     (* return statement           *) | Return    of t option
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
-    (* entering the scope         *) | Scope     of (string * [`Fun of string list * t | `Variable of t option]) list * t
+    (* entering the scope         *) | Scope     of (string * decl) list * t
     (* lambda expression          *) | Lambda    of string list * t
     (* leave a scope              *) | Leave
-    (* intrinsic (for evaluation) *) | Intrinsic of (t config -> t config)
-    (* control (for control flow) *) | Control   of (t config -> t * t config) 
+    (* intrinsic (for evaluation) *) | Intrinsic of (t config, t config) arrow
+    (* control (for control flow) *) | Control   of (t config, t * t config) arrow
+    and decl = [`Fun of string list * t | `Variable of t option]
+    with show,html
 
     (* Reff : parsed expression should return value Reff (look for ":=");
        Val : -//- returns simple value;
@@ -394,7 +417,7 @@ module Expr =
            List.fold_left
              (fun (vs, bd, bnd) -> function
               | (name, `Variable value) -> (name, true) :: vs, (match value with None -> bd | Some v -> Seq (Ignore (Assign (Ref name, v)), bd)), bnd
-              | (name, `Fun (args, b))  -> (name, false) :: vs, bd, (name, Value.Closure (args, b, st)) :: bnd
+              | (name, `Fun (args, b))  -> (name, false) :: vs, bd, (name, Value.FunRef (name, args, b, 1 + State.level st)) :: bnd
              )
              ([], body, [])
              (List.rev defs)
@@ -416,7 +439,13 @@ module Expr =
       | StringVal s ->
          eval conf k (schedule_list [s; Intrinsic (fun (st, i, o, s::vs) -> (st, i, o, (Value.of_string @@ Value.string_val s)::vs))])
       | Var x ->
-         eval (st, i, o, (State.eval st x) :: vs) Skip k
+         let v =
+           match State.eval st x with
+           | Value.FunRef (_, args, body, level) ->
+              Value.Closure (args, body, State.prune st level)
+           | v -> v
+         in
+         eval (st, i, o, v :: vs) Skip k
       | Ref x ->
          eval (st, i, o, (Value.Var (Value.Global x)) :: vs) Skip k
       | Array xs ->
@@ -640,7 +669,7 @@ module Expr =
       | s:STRING                                  => {notRef atr} => {ignore atr (String (unquote s))}
       | c:CHAR                                    => {notRef atr} => {ignore atr (Const  (Char.code c))}
       | %"infix" s:STRING                         => {notRef atr} => {ignore atr (Var (infix_name @@ unquote s))}
-      | %"fun" "(" args:!(Util.list0)[ostap (STRING)] ")" body:parse[def][infix][Void]  => {notRef atr} => {ignore atr (Lambda (args, body))}
+      | %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" body:basic[def][infix][Void]  => {notRef atr} => {ignore atr (Lambda (args, body))}
       | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
       | -"{" scope[def][infix][atr][parse def] -"}" 
       | "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} => {ignore atr (match es with
