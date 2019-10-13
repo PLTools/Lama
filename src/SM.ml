@@ -216,83 +216,183 @@ let check_name_and_add names name mut =
   if List.exists (fun (n, _) -> n = name) names
   then invalid_arg (Printf.sprintf "name %s is already defined in the scope\n" name)
   else (name, mut) :: names
+;;
+
+@type funscope = {
+    st           : Value.designation State.t;
+    arg_index    : int;
+    local_index  : int;
+    acc_index    : int;
+    nlocals      : int;
+    closure      : Value.designation list 
+} with show
+       
+@type fundef  = {
+    name         : string;
+    args         : string list;
+    body         : Expr.t;
+    scope        : funscope;
+} with show
+       
+@type context =
+| Top  of fundef list
+| Item of fundef * fundef list * context
+with show
+
+let init_scope st = {
+    st          = st;
+    arg_index   = 0;
+    acc_index   = 0;
+    local_index = 0;
+    nlocals     = 0;
+    closure     = []
+  }
+                  
+let to_fundef name args body st = {
+    name        = name;
+    args        = args;
+    body        = body;
+    scope       = init_scope st;
+}
+
+let from_fundef fd = (fd.name, fd.args, fd.body, fd.scope.st)
+                                  
+let open_scope c fd =
+  match c with
+  | Top _             -> Item (fd, [], c)
+  | Item (p, fds, up) ->
+     Item (fd, [], Item ({p with scope = fd.scope}, fds, up))
+                    
+let close_scope c =
+  match c with
+  | Item (f, [], c) -> Printf.eprintf "Closing scope for %s\n%!" f.name; c
+  | _ -> invalid_arg "closing scope"
+                   
+let add_fun c fd =
+  Printf.eprintf "Adding fun %s\n%!" fd.name;
+  Printf.eprintf "In context: %s\n%!" @@ show(context) c;
+  let c' = match c with
+  | Top   fds              -> Top (fd :: fds)
+  | Item (parent, fds, up) -> Item (parent, fd :: fds, up)
+  in
+  Printf.eprintf "Result: %s\n%!" @@ show(context) c';
+  c'
   
+let rec pick c =
+  Printf.eprintf "Picking from %s\n%!"  (show(context) c);
+  match c with
+  | Item (parent, fd :: fds, up) ->
+     Printf.eprintf "Picked %s\n%!" fd.name;
+     Printf.eprintf "Result: %s\n%!" (show(context) (Item (parent, fds, up)));
+     Item (parent, fds, up), Some fd
+  | Top (fd :: fds) ->
+     Printf.eprintf "Picked %s\n%!" fd.name;
+     Printf.eprintf "Result: %s\n%!" (show(context) (Top (fds)));
+     Top fds, Some fd
+  | c -> c, None
+
+let top = function Item (p, _, _) -> Some p | _ -> None
+                                   
 class env =
 object (self : 'self)
   val label_index  = 0
   val scope_index  = 0
-  val local_index  = 0
-  val arg_index    = 0
-  val acc_index    = 0
-  val nlocals      = 0
   val lam_index    = 0
-  val st           = (State.I : Value.designation State.t)
+  val scope        = init_scope State.I
   val enclosing_st = (State.I : Value.designation State.t)
-  val closure      = ([] : Value.designation list)
-  val fundefs      = ([] : (string * string list * Expr.t * Value.designation State.t) list)
+  val fundefs      = Top []
             
   method get_label = (label @@ string_of_int label_index), {< label_index = label_index + 1 >}
 
-  method nargs   = arg_index
-  method nlocals = nlocals
+  method nargs   = scope.arg_index
+  method nlocals = scope.nlocals
                      
-  method push_scope = {<
+  method push_scope = {<    
     scope_index = scope_index + 1;
-    st = match st with
-         | State.I -> State.G (Builtin.names, List.fold_left (fun s (name, value) -> State.bind name (Value.Global name) s) State.undefined (Builtin.bindings ()))
-         | _       -> State.L ([], State.undefined, st)
+    scope       = {
+        scope with
+        st = match scope.st with
+             | State.I ->
+                State.G (Builtin.names,
+                         List.fold_left
+                           (fun s (name, value) -> State.bind name (Value.Global name) s)
+                           State.undefined
+                           (Builtin.bindings ()))
+             | _ ->
+                State.L ([], State.undefined, scope.st)
+      }
   >}
                     
   method pop_scope =
-    match st with
-    | State.G _ -> {< st = State.I >}
-    | State.L (xs, _, x) -> {< st = x; local_index = local_index - List.length xs >}
+    match scope.st with
+    | State.I   -> {< scope = {scope with st = State.I} >}
+    | State.G _ -> {< scope = {scope with st = State.I} >}
+    | State.L (xs, _, x) ->
+       {< scope = {scope with st = x; local_index = scope.local_index - List.length xs} >}
 
-  method init_fun_scope (st' : Value.designation State.t) =
-    {< st = (
-          let rec readdress_to_closure = function
-          | State.L (xs, _, tl) ->
-             State.L (xs, (fun _ -> Value.Access (~-1)), readdress_to_closure tl)
-          | st -> st
-          in
-          readdress_to_closure st'
-       );
+  method open_fun_scope (name, args, body, st') =
+    {< 
+       fundefs      = open_scope fundefs {
+                          name        = name;
+                          args        = args;
+                          body        = body;
+                          scope       = {scope with st = st'}
+                      };
+       
        enclosing_st = st';
-       arg_index    = 0;
-       local_index  = 0;
-       acc_index    = 0;
-       nlocals      = 0;
-       closure      = []
+       scope        = init_scope (
+                        let rec readdress_to_closure = function
+                          | State.L (xs, _, tl) ->
+                             State.L (xs, (fun _ -> Value.Access (~-1)), readdress_to_closure tl)
+                          | st -> st
+                        in
+                        readdress_to_closure st'
+                        );
     >} # push_scope
-           
+
+  method close_fun_scope =
+    Printf.eprintf "ARGS: %d\n%!" scope.arg_index;
+    let fundefs' = close_scope fundefs in
+    match top fundefs' with
+    | Some fd -> {< fundefs = fundefs'; scope = fd.scope >} # pop_scope
+    | None -> {< fundefs = fundefs' >} # pop_scope 
+                         
   method add_arg (name : string) = {<
-    st = (match st with
-          | State.I | State.G _ ->
-             invalid_arg "wrong scope in add_arg"
-          | State.L (names, s, p) ->
-             State.L (check_name_and_add names name true, State.bind name (Value.Arg arg_index) s, p));
-    arg_index = arg_index + 1 
+      scope = {
+        scope with
+        st        = (match scope.st with
+                     | State.I | State.G _ ->
+                        invalid_arg "wrong scope in add_arg"
+                     | State.L (names, s, p) ->
+                        State.L (check_name_and_add names name true, State.bind name (Value.Arg scope.arg_index) s, p)
+                    );
+        arg_index = scope.arg_index + 1
+      }
   >}
                                  
   method add_name (name : string) (mut : bool) = {<
-    st = (match st with
-          | State.I ->
-             invalid_arg "uninitialized scope"
-          | State.G (names, s)    ->
-             State.G (check_name_and_add names name mut, State.bind name (Value.Global name) s)
-          | State.L (names, s, p) ->
-             State.L (check_name_and_add names name mut, State.bind name (Value.Local local_index) s, p));
-    local_index = (match st with State.L _ -> local_index + 1 | _ -> local_index);
-    nlocals     = (match st with State.L _ -> max (local_index + 1) nlocals | _ -> nlocals) 
+      scope = {
+        scope with
+        st          = (match scope.st with
+                       | State.I ->
+                          invalid_arg "uninitialized scope"
+                       | State.G (names, s)    ->
+                          State.G (check_name_and_add names name mut, State.bind name (Value.Global name) s)
+                       | State.L (names, s, p) ->
+                          State.L (check_name_and_add names name mut, State.bind name (Value.Local scope.local_index) s, p)
+                      );
+        local_index = (match scope.st with State.L _ -> scope.local_index + 1 | _ -> scope.local_index);
+        nlocals     = (match scope.st with State.L _ -> max (scope.local_index + 1) scope.nlocals | _ -> scope.nlocals)
+      }
   >}
 
   method fun_internal_name (name : string) =
-    (match st with State.G _ -> label | _ -> scope_label scope_index) name 
+    (match scope.st with State.G _ -> label | _ -> scope_label scope_index) name 
     
   method add_fun_name (name : string) =
     let name' = self#fun_internal_name name in
     let st'   =
-      match st with
+      match scope.st with
       | State.I ->
          invalid_arg "uninitialized scope"
       | State.G (names, s) ->
@@ -301,34 +401,40 @@ object (self : 'self)
          State.L (check_name_and_add names name false, State.bind name (Value.Fun name') s, p)        
     in
     {<
-      st = st'
+      scope = {scope with st = st'}
     >}
 
   method add_lambda (args : string list) (body : Expr.t) =
     let name' = self#fun_internal_name (Printf.sprintf "lambda_%d" lam_index) in
-    {< fundefs = (name', args, body, st) :: fundefs; lam_index = lam_index + 1 >}, name'
+    {< fundefs = add_fun fundefs (to_fundef name' args body scope.st); lam_index = lam_index + 1 >}, name'
       
   method add_fun (name : string) (args : string list) (body : Expr.t) =
     let name' = self#fun_internal_name name in
     {<
-      fundefs = (name', args, body, st) :: fundefs
+      fundefs = add_fun fundefs (to_fundef name' args body scope.st)
     >}
 
   method lookup name =
-    match State.eval st name with
+    match State.eval scope.st name with
     | Value.Access n when n = ~-1 ->
-       let index         = acc_index in
+       let index         = scope.acc_index in
        let enclosing_loc = State.eval enclosing_st name in
-       {< st = State.update name (Value.Access index) st; acc_index = acc_index + 1; closure = enclosing_loc :: closure >}, Value.Access index
-       
+       {<
+         scope = {
+           scope with
+           st        = State.update name (Value.Access index) scope.st;
+           acc_index = scope.acc_index + 1;
+           closure   = enclosing_loc :: scope.closure
+         }
+       >}, Value.Access index       
     | other -> self, other
     
   method next_definition =
-    match fundefs with
-    | [] -> None
-    | (name, args, body, st) :: rest -> Some ({< fundefs = rest >}, (name, args, body, st))
+    match pick fundefs with
+    | fds, None    -> None
+    | fds, Some fd -> Some ({< fundefs = fds >}, from_fundef fd)
 
-  method closure = List.rev closure
+  method closure = List.rev scope.closure
                  
 end
   
@@ -429,7 +535,8 @@ let compile p =
          (env, e, [])
          (List.rev ds)
      in
-     let env = List.fold_left (fun env (name, args, b) -> env#add_fun name args b) env funs in
+     let env = List.fold_left (fun env (name, args, b) -> Printf.eprintf "ADDING %s\n%!" name; env#add_fun name args b) env funs in
+     Printf.eprintf "???\n%!";
      let env, flag, code = compile_expr l env e in
      env#pop_scope, flag, code
  
@@ -538,26 +645,27 @@ let compile p =
      in
      env, true, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] 
   in
-  let compile_fundef env (name, args, stmt, st) =
-    let env             = env#init_fun_scope st in
+  let rec compile_fundef env ((name, args, stmt, st) as fd) =
+    let env             = env#open_fun_scope fd in
     let env             = List.fold_left (fun env arg -> env#add_arg arg) env args in 
     let lend, env       = env#get_label in
     let env, flag, code = compile_expr lend env stmt in
-    env#pop_scope,
-    [LABEL name; BEGIN (name, env#nargs, env#nlocals, env#closure)] @
-    code @
-    (if flag then [LABEL lend] else []) @
-    [END]
-  in
-  let rec compile_fundefs acc env =
+    let env, funcode    = compile_fundefs [] env in
+    env#close_fun_scope, 
+    ([LABEL name; BEGIN (name, env#nargs, env#nlocals, env#closure)] @
+     code @
+     (if flag then [LABEL lend] else []) @
+     [END]) :: funcode
+  and compile_fundefs acc env =
     match env#next_definition with
-    | None            -> List.flatten @@ List.rev acc
+    | None            -> env, acc
     | Some (env, def) ->
        let env, code = compile_fundef env def in
-       compile_fundefs (code :: acc) env
+       compile_fundefs (acc @ code) env
   in
   let env             = new env in
   let lend, env       = env#get_label in
   let env, flag, code = compile_expr lend env p in
-  let prg = compile_fundefs [[BEGIN ("main", 0, env#nlocals, [])] @(if flag then code @ [LABEL lend] else code) @ [END]] env in
+  let env, prg        = compile_fundefs [[BEGIN ("main", 0, env#nlocals, [])] @(if flag then code @ [LABEL lend] else code) @ [END]] env in
+  let prg = List.flatten prg in
   print_prg prg; prg
