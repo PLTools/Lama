@@ -263,43 +263,41 @@ let open_scope c fd =
   | Item (p, fds, up) ->
      Item (fd, [], Item ({p with scope = fd.scope}, fds, up))
                     
-let close_scope c =
-  match c with
-  | Item (f, [], c) -> Printf.eprintf "Closing scope for %s\n%!" f.name; c
-  | _ -> invalid_arg "closing scope"
+let close_scope (Item (f, [], c)) = c
                    
 let add_fun c fd =
-  Printf.eprintf "Adding fun %s\n%!" fd.name;
-  Printf.eprintf "In context: %s\n%!" @@ show(context) c;
-  let c' = match c with
+  match c with
   | Top   fds              -> Top (fd :: fds)
   | Item (parent, fds, up) -> Item (parent, fd :: fds, up)
-  in
-  Printf.eprintf "Result: %s\n%!" @@ show(context) c';
-  c'
   
-let rec pick c =
-  Printf.eprintf "Picking from %s\n%!"  (show(context) c);
-  match c with
-  | Item (parent, fd :: fds, up) ->
-     Printf.eprintf "Picked %s\n%!" fd.name;
-     Printf.eprintf "Result: %s\n%!" (show(context) (Item (parent, fds, up)));
-     Item (parent, fds, up), Some fd
-  | Top (fd :: fds) ->
-     Printf.eprintf "Picked %s\n%!" fd.name;
-     Printf.eprintf "Result: %s\n%!" (show(context) (Top (fds)));
-     Top fds, Some fd
-  | c -> c, None
+let rec pick = function
+| Item (parent, fd :: fds, up) ->
+   Item (parent, fds, up), Some fd
+| Top (fd :: fds) ->
+   Top fds, Some fd
+| c -> c, None
 
 let top = function Item (p, _, _) -> Some p | _ -> None
-                                   
+
+let rec propagate_acc (Item (p, fds, up) as item) name =
+  match State.eval p.scope.st name with
+  | Value.Access n when n = ~-1 ->
+     let index    = p.scope.acc_index     in
+     let up', loc = propagate_acc up name in
+     Item ({p with
+             scope = {p.scope with
+                       st        = State.update name (Value.Access index) p.scope.st;
+                       acc_index = p.scope.acc_index + 1;
+                       closure   = loc :: p.scope.closure
+           }}, fds, up'), Value.Access index       
+  | other -> item, other
+
 class env =
 object (self : 'self)
   val label_index  = 0
   val scope_index  = 0
   val lam_index    = 0
   val scope        = init_scope State.I
-  val enclosing_st = (State.I : Value.designation State.t)
   val fundefs      = Top []
             
   method get_label = (label @@ string_of_int label_index), {< label_index = label_index + 1 >}
@@ -325,10 +323,16 @@ object (self : 'self)
                     
   method pop_scope =
     match scope.st with
-    | State.I   -> {< scope = {scope with st = State.I} >}
-    | State.G _ -> {< scope = {scope with st = State.I} >}
+    | State.I            -> {< scope = {scope with st = State.I} >}
+    | State.G _          -> {< scope = {scope with st = State.I} >}
     | State.L (xs, _, x) ->
-       {< scope = {scope with st = x; local_index = scope.local_index - List.length xs} >}
+       {<
+         scope = {
+           scope with
+           st          = x;
+           local_index = scope.local_index - List.length xs
+         }
+       >}
 
   method open_fun_scope (name, args, body, st') =
     {< 
@@ -337,9 +341,7 @@ object (self : 'self)
                           args        = args;
                           body        = body;
                           scope       = {scope with st = st'}
-                      };
-       
-       enclosing_st = st';
+                      };       
        scope        = init_scope (
                         let rec readdress_to_closure = function
                           | State.L (xs, _, tl) ->
@@ -347,15 +349,14 @@ object (self : 'self)
                           | st -> st
                         in
                         readdress_to_closure st'
-                        );
+                      );
     >} # push_scope
 
   method close_fun_scope =
-    Printf.eprintf "ARGS: %d\n%!" scope.arg_index;
     let fundefs' = close_scope fundefs in
     match top fundefs' with
     | Some fd -> {< fundefs = fundefs'; scope = fd.scope >} # pop_scope
-    | None -> {< fundefs = fundefs' >} # pop_scope 
+    | None    -> {< fundefs = fundefs' >} # pop_scope 
                          
   method add_arg (name : string) = {<
       scope = {
@@ -418,13 +419,15 @@ object (self : 'self)
     match State.eval scope.st name with
     | Value.Access n when n = ~-1 ->
        let index         = scope.acc_index in
-       let enclosing_loc = State.eval enclosing_st name in
+       let fundefs', loc = propagate_acc fundefs name in
+       (*        let enclosing_loc = (*State.eval enclosing_st name*) in *)
        {<
-         scope = {
+         fundefs = fundefs';
+         scope   = {
            scope with
            st        = State.update name (Value.Access index) scope.st;
            acc_index = scope.acc_index + 1;
-           closure   = enclosing_loc :: scope.closure
+           closure   = loc :: scope.closure
          }
        >}, Value.Access index       
     | other -> self, other
@@ -535,8 +538,7 @@ let compile p =
          (env, e, [])
          (List.rev ds)
      in
-     let env = List.fold_left (fun env (name, args, b) -> Printf.eprintf "ADDING %s\n%!" name; env#add_fun name args b) env funs in
-     Printf.eprintf "???\n%!";
+     let env = List.fold_left (fun env (name, args, b) -> env#add_fun name args b) env funs in
      let env, flag, code = compile_expr l env e in
      env#pop_scope, flag, code
  
@@ -668,4 +670,4 @@ let compile p =
   let env, flag, code = compile_expr lend env p in
   let env, prg        = compile_fundefs [[BEGIN ("main", 0, env#nlocals, [])] @(if flag then code @ [LABEL lend] else code) @ [END]] env in
   let prg = List.flatten prg in
-  print_prg prg; prg
+  prg
