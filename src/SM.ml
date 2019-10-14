@@ -21,7 +21,8 @@ open Language
 (* begins procedure definition               *) | BEGIN   of string * int * int * Value.designation list
 (* end procedure definition                  *) | END
 (* create a closure                          *) | CLOSURE of string
-(* calls a function/procedure                *) | CALL    of int 
+(* calls a closure                           *) | CALLC   of int 
+(* calls a function/procedure                *) | CALL    of string * int 
 (* returns from a function                   *) | RET     
 (* drops the top element off                 *) | DROP
 (* duplicates the top element                *) | DUP
@@ -121,12 +122,33 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                      | Value.Arg    i -> loc.args.(i)
                                      | Value.Local  i -> loc.locals.(i)
                                      | Value.Access i -> loc.closure.(i)
-                                     | _ -> invalid_arg "wrong value in CLOSURE")
+                                     | _              -> invalid_arg "wrong value in CLOSURE")
                                      dgs
                                  in
                                  eval env (cstack, (Value.Closure ([], name, closure)) :: stack, glob, loc, i, o) prg'
                                  
-    | CALL   n                -> let vs, stack' = split (n+1) stack in
+    | CALL (f, n)             -> let args, stack' = split n stack in
+                                 if env#is_label f
+                                 then (
+                                   let BEGIN (_, _, _, dgs) :: _ = env#labeled f in
+                                   match dgs with
+                                   | [] -> eval env ((prg', loc)::cstack, stack', glob, {args = Array.of_list (List.rev args); locals = [||]; closure = [||]}, i, o) (env#labeled f)
+                                   | _  ->
+                                      let closure =
+                                        Array.of_list @@
+                                          List.map (
+                                            function
+                                            | Value.Arg    i -> loc.args.(i)
+                                            | Value.Local  i -> loc.locals.(i)
+                                            | Value.Access i -> loc.closure.(i)
+                                            | _              -> invalid_arg "wrong value in CLOSURE")
+                                            dgs
+                                      in
+                                      eval env ((prg', loc)::cstack, stack', glob, {args = Array.of_list (List.rev args); locals = [||]; closure = closure}, i, o) (env#labeled f)
+                                 )
+                                 else eval env (env#builtin f args ((cstack, stack', glob, loc, i, o) : config)) prg'
+
+    | CALLC n                 -> let vs, stack' = split (n+1) stack in
                                  let f::args    = List.rev vs   in
                                  (match f with
                                   | Value.Builtin f ->
@@ -313,7 +335,7 @@ object (self : 'self)
              | State.I ->
                 State.G (Builtin.names,
                          List.fold_left
-                           (fun s (name, value) -> State.bind name (Value.Global name) s)
+                           (fun s (name, value) -> State.bind name (Value.Fun name) s)
                            State.undefined
                            (Builtin.bindings ()))
              | _ ->
@@ -420,7 +442,6 @@ object (self : 'self)
     | Value.Access n when n = ~-1 ->
        let index         = scope.acc_index in
        let fundefs', loc = propagate_acc fundefs name in
-       (*        let enclosing_loc = (*State.eval enclosing_st name*) in *)
        {<
          fundefs = fundefs';
          scope   = {
@@ -470,7 +491,7 @@ let compile p =
       List.fold_left
         (fun (i, env, code) p ->
            let env, _, pcode = pattern env ldrop p in
-           i+1, env, ([DUP; LD (Value.Global ".elem"); SWAP; CONST i; CALL 2] @ pcode) :: code
+           i+1, env, ([DUP; CONST i; CALL (".elem", 2)] @ pcode) :: code
         )
         (0, env, [])
         ps
@@ -504,7 +525,7 @@ let compile p =
            let env, dsg = env#lookup name in
            env,
            ([DUP] @
-            List.concat (List.map (fun i -> [LD (Value.Global ".elem"); SWAP; CONST i; CALL 2]) path) @
+            List.concat (List.map (fun i -> [CONST i; CALL (".elem", 2)]) path) @
             [ST dsg; DROP]) :: acc
         )
         (env, [])
@@ -554,24 +575,35 @@ let compile p =
   | Expr.String   s         -> env, false, [STRING s]
   | Expr.Binop (op, x, y)   -> let lop, env = env#get_label in
                                add_code (compile_list lop env [x; y]) lop false [BINOP op]
-                                 
-  | Expr.Call  (f, args)    -> let lcall, env = env#get_label in
-                               add_code (compile_list lcall env (f :: args)) lcall false [CALL (List.length args)]                               
+                               
+  | Expr.Call (f, args)     -> let lcall, env = env#get_label in
+                               (match f with
+                                | Expr.Var name ->
+                                   let env, acc = env#lookup name in
+                                   (match acc with
+                                    | Value.Fun name ->
+                                       add_code (compile_list lcall env args) lcall false [CALL (name, List.length args)]
+                                    | _ ->
+                                       add_code (compile_list lcall env (f :: args)) lcall false [CALLC (List.length args)]
+                                   )
+                                  
+                                | _ -> add_code (compile_list lcall env (f :: args)) lcall false [CALLC (List.length args)]
+                               )
                                     
   | Expr.Array  xs          -> let lar, env = env#get_label in
-                               add_code (compile_list lar env ((Expr.Var ".array") :: xs)) lar false [CALL (List.length xs)]
+                               add_code (compile_list lar env xs) lar false [CALL (".array", List.length xs)]
                                
   | Expr.Sexp (t, xs)       -> let lsexp, env = env#get_label in
                                add_code (compile_list lsexp env xs) lsexp false [SEXP (t, List.length xs)]
                              
   | Expr.Elem (a, i)        -> let lelem, env = env#get_label in
-                               add_code (compile_list lelem env [Expr.Var ".elem"; a; i]) lelem false [CALL 2]
+                               add_code (compile_list lelem env [a; i]) lelem false [CALL (".elem", 2)]
                                
   | Expr.Length e           -> let llen, env = env#get_label in
-                               add_code (compile_list llen env [Expr.Var ".length"; e]) llen false [CALL 1]
+                               add_code (compile_expr llen env e) llen false [CALL (".length", 1)]
                                
   | Expr.StringVal e        -> let lsv, env = env#get_label in
-                               add_code (compile_list lsv env [Expr.Var ".stringval"; e]) lsv false [CALL 1]
+                               add_code (compile_expr lsv env e) lsv false [CALL (".stringval", 1)]
 
   | Expr.Assign (x, e)      -> let lassn, env = env#get_label in
                                add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]                              
@@ -669,5 +701,5 @@ let compile p =
   let lend, env       = env#get_label in
   let env, flag, code = compile_expr lend env p in
   let env, prg        = compile_fundefs [[BEGIN ("main", 0, env#nlocals, [])] @(if flag then code @ [LABEL lend] else code) @ [END]] env in
-  let prg = List.flatten prg in
+  let prg             = List.flatten prg in
   prg

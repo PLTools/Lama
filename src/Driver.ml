@@ -43,7 +43,7 @@ let main =
        if to_compile
        then (
          let basename = Filename.chop_suffix infile ".expr" in
-         (* ignore @@ X86.build prog basename *) (* TODO! *) ()
+         ignore @@ X86.build prog basename 
        )
        else (
          (* Printf.printf "Program:\n%s\n" (GT.show(Language.Expr.t) prog);*)
