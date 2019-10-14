@@ -120,7 +120,7 @@ module Builtin =
     | ".length"     -> (st, i, o, (Value.of_int (match List.hd args with Value.Sexp (_, a) | Value.Array a -> Array.length a | Value.String s -> Bytes.length s))::vs)
     | ".array"      -> (st, i, o, (Value.of_array @@ Array.of_list args)::vs)
     | ".stringval"  -> let [a] = args in (st, i, o, (Value.of_string @@ Value.string_val a)::vs)
-    | "_gc_init"    -> (st, i, o, vs)
+    | "__gc_init"   -> (st, i, o, vs)
     | "raw"         -> let [a] = args in (st, i, o, a :: vs)
 
   end

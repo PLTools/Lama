@@ -126,10 +126,7 @@ let compile env code =
   let rec compile' env scode =
     let on_stack = function S _ -> true | _ -> false in
     let mov x s = if on_stack x && on_stack s then [Mov (x, eax); Mov (eax, s)] else [Mov (x, s)]  in
-    let call env n =
-      let f = "foo" in
-      Printf.eprintf "Stack in call: %s\n%!" env#show_stack;
-      invalid_arg "CALL not yet supported.\n";
+    let call env f n =
       let f =
         match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
       in
@@ -167,7 +164,7 @@ let compile env code =
           | STRING s ->
              let s, env = env#string s in
              let l, env = env#allocate in
-             let env, call = call env (* TODO!!! ".string" *) 1 in
+             let env, call = call env ".string" 1 in
              (env, Mov (M ("$" ^ s), l) :: call)
 
           | LDA x ->
@@ -196,7 +193,7 @@ let compile env code =
 	     )
 
           | STA ->
-             call env (* TODO! ".sta" *) 3
+             call env ".sta" 3
 
 	  | STI ->
              let v, x, env' = env#pop2 in
@@ -305,14 +302,21 @@ let compile env code =
 
           | BEGIN (f, nargs, nlocals, closure) ->
              env#assert_empty_stack;
-             let env  = env#enter f nlocals in
-             let size = Printf.sprintf "$%d" (word_size * (nlocals + if closure = [] then 0 else 1)) in
-             env, [Push ebp; Mov (esp, ebp); Binop ("-", M size, esp);
+             let env  = env#enter f (nlocals + if closure = [] then 0 else 1) in
+             env, [Push ebp; Mov (esp, ebp); Binop ("-", M ("$" ^ env#lsize), esp);
                         Mov (esp, edi);
 	                Mov (M "$filler", esi);
-	                Mov (M size, ecx);
+	                Mov (M ("$" ^ (env#allocated_size)), ecx);
 	                Repmovsl
                   ]
+(*
+             env, [Push ebp; Mov (esp, ebp); Binop ("-", M ("$" ^ string_of_int @@ word_size * size), esp);
+                        Mov (esp, edi);
+	                Mov (M "$filler", esi);
+	                Mov (M ("$" ^ string_of_int size), ecx);
+	                Repmovsl
+                  ]
+ *)
              
 (*
           | BEGIN (f, nargs, nlocals, closure) ->
@@ -329,21 +333,23 @@ let compile env code =
              env#endfunc, [Label env#epilogue;
                    Mov (ebp, esp);
                    Pop ebp;
-                   Ret (*;
+                   Ret ;
                    Meta (Printf.sprintf "\t.set\t%s,\t%d" env#lsize (env#allocated * word_size));
                    Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated)
-                        *)
                   ]
 
           | RET ->
              let x, env = env#pop in
              env, [Mov (x, eax); Jmp env#epilogue]
             
-          | CALL (f, n) -> call env n
+          | CALL (f, n) -> call env f n
+                         
+          | CALLC n ->
+             invalid_arg "CALLC not supported yet"
               
           | SEXP (t, n) ->
              let s, env = env#allocate in
-             let env, code = call env (* TODO! ".sexp" *) (n+1) in
+             let env, code = call env ".sexp" (n+1) in
              env, [Mov (L env#hash t, s)] @ code
 
           | DROP ->
@@ -361,25 +367,25 @@ let compile env code =
           | TAG (t, n) ->
              let s1, env = env#allocate in
              let s2, env = env#allocate in
-             let env, code = call env (* TODO! ".tag" *) 3 in
+             let env, code = call env ".tag" 3 in
              env, [Mov (L env#hash t, s1); Mov (L n, s2)] @ code
 
           | ARRAY n ->
              let s, env    = env#allocate in
-             let env, code = call env (* TODO! ".array_patt" *) 2 in
+             let env, code = call env ".array_patt" 2 in
              env, [Mov (L n, s)] @ code
 
-          | PATT StrCmp -> call env (* TODO!!! ".string_patt" *) 2
+          | PATT StrCmp -> call env ".string_patt" 2
 
           | PATT patt ->
-             call env (* TODO!!!
+             call env 
                (match patt with
                 | Boxed   -> ".boxed_patt"
                 | UnBoxed -> ".unboxed_patt"
                 | Array   -> ".array_tag_patt"
                 | String  -> ".string_tag_patt"
                 | Sexp    -> ".sexp_tag_patt"
-               ) *)1
+               ) 1
             
           | i ->
              invalid_arg (Printf.sprintf "invalid SM insn: %s\n" (GT.show(insn) i))
@@ -507,7 +513,7 @@ class env =
     (* registers a variable in the environment *)
     method variable x =
       match x with
-      | Value.Global name -> {< globals = S.add name globals >}
+      | Value.Global name -> {< globals = S.add ("global_" ^ name) globals >}
       | _                 -> self
 
     (* registers a string constant *)
@@ -526,10 +532,8 @@ class env =
 
     (* gets a number of stack positions allocated *)
     method allocated = stack_slots
-
-                     (*
+                     
     method allocated_size = Printf.sprintf "LS%s_SIZE" fname
-                      *)
                      
     (* enters a function *)
     method enter f nlocals =
@@ -550,10 +554,8 @@ class env =
     (* returns a label for the epilogue *)
     method epilogue = Printf.sprintf "L%s_epilogue" fname
 
-                    (*
     (* returns a name for local size meta-symbol *)
     method lsize = Printf.sprintf "L%s_SIZE" fname
-                     *)
                     
     (* returns a list of live registers *)
     method live_registers depth =
@@ -582,7 +584,6 @@ let genasm prog =
     | _ -> decorate prog  
   in
   let sm        = SM.compile expr in
-  Printf.eprintf "SM:\n"; print_prg sm;
   let env, code = compile (new env) sm in
   let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
   let data = [Meta "\t.data";

@@ -82,9 +82,17 @@ let print_stack memo s =
   List.iter (fun v -> Printf.eprintf "%s " @@ show(value) v) s;
   Printf.eprintf "\n%!"
 
+let show_insn = show insn
+              
 let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = function
 | [] -> conf
-| insn :: prg' -> 
+| insn :: prg' ->
+   (*
+   Printf.eprintf "eval\n";
+   Printf.eprintf "   insn=%s\n" (show_insn insn);
+   Printf.eprintf "   stack=%s\n" (show(list) (show(value)) stack);
+   Printf.eprintf "end\n";
+   *)
    (match insn with
     | BINOP  op               -> let y::x::stack' = stack in eval env (cstack, (Value.of_int @@ Expr.to_func op (Value.to_int x) (Value.to_int y)) :: stack', glob, loc, i, o) prg'
     | CONST n                 -> eval env (cstack, (Value.of_int n)::stack, glob, loc, i, o) prg'
@@ -201,7 +209,6 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
 let run p i = 
-  (* print_prg p; *)
   let module M = Map.Make (String) in
   let rec make_env (m, s) = function
   | []              -> (m, s)
@@ -219,7 +226,7 @@ let run p i =
            let (st, i, o, r) = Language.Builtin.eval (State.I, i, o, []) (List.map Obj.magic @@ List.rev args) f in
            (cstack, (match r with [r] -> (Obj.magic r)::stack | _ -> Value.Empty :: stack), glob, loc, i, o)
        end      
-      ([], [Value.Closure ([], "main", [||])], (List.fold_left (fun s (name, value) -> State.bind name value s) glob (Builtin.bindings ())), {locals=[||]; args=[||]; closure=[||]}, i, [])
+      ([], [], (List.fold_left (fun s (name, value) -> State.bind name value s) glob (Builtin.bindings ())), {locals=[||]; args=[||]; closure=[||]}, i, [])
       p
   in
   o 
@@ -335,7 +342,13 @@ object (self : 'self)
              | State.I ->
                 State.G (Builtin.names,
                          List.fold_left
-                           (fun s (name, value) -> State.bind name (Value.Fun name) s)
+                           (fun s (name, value) ->
+                             let name' =
+                               match name.[0] with
+                               | '.' -> name
+                               | _   -> "L" ^ name
+                             in
+                             State.bind name (Value.Fun name') s)
                            State.undefined
                            (Builtin.bindings ()))
              | _ ->
@@ -639,20 +652,7 @@ let compile p =
   | Expr.Return None        -> env, false, [CONST 0; RET]
 
   | Expr.Leave              -> env, false, []
-                                             
-  | Expr.Case (e, [p, s]) ->
-     let lexp , env          = env#get_label in
-     let ldrop, env          = env#get_label in
-     let env, fe     , se    = compile_expr lexp env e in
-     let env, ldrop' , pcode = pattern env ldrop p in
-     let env                 = env#push_scope in
-     let env, bindcode       = bindings env p in
-     let env, ldrop'', scode = compile_expr ldrop env s in
-     let env                 = env#pop_scope in
-     if ldrop' || ldrop''
-     then env, true , se @ (if fe then [LABEL lexp] else []) @ [DUP] @ pcode @ bindcode @ scode @ [JMP l; LABEL ldrop; DROP]
-     else env, false, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ pcode @ bindcode @ scode 
-                                    
+                                 
   | Expr.Case (e, brs) ->
      let n         = List.length brs - 1 in
      let lexp, env = env#get_label in
@@ -700,6 +700,6 @@ let compile p =
   let env             = new env in
   let lend, env       = env#get_label in
   let env, flag, code = compile_expr lend env p in
-  let env, prg        = compile_fundefs [[BEGIN ("main", 0, env#nlocals, [])] @(if flag then code @ [LABEL lend] else code) @ [END]] env in
+  let env, prg        = compile_fundefs [[LABEL "main"; BEGIN ("main", 0, env#nlocals, [])] @(if flag then code @ [LABEL lend] else code) @ [END]] env in
   let prg             = List.flatten prg in
   prg
