@@ -8,7 +8,13 @@
 # include <sys/mman.h>
 # include <assert.h>
 
-// # define DEBUG_PRINT 1
+/*# define __ENABLE_GC__*/
+# ifndef __ENABLE_GC__
+# define alloc malloc
+# endif
+
+/*# define DEBUG_PRINT 1*/
+
 /* GC pool structure and data; declared here in order to allow debug print */
 typedef struct {
   size_t * begin;
@@ -22,14 +28,27 @@ static pool to_space;
 size_t      *current;
 /* end */
 
+# ifdef __ENABLE_GC__
+
 /* GC extern invariant for built-in functions */
 extern void __pre_gc  ();
 extern void __post_gc ();
+
+# else
+
+# define __pre_gc __pre_gc_subst
+# define __post_gc __post_gc_subst
+
+void __pre_gc_subst () {}
+void __post_gc_subst () {}
+
+# endif
 /* end */
 
-# define STRING_TAG 0x00000001
-# define ARRAY_TAG  0x00000003
-# define SEXP_TAG   0x00000005
+# define STRING_TAG  0x00000001
+# define ARRAY_TAG   0x00000003
+# define SEXP_TAG    0x00000005
+# define CLOSURE_TAG 0x00000007 
 
 # define LEN(x) ((x & 0xFFFFFFF8) >> 3)
 # define TAG(x)  (x & 0x00000007)
@@ -244,6 +263,36 @@ extern void* Bstringval (void *p) {
   return s;
 }
 
+extern void* Bclosure (int n, void *entry, ...) {
+  va_list args = (va_list) BOX (NULL);
+  int     i    = BOX(0),
+          ai   = BOX(0);
+  data    *r   = (data*) BOX (NULL);
+
+  __pre_gc ();
+  
+#ifdef DEBUG_PRINT
+  printf ("Bclosure: create n = %d\n", n); fflush(stdout);
+#endif
+  r = (data*) alloc (sizeof(int) * (n+2));
+
+  r->tag = CLOSURE_TAG | (n << 3);
+  ((void**) r->contents)[0] = entry;
+  
+  va_start(args, n);
+  
+  for (i = 1; i<n; i++) {
+    ai = va_arg(args, int);
+    ((int*)r->contents)[i] = ai;
+  }
+  
+  va_end(args);
+
+  __post_gc();
+
+  return r->contents;
+}
+
 extern void* Barray (int n, ...) {
   va_list args = (va_list) BOX (NULL);
   int     i    = BOX(0),
@@ -348,6 +397,12 @@ extern int Bstring_patt (void *x, void *y) {
     
     return BOX(strcmp (rx->contents, ry->contents) == 0 ? 1 : 0);
   }
+}
+
+extern int Bclosure_tag_patt (void *x) {
+  if (UNBOXED(x)) return BOX(0);
+  
+  return BOX(TAG(TO_DATA(x)->tag) == CLOSURE_TAG);
 }
 
 extern int Bboxed_patt (void *x) {
@@ -456,14 +511,24 @@ extern int Lwrite (int n) {
 
 extern const size_t __gc_data_end, __gc_data_start;
 
+# ifdef __ENABLE_GC__
+
 extern void L__gc_init ();
+
+# else
+
+# define L__gc_init __gc_init_subst
+void __gc_init_subst () {}
+
+# endif
+
 extern void __gc_root_scan_stack ();
 
 /* ======================================== */
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-static size_t SPACE_SIZE = 128;
+static size_t SPACE_SIZE = 1280;
 // static size_t SPACE_SIZE = 1280;
 # define POOL_SIZE (2*SPACE_SIZE)
 
@@ -578,6 +643,20 @@ extern size_t * gc_copy (size_t *obj) {
   objj = d;
 #endif
   switch (TAG(d->tag)) {
+    case CLOSURE_TAG:
+#ifdef DEBUG_PRINT
+      printf ("gc_copy:closure_tag; len =  %zu\n", LEN(d->tag)); fflush (stdout);
+#endif
+      current += (LEN(d->tag) + 1) * sizeof (int);
+      *copy = d->tag;
+      copy++;
+      *copy = d->contents[0];
+      copy++;
+      i = LEN(d->tag) - 1;
+      d->tag = (int) (copy-1);
+      copy_elements (copy, obj, i);
+      break;
+    
     case ARRAY_TAG:
 #ifdef DEBUG_PRINT
       printf ("gc_copy:array_tag; len =  %zu\n", LEN(d->tag)); fflush (stdout);
@@ -736,6 +815,19 @@ static void printFromSpace (void) {
       fflush (stdout);
       break;
 
+    case CLOSURE_TAG:
+      printf ("(=>%p): CLOSURE\n\t", d->contents);
+      len = LEN(d->tag);
+      for (int i = 1; i < len; i++) {
+	int elem = ((int*)d->contents)[i];
+	if (UNBOXED(elem)) printf ("%d ", elem);
+	else printf ("%p ", elem);
+      }
+      len += 1;
+      printf ("\n");
+      fflush (stdout);
+      break;
+
     case ARRAY_TAG:
       printf ("(=>%p): ARRAY\n\t", d->contents);
       len = LEN(d->tag);
@@ -781,6 +873,7 @@ static void printFromSpace (void) {
 }
 #endif
 
+#ifdef __ENABLE_GC__
 extern void * alloc (size_t size) {
   void * p = (void*)BOX(NULL);
   if (from_space.current + size < from_space.end) {
@@ -805,3 +898,4 @@ extern void * alloc (size_t size) {
 #endif
   return gc (size);
 }
+# endif

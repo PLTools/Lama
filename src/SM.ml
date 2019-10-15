@@ -208,19 +208,28 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
 
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
+
+module M = Map.Make (String) 
+
+class indexer prg =
+  let rec make_env m = function
+  | []              -> m
+  | (LABEL l) :: tl -> make_env (M.add l tl m) tl
+  | _ :: tl         -> make_env m tl
+  in
+  let m = make_env M.empty prg in
+  object
+    method is_label l = M.mem l m
+    method labeled l = M.find l m
+  end
+  
 let run p i = 
   let module M = Map.Make (String) in
-  let rec make_env (m, s) = function
-  | []              -> (m, s)
-  | (LABEL l) :: tl -> make_env (M.add l tl m, State.bind l (Value.Closure ([], l, [||])) s) tl
-  | _ :: tl         -> make_env (m, s) tl
-  in
-  let m, glob = make_env (M.empty, State.undefined) p in
+  let glob = State.undefined in
   let (_, _, _, _, i, o) =
     eval
       object
-         method is_label l = M.mem l m
-         method labeled l = M.find l m
+         inherit indexer p
          method builtin f args ((cstack, stack, glob, loc, i, o) as conf : config) = 
            let f = match f.[0] with 'L' -> String.sub f 1 (String.length f - 1) | _ -> f in
            let (st, i, o, r) = Language.Builtin.eval (State.I, i, o, []) (List.map Obj.magic @@ List.rev args) f in

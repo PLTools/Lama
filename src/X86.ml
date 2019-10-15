@@ -48,6 +48,7 @@ type instr =
 (* pushes the operand on the hardware stack              *) | Push  of opnd
 (* pops from the hardware stack to the operand           *) | Pop   of opnd
 (* call a function by a name                             *) | Call  of string
+(* call a function by indirect address                   *) | CallI of opnd
 (* returns from a function                               *) | Ret
 (* a label in the code                                   *) | Label of string
 (* a conditional jump                                    *) | CJmp  of string * string
@@ -91,6 +92,7 @@ let show instr =
   | Pop    s           -> Printf.sprintf "\tpopl\t%s"      (opnd s)
   | Ret                -> "\tret"
   | Call   p           -> Printf.sprintf "\tcall\t%s" p
+  | CallI  o           -> Printf.sprintf "\tcall\t*(%s)" (opnd o)
   | Label  l           -> Printf.sprintf "%s:\n" l
   | Jmp    l           -> Printf.sprintf "\tjmp\t%s" l
   | CJmp  (s , l)      -> Printf.sprintf "\tj%s\t%s" s l
@@ -126,6 +128,24 @@ let compile env code =
   let rec compile' env scode =
     let on_stack = function S _ -> true | _ -> false in
     let mov x s = if on_stack x && on_stack s then [Mov (x, eax); Mov (eax, s)] else [Mov (x, s)]  in
+    let callc env n =
+      let pushr, popr =
+        List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
+      in
+      let env, code =
+        let rec push_args env acc = function
+        | 0 -> env, acc
+        | n -> let x, env = env#pop in
+               push_args env ((Push x)::acc) (n-1)
+        in
+        let env, pushs   = push_args env [] n in
+        let pushs        = List.rev pushs     in
+        let closure, env = env#pop            in
+        let call_closure = [Mov (closure, eax); CallI closure] in
+        env, pushr @ pushs @ call_closure @ [Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr)
+      in
+      let y, env = env#allocate in env, code @ [Mov (eax, y)]
+    in
     let call env f n =
       let f =
         match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
@@ -147,7 +167,7 @@ let compile env code =
           | "Bsta"   -> pushs
           | _        -> List.rev pushs
         in
-        env, pushr @ pushs @ [Call f; Binop ("+", L (4 * List.length pushs), esp)] @ (List.rev popr)
+        env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr)
       in
       let y, env = env#allocate in env, code @ [Mov (eax, y)]
     in
@@ -157,6 +177,26 @@ let compile env code =
         let stack = env#show_stack in
         let env', code' =
           match instr with
+          | CLOSURE name ->
+             let pushr, popr =
+               List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers 0)
+             in
+             let BEGIN (_, _, _, closure) :: _ = env#labeled name in
+             let closure_len  = List.length closure in 
+             let push_closure =
+               List.map (fun d -> Push (env#loc d)) @@ List.rev closure
+             in
+             let s, env = env#allocate in             
+             (env,
+              pushr @
+              push_closure @
+              [Push (M ("$" ^ name));
+              Push (L closure_len);
+              Call "Bclosure";
+              Binop ("+", L (word_size * (closure_len + 2)), esp); 
+              Mov (eax, s)] @
+              List.rev popr)
+             
   	  | CONST n ->
              let s, env' = env#allocate in
 	     (env', [Mov (L ((n lsl 1) lor 1), s)])
@@ -302,38 +342,23 @@ let compile env code =
 
           | BEGIN (f, nargs, nlocals, closure) ->
              env#assert_empty_stack;
-             let env  = env#enter f (nlocals + if closure = [] then 0 else 1) in
-             env, [Push ebp; Mov (esp, ebp); Binop ("-", M ("$" ^ env#lsize), esp);
-                        Mov (esp, edi);
-	                Mov (M "$filler", esi);
-	                Mov (M ("$" ^ (env#allocated_size)), ecx);
-	                Repmovsl
+             let has_closure = closure <> [] in
+             let env  = env#enter f nlocals has_closure in
+             env, (if has_closure then [Push eax] else []) @
+                   [Push ebp;
+                    Mov (esp, ebp);
+                    Binop ("-", M ("$" ^ env#lsize), esp);
+                    Mov (esp, edi);
+	            Mov (M "$filler", esi);
+	            Mov (M ("$" ^ (env#allocated_size)), ecx);
+	            Repmovsl
                   ]
-(*
-             env, [Push ebp; Mov (esp, ebp); Binop ("-", M ("$" ^ string_of_int @@ word_size * size), esp);
-                        Mov (esp, edi);
-	                Mov (M "$filler", esi);
-	                Mov (M ("$" ^ string_of_int size), ecx);
-	                Repmovsl
-                  ]
- *)
-             
-(*
-          | BEGIN (f, nargs, nlocals, closure) ->
-             env#assert_empty_stack;
-             let env = env#enter f a l in
-             env, [Push ebp; Mov (esp, ebp); Binop ("-", M ("$" ^ env#lsize), esp);
-                        Mov (esp, edi);
-	                Mov (M "$filler", esi);
-	                Mov (M ("$" ^ (env#allocated_size)), ecx);
-	                Repmovsl
-                  ]
- *)
+
           | END ->
              env#endfunc, [Label env#epilogue;
                    Mov (ebp, esp);
                    Pop ebp;
-                   Ret ;
+                   Ret;
                    Meta (Printf.sprintf "\t.set\t%s,\t%d" env#lsize (env#allocated * word_size));
                    Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated)
                   ]
@@ -344,8 +369,7 @@ let compile env code =
             
           | CALL (f, n) -> call env f n
                          
-          | CALLC n ->
-             invalid_arg "CALLC not supported yet"
+          | CALLC n -> callc env n
               
           | SEXP (t, n) ->
              let s, env = env#allocate in
@@ -385,6 +409,7 @@ let compile env code =
                 | Array   -> ".array_tag_patt"
                 | String  -> ".string_tag_patt"
                 | Sexp    -> ".sexp_tag_patt"
+                | Closure -> ".closure_tag_patt"
                ) 1
             
           | i ->
@@ -402,23 +427,25 @@ module S = Set.Make (String)
 module M = Map.Make (String)
 
 (* Environment implementation *)
-class env =
+class env prg =
   let chars          = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" in
   let make_assoc l i = List.combine l (List.init (List.length l) (fun x -> x + i)) in
   let rec assoc  x   = function [] -> raise Not_found | l :: ls -> try List.assoc x l with Not_found -> assoc x ls in
   object (self)
-    val globals     = S.empty (* a set of global variables         *)
-    val stringm     = M.empty (* a string map                      *)
-    val scount      = 0       (* string count                      *)
-    val stack_slots = 0       (* maximal number of stack positions *)
-    val static_size = 0       (* static data size                  *)
-    val stack       = []      (* symbolic stack                    *)
-    val args        = []      (* function arguments                *)
-    val locals      = []      (* function local variables          *)
-    val fname       = ""      (* function name                     *)
-    val stackmap    = M.empty (* labels to stack map               *)
-    val barrier     = false   (* barrier condition                 *)
+    inherit SM.indexer prg
+    val globals         = S.empty (* a set of global variables         *)
+    val stringm         = M.empty (* a string map                      *)
+    val scount          = 0       (* string count                      *)
+    val stack_slots     = 0       (* maximal number of stack positions *)
+    val static_size     = 0       (* static data size                  *)
+    val stack           = []      (* symbolic stack                    *)
+    val args            = []      (* function arguments                *)
+    val locals          = []      (* function local variables          *)
+    val fname           = ""      (* function name                     *)
+    val stackmap        = M.empty (* labels to stack map               *)
+    val barrier         = false   (* barrier condition                 *)
     val max_locals_size = 0
+    val has_closure     = false
 
     method max_locals_size = max_locals_size
 
@@ -463,8 +490,8 @@ class env =
     method loc x =
       match x with
       | Value.Global name -> M ("global_" ^ name)
-      | Value.Fun    name -> M name
-      | Value.Local  i    -> S i
+      | Value.Fun    name -> M ("$" ^ name)
+      | Value.Local  i    -> S ((if has_closure then 1 else 0) + i)
       | Value.Arg    i    -> S (- (i+1))
       | Value.Access i    -> invalid_arg "closure access not yet implemented"
                            
@@ -536,21 +563,10 @@ class env =
     method allocated_size = Printf.sprintf "LS%s_SIZE" fname
                      
     (* enters a function *)
-    method enter f nlocals =
-      {< static_size = nlocals; stack_slots = nlocals; stack = []; fname = f >}
+    method enter f nlocals has_closure =
+      let n = nlocals + (if has_closure then 1 else 0) in
+      {< static_size = n; stack_slots = n; stack = []; fname = f; has_closure = has_closure >}
 
-      (*
-    (* enters a scope *)
-    method scope vars =
-      let n = List.length vars in
-      let static_size' = n + static_size in
-      {< stack_slots = max stack_slots static_size'; static_size = static_size'; locals = (make_assoc vars static_size) :: locals >}
-
-    (* leaves a scope *)
-    method unscope =
-      let n = List.length (List.hd locals) in
-      {< static_size = static_size - n; locals = List.tl locals >}
-       *)
     (* returns a label for the epilogue *)
     method epilogue = Printf.sprintf "L%s_epilogue" fname
 
@@ -584,7 +600,7 @@ let genasm prog =
     | _ -> decorate prog  
   in
   let sm        = SM.compile expr in
-  let env, code = compile (new env) sm in
+  let env, code = compile (new env sm) sm in
   let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
   let data = [Meta "\t.data";
               Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size);

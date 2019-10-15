@@ -10,6 +10,8 @@ fun f (l) {
   esac
 }
 
+local x = read ();
+
 write (f ({}));
 write (f ({1}));
 write (f ({1, 1}));
