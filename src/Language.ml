@@ -102,7 +102,7 @@ module Value =
 module Builtin =
   struct
 
-    let list        = ["read"; "write"; ".elem"; ".length"; ".array"; ".stringval"; "__gc_init"; "raw"]
+    let list        = ["read"; "write"; ".elem"; ".length"; ".array"; ".stringval"]
     let bindings () = List.map (fun name -> name, Value.Builtin name) list
     let names       = List.map (fun name -> name, false) list
                  
@@ -120,8 +120,6 @@ module Builtin =
     | ".length"     -> (st, i, o, (Value.of_int (match List.hd args with Value.Sexp (_, a) | Value.Array a -> Array.length a | Value.String s -> Bytes.length s))::vs)
     | ".array"      -> (st, i, o, (Value.of_array @@ Array.of_list args)::vs)
     | ".stringval"  -> let [a] = args in (st, i, o, (Value.of_string @@ Value.string_val a)::vs)
-    | "__gc_init"   -> (st, i, o, vs)
-    | "raw"         -> let [a] = args in (st, i, o, a :: vs)
 
   end
 

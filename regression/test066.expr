@@ -8,4 +8,6 @@ fun f (a) {
   return g (a)
 }
 
+local x = read ();
+
 write (f(10)(5))

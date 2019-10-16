@@ -2,4 +2,6 @@ infixr "**" before "*" (f, g) {
   return fun (x) {return f (g (x))}
 }
 
+local x = read ();
+
 write ((fun (x) {return x+2} ** fun (x) {return x+3})(7))

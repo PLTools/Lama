@@ -8,7 +8,7 @@
 # include <sys/mman.h>
 # include <assert.h>
 
-/*# define __ENABLE_GC__*/
+# define __ENABLE_GC__
 # ifndef __ENABLE_GC__
 # define alloc malloc
 # endif
@@ -281,9 +281,9 @@ extern void* Bclosure (int n, void *entry, ...) {
   
   va_start(args, n);
   
-  for (i = 1; i<n; i++) {
+  for (i = 0; i<n; i++) {
     ai = va_arg(args, int);
-    ((int*)r->contents)[i] = ai;
+    ((int*)r->contents)[i+1] = ai;
   }
   
   va_end(args);
@@ -528,8 +528,8 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
+//static size_t SPACE_SIZE = 128;
 static size_t SPACE_SIZE = 1280;
-// static size_t SPACE_SIZE = 1280;
 # define POOL_SIZE (2*SPACE_SIZE)
 
 static void swap (size_t ** a, size_t ** b) {

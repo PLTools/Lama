@@ -15,11 +15,11 @@ let word_size = 4;;
 
 (* We need to distinguish the following operand types: *)
 @type opnd =
-| R of int    (* hard register                    *)
-| S of int    (* a position on the hardware stack *)
-| M of string (* a named memory location          *)
-| L of int    (* an immediate operand             *)
-| I of opnd   (* an indirect operand              *)
+| R  of int        (* hard register                    *)
+| S  of int        (* a position on the hardware stack *)
+| M  of string     (* a named memory location          *)
+| L  of int        (* an immediate operand             *)
+| I  of int * opnd (* an indirect operand with offset  *)
 with show
 
 let show_opnd = show(opnd)
@@ -73,13 +73,14 @@ let show instr =
   | _     -> failwith "unknown binary operator"
   in
   let rec opnd = function
-  | R i -> regs.(i)
-  | S i -> if i >= 0
-           then Printf.sprintf "-%d(%%ebp)" ((i+1) * word_size)
-           else Printf.sprintf "%d(%%ebp)"  (8+(-i-1) * word_size)
-  | M x -> x
-  | L i -> Printf.sprintf "$%d" i
-  | I x -> Printf.sprintf "(%s)" (opnd x)
+  | R i      -> regs.(i)
+  | S i      -> if i >= 0
+                then Printf.sprintf "-%d(%%ebp)" ((i+1) * word_size)
+                else Printf.sprintf "%d(%%ebp)"  (8+(-i-1) * word_size)
+  | M x      -> x
+  | L i      -> Printf.sprintf "$%d" i
+  | I (0, x) -> Printf.sprintf "(%s)" (opnd x)
+  | I (n, x) -> Printf.sprintf "%d(%s)" n (opnd x)
   in
   match instr with
   | Cltd               -> "\tcltd"
@@ -132,6 +133,7 @@ let compile env code =
       let pushr, popr =
         List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
       in
+      let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in
       let env, code =
         let rec push_args env acc = function
         | 0 -> env, acc
@@ -141,35 +143,73 @@ let compile env code =
         let env, pushs   = push_args env [] n in
         let pushs        = List.rev pushs     in
         let closure, env = env#pop            in
-        let call_closure = [Mov (closure, eax); CallI closure] in
+        let call_closure = [Mov (closure, edx); CallI closure] in
         env, pushr @ pushs @ call_closure @ [Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr)
       in
       let y, env = env#allocate in env, code @ [Mov (eax, y)]
     in
     let call env f n =
-      let f =
-        match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
+      let closure =
+        try
+          let BEGIN (_, _, _, closure) :: _ = env#labeled f in closure
+        with Not_found -> []
       in
-      let pushr, popr =
-        List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
-      in
-      let env, code =
-        let rec push_args env acc = function
-        | 0 -> env, acc
-        | n -> let x, env = env#pop in
-               push_args env ((Push x)::acc) (n-1)
-        in
-        let env, pushs = push_args env [] n in
-        let pushs      =
-          match f with
-          | "Barray" -> List.rev @@ (Push (L n)) :: pushs
-          | "Bsexp"  -> List.rev @@ (Push (L n)) :: pushs
-          | "Bsta"   -> pushs
-          | _        -> List.rev pushs
-        in
-        env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr)
-      in
-      let y, env = env#allocate in env, code @ [Mov (eax, y)]
+      match closure with
+      | [] ->
+         let f =
+           match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
+         in
+         let pushr, popr =
+           List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
+         in      
+         let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in
+         let env, code =
+           let rec push_args env acc = function
+             | 0 -> env, acc
+             | n -> let x, env = env#pop in
+                    push_args env ((Push x)::acc) (n-1)
+           in
+           let env, pushs = push_args env [] n in
+           let pushs      =
+             match f with
+             | "Barray" -> List.rev @@ (Push (L n)) :: pushs
+             | "Bsexp"  -> List.rev @@ (Push (L n)) :: pushs
+             | "Bsta"   -> pushs
+             | _        -> List.rev pushs
+           in
+           env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr)
+         in
+         let y, env = env#allocate in env, code @ [Mov (eax, y)]
+      | _ ->
+         let pushr, popr =
+           List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
+         in
+         let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in      
+         let rec push_args env acc = function
+           | 0 -> env, acc
+           | n -> let x, env = env#pop in
+                  push_args env ((Push x)::acc) (n-1)
+         in         
+         let env, push_args = push_args env [] n in
+         let push_args      = List.rev push_args  in         
+         let closure_len    = List.length closure in 
+         let push_closure =
+           List.map (fun d -> Push (env#loc d)) @@ List.rev closure
+         in
+         let s, env = env#allocate in             
+         (env, pushr @
+               push_args @
+               push_closure @
+              [Push (M ("$" ^ f));
+               Push (L closure_len);
+               Call "Bclosure";
+               Binop ("+", L (word_size * (closure_len + 2)), esp); 
+               Mov (eax, edx);
+               CallI edx;
+               Binop ("+", L (word_size * List.length push_args), esp);
+               Mov (eax, s)
+               ] @
+               List.rev popr)
     in
     match scode with
     | [] -> env, []
@@ -239,8 +279,8 @@ let compile env code =
              let v, x, env' = env#pop2 in
              env'#push x,
              (match x with
-              | S _ | M _ -> [Mov (v, edx); Mov (x, eax); Mov (edx, I eax); Mov (edx, x)]
-              | _         -> [Mov (v, eax); Mov (eax, I x); Mov (eax, x)]
+              | S _ | M _ -> [Mov (v, edx); Mov (x, eax); Mov (edx, I (0, eax)); Mov (edx, x)] @ env#reload_closure
+              | _         -> [Mov (v, eax); Mov (eax, I (0, x)); Mov (eax, x)]
              )
 
           | BINOP op ->
@@ -268,7 +308,7 @@ let compile env code =
                   Sal1 edx;
                   Or1  edx;
                   Mov (edx, y)
-                 ]
+                 ] @ env#reload_closure
               | "<" | "<=" | "==" | "!=" | ">=" | ">" ->
                  (match x with
                   | M _ | S _ ->
@@ -279,7 +319,7 @@ let compile env code =
                       Sal1   eax;
                       Or1    eax;
                       Mov   (eax, y)
-                     ]
+                     ] @ env#reload_closure
                   | _ ->
                      [Binop ("^"  , eax, eax);
                       Binop ("cmp", x, y);
@@ -311,7 +351,7 @@ let compile env code =
                   Sal1  eax;
                   Or1   eax;
 		  Mov   (eax, y)
-                 ]
+                 ] @ env#reload_closure
 	      | "!!" ->
 		 [Mov   (y, eax);
                   Sar1  eax;
@@ -344,24 +384,30 @@ let compile env code =
              env#assert_empty_stack;
              let has_closure = closure <> [] in
              let env  = env#enter f nlocals has_closure in
-             env, (if has_closure then [Push eax] else []) @
-                   [Push ebp;
-                    Mov (esp, ebp);
-                    Binop ("-", M ("$" ^ env#lsize), esp);
-                    Mov (esp, edi);
-	            Mov (M "$filler", esi);
-	            Mov (M ("$" ^ (env#allocated_size)), ecx);
-	            Repmovsl
-                  ]
+             env, (if has_closure then [Push edx] else []) @
+                  [Push ebp;
+                   Mov (esp, ebp);
+                   Binop ("-", M ("$" ^ env#lsize), esp);
+                   Mov (esp, edi);
+	           Mov (M "$filler", esi);
+	           Mov (M ("$" ^ (env#allocated_size)), ecx);
+	           Repmovsl
+                  ] @
+                  (if f = "main" then [Call "L__gc_init"] else [])   
 
           | END ->
-             env#endfunc, [Label env#epilogue;
-                   Mov (ebp, esp);
-                   Pop ebp;
-                   Ret;
-                   Meta (Printf.sprintf "\t.set\t%s,\t%d" env#lsize (env#allocated * word_size));
-                   Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated)
-                  ]
+             let name = env#fname in
+             env#leave, [
+                 Label env#epilogue;
+                 Mov (ebp, esp);
+                 Pop ebp
+               ] @
+               env#rest_closure @
+               (if name = "main" then [Binop ("^", eax, eax)] else []) @
+               [Ret;
+                Meta (Printf.sprintf "\t.set\t%s,\t%d" env#lsize (env#allocated * word_size));
+                Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated)
+               ]
 
           | RET ->
              let x, env = env#pop in
@@ -448,8 +494,21 @@ class env prg =
     val has_closure     = false
 
     method max_locals_size = max_locals_size
+                           
+    method has_closure = has_closure
+                       
+    method save_closure =
+      if has_closure then [Push edx] else []
 
-    method endfunc =
+    method rest_closure =
+      if has_closure then [Pop edx] else []
+
+    method reload_closure =
+      if has_closure then [Mov (S 0, edx)] else []
+      
+    method fname = fname
+                 
+    method leave =
       if stack_slots > max_locals_size
       then {< max_locals_size = stack_slots >}
       else self
@@ -491,16 +550,10 @@ class env prg =
       match x with
       | Value.Global name -> M ("global_" ^ name)
       | Value.Fun    name -> M ("$" ^ name)
-      | Value.Local  i    -> S ((if has_closure then 1 else 0) + i)
-      | Value.Arg    i    -> S (- (i+1))
-      | Value.Access i    -> invalid_arg "closure access not yet implemented"
-                           
-      (*
-      try S (- (List.assoc x args)  -  1)
-      with Not_found ->
-        try S (assoc x locals) with Not_found -> M ("global_" ^ x)
-       *)
-      
+      | Value.Local  i    -> S i
+      | Value.Arg    i    -> S (- (i + if has_closure then 2 else 1))
+      | Value.Access i    -> I (word_size * (i+1), edx)
+         
     (* allocates a fresh position on a symbolic stack *)
     method allocate =
       let x, n =
@@ -564,8 +617,7 @@ class env prg =
                      
     (* enters a function *)
     method enter f nlocals has_closure =
-      let n = nlocals + (if has_closure then 1 else 0) in
-      {< static_size = n; stack_slots = n; stack = []; fname = f; has_closure = has_closure >}
+      {< static_size = nlocals; stack_slots = nlocals; stack = []; fname = f; has_closure = has_closure >}
 
     (* returns a label for the epilogue *)
     method epilogue = Printf.sprintf "L%s_epilogue" fname
@@ -588,18 +640,7 @@ class env prg =
    the stack code, then generates x86 assember code, then prints the assembler file
 *)
 let genasm prog =
-  let decorate e =
-    Expr.Seq (
-        Expr.Ignore (Expr.Call (Expr.Var "__gc_init", [])), 
-        Expr.Seq (e, Expr.Return (Some (Expr.Call (Expr.Var "raw", [Expr.Const 0]))))    
-      ) 
-  in  
-  let expr =
-    match prog with
-    | Expr.Scope (defs, e) -> Expr.Scope (defs, decorate e)
-    | _ -> decorate prog  
-  in
-  let sm        = SM.compile expr in
+  let sm        = SM.compile prog in
   let env, code = compile (new env sm) sm in
   let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
   let data = [Meta "\t.data";

@@ -17,4 +17,6 @@ fun a (x, y) {
   }
 }
 
+local x = read ();
+
 a (5, 7) ()

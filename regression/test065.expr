@@ -18,4 +18,6 @@ fun p (l) {
   esac
 }
 
+local x = read ();
+
 p (f ())
