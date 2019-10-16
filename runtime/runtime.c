@@ -13,7 +13,7 @@
 # define alloc malloc
 # endif
 
-/*# define DEBUG_PRINT 1*/
+/* # define DEBUG_PRINT 1 */
 
 /* GC pool structure and data; declared here in order to allow debug print */
 typedef struct {
@@ -276,7 +276,7 @@ extern void* Bclosure (int n, void *entry, ...) {
 #endif
   r = (data*) alloc (sizeof(int) * (n+2));
 
-  r->tag = CLOSURE_TAG | (n << 3);
+  r->tag = CLOSURE_TAG | ((n + 1) << 3);
   ((void**) r->contents)[0] = entry;
   
   va_start(args, n);
@@ -528,8 +528,8 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-//static size_t SPACE_SIZE = 128;
-static size_t SPACE_SIZE = 1280;
+static size_t SPACE_SIZE = 128;
+//static size_t SPACE_SIZE = 1280;
 # define POOL_SIZE (2*SPACE_SIZE)
 
 static void swap (size_t ** a, size_t ** b) {
@@ -650,11 +650,10 @@ extern size_t * gc_copy (size_t *obj) {
       current += (LEN(d->tag) + 1) * sizeof (int);
       *copy = d->tag;
       copy++;
-      *copy = d->contents[0];
-      copy++;
       i = LEN(d->tag) - 1;
-      d->tag = (int) (copy-1);
-      copy_elements (copy, obj, i);
+      d->tag = (int) copy;
+      *copy = obj[0];
+      copy_elements (copy, obj++, i);
       break;
     
     case ARRAY_TAG:
@@ -818,7 +817,7 @@ static void printFromSpace (void) {
     case CLOSURE_TAG:
       printf ("(=>%p): CLOSURE\n\t", d->contents);
       len = LEN(d->tag);
-      for (int i = 1; i < len; i++) {
+      for (int i = 0; i < len; i++) {
 	int elem = ((int*)d->contents)[i];
 	if (UNBOXED(elem)) printf ("%d ", elem);
 	else printf ("%p ", elem);
