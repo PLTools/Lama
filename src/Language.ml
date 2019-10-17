@@ -295,8 +295,8 @@ module Expr =
     (* The type of configuration: a state, an input stream, an output stream,
        and a stack of values
     *)
-    @type 'a value  = ('a, 'a value State.t) Value.t with show,html
-    @type 'a config = 'a value State.t * int list * int list * 'a value list with show,html
+    @type 'a value  = ('a, 'a value State.t array) Value.t with show, html
+    @type 'a config = 'a value State.t * int list * int list * 'a value list with show, html
     (* The type for expressions. Note, in regular OCaml there is no "@type..."
        notation, it came from GT.
     *)
@@ -411,7 +411,7 @@ module Expr =
       in
       match expr with
       | Lambda (args, body) ->
-         eval (st, i, o, Value.Closure (args, body, st) ::vs) Skip k        
+         eval (st, i, o, Value.Closure (args, body, [|st|]) :: vs) Skip k        
       | Scope (defs, body) ->
          let vars, body, bnds =
            List.fold_left
@@ -442,7 +442,7 @@ module Expr =
          let v =
            match State.eval st x with
            | Value.FunRef (_, args, body, level) ->
-              Value.Closure (args, body, State.prune st level)
+              Value.Closure (args, body, [|State.prune st level|])
            | v -> v
          in
          eval (st, i, o, v :: vs) Skip k
@@ -468,8 +468,9 @@ module Expr =
              | Value.Builtin name ->
                 Builtin.eval (st, i, o, vs') es name
              | Value.Closure (args, body, closure) ->
-                let st' = State.push (State.leave st closure) (State.from_list @@ List.combine args es) (List.map (fun x -> x, true) args) in
+                let st' = State.push (State.leave st closure.(0)) (State.from_list @@ List.combine args es) (List.map (fun x -> x, true) args) in
                 let st'', i', o', vs'' = eval (st', i, o, []) Skip body in
+                closure.(0) <- st'';
                 (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')                      
              | _ -> invalid_arg (Printf.sprintf "callee did not evaluate to a function: %s" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") f))
             ))]))
