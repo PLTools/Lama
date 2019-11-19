@@ -115,7 +115,7 @@ All existing rules have to be rewritten~--- we need to formally add a $\withenv{
 Finally, the top-level semantics for the extended stack machine can be redefined as follows:
 
 \[
-\forall p\in\mathscr P,\,\forall i\in\mathbb Z^*\;:\;\sembr{p}_{SM}\;i=o\Leftrightarrow\withenv{p}{\trans{\inbr{\epsilon, \inbr{\bot, i, \epsilon}}}{p}{\inbr{\_, \inbr{\_, \_, o}}}}
+\forall p\in\mathscr P,\,\forall i\in\mathbb Z^*\;:\;\sembr{p}_{SM}\;i=o\Leftrightarrow\withenv{p}{\trans{\inbr{\epsilon, \inbr{\lambda, i, \epsilon}}}{p}{\inbr{\_, \inbr{\_, \_, o}}}}
 \]
 
 \subsection{Syntax Extensions}

@@ -48,7 +48,7 @@ With the relation ``$\Rightarrow$'' defined we can abbreviate the ``surface'' se
 \setarrow{\xRightarrow}
 
 \[
-\forall S\in\mathscr S,\,\forall \iota\in\mathbb Z^*\;:\;\sembr{S}_{\mathscr S} \iota = o \Leftrightarrow \trans{\inbr{\bot, i, \epsilon}}{S}{\inbr{\_, \_, o}}
+\forall S\in\mathscr S,\,\forall \iota\in\mathbb Z^*\;:\;\sembr{S}_{\mathscr S} \iota = o \Leftrightarrow \trans{\inbr{\Lambda, i, \epsilon}}{S}{\inbr{\_, \_, o}}
 \]
 
 
@@ -102,7 +102,7 @@ now we have one axiom and six inference rules (one per instruction).
 As for the statement, with the aid of the relation ``$\Rightarrow$'' we can define the surface semantics of stack machine:
 
 \[
-\forall p\in\mathscr P,\,\forall i\in\mathbb Z^*\;:\;\sembr{p}_{SM}\;i=o\Leftrightarrow\trans{\inbr{\epsilon, \inbr{\bot, i, \epsilon}}}{p}{\inbr{\_, \inbr{\_, \_, o}}}
+\forall p\in\mathscr P,\,\forall i\in\mathbb Z^*\;:\;\sembr{p}_{SM}\;i=o\Leftrightarrow\trans{\inbr{\epsilon, \inbr{\Lambda, i, \epsilon}}}{p}{\inbr{\_, \inbr{\_, \_, o}}}
 \]
 
 \begin{figure}[t]

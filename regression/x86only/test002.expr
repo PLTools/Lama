@@ -1,4 +1,6 @@
-fun collect_ints_acc (v, tail) local i {
+fun collect_ints_acc (v, tail) {
+  local i;
+  
   case v of
     a@#unboxed -> return Cons (a, tail)
   | #string    -> return tail

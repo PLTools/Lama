@@ -1,0 +1,215 @@
+\section{S-expressions and Pattern Matching}
+
+S-expressions can be considered as arrays with additionally attached \emph{tags} (of constructors). We denote
+the set of all constructors as $\mathscr C$:
+
+\[
+\mathscr{C}=\{C_1, C_2, \dots\}
+\]
+
+Thus, the set of all S-expressions can be described as
+
+\[
+\mathscr{S}_{exp}=\mathscr{C}\times\mathscr{A}(\mathscr{V})
+\]
+
+In the concrete syntax constructors are represented by identifiers started with capital letters (A-Z). As
+being represented as augmented arrays, the values of S-expressions can be manipulated by array
+primitives (in particular, their elements can be accessed and assigned using square brackets); like arrays
+they are stored in abstract memory and accessed via locations.
+
+\subsection{S-expressions on expression level}
+
+At the expression level S-expressions are represented by a single additional syntactic form:
+
+\[
+\mathscr{E} += \mathscr{C}\mathscr{E}^*
+\]
+
+In the concrete syntax this form is represented by expressions ``\lstinline|C (e$_1$, e$_1$, ..., e$_k$)|'' or just ``\lstinline|C|''
+if no constructor arguments are specified. The semantics of this form of expression is straightforward: all arguments are
+sequentially evauated left-to right and their values are packed into an array with appropriate tag attached:
+
+\setsubarrow{_{\mathscr E}}
+\arraycolsep=10pt
+\[\trule{\begin{array}{c}
+            \withenv{\Phi}{\trans{c_j}{e_j}{c_{j+1}}},\,j\in [0..k]\\
+            \inbr{s,\,\mu,\,l_m,\,i,\,o,\,\_}=c_{k+1}
+         \end{array}
+        }
+        {\withenv{\Phi}{\trans{c_0}{C\mathtt{(}e_0, e_1,...,e_k\mathtt{)}}{\inbr{s,\,\mu\,[l_m\gets(C, (k+1,\,\lambda n.\primi{val}{c_n}))],\,l_{m+1},\,i,\,o,\,l_m}}}}
+        \ruleno{S$_{exp}$}
+\]
+
+
+\subsection{Patterns Matching}
+
+Pattern-matching is a new control construct which allows to discriminate between different constructors of S-expressions. Pattern-matching is added at
+the statement level, its abstract syntax is as follows:
+
+\[
+\mathscr S += \primi{case}\,\mathscr{E}\,(\mathscr{P}\times\mathscr{S})^*
+\]
+
+Here $\mathscr P$ stands for a new syntactic category~--- \emph{patterns} (see below). In the concrete syntax:
+
+\begin{lstlisting}
+    case $e$ of $p_1$ -> $s_1$ | ... | $p_k$ -> $s_k$ esac
+\end{lstlisting}
+
+where $e$~--- expression (\emph{scrutinee}), $p_i$~--- patterns, $s_i$~--- statements.
+
+The syntactic category of patterns is defined as follows:
+
+\[
+\mathscr P = \_ \mid \mathscr X \mid C \mathscr{P}^*
+\]
+
+In the concrete syntax: ``\lstinline|_|'', ``\lstinline|x|'', ``\lstinline|C ($p_1$, $p_2$, ..., $p_k$)|'' or just ``\lstinline|C|'',
+where $x$~--- variable, $C$~--- constructor, $p_i$~--- patterns. Informally speaking, each pattern describes a
+set of S-expressions and a set of bindings of variables to sub sub-expression of each of these expressions. To specify
+this precisly we introduce the following semantics for patterns: for a pattern $p$ and abstract memory function $\mu$ we
+define
+
+\[
+\sembr{p}^\mu : \mathscr{V}\to\bot\uplus(2^{\mathscr X}\times(\mathscr{X}\to\mathscr{V}))
+\]
+
+$\sembr{p}^\mu$ defines a procedure to inspect a value $v$; as a result either $\bot$ (which can be interpreted as a witness that $v$
+does not belong to the set of values defined by $p$) or a set of variables in the patterns with their bindings is returned.
+The definition is as follows:
+
+\[
+\begin{array}{rclcl}
+  \sembr{\_}^\mu\; v                      &=& \inbr{\emptyset,\,\mbox{empty state}} & & \\
+  \sembr{x}^\mu\; v                       &=& \inbr{\{x\},\, [x \gets v]} & & \\
+  \sembr{C (p_1, p_2, \dots, p_k)}^\mu\; l &=& \bigoplus_i\,(\sembr{p_i}^\mu\;v_i) &,& \mu\,(l)=C\,(v_1,v_2,\dots,v_k)\\
+  \sembr{p}^\mu\; v                       &=& \bot &,& \mbox{otherwise}
+\end{array}
+\]
+
+where $\bigoplus$ unions the bindings:
+
+\[
+\begin{array}{rcl}
+  \bot \oplus \_ & = & \bot \\
+  \_ \oplus \bot & = & \bot \\
+  \inbr{S_1,\,\sigma_1} \oplus \inbr{S_2,\,\sigma_2} & = & \inbr{S_1\cup S_2,\,\lambda x . \left\{
+                                     \begin{array}{rcl}
+                                       \sigma_2\, x &,& x\in S_2\\
+                                       \sigma_1\, x &,& x\in S_1\setminus S_2
+                                     \end{array}
+                                   \right.}
+\end{array}
+\]
+
+As pattern matching may introduce new bindings, we need also to modify the definition of state:
+
+\[
+\Sigma=(\mathscr X\to \mathscr V) \times (2^{\mathscr X} \times (\mathscr X\to \mathscr V))^*
+\]
+
+
+Now we have one global state and a list of local scopes with sets of variables and their bindings. The redefined state primitives
+look like the follows. Evaluating in the state:
+
+
+\[
+\begin{array}{rcl}
+  \inbr{\sigma_g,\,\epsilon}\;x&=&\sigma_g\;x\\
+  \inbr{\sigma_g,\,\inbr{S,\,\sigma_l}::t}\;x&=&
+     \left\{\begin{array}{rcl}
+              \sigma_l\;x & , & x\in S\\
+              \inbr{\sigma_g,\,t}\;x & , & x\not\in S
+           \end{array}
+     \right.
+\end{array}
+\]
+
+Updating the state:
+
+\[
+ \inbr{\sigma_g,\,s}[x\gets z]=\primi{update}{\inbr{\sigma_g,\,s}\;\epsilon\;x\;z}
+\]
+
+where $\primi{update}{}$ is defined as follows:
+
+\[
+\begin{array}{rcl}
+  \primi{update}{\inbr{\sigma_g,\,\epsilon}\;s\;x\;z}&=&\inbr{\sigma_g[x\gets z],\,s}\\
+  \primi{update}{\inbr{\sigma_g,\,\inbr{S,\,\sigma_l}::t}\;s\;x\;z}&=&\left\{
+     \begin{array}{rcl}
+       \inbr{\sigma_g,\,s\llang{@}\inbr{S,\,\sigma_l[x\gets z]}t} &,&x\in S\\
+       \primi{update}{\inbr{\sigma_g,\,t}\;s\llang{@}\inbr{S,\,\sigma_l}\;x\;z} &,&x\not\in S
+     \end{array}\right.
+\end{array}
+\]
+
+Empty state:
+
+\[
+\Lambda=\inbr{\Lambda,\,\epsilon}
+\]
+
+Primitives $\primi{enter}{}$/$\primi{leave}{}$:
+
+\[
+\begin{array}{rcl}
+  \primi{enter}{\inbr{\sigma_g,\,\_}\,S} & = & \inbr{\sigma_g,\,\inbr{S,\,\Lambda}}\\
+  \primi{leave}{\inbr{\sigma_g,\,\_}\,\inbr{\_,\,t}}& = & \inbr{\sigma_g,\,t}
+\end{array}
+\]
+
+We will also need two additional primitives to push/drop new scopes:
+
+\[
+\begin{array}{rcl}
+  \primi{push}{\inbr{\sigma_g,\,t}\;s}&=&\inbr{\sigma_g,\,s::t}\\
+  \primi{drop}{\inbr{\sigma_g,\,\_::t}}&=&\inbr{\sigma_g,\,t}
+\end{array}
+\]
+
+We will also use these primitives for the whole configurations, meaning that they apply only to their state parts and leave
+all other components intact.
+
+To specify big-step semantics for pattern-matching we need a yet another ``intrinsic'' statement
+$\primi{leave}{}$ (remember, the first one was ``$\diamond$''). The rules are shown on Fig.~\ref{pattern_matching}; note,
+we need an additional transition relation ``${\setsubarrow{_{\mathscr P}}\transarrow{}\subarrow}$'' to reflect the top-down
+pattern-matching discipline.
+
+\begin{figure}
+  \[\trule{\withenv{\llang{skip},\,\Phi}{\trans{\primi{drop}{c}}{K}{c^\prime}}}
+          {\withenv{K,\,\Phi}{\trans{c}{\primi{leave}{}}{c^\prime}}}
+    \ruleno{Leave}
+  \]
+
+  \[\trule{\begin{array}{cc}
+             {\setsubarrow{_{\mathscr E}}\withenv{\Phi}{\trans{c}{e}{c^\prime}}} & {\setsubarrow{_{\mathscr P}}\withenv{K,\,\Phi}{\trans{c^\prime}{\inbr{\primi{val}{c^\prime},\,ps}}{c^{\prime\prime}}}}
+           \end{array}
+          }
+          {\withenv{K,\,\Phi}{\trans{c}{\llang{case $\;e\;$ $\;ps$}}{c^{\prime\prime}}}}
+    \ruleno{Case}
+  \]
+  
+  \setsubarrow{_{\mathscr P}}
+
+  \[\trule{\begin{array}{cc}
+              \sembr{p}^{\primi{mem}{c}}\;v=r\;(\neq\bot) & \withenv{\primi{leave}{}\diamond K,\,\Phi}{\trans{\primi{push}{c\;r}}{s}{c^\prime}}
+           \end{array}
+          }
+          {\withenv{K,\,\Phi}{\trans{c}{\inbr{v,\,\inbr{p,\,s}::t}}{c^\prime}}}
+    \ruleno{PatternMatched}
+  \]
+    
+  \[\trule{\begin{array}{cc}
+              \sembr{p}^{\primi{mem}{c}}\;v=\bot & \withenv{K,\,\Phi}{\trans{c}{\inbr{v,\,t}}{c^\prime}}
+           \end{array}
+          }
+          {\withenv{K,\,\Phi}{\trans{c}{\inbr{v,\,\inbr{p,\,s}::t}}{c^\prime}}}
+    \ruleno{PatternNotMatched}
+  \]
+  
+  \caption{Continuation-passing Style Semantics for Pattern Matching}
+  \label{pattern_matching}
+\end{figure}
+

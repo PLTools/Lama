@@ -9,7 +9,7 @@ fun insert (tree, value) {
   esac  
 }
 
-tree := Empty;
+local i, tree = Empty;
 
 for i := 0, i <= 10, i := i+1 do
  printf ("%s\n", tree.string);
