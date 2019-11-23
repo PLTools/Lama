@@ -328,7 +328,7 @@ module Expr =
     (* leave a scope              *) | Leave
     (* intrinsic (for evaluation) *) | Intrinsic of (t config, t config) arrow
     (* control (for control flow) *) | Control   of (t config, t * t config) arrow
-    and decl = [`Fun of string list * t | `Variable of t option]
+    and decl = [`Local | `Public | `Extern] * [`Fun of string list * t | `Variable of t option]
     with show,html
 
     (* Reff : parsed expression should return value Reff (look for ":=");
@@ -416,11 +416,16 @@ module Expr =
          let vars, body, bnds =
            List.fold_left
              (fun (vs, bd, bnd) -> function
-              | (name, `Variable value) -> (name, true) :: vs, (match value with None -> bd | Some v -> Seq (Ignore (Assign (Ref name, v)), bd)), bnd
-              | (name, `Fun (args, b))  -> (name, false) :: vs, bd, (name, Value.FunRef (name, args, b, 1 + State.level st)) :: bnd
+              | (name, (_, `Variable value)) -> (name, true) :: vs, (match value with None -> bd | Some v -> Seq (Ignore (Assign (Ref name, v)), bd)), bnd
+              | (name, (_, `Fun (args, b)))  -> (name, false) :: vs, bd, (name, Value.FunRef (name, args, b, 1 + State.level st)) :: bnd
              )
              ([], body, [])
-             (List.rev defs)
+             (List.rev @@
+              List.map (function
+                        | (name, (`Extern, _)) -> raise (Semantic_error (Printf.sprintf "external names ('%s') not supported in evaluation" name))
+                        | x -> x
+                       )
+              defs)
          in
          eval (State.push st (State.from_list bnds) vars, i, o, vs) k (Seq (body, Leave))
       | Unit ->
@@ -447,7 +452,7 @@ module Expr =
          in
          eval (st, i, o, v :: vs) Skip k
       | Ref x ->
-         eval (st, i, o, (Value.Var (Value.Global x)) :: vs) Skip k
+         eval (st, i, o, (Value.Var (Value.Global x)) :: vs) Skip k (* only Value.Global is supported in interpretation *)
       | Array xs ->
          eval conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in Builtin.eval (st, i, o, vs') (List.rev es) ".array")]))
       | Sexp (t, xs) ->
@@ -700,9 +705,8 @@ module Expr =
       | %"for" i:parse[def][infix][Void] "," c:parse[def][infix][Val] "," s:parse[def][infix][Void] %"do" b:scope[def][infix][Void][parse def] => {isVoid atr} => %"od"
                                                                      {Seq (i, While (c, Seq (b, s)))}
 
-      | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val]
-                                                  => {isVoid atr} => {Repeat (s, e)}
-      | %"return" e:basic[def][infix][Val]?            => {isVoid atr} => {Return e}
+      | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val] => {isVoid atr} => {Repeat (s, e)}
+      | %"return" e:basic[def][infix][Val]? => {isVoid atr} => {Return e}
 
       | %"case" e:parse[def][infix][Val] %"of" bs:!(Util.listBy1)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse[def][infix][atr])] %"esac"
                                                                      {Case (e, bs)}
@@ -792,29 +796,43 @@ module Definition =
 
     (* The type for a definition: aither a function/infix, or a local variable *)
     type t = string * [`Fun of string list * Expr.t | `Variable of Expr.t option]
+
+    let unopt_mod = function None -> `Local | Some m -> m
       
     ostap (
-      arg : LIDENT;
+      arg : LIDENT;      
       position[ass][coord][newp]:
         %"at" s:STRING {Infix.at coord (unquote s) newp}
         | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord (unquote s) newp ass};
       head[infix]:
-        %"fun" name:LIDENT {name, infix}
-      | ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
+        m:(%"external" {`Extern} | %"public" {`Public})? %"fun" name:LIDENT {unopt_mod m, name, name, infix}
+    |   m:(%"public" {`Public})? ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
         l:$ op:(s:STRING {unquote s})
         md:position[ass][l#coord][op] {
           let name = Expr.infix_name op in
           match md (Expr.sem name) infix with
-          | `Ok infix' -> name, infix'
+          | `Ok infix' -> unopt_mod m, op, name, infix'
           | `Fail msg  -> raise (Semantic_error msg)
       };
-      local_var[infix][expr][def]: name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {name, `Variable value};
+      local_var[m][infix][expr][def]: name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {
+        match m, value with
+        | `Extern, Some _ -> raise (Semantic_error (Printf.sprintf "initial value for an external variable '%s' can not be specified" name))
+        | _               -> name, (m,`Variable value)
+      };
       parse[infix][expr][def]:
-        %"local" locs:!(Util.list (local_var infix expr def)) ";" {locs, infix}
-      | <(name, infix')> : head[infix] "(" args:!(Util.list0 arg) ")"
-         body:expr[def][infix'][Expr.Void] {
-           [(name, `Fun (args, body))], infix'
-      }
+        m:(%"local" {`Local} | %"public" {`Public} | %"external" {`Extern})
+        locs:!(Util.list (local_var m infix expr def)) ";" {locs, infix}
+      | - <(m, orig_name, name, infix')> : head[infix] -"(" -args:!(Util.list0 arg) -")"
+        (body:expr[def][infix'][Expr.Void] {
+            match m with
+            | `Extern -> raise (Semantic_error (Printf.sprintf "body for an external function '%s' can not be specified" orig_name))
+            | _       -> [(name, (m, `Fun (args, body)))], infix'
+         } |
+         ";" {
+            match m with
+            | `Extern -> [(name, (m, `Fun (args, Expr.Skip)))], infix'      
+            | _       -> raise (Semantic_error (Printf.sprintf "missing body for the function/infix '%s'" orig_name))
+         })           
     )
 
   end
@@ -836,8 +854,13 @@ let eval expr i =
 
 (* Top-level parser *)
 ostap (
-  parse[infix]: !(Expr.scope definitions infix Expr.Void (Expr.parse definitions));
+  parse[infix]:
+    <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Void)? {
+      Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
+    };
   definitions[infix]:
-    <(def, infix')> : !(Definition.parse infix Expr.basic definitions) <(defs, infix'')> : definitions[infix'] {def @ defs, infix''}
+    <(def, infix')> : !(Definition.parse infix Expr.basic definitions) <(defs, infix'')> : definitions[infix'] {
+      def @ defs, infix''
+     }
   | empty {[], infix}
 )

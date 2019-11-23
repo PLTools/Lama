@@ -1,0 +1,20 @@
+\section{Names, Values and States}
+
+\begin{table}[t]
+  \begin{tabular}{cccl}
+    denotation         & instances                       & definition                                 & comments \\
+    \hline
+    $\mathscr X$       & $x,\,y,\,z,\,\dots$             &                                            & variables \\
+    $\mathscr T$       & $\llang{C},\,\llang{D},\,\dots$ &                                            & tags (constructors) \\
+    $\Sigma$           & $\sigma$                        & $\mathscr X\to\mathscr V$                  & bindings (a partial map from variables to values) \\
+    $\Sigma_{\mathscr X}$ & $\inbr{\sigma,\,S}$             & $2^{\mathscr X}\times\Sigma$                 & local scope (a set of variable and bindings) \\
+    $St$               & $\inbr{\sigma_g,\,ss}$          & $\Sigma\times\Sigma^*_{\mathscr X}$           & state (global bindings and a stack of local scopes) \\
+    $\mathscr L$       & $l$                             &                                            & locations \\
+    $M$                & $\mu$                           & $\mathscr L\to\mathscr C$                  & abstract memory (a partial map from locations to composite values) \\
+    $\mathscr V$       & $v$                             & $\mathbb Z\uplus \mathscr L$               & values (integer values or locations) \\
+    $\mathscr C$       &                                 & $Arr\uplus Sexp \uplus Clo$                & composite values (arrays, S-expressions or closures) \\
+    $Arr$              &                                 & $\mathbb N\times (\mathbb N\to\mathscr V)$ & arrays (length and element function) \\
+    $Sexp$             &                                 & $\mathscr T \times Arr$                    & S-expressions (tag and array of subvalues) \\
+    $Clo$              &                                 & $\mathscr X \times \Sigma^*_{\mathscr X}$     & closures (function name and a stack of local scopes) 
+  \end{tabular}
+\end{table}

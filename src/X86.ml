@@ -217,6 +217,9 @@ let compile env code =
         let stack = env#show_stack in
         let env', code' =
           match instr with
+          | PUBLIC name -> env#register_public name, []
+          | EXTERN name -> env#register_extern name, []
+                         
           | CLOSURE name ->
              let pushr, popr =
                List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers 0)
@@ -492,7 +495,14 @@ class env prg =
     val barrier         = false   (* barrier condition                 *)
     val max_locals_size = 0
     val has_closure     = false
+    val publics         = S.empty
+    val externs         = S.empty
 
+    method publics = S.elements publics
+                   
+    method register_public name = {< publics = S.add name publics >}
+    method register_extern name = {< externs = S.add name externs >}
+                                
     method max_locals_size = max_locals_size
                            
     method has_closure = has_closure
@@ -548,7 +558,7 @@ class env prg =
     (* gets a name for a global variable *)
     method loc x =
       match x with
-      | Value.Global name -> M ("global_" ^ name)
+      | Value.Global name -> M ((*"global_" ^*) name)
       | Value.Fun    name -> M ("$" ^ name)
       | Value.Local  i    -> S i
       | Value.Arg    i    -> S (- (i + if has_closure then 2 else 1))
@@ -593,7 +603,7 @@ class env prg =
     (* registers a variable in the environment *)
     method variable x =
       match x with
-      | Value.Global name -> {< globals = S.add ("global_" ^ name) globals >}
+      | Value.Global name -> {< globals = S.add ((*"global_" ^*) name) globals >}
       | _                 -> self
 
     (* registers a string constant *)
@@ -605,7 +615,7 @@ class env prg =
         y, {< scount = scount + 1; stringm = m>}
 
     (* gets all global variables *)
-    method globals = S.elements globals
+    method globals = S.elements (S.diff globals externs)
 
     (* gets all string definitions *)
     method strings = M.bindings stringm
@@ -643,24 +653,32 @@ let genasm prog =
   let sm        = SM.compile prog in
   let env, code = compile (new env sm) sm in
   let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
+  let globals =
+    List.map (fun s -> Meta (Printf.sprintf "\t.globl\t%s" s)) ([gc_start; gc_end] @ env#publics)
+  in
   let data = [Meta "\t.data";
               Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size);
-              Meta (Printf.sprintf "\t.globl\t%s" gc_start); Meta (Printf.sprintf "\t.globl\t%s" gc_end)] @
-             [Meta (Printf.sprintf "%s:" gc_start)] @
-             (List.map (fun s      -> Meta (Printf.sprintf "%s:\t.int\t1"         s  )) env#globals) @
-             [Meta (Printf.sprintf "%s:" gc_end)] @
-             (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings)
+              Meta (Printf.sprintf "%s:" gc_start)] @
+              (List.map (fun s -> Meta (Printf.sprintf "%s:\t.int\t1" s)) env#globals) @
+              [Meta (Printf.sprintf "%s:" gc_end)] @
+              (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings)
   in
   let asm = Buffer.create 1024 in
   List.iter
     (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show i))
-    (data @ [Meta "\t.text"; Meta "\t.globl\tmain"] @ code);
+    (globals @ data @ [Meta "\t.text"] @ code);
   Buffer.contents asm
 
 (* Builds a program: generates the assembler file and compiles it with the gcc toolchain *)
-let build prog name =
+let build cmd prog =
+  let name = Filename.chop_suffix cmd#get_infile ".expr" in
   let outf = open_out (Printf.sprintf "%s.s" name) in
   Printf.fprintf outf "%s" (genasm prog);
   close_out outf;
   let inc = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
-  Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s.s %s/runtime.a" name name inc)
+  match cmd#get_mode with
+  | `Default ->
+     Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s.s %s/runtime.a" name name inc)
+  | `Compile ->
+     Sys.command (Printf.sprintf "gcc -g -m32 -c %s.s" name)
+  | _ -> invalid_arg "must not happen"

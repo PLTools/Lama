@@ -25,6 +25,7 @@
 \usepackage{multirow,bigdelim}
 \usepackage{subcaption}
 \usepackage{placeins}
+\usepackage{xspace}
 
 \makeatletter
 
@@ -71,15 +72,12 @@
 \renewcommand{\emptyset}{\varnothing}
 \newcommand{\dom}[1]{\mathtt{dom}\;{#1}}
 \newcommand{\primi}[2]{\mathbf{#1}\;{#2}}
-
+\newcommand{\sial}{S\textit{\lower -.5ex\hbox{I}\kern -.1667em\lower .5ex\hbox {A}}\kern -.125emL\@\xspace}
 \definecolor{light-gray}{gray}{0.90}
 \newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
 
-\lstdefinelanguage{ocaml}{
-keywords={let, begin, end, in, match, type, and, fun, 
-function, try, mod, with, class, object, method, of, rec, repeat, until,
-while, not, do, done, as, val, inherit, module, sig, @type, struct, 
-if, then, else, open, virtual, new, fresh, skip, od, fi, elif, for, local, return, read, write, fi, case, esac, od},
+\lstdefinelanguage{sial}{
+keywords={fun, case, esac, do, od, if, then, else, elif, fi, skip, repeat, until, for, local},
 sensitive=true,
 %basicstyle=\small,
 commentstyle=\scriptsize\rmfamily,
@@ -88,7 +86,7 @@ identifierstyle=\ttfamily,
 basewidth={0.5em,0.5em},
 columns=fixed,
 fontadjust=true,
-literate={->}{{$\to$}}3 {===}{{$\equiv$}}1 {=/=}{{$\not\equiv$}}1 {|>}{{$\triangleright$}}3 {\&\&\&}{{$\wedge$}}2 {|||}{{$\vee$}}2 {^}{{$\uparrow$}}1,
+literate={->}{{$\to$}}3,
 morecomment=[s]{(*}{*)}
 }
 
@@ -101,16 +99,12 @@ commentstyle=\scriptsize\rmfamily,
 basewidth={0.5em,0.5em},
 fontadjust=true,
 escapechar=!,
-language=ocaml
+language=sial
 }
 
 \sloppy
 
-\newcommand{\ocaml}{\texttt{OCaml}\xspace}
-
-\theoremstyle{definition}
-
-\title{Introduction to Programming Languages, Compilers and Tools}
+\title{\sial Language Definition}
 
 \author{Dmitry Boulytchev}
 
@@ -118,13 +112,8 @@ language=ocaml
 
 \maketitle
 
-\input{01}
-\input{02}
-\input{03}
-\input{04}
-\input{05}
-\input{06}
-\input{07}
-\input{08}
+\input{01.general_characteristic}
+\input{02.notation}
+\input{03.values}
 
 \end{document}

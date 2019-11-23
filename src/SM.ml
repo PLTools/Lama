@@ -30,6 +30,8 @@ open Language
 (* checks the tag and arity of S-expression  *) | TAG     of string * int
 (* checks the tag and size of array          *) | ARRAY   of int
 (* checks various patterns                   *) | PATT    of patt
+(* external definition                       *) | EXTERN  of string
+(* public definition                         *) | PUBLIC  of string                                                           
 with show
                                                    
 (* The type for the stack machine program *)
@@ -94,6 +96,7 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
    Printf.eprintf "end\n";
    *)
    (match insn with
+    | PUBLIC _ | EXTERN _     -> eval env conf prg'
     | BINOP  op               -> let y::x::stack' = stack in eval env (cstack, (Value.of_int @@ Expr.to_func op (Value.to_int x) (Value.to_int y)) :: stack', glob, loc, i, o) prg'
     | CONST n                 -> eval env (cstack, (Value.of_int n)::stack, glob, loc, i, o) prg'
     | STRING s                -> eval env (cstack, (Value.of_string @@ Bytes.of_string s)::stack, glob, loc, i, o) prg'
@@ -337,12 +340,19 @@ object (self : 'self)
   val lam_index    = 0
   val scope        = init_scope State.I
   val fundefs      = Top []
-            
+  val decls        = []
+                   
+  method global_scope = scope_index = 0
+                      
   method get_label = (label @@ string_of_int label_index), {< label_index = label_index + 1 >}
 
   method nargs   = scope.arg_index
   method nlocals = scope.nlocals
-                     
+
+  method get_decls =
+    List.map (function (name, `Extern) -> EXTERN name | (name, `Public) -> PUBLIC name | _ -> invalid_arg "must not happen") @@
+    List.filter (function (_, `Local) -> false | _ -> true) decls
+    
   method push_scope = {<    
     scope_index = scope_index + 1;
     scope       = {
@@ -414,8 +424,15 @@ object (self : 'self)
         arg_index = scope.arg_index + 1
       }
   >}
-                                 
-  method add_name (name : string) (mut : bool) = {<
+
+  method check_scope m name =
+    match m with
+    | `Local -> ()
+    |  _  ->
+       raise (Semantic_error (Printf.sprintf "external/public definitions ('%s') not allowed in local scopes" name))    
+    
+  method add_name (name : string) (m : [`Local | `Extern | `Public]) (mut : bool) = {<
+      decls = (name, m) :: decls;
       scope = {
         scope with
         st          = (match scope.st with
@@ -424,6 +441,7 @@ object (self : 'self)
                        | State.G (names, s)    ->
                           State.G (check_name_and_add names name mut, State.bind name (Value.Global name) s)
                        | State.L (names, s, p) ->
+                          self#check_scope m name;
                           State.L (check_name_and_add names name mut, State.bind name (Value.Local scope.local_index) s, p)
                       );
         local_index = (match scope.st with State.L _ -> scope.local_index + 1 | _ -> scope.local_index);
@@ -434,7 +452,7 @@ object (self : 'self)
   method fun_internal_name (name : string) =
     (match scope.st with State.G _ -> label | _ -> scope_label scope_index) name 
     
-  method add_fun_name (name : string) =
+  method add_fun_name (name : string) (m : [`Local | `Extern | `Public]) =
     let name' = self#fun_internal_name name in
     let st'   =
       match scope.st with
@@ -443,9 +461,11 @@ object (self : 'self)
       | State.G (names, s) ->
          State.G (check_name_and_add names name false, State.bind name (Value.Fun name') s)
       | State.L (names, s, p) ->
+         self#check_scope m name;
          State.L (check_name_and_add names name false, State.bind name (Value.Fun name') s, p)        
     in
     {<
+      decls = (name, m) :: decls;
       scope = {scope with st = st'}
     >}
 
@@ -453,11 +473,14 @@ object (self : 'self)
     let name' = self#fun_internal_name (Printf.sprintf "lambda_%d" lam_index) in
     {< fundefs = add_fun fundefs (to_fundef name' args body scope.st); lam_index = lam_index + 1 >}, name'
       
-  method add_fun (name : string) (args : string list) (body : Expr.t) =
+  method add_fun (name : string) (args : string list) (m : [`Local | `Extern | `Public]) (body : Expr.t) =
     let name' = self#fun_internal_name name in
-    {<
-      fundefs = add_fun fundefs (to_fundef name' args body scope.st)
-    >}
+    match m with
+    | `Extern -> self
+    | _ ->
+       {<
+         fundefs = add_fun fundefs (to_fundef name' args body scope.st)
+       >}
 
   method lookup name =
     match State.eval scope.st name with
@@ -543,7 +566,7 @@ let compile p =
     let env, code =
       List.fold_left
         (fun (env, acc) (name, path) ->
-           let env = env#add_name name true in
+           let env = env#add_name name `Local true in
            let env, dsg = env#lookup name in
            env,
            ([DUP] @
@@ -574,14 +597,14 @@ let compile p =
        List.fold_left
          (fun (env, e, funs) ->
            function
-           | name, `Fun (args, b)     -> env#add_fun_name name, e, (name, args, b) :: funs
-           | name, `Variable None     -> env#add_name name true, e, funs
-           | name, `Variable (Some v) -> env#add_name name true, Expr.Seq (Expr.Ignore (Expr.Assign (Expr.Ref name, v)), e), funs
+           | name, (m, `Fun (args, b))     -> env#add_fun_name name m, e, (name, args, m, b) :: funs
+           | name, (m, `Variable None)     -> env#add_name name m true, e, funs
+           | name, (m, `Variable (Some v)) -> env#add_name name m true, Expr.Seq (Expr.Ignore (Expr.Assign (Expr.Ref name, v)), e), funs
          )
          (env, e, [])
          (List.rev ds)
      in
-     let env = List.fold_left (fun env (name, args, b) -> env#add_fun name args b) env funs in
+     let env = List.fold_left (fun env (name, args, m, b) -> env#add_fun name args m b) env funs in
      let env, flag, code = compile_expr l env e in
      env#pop_scope, flag, code
  
@@ -709,6 +732,8 @@ let compile p =
   let env             = new env in
   let lend, env       = env#get_label in
   let env, flag, code = compile_expr lend env p in
-  let env, prg        = compile_fundefs [[LABEL "main"; BEGIN ("main", 0, env#nlocals, [])] @(if flag then code @ [LABEL lend] else code) @ [END]] env in
-  let prg             = List.flatten prg in
+  let code            = if flag then code @ [LABEL lend] else code in
+  let has_main        = List.length code > 0 in
+  let env, prg        = compile_fundefs [if has_main then [LABEL "main"; BEGIN ("main", 0, env#nlocals, [])] @ code @ [END] else []] env in
+  let prg             = (if has_main then [PUBLIC "main"] else []) @ env#get_decls @ List.flatten prg in
   prg

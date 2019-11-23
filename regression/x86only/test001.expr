@@ -1,3 +1,5 @@
+external fun printf ();
+
 fun insert (tree, value) {
   case tree of
     Empty -> return Node (value, Empty, Empty)

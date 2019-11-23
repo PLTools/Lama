@@ -1,3 +1,5 @@
+external fun printf ();
+
 local lists = [
  {},
  {1, 2, 3, 4},

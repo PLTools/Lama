@@ -1,3 +1,5 @@
+external fun printf ();
+
 fun collect_ints_acc (v, tail) {
   local i;
   
