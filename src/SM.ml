@@ -350,7 +350,14 @@ object (self : 'self)
   method nlocals = scope.nlocals
 
   method get_decls =
-    List.map (function (name, `Extern) -> EXTERN name | (name, `Public) -> PUBLIC name | _ -> invalid_arg "must not happen") @@
+    List.flatten @@
+    List.map
+      (function
+       | (name, `Extern)       -> [EXTERN name]
+       | (name, `Public)       -> [PUBLIC name]
+       | (name, `PublicExtern) -> [PUBLIC name; EXTERN name]
+       | _                     -> invalid_arg "must not happen"
+      ) @@
     List.filter (function (_, `Local) -> false | _ -> true) decls
     
   method push_scope = {<    
@@ -431,7 +438,7 @@ object (self : 'self)
     |  _  ->
        raise (Semantic_error (Printf.sprintf "external/public definitions ('%s') not allowed in local scopes" name))    
     
-  method add_name (name : string) (m : [`Local | `Extern | `Public]) (mut : bool) = {<
+  method add_name (name : string) (m : [`Local | `Extern | `Public | `PublicExtern]) (mut : bool) = {<
       decls = (name, m) :: decls;
       scope = {
         scope with
@@ -452,7 +459,7 @@ object (self : 'self)
   method fun_internal_name (name : string) =
     (match scope.st with State.G _ -> label | _ -> scope_label scope_index) name 
     
-  method add_fun_name (name : string) (m : [`Local | `Extern | `Public]) =
+  method add_fun_name (name : string) (m : [`Local | `Extern | `Public | `PublicExtern]) =
     let name' = self#fun_internal_name name in
     let st'   =
       match scope.st with
@@ -473,7 +480,7 @@ object (self : 'self)
     let name' = self#fun_internal_name (Printf.sprintf "lambda_%d" lam_index) in
     {< fundefs = add_fun fundefs (to_fundef name' args body scope.st); lam_index = lam_index + 1 >}, name'
       
-  method add_fun (name : string) (args : string list) (m : [`Local | `Extern | `Public]) (body : Expr.t) =
+  method add_fun (name : string) (args : string list) (m : [`Local | `Extern | `Public | `PublicExtern]) (body : Expr.t) =
     let name' = self#fun_internal_name name in
     match m with
     | `Extern -> self

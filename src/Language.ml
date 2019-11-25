@@ -328,7 +328,7 @@ module Expr =
     (* leave a scope              *) | Leave
     (* intrinsic (for evaluation) *) | Intrinsic of (t config, t config) arrow
     (* control (for control flow) *) | Control   of (t config, t * t config) arrow
-    and decl = [`Local | `Public | `Extern] * [`Fun of string list * t | `Variable of t option]
+    and decl = [`Local | `Public | `Extern | `PublicExtern ] * [`Fun of string list * t | `Variable of t option]
     with show,html
 
     (* Reff : parsed expression should return value Reff (look for ":=");
@@ -805,7 +805,7 @@ module Definition =
         %"at" s:STRING {Infix.at coord (unquote s) newp}
         | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord (unquote s) newp ass};
       head[infix]:
-        m:(%"external" {`Extern} | %"public" {`Public})? %"fun" name:LIDENT {unopt_mod m, name, name, infix}
+        m:(%"external" {`Extern} | %"public" e:(%"external")? {match e with None -> `Public | _ -> `PublicExtern})? %"fun" name:LIDENT {unopt_mod m, name, name, infix}
     |   m:(%"public" {`Public})? ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
         l:$ op:(s:STRING {unquote s})
         md:position[ass][l#coord][op] {
@@ -820,7 +820,7 @@ module Definition =
         | _               -> name, (m,`Variable value)
       };
       parse[infix][expr][def]:
-        m:(%"local" {`Local} | %"public" {`Public} | %"external" {`Extern})
+        m:(%"local" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
         locs:!(Util.list (local_var m infix expr def)) ";" {locs, infix}
       | - <(m, orig_name, name, infix')> : head[infix] -"(" -args:!(Util.list0 arg) -")"
         (body:expr[def][infix'][Expr.Void] {
