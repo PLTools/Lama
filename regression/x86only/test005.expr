@@ -1,0 +1,5 @@
+public fun from_test005 (s) {
+  printf ("called with %s\n", s)
+}
+
+from_test005 ("this one")

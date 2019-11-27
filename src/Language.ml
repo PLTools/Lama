@@ -837,10 +837,68 @@ module Definition =
 
   end
 
-(* The top-level definitions *)
+module Interface =
+  struct
+    
+    (* Generates an interface file. *)
+    let gen (imps, p) =
+      let buf = Buffer.create 256 in
+      let append str = Buffer.add_string buf str in
+      List.iter (fun i -> append "I,"; append i; append ";\n") imps;
+      (match p with
+       | Expr.Scope (decls, _) ->
+          List.iter
+            (function
+             | (name, (`Public, item)) | (name, (`PublicExtern, item))  ->
+                (match item with
+                 | `Fun _      -> append "F,"; append name; append ";\n"
+                 | `Variable _ -> append "V,"; append name; append ";\n"
+                )
+             | _ -> ()
+            )
+            decls;
+       | _ -> ());  
+      Buffer.contents buf
+      
+    (* Read an interface file *)
+    let read fname =
+      let ostap (
+              funspec: "F" "," i:IDENT ";" {`Fun i};
+              varspec: "V" "," i:IDENT ";" {`Variable i};
+              import : "I" "," i:IDENT ";" {`Import i};
+              interface: (funspec | varspec | import)*
+            )
+      in
+      try
+        let s = Util.read fname in
+        (match Util.parse (object
+                             inherit Matcher.t s
+                             inherit Util.Lexers.ident [] s
+                             inherit Util.Lexers.skip  [Matcher.Skip.whitespaces " \t\n"] s
+                           end)             
+                          (ostap (interface -EOF))
+         with
+         | `Ok intfs -> Some intfs
+         | `Fail er  -> invalid_arg (Printf.sprintf "malformed interface file '%s': %s" fname er)
+        )
+      with Sys_error _ -> None                        
 
-(* The top-level syntax category is a pair of definition list and statement (program body) *)
-type t = Definition.t list * Expr.t
+    let find import paths =
+      let rec inner = function
+      | [] -> None
+      | p::paths ->
+         (match read (Filename.concat p (import ^ ".i")) with
+          | None   -> inner paths
+          | Some i -> Some (p, i)
+         )
+      in
+      match inner paths with
+      | Some (path, intfs) -> path, intfs
+      | None               -> invalid_arg (Printf.sprintf "could not find an interface file for import '%s'" import)
+
+  end
+  
+(* The top-level definitions *)
 
 (* Top-level evaluator
 
@@ -848,15 +906,16 @@ type t = Definition.t list * Expr.t
 
    Takes a program and its input stream, and returns the output stream
 *)
-let eval expr i =
+let eval (_, expr) i =
   let _, _, o, _ = Expr.eval (State.empty, i, [], []) Skip expr in
   o
 
 (* Top-level parser *)
 ostap (
+  imports: is:(%"import" !(Util.list (ostap (LIDENT))) -";")* {List.flatten is};
   parse[infix]:
-    <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Void)? {
-      Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
+    is:imports <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Void)? {
+      is, Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
     };
   definitions[infix]:
     <(def, infix')> : !(Definition.parse infix Expr.basic definitions) <(defs, infix'')> : definitions[infix'] {

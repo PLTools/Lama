@@ -8,7 +8,7 @@ let parse infile =
     "while"; "do"; "od";
     "repeat"; "until";
     "for";
-    "fun"; "local"; "public"; "external"; "return"; 
+    "fun"; "local"; "public"; "external"; "return"; "import"; 
     "length";
     "string";
     "case"; "of"; "esac"; "when";
@@ -30,7 +30,7 @@ let parse infile =
        ] s
      end
     )
-    (ostap (!(Language.parse Language.Infix.default)  -EOF))
+    (ostap (p:!(Language.parse Language.Infix.default) -EOF))
 
 exception Commandline_error of string
   
@@ -40,7 +40,7 @@ class options args =
   object (self)
     val i      = ref 1
     val infile = ref (None : string option)
-    val paths  = ref ([] : string list)
+    val paths  = ref [try Sys.getenv "RC_RUNTIME" with _ -> "../runtime"]
     val mode   = ref (`Default : [`Default | `Eval | `SM | `Compile ])
     val help   = ref false
     initializer
@@ -89,18 +89,12 @@ class options args =
 let main =
   (*  try*)
     let cmd = new options Sys.argv in
-  
-    (*let interpret  = Sys.argv.(1) = "-i"  in
-    let stack      = Sys.argv.(1) = "-s"  in
-    let to_compile = not (interpret || stack) in
-    let infile     = Sys.argv.(if not to_compile then 2 else 1) in
-     *)
     match (try parse cmd#get_infile with Language.Semantic_error msg -> `Fail msg) with
     | `Ok prog ->
        (match cmd#get_mode with
         | `Default | `Compile ->
-            ignore @@ X86.build cmd prog 
-        | _ ->       
+            ignore @@ X86.build cmd prog
+        | _ -> 
            (* Printf.printf "Program:\n%s\n" (GT.show(Language.Expr.t) prog);*)
            (*Format.printf "Program\n%s\n%!" (HTML.toHTML ((GT.html(Language.Expr.t)) prog));*)
 	   let rec read acc =
@@ -109,14 +103,14 @@ let main =
 	       Printf.printf "> ";
 	       read (acc @ [r])
              with End_of_file -> acc
-	   in
+	   in 
 	   let input = read [] in
 	   let output =
 	     if cmd#get_mode = `Eval
 	     then Language.eval prog input
-	     else SM.run (SM.compile prog) input
+	     else SM.run (SM.compile cmd prog) input
 	   in
-	   List.iter (fun i -> Printf.printf "%d\n" i) output
+	   List.iter (fun i -> Printf.printf "%d\n" i) output 
        )
     | `Fail er -> Printf.eprintf "Error: %s\n" er
 (*  with Invalid_argument _ ->

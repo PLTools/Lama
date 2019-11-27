@@ -649,8 +649,8 @@ class env prg =
 (* Generates an assembler text for a program: first compiles the program into
    the stack code, then generates x86 assember code, then prints the assembler file
 *)
-let genasm prog =
-  let sm        = SM.compile prog in
+let genasm cmd prog =
+  let sm        = SM.compile cmd prog in
   let env, code = compile (new env sm) sm in
   let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
   let globals =
@@ -671,14 +671,38 @@ let genasm prog =
 
 (* Builds a program: generates the assembler file and compiles it with the gcc toolchain *)
 let build cmd prog =
+  let find_objects imports paths =
+    let module S = Set.Make (String) in
+    let rec iterate acc s = function
+    | []              -> acc
+    | import::imports -> 
+       if S.mem import s
+       then iterate acc s imports
+       else
+         let path, intfs = Interface.find import paths in         
+         iterate
+           ((import ^ ".o") :: acc)
+           (S.add import s)
+           ((List.map (function `Import name -> name | _ -> invalid_arg "must not happen") @@
+             List.filter (function `Import _ -> true | _ -> false) intfs) @
+             imports)
+    in
+    iterate [] S.empty imports
+  in
   let name = Filename.chop_suffix cmd#get_infile ".expr" in
   let outf = open_out (Printf.sprintf "%s.s" name) in
-  Printf.fprintf outf "%s" (genasm prog);
+  Printf.fprintf outf "%s" (genasm cmd prog);
   close_out outf;
+  let outf = open_out (Printf.sprintf "%s.i" name) in
+  Printf.fprintf outf "%s" (Interface.gen prog);
+  close_out outf; 
   let inc = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
   match cmd#get_mode with
   | `Default ->
-     Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s.s %s/runtime.a" name name inc)
+     let objs = find_objects (fst prog) cmd#get_include_paths in
+     let buf  = Buffer.create 255 in
+     List.iter (fun o -> Buffer.add_string buf o; Buffer.add_string buf " ") objs;
+     Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s.s %s %s/runtime.a" name name (Buffer.contents buf) inc)
   | `Compile ->
      Sys.command (Printf.sprintf "gcc -g -m32 -c %s.s" name)
   | _ -> invalid_arg "must not happen"

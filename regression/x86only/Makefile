@@ -7,7 +7,7 @@ RC=../../src/rc.opt
 check: $(TESTS)
 
 $(TESTS): %: %.expr
-	@RC_RUNTIME=../../runtime $(RC) $< && cat $@.input | ./$@ > $@.log && diff -u $@.log orig/$@.log
+	@RC_RUNTIME=../../runtime $(RC) -I . $< && cat $@.input | ./$@ > $@.log && diff -u $@.log orig/$@.log
 
 clean:
 	rm -f test*.log *.s *~ $(TESTS)

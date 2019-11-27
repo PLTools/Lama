@@ -31,7 +31,7 @@ open Language
 (* checks the tag and size of array          *) | ARRAY   of int
 (* checks various patterns                   *) | PATT    of patt
 (* external definition                       *) | EXTERN  of string
-(* public definition                         *) | PUBLIC  of string                                                           
+(* public   definition                       *) | PUBLIC  of string
 with show
                                                    
 (* The type for the stack machine program *)
@@ -333,7 +333,7 @@ let rec propagate_acc (Item (p, fds, up) as item) name =
            }}, fds, up'), Value.Access index       
   | other -> item, other
 
-class env =
+class env cmd imports =
 object (self : 'self)
   val label_index  = 0
   val scope_index  = 0
@@ -341,7 +341,26 @@ object (self : 'self)
   val scope        = init_scope State.I
   val fundefs      = Top []
   val decls        = []
-                   
+
+  method private import_imports =
+    let paths = cmd#get_include_paths in
+    let env = List.fold_left
+                (fun env import ->
+                   let _, intfs = Interface.find import paths in
+                   List.fold_left
+                     (fun env -> function
+                      | `Variable name -> env#add_name     name `Extern true
+                      | `Fun name      -> env#add_fun_name name `Extern 
+                      | _              -> env
+                     )
+                     env
+                     intfs
+                )
+                self
+                ("Std" :: imports)
+    in
+    env
+
   method global_scope = scope_index = 0
                       
   method get_label = (label @@ string_of_int label_index), {< label_index = label_index + 1 >}
@@ -360,28 +379,25 @@ object (self : 'self)
       ) @@
     List.filter (function (_, `Local) -> false | _ -> true) decls
     
-  method push_scope = {<    
-    scope_index = scope_index + 1;
-    scope       = {
-        scope with
-        st = match scope.st with
-             | State.I ->
-                State.G (Builtin.names,
-                         List.fold_left
-                           (fun s (name, value) ->
-                             let name' =
-                               match name.[0] with
-                               | '.' -> name
-                               | _   -> "L" ^ name
-                             in
-                             State.bind name (Value.Fun name') s)
-                           State.undefined
-                           (Builtin.bindings ()))
-             | _ ->
-                State.L ([], State.undefined, scope.st)
-      }
-  >}
-                    
+  method push_scope =
+    match scope.st with
+    | State.I ->
+       {<
+         scope_index = scope_index + 1;
+         scope       = {
+             scope with
+             st = State.G ([], State.undefined)
+         }
+       >} # import_imports
+      
+    | _ ->
+       {< scope_index = scope_index + 1;
+          scope       = {
+              scope with
+              st = State.L ([], State.undefined, scope.st)
+            }
+       >}
+
   method pop_scope =
     match scope.st with
     | State.I            -> {< scope = {scope with st = State.I} >}
@@ -446,7 +462,7 @@ object (self : 'self)
                        | State.I ->
                           invalid_arg "uninitialized scope"
                        | State.G (names, s)    ->
-                          State.G (check_name_and_add names name mut, State.bind name (Value.Global name) s)
+                          State.G ((match m with `Extern | `PublicExtern -> names | _ -> check_name_and_add names name mut), State.bind name (Value.Global name) s)
                        | State.L (names, s, p) ->
                           self#check_scope m name;
                           State.L (check_name_and_add names name mut, State.bind name (Value.Local scope.local_index) s, p)
@@ -466,7 +482,7 @@ object (self : 'self)
       | State.I ->
          invalid_arg "uninitialized scope"
       | State.G (names, s) ->
-         State.G (check_name_and_add names name false, State.bind name (Value.Fun name') s)
+         State.G ((match m with `Extern | `PublicExtern -> names | _ -> check_name_and_add names name false), State.bind name (Value.Fun name') s)
       | State.L (names, s, p) ->
          self#check_scope m name;
          State.L (check_name_and_add names name false, State.bind name (Value.Fun name') s, p)        
@@ -514,7 +530,7 @@ object (self : 'self)
                  
 end
   
-let compile p =
+let compile cmd (imports, p) =
   let rec pattern env lfalse = function
   | Pattern.Wildcard        -> env, false, [DROP]
   | Pattern.Named   (_, p)  -> pattern env lfalse p
@@ -736,7 +752,7 @@ let compile p =
        let env, code = compile_fundef env def in
        compile_fundefs (acc @ code) env
   in
-  let env             = new env in
+  let env             = new env cmd imports in
   let lend, env       = env#get_label in
   let env, flag, code = compile_expr lend env p in
   let code            = if flag then code @ [LABEL lend] else code in

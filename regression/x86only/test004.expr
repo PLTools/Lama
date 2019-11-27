@@ -1,5 +1,3 @@
-external fun printf ();
-
 fun hd (l) {
   case l of
     h : _ -> return h
