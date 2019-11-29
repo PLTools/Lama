@@ -392,7 +392,7 @@ module Expr =
 
     let infix_name infix =
       let b = Buffer.create 64 in
-      Buffer.add_string b "__Infix_";
+      Buffer.add_string b "i__Infix_";
       Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
       Buffer.contents b
 
@@ -632,7 +632,7 @@ module Expr =
                               | basic[def][infix][atr];
       scope[def][infix][atr][e]: <(d, infix')> : def[infix] expr:e[infix'][atr] {Scope (d, expr)};
 
-      basic[def][infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, f) -> ostap (- $(s)), f) l)) infix) (primary def infix) atr);
+      basic[def][infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary def infix) atr);
 
       primary[def][infix][atr]:
         b:base[def][infix][Val] is:(  "[" i:parse[def][infix][Val] "]"                     {`Elem i}
@@ -721,14 +721,48 @@ module Expr =
 (* Infix helpers *)
 module Infix =
   struct
+    
+    @type kind   = Predefined | Public | Local with show
+    @type ass    = [`Lefta | `Righta | `Nona] with show
+    @type loc    = [`Before of string | `After of string | `At of string] with show
+    @type export = (ass * string * loc) list with show
+      
+    type t = ([`Lefta | `Righta | `Nona] * ((Expr.atr -> (Expr.atr * Expr.atr)) * ((string * kind * (Expr.t -> Expr.atr -> Expr.t -> Expr.t)) list))) array
 
-    type t = ([`Lefta | `Righta | `Nona] * ((Expr.atr -> (Expr.atr * Expr.atr)) * ((string * (Expr.t -> Expr.atr -> Expr.t -> Expr.t)) list))) array
-
+    let extract_exports infix =
+      let ass_string = function `Lefta -> "L" | `Righta -> "R" | _ -> "I" in
+      let exported = 
+        Array.map
+          (fun (ass, (_, ops)) ->
+            (ass, List.map (fun (s, kind, _) -> s, kind) @@ List.filter (function (_, Public, _) | (_, Predefined, _) -> true | _ -> false) ops)
+          )
+          infix
+      in
+      let _, exports =
+        Array.fold_left
+          (fun (loc, acc) (ass, list) ->
+            let rec inner (loc, acc) = function
+              | [] -> (loc, acc)
+              | (s, kind) :: tl ->
+                 let loc' = match tl with [] -> `After s | _ -> `At s in
+                 (fun again ->
+                   match kind with
+                   | Public -> again (loc', (ass, s, loc) :: acc) 
+                   | _      -> again (loc', acc) 
+                 )
+                   (match tl with [] -> fun acc -> acc | _ -> fun acc -> inner acc tl)
+            in
+            inner (loc, acc) list
+          )
+          (`Before ":=", [])
+          exported
+      in List.rev exports
+      
     let default : t =
       Array.map (fun (a, s) ->
         a,
         ((fun _ -> (if (List.hd s) = ":=" then Expr.Reff else Expr.Val), Expr.Val),
-        List.map (fun s -> s, Expr.sem_init s) s)
+        List.map (fun s -> s, Predefined, Expr.sem_init s) s)
       )
       [|
         `Righta, [":="];
@@ -744,45 +778,47 @@ module Infix =
 
     let find_op infix op cb ce =
       try
-        Array.iteri (fun i (_, (_, l)) -> if List.exists (fun (s, _) -> s = op) l then raise (Break (cb i))) infix;
+        Array.iteri (fun i (_, (_, l)) -> if List.exists (fun (s, _, _) -> s = op) l then raise (Break (cb i))) infix;
         ce ()
       with Break x -> x
 
     let no_op op coord = `Fail (Printf.sprintf "infix ``%s'' not found in the scope at %s" op (Msg.Coord.toString coord))
 
-    let at coord op newp (sem, _) infix =
+    let kind_of = function true -> Public | _ -> Local
+                                               
+    let at coord op newp public (sem, _) (infix : t) =
       find_op infix op
         (fun i ->
           `Ok (Array.init (Array.length infix)
                  (fun j ->
                    if j = i
-                   then let (a, (atr, l)) = infix.(i) in (a, (atr, ((newp, sem) :: l)))
+                   then let (a, (atr, l)) = infix.(i) in (a, (atr, ((newp, kind_of public, sem) :: l)))
                    else infix.(j)
             ))
         )
         (fun _ -> no_op op coord)
 
-    let before coord op newp ass (sem, atr) infix =
+    let before coord op newp ass public (sem, atr) (infix : t) =
       find_op infix op
         (fun i ->
           `Ok (Array.init (1 + Array.length infix)
                  (fun j ->
                    if j < i
                    then infix.(j)
-                   else if j = i then (ass, (atr, [newp, sem]))
+                   else if j = i then (ass, (atr, [newp, kind_of public, sem]))
                    else infix.(j-1)
                  ))
         )
         (fun _ -> no_op op coord)
 
-    let after coord op newp ass (sem, atr) infix =
+    let after coord op newp ass public (sem, atr) (infix : t) =
       find_op infix op
         (fun i ->
           `Ok (Array.init (1 + Array.length infix)
                  (fun j ->
                    if j <= i
                    then infix.(j)
-                   else if j = i+1 then (ass, (atr, [newp, sem]))
+                   else if j = i+1 then (ass, (atr, [newp, kind_of public, sem]))
                    else infix.(j-1)
                  ))
         )
@@ -801,14 +837,14 @@ module Definition =
       
     ostap (
       arg : LIDENT;      
-      position[ass][coord][newp]:
-        %"at" s:STRING {Infix.at coord (unquote s) newp}
-        | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord (unquote s) newp ass};
+      position[pub][ass][coord][newp]:
+        %"at" s:STRING {Infix.at coord (unquote s) newp pub}
+        | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord (unquote s) newp ass pub};
       head[infix]:
         m:(%"external" {`Extern} | %"public" e:(%"external")? {match e with None -> `Public | _ -> `PublicExtern})? %"fun" name:LIDENT {unopt_mod m, name, name, infix}
     |   m:(%"public" {`Public})? ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
         l:$ op:(s:STRING {unquote s})
-        md:position[ass][l#coord][op] {
+        md:position[match m with Some _ -> true | _ -> false][ass][l#coord][op] {
           let name = Expr.infix_name op in
           match md (Expr.sem name) infix with
           | `Ok infix' -> unopt_mod m, op, name, infix'
@@ -836,12 +872,12 @@ module Definition =
     )
 
   end
-
+  
 module Interface =
   struct
     
     (* Generates an interface file. *)
-    let gen (imps, p) =
+    let gen ((imps, ifxs), p) =
       let buf = Buffer.create 256 in
       let append str = Buffer.add_string buf str in
       List.iter (fun i -> append "I,"; append i; append ";\n") imps;
@@ -857,7 +893,16 @@ module Interface =
              | _ -> ()
             )
             decls;
-       | _ -> ());  
+       | _ -> ());      
+      List.iter
+        (function (ass, op, loc) ->
+           let append_op op = append "\""; append op; append "\"" in
+           append (match ass with `Lefta -> "L," | `Righta -> "R," | _ -> "N,");
+           append_op op;
+           append ",";
+           (match loc with `At op -> append "T,"; append_op op | `After op -> append "A,"; append_op op | `Before op -> append "B,"; append_op op);
+           append ";\n"
+        ) ifxs;
       Buffer.contents buf
       
     (* Read an interface file *)
@@ -866,7 +911,11 @@ module Interface =
               funspec: "F" "," i:IDENT ";" {`Fun i};
               varspec: "V" "," i:IDENT ";" {`Variable i};
               import : "I" "," i:IDENT ";" {`Import i};
-              interface: (funspec | varspec | import)*
+              infix  : a:ass "," op:STRING "," l:loc ";" {`Infix (a, op, l)};
+              ass    : "L" {`Lefta} | "R" {`Righta} | "N" {`Nona};
+              loc    : m:mode "," op:STRING {m op};
+              mode   : "T" {fun x -> `At x} | "A" {fun x -> `After x} | "B" {fun x -> `Before x};
+              interface: (funspec | varspec | import | infix)*
             )
       in
       try
@@ -874,6 +923,7 @@ module Interface =
         (match Util.parse (object
                              inherit Matcher.t s
                              inherit Util.Lexers.ident [] s
+                             inherit Util.Lexers.string s
                              inherit Util.Lexers.skip  [Matcher.Skip.whitespaces " \t\n"] s
                            end)             
                           (ostap (interface -EOF))
@@ -897,7 +947,7 @@ module Interface =
       | None               -> invalid_arg (Printf.sprintf "could not find an interface file for import '%s'" import)
 
   end
-  
+
 (* The top-level definitions *)
 
 (* Top-level evaluator
@@ -912,10 +962,36 @@ let eval (_, expr) i =
 
 (* Top-level parser *)
 ostap (
-  imports: is:(%"import" !(Util.list (ostap (LIDENT))) -";")* {List.flatten is};
-  parse[infix]:
-    is:imports <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Void)? {
-      is, Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
+  imports[cmd]: l:$ is:(%"import" !(Util.list (ostap (LIDENT))) -";")* {
+    let is    = List.flatten is in
+    let infix =
+      List.fold_left
+        (fun infix import ->
+          List.fold_left
+            (fun infix item ->
+               let insert name infix md =
+                 let name = Expr.infix_name name in
+                 match md (Expr.sem name) infix with
+                 | `Ok infix' -> infix'
+                 | `Fail msg  -> raise (Semantic_error msg)
+               in
+               match item with
+               | `Infix (_  , op, `At     op') -> insert (unquote op) infix (Infix.at l#coord (unquote op') (unquote op) false)
+               | `Infix (ass, op, `Before op') -> insert (unquote op) infix (Infix.before l#coord (unquote op') (unquote op) ass false)
+               | `Infix (ass, op, `After  op') -> insert (unquote op) infix (Infix.after l#coord (unquote op') (unquote op) ass false)
+               | _                             -> infix
+            )
+            infix
+            (snd (Interface.find import cmd#get_include_paths))
+        )
+        Infix.default
+        is
+    in
+    is, infix
+  };
+  parse[cmd]:
+    <(is, infix)> : imports[cmd] <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Void)? {
+    (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
     };
   definitions[infix]:
     <(def, infix')> : !(Definition.parse infix Expr.basic definitions) <(defs, infix'')> : definitions[infix'] {

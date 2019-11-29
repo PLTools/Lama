@@ -1,7 +1,7 @@
 open Ostap
 
-let parse infile =
-  let s   = Util.read infile in
+let parse cmd =
+  let s   = Util.read cmd#get_infile in
   let kws = [
     "skip";
     "if"; "then"; "else"; "elif"; "fi";
@@ -30,7 +30,7 @@ let parse infile =
        ] s
      end
     )
-    (ostap (p:!(Language.parse Language.Infix.default) -EOF))
+    (ostap (p:!(Language.parse cmd) -EOF))
 
 exception Commandline_error of string
   
@@ -89,7 +89,7 @@ class options args =
 let main =
   (*  try*)
     let cmd = new options Sys.argv in
-    match (try parse cmd#get_infile with Language.Semantic_error msg -> `Fail msg) with
+    match (try parse cmd with Language.Semantic_error msg -> `Fail msg) with
     | `Ok prog ->
        (match cmd#get_mode with
         | `Default | `Compile ->

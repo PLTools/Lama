@@ -558,7 +558,7 @@ class env prg =
     (* gets a name for a global variable *)
     method loc x =
       match x with
-      | Value.Global name -> M ((*"global_" ^*) name)
+      | Value.Global name -> M ("global_" ^ name)
       | Value.Fun    name -> M ("$" ^ name)
       | Value.Local  i    -> S i
       | Value.Arg    i    -> S (- (i + if has_closure then 2 else 1))
@@ -603,7 +603,7 @@ class env prg =
     (* registers a variable in the environment *)
     method variable x =
       match x with
-      | Value.Global name -> {< globals = S.add ((*"global_" ^*) name) globals >}
+      | Value.Global name -> {< globals = S.add ("global_" ^ name) globals >}
       | _                 -> self
 
     (* registers a string constant *)
@@ -699,7 +699,7 @@ let build cmd prog =
   let inc = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
   match cmd#get_mode with
   | `Default ->
-     let objs = find_objects (fst prog) cmd#get_include_paths in
+     let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
      let buf  = Buffer.create 255 in
      List.iter (fun o -> Buffer.add_string buf o; Buffer.add_string buf " ") objs;
      Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s.s %s %s/runtime.a" name name (Buffer.contents buf) inc)

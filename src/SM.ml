@@ -369,15 +369,16 @@ object (self : 'self)
   method nlocals = scope.nlocals
 
   method get_decls =
+    let opt_label = function true -> label | _ -> fun x -> "global_" ^ x in
     List.flatten @@
     List.map
       (function
-       | (name, `Extern)       -> [EXTERN name]
-       | (name, `Public)       -> [PUBLIC name]
-       | (name, `PublicExtern) -> [PUBLIC name; EXTERN name]
-       | _                     -> invalid_arg "must not happen"
+       | (name, `Extern, f)       -> [EXTERN (opt_label f name)]
+       | (name, `Public, f)       -> [PUBLIC (opt_label f name)]
+       | (name, `PublicExtern, f) -> [PUBLIC (opt_label f name); EXTERN (opt_label f name)]
+       | _                        -> invalid_arg "must not happen"
       ) @@
-    List.filter (function (_, `Local) -> false | _ -> true) decls
+    List.filter (function (_, `Local, _) -> false | _ -> true) decls
     
   method push_scope =
     match scope.st with
@@ -455,7 +456,7 @@ object (self : 'self)
        raise (Semantic_error (Printf.sprintf "external/public definitions ('%s') not allowed in local scopes" name))    
     
   method add_name (name : string) (m : [`Local | `Extern | `Public | `PublicExtern]) (mut : bool) = {<
-      decls = (name, m) :: decls;
+      decls = (name, m, false) :: decls;
       scope = {
         scope with
         st          = (match scope.st with
@@ -488,7 +489,7 @@ object (self : 'self)
          State.L (check_name_and_add names name false, State.bind name (Value.Fun name') s, p)        
     in
     {<
-      decls = (name, m) :: decls;
+      decls = (name, m, true) :: decls;
       scope = {scope with st = st'}
     >}
 
@@ -530,7 +531,7 @@ object (self : 'self)
                  
 end
   
-let compile cmd (imports, p) =
+let compile cmd ((imports, infixes), p) =
   let rec pattern env lfalse = function
   | Pattern.Wildcard        -> env, false, [DROP]
   | Pattern.Named   (_, p)  -> pattern env lfalse p
