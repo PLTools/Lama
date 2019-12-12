@@ -37,22 +37,27 @@ exception Commandline_error of string
 class options args =
   let n = Array.length args in
   let rec fix f = f (fix f) in
+  let dump_ast  = 1 in
+  let dump_sm   = 2 in
   object (self)
     val i      = ref 1
     val infile = ref (None : string option)
     val paths  = ref [try Sys.getenv "RC_RUNTIME" with _ -> "../runtime"]
     val mode   = ref (`Default : [`Default | `Eval | `SM | `Compile ])
+    val dump   = ref 0
     val help   = ref false
     initializer
       let rec loop () =
         match self#peek with
         | Some opt ->
            (match opt with
-            | "-c" -> self#set_mode `Compile
-            | "-I" -> (match self#peek with None -> raise (Commandline_error "path expected after '-I' specifier") | Some path -> self#add_include_path path)
-            | "-s" -> self#set_mode `SM
-            | "-i" -> self#set_mode `Eval
-            | "-h" -> self#set_help
+            | "-c"  -> self#set_mode `Compile
+            | "-I"  -> (match self#peek with None -> raise (Commandline_error "path expected after '-I' specifier") | Some path -> self#add_include_path path)
+            | "-s"  -> self#set_mode `SM
+            | "-i"  -> self#set_mode `Eval
+            | "-ds" -> self#set_dump dump_sm
+            | "-dp" -> self#set_dump dump_ast
+            | "-h"  -> self#set_help
             | _ ->
                if opt.[0] = '-'
                then raise (Commandline_error (Printf.sprintf "invalid command line specifier ('%s')" opt))
@@ -61,6 +66,8 @@ class options args =
            loop ()
         | None -> ()
       in loop ()
+    method private set_dump mask =
+      dump := !dump lor mask
     method private set_infile name =
       match !infile with
       | None       -> infile := Some name
@@ -84,6 +91,20 @@ class options args =
       | Some name -> name
     method get_help = !help
     method get_include_paths = !paths
+    method basename = Filename.chop_suffix self#get_infile ".expr"
+    method dump_file ext contents =
+      let name = self#basename in
+      let outf = open_out (Printf.sprintf "%s.%s" name ext) in
+      Printf.fprintf outf "%s" contents;
+      close_out outf
+    method dump_AST ast =
+      if (!dump land dump_ast) > 0
+      then self#dump_file "ast" (GT.show(Language.Expr.t) ast)
+      else ()
+    method dump_SM sm  =
+      if (!dump land dump_sm) > 0
+      then self#dump_file "sm" (SM.show_prg sm)
+      else ()
   end
   
 let main =
@@ -91,6 +112,7 @@ let main =
     let cmd = new options Sys.argv in
     match (try parse cmd with Language.Semantic_error msg -> `Fail msg) with
     | `Ok prog ->
+       cmd#dump_AST (snd prog);
        (match cmd#get_mode with
         | `Default | `Compile ->
             ignore @@ X86.build cmd prog

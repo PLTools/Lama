@@ -329,7 +329,7 @@ module Expr =
     (* intrinsic (for evaluation) *) | Intrinsic of (t config, t config) arrow
     (* control (for control flow) *) | Control   of (t config, t * t config) arrow
     and decl = [`Local | `Public | `Extern | `PublicExtern ] * [`Fun of string list * t | `Variable of t option]
-    with show,html
+    with show, html
 
     (* Reff : parsed expression should return value Reff (look for ":=");
        Val : -//- returns simple value;

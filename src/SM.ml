@@ -37,7 +37,10 @@ with show
 (* The type for the stack machine program *)
 @type prg = insn list with show
 
-let print_prg p = List.iter (fun i -> Printf.eprintf "%s\n%!" (show(insn) i)) p;;
+let show_prg p =
+  let b = Buffer.create 512 in
+  List.iter (fun i -> Buffer.add_string b (show(insn) i); Buffer.add_string b "\n") p;
+  Buffer.contents b;;
 
 (* Values *)
 @type value = (string, value array) Value.t with show
@@ -760,4 +763,5 @@ let compile cmd ((imports, infixes), p) =
   let has_main        = List.length code > 0 in
   let env, prg        = compile_fundefs [if has_main then [LABEL "main"; BEGIN ("main", 0, env#nlocals, [])] @ code @ [END] else []] env in
   let prg             = (if has_main then [PUBLIC "main"] else []) @ env#get_decls @ List.flatten prg in
+  cmd#dump_SM prg;
   prg

@@ -689,6 +689,9 @@ let build cmd prog =
     in
     iterate [] S.empty imports
   in
+  cmd#dump_file "s" (genasm cmd prog);
+  cmd#dump_file "i" (Interface.gen prog);
+  (*
   let name = Filename.chop_suffix cmd#get_infile ".expr" in
   let outf = open_out (Printf.sprintf "%s.s" name) in
   Printf.fprintf outf "%s" (genasm cmd prog);
@@ -696,13 +699,14 @@ let build cmd prog =
   let outf = open_out (Printf.sprintf "%s.i" name) in
   Printf.fprintf outf "%s" (Interface.gen prog);
   close_out outf; 
-  let inc = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
+   *)
+  let inc  = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
   match cmd#get_mode with
   | `Default ->
      let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
      let buf  = Buffer.create 255 in
      List.iter (fun o -> Buffer.add_string buf o; Buffer.add_string buf " ") objs;
-     Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s.s %s %s/runtime.a" name name (Buffer.contents buf) inc)
+     Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s.s %s %s/runtime.a" cmd#basename cmd#basename (Buffer.contents buf) inc)
   | `Compile ->
-     Sys.command (Printf.sprintf "gcc -g -m32 -c %s.s" name)
+     Sys.command (Printf.sprintf "gcc -g -m32 -c %s.s" cmd#basename)
   | _ -> invalid_arg "must not happen"
