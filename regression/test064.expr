@@ -1,4 +1,4 @@
-infixr "++" at "+" (a, b) {return a+b}
+infix "++" at "+" (a, b) {return a+b}
 
 local x = read ();
 

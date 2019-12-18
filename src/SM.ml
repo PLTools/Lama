@@ -360,7 +360,7 @@ object (self : 'self)
                      intfs
                 )
                 self
-                ("Std" :: imports)
+                imports
     in
     env
 

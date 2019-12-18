@@ -163,6 +163,17 @@ static void printValue (void *p) {
     case STRING_TAG:
       printStringBuf ("\"%s\"", a->contents);
       break;
+
+    case CLOSURE_TAG:
+      printStringBuf ("<closure ");
+      for (i = 0; i < LEN(a->tag); i++) {
+	if (i) printValue ((void*)((int*) a->contents)[i]);
+	else printStringBuf ("%x", (void*)((int*) a->contents)[i]);
+	
+	if (i != LEN(a->tag) - 1) printStringBuf (", ");
+      }
+      printStringBuf (">");
+      break;
       
     case ARRAY_TAG:
       printStringBuf ("[");
@@ -445,12 +456,25 @@ extern int Lraw (int x) {
 extern void Lprintf (char *s, ...) {
   va_list args = (va_list) BOX (NULL);
 
+  //void *p = &s;
+  //char *c = s;
+
+  //printf ("%d\n", ((int*)p)[2]);
+  /*
+  while (*c) {
+    if (*c == '%') {
+      p++;
+      printf ("arg: %d\n", *(int*)p);
+    }
+    c++;
+  }
+  */
   va_start (args, s);
   vprintf  (s, args); // vprintf (char *, va_list) <-> printf (char *, ...) 
   va_end   (args);
 }
 
-extern void* Lstrcat (void *a, void *b) {
+extern void* /*Lstrcat*/ i__Infix_4343 (void *a, void *b) {
   data *da = (data*) BOX (NULL);
   data *db = (data*) BOX (NULL);
   data *d  = (data*) BOX (NULL);

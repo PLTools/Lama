@@ -687,19 +687,10 @@ let build cmd prog =
              List.filter (function `Import _ -> true | _ -> false) intfs) @
              imports)
     in
-    iterate [] S.empty imports
+    iterate [] (S.add "Std" S.empty) imports
   in
   cmd#dump_file "s" (genasm cmd prog);
   cmd#dump_file "i" (Interface.gen prog);
-  (*
-  let name = Filename.chop_suffix cmd#get_infile ".expr" in
-  let outf = open_out (Printf.sprintf "%s.s" name) in
-  Printf.fprintf outf "%s" (genasm cmd prog);
-  close_out outf;
-  let outf = open_out (Printf.sprintf "%s.i" name) in
-  Printf.fprintf outf "%s" (Interface.gen prog);
-  close_out outf; 
-   *)
   let inc  = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
   match cmd#get_mode with
   | `Default ->

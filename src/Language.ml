@@ -589,7 +589,7 @@ module Expr =
     ignore atr (
        match s with
        | ":"  -> Sexp   ("cons", [x; y])
-       | "++" -> Call   (Var "strcat", [x; y])
+       (*| "++" -> Call   (Var "strcat", [x; y]) *)
        | ":=" -> Assign (x, y)
        | _ -> Binop  (s, x, y)
     )
@@ -734,7 +734,7 @@ module Infix =
       let exported = 
         Array.map
           (fun (ass, (_, ops)) ->
-            (ass, List.map (fun (s, kind, _) -> s, kind) @@ List.filter (function (_, Public, _) | (_, Predefined, _) -> true | _ -> false) ops)
+            (ass, List.rev @@ List.map (fun (s, kind, _) -> s, kind) @@ List.filter (function (_, Public, _) | (_, Predefined, _) -> true | _ -> false) ops)
           )
           infix
       in
@@ -746,11 +746,11 @@ module Infix =
               | (s, kind) :: tl ->
                  let loc' = match tl with [] -> `After s | _ -> `At s in
                  (fun again ->
-                   match kind with
-                   | Public -> again (loc', (ass, s, loc) :: acc) 
-                   | _      -> again (loc', acc) 
+                    match kind with
+                    | Public -> again (loc', (ass, s, loc) :: acc) 
+                    | _      -> again (loc', acc) 
                  )
-                   (match tl with [] -> fun acc -> acc | _ -> fun acc -> inner acc tl)
+                 (match tl with [] -> fun acc -> acc | _ -> fun acc -> inner acc tl)
             in
             inner (loc, acc) list
           )
@@ -770,7 +770,7 @@ module Infix =
 	`Lefta , ["!!"];
 	`Lefta , ["&&"];
 	`Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
-	`Lefta , ["++"; "+" ; "-"];
+	`Lefta , [(*"++";*) "+" ; "-"];
 	`Lefta , ["*" ; "/"; "%"];
       |]
 
@@ -838,7 +838,7 @@ module Definition =
     ostap (
       arg : LIDENT;      
       position[pub][ass][coord][newp]:
-        %"at" s:STRING {Infix.at coord (unquote s) newp pub}
+        %"at" s:STRING {match ass with `Nona -> Infix.at coord (unquote s) newp pub | _ -> raise (Semantic_error (Printf.sprintf "associativity for infxi '%s' can not be specified (it is inherited from that for '%s')" newp s))}
         | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord (unquote s) newp ass pub};
       head[infix]:
         m:(%"external" {`Extern} | %"public" e:(%"external")? {match e with None -> `Public | _ -> `PublicExtern})? %"fun" name:LIDENT {unopt_mod m, name, name, infix}
@@ -963,13 +963,13 @@ let eval (_, expr) i =
 (* Top-level parser *)
 ostap (
   imports[cmd]: l:$ is:(%"import" !(Util.list (ostap (LIDENT))) -";")* {
-    let is    = List.flatten is in
+    let is    = "Std" :: List.flatten is in
     let infix =
       List.fold_left
         (fun infix import ->
           List.fold_left
             (fun infix item ->
-               let insert name infix md =
+               let insert name infix md = 
                  let name = Expr.infix_name name in
                  match md (Expr.sem name) infix with
                  | `Ok infix' -> infix'
