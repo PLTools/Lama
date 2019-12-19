@@ -1,0 +1,31 @@
+fun f (x) {
+  return fun (y) {return x + y}
+}
+
+write (compare (1, 2));
+write (compare (2, 1));
+write (compare (3, 3));
+write (compare (2, "abc")); 
+write (compare ("abc", 2)); 
+write (compare ("abc", "abc"));
+write (compare ("ab", "abc"));
+write (compare ("abc", "ab"));
+write (compare ([], []));
+write (compare (A, A));
+write (compare (A, B));
+write (compare (B, A));
+write (compare (A (1), A (1, 1)));
+write (compare (A (1, 1), A (1)));
+write (compare (f, f));
+write (compare (f, f(5)));
+write (compare (f(5), f)); 
+write (compare (f(5), f(5)));
+write (compare (f(5), f(6)));
+write (compare (f(6), f(5)));
+write (compare ({1, 2, 3}, {1, 2, 3}));
+write (compare ({1, [2], [[3]]}, {1, [2], [[3]]}));
+write (compare ({1, [2], [[3]]}, {1, [2], [3]}));
+write (compare ({1, [2], [3]}, {1, [2], [[3]]}))
+
+
+

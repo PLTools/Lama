@@ -589,7 +589,6 @@ module Expr =
     ignore atr (
        match s with
        | ":"  -> Sexp   ("cons", [x; y])
-       (*| "++" -> Call   (Var "strcat", [x; y]) *)
        | ":=" -> Assign (x, y)
        | _ -> Binop  (s, x, y)
     )
@@ -770,7 +769,7 @@ module Infix =
 	`Lefta , ["!!"];
 	`Lefta , ["&&"];
 	`Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
-	`Lefta , [(*"++";*) "+" ; "-"];
+	`Lefta , ["+" ; "-"];
 	`Lefta , ["*" ; "/"; "%"];
       |]
 

@@ -13,7 +13,7 @@
 # define alloc malloc
 # endif
 
-/* # define DEBUG_PRINT 1 */
+/*# define DEBUG_PRINT 1 */
 
 /* GC pool structure and data; declared here in order to allow debug print */
 typedef struct {
@@ -225,6 +225,62 @@ static void printValue (void *p) {
     default:
       printStringBuf ("*** invalid tag: %x ***", TAG(a->tag));
     }
+  }
+}
+
+int Lcompare (void *p, void *q) {
+# define COMPARE_AND_RETURN(x,y) do if (x != y) return BOX(x - y); while (0)
+  if (UNBOXED(p)) {
+    if (UNBOXED(q)) return BOX(UNBOX(p) - UNBOX(q));    
+    else return BOX(-1);
+  }
+  else if (UNBOXED(q)) return BOX(1);
+  else {
+    data *a = TO_DATA(p), *b = TO_DATA(q);
+    int ta = TAG(a->tag), tb = TAG(b->tag);
+    int la = LEN(a->tag), lb = LEN(b->tag);
+    int i;
+    
+    COMPARE_AND_RETURN (ta, tb);
+      
+    switch (ta) {
+    case STRING_TAG:
+      return BOX(strcmp (a->contents, b->contents));
+      
+    case CLOSURE_TAG:
+      COMPARE_AND_RETURN (((void**) a->contents)[0], ((void**) b->contents)[0]);
+      COMPARE_AND_RETURN (la, lb);
+      i = 1;
+      break;
+      
+    case ARRAY_TAG:
+      COMPARE_AND_RETURN (la, lb);
+      i = 0;
+      break;
+
+    case SEXP_TAG: {
+#ifndef DEBUG_PRINT
+      int ta = TO_SEXP(p)->tag, tb = TO_SEXP(q)->tag;      
+#else
+      int ta = GET_SEXP_TAG(TO_SEXP(p)->tag), tb = GET_SEXP_TAG(TO_SEXP(q)->tag);
+#endif      
+      COMPARE_AND_RETURN (ta, tb);
+      COMPARE_AND_RETURN (la, lb);
+      i = 0;
+      break;
+    }
+
+    default:
+      fprintf (stderr, "***** INTERNAL ERROR: invalid tag %d in compare *****\n", ta);
+      exit (255);
+    }
+
+    for (; i<la; i++) {
+      int c = Lcompare (((void**) a->contents)[i], ((void**) b->contents)[i]);
+      if (c != BOX(0)) return BOX(c);
+    }
+    
+    return BOX(0);
   }
 }
 
@@ -552,8 +608,8 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-static size_t SPACE_SIZE = 128;
-//static size_t SPACE_SIZE = 1280;
+//static size_t SPACE_SIZE = 128;
+static size_t SPACE_SIZE = 1280;
 # define POOL_SIZE (2*SPACE_SIZE)
 
 static void swap (size_t ** a, size_t ** b) {
