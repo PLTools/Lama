@@ -7,6 +7,7 @@
 # include <stdlib.h>
 # include <sys/mman.h>
 # include <assert.h>
+# include <errno.h>
 
 # define __ENABLE_GC__
 # ifndef __ENABLE_GC__
@@ -105,6 +106,19 @@ char* de_hash (int n) {
   return ++p;
 }
 
+static void vfailure (char *s, va_list args) {
+  fprintf  (stderr, "*** FAILURE: ");
+  vfprintf (stderr, s, args); // vprintf (char *, va_list) <-> printf (char *, ...)
+  exit     (255);
+}
+
+static void failure (char *s, ...) {
+  va_list args;
+
+  va_start (args, s);
+  vfailure (s, args);
+}
+
 typedef struct {
   char *contents;
   int ptr;
@@ -132,14 +146,12 @@ static void extendStringBuf () {
   stringBuf.len      = len;
 }
 
-static void printStringBuf (char *fmt, ...) {
-  va_list args    = (va_list) BOX(NULL);
+static void vprintStringBuf (char *fmt, va_list args) {
   int     written = 0,
           rest    = 0;
   char   *buf     = (char*) BOX(NULL);
 
  again:
-  va_start (args, fmt);
   buf     = &stringBuf.contents[stringBuf.ptr];
   rest    = stringBuf.len - stringBuf.ptr;
   written = vsnprintf (buf, rest, fmt, args);
@@ -150,6 +162,13 @@ static void printStringBuf (char *fmt, ...) {
   }
 
   stringBuf.ptr += written;
+}
+
+static void printStringBuf (char *fmt, ...) {
+  va_list args;
+
+  va_start (args, fmt);
+  vprintStringBuf (fmt, args);
 }
 
 static void printValue (void *p) {
@@ -228,7 +247,48 @@ static void printValue (void *p) {
   }
 }
 
-int Lcompare (void *p, void *q) {
+static void stringcat (void *p) {
+  data *a;
+  int i;
+  
+  if (UNBOXED(p)) ;
+  else {
+    a = TO_DATA(p);
+
+    switch (TAG(a->tag)) {      
+    case STRING_TAG:
+      printStringBuf ("%s", a->contents);
+      break;
+      
+    case SEXP_TAG: {
+#ifndef DEBUG_PRINT
+      char * tag = de_hash (TO_SEXP(p)->tag);
+#else
+      char * tag = de_hash (GET_SEXP_TAG(TO_SEXP(p)->tag));
+#endif   
+      if (strcmp (tag, "cons") == 0) {
+	data *b = a;
+	
+	while (LEN(a->tag)) {
+	  stringcat ((void*)((int*) b->contents)[0]);
+	  b = (data*)((int*) b->contents)[1];
+	  if (! UNBOXED(b)) {
+	    b = TO_DATA(b);
+	  }
+	  else break;
+	}
+      }
+      else printStringBuf ("*** non-list tag: %s ***", tag);
+    }
+    break;
+
+    default:
+      printStringBuf ("*** invalid tag: %x ***", TAG(a->tag));
+    }
+  }
+}
+
+extern int Lcompare (void *p, void *q) {
 # define COMPARE_AND_RETURN(x,y) do if (x != y) return BOX(x - y); while (0)
   if (UNBOXED(p)) {
     if (UNBOXED(q)) return BOX(UNBOX(p) - UNBOX(q));    
@@ -271,8 +331,7 @@ int Lcompare (void *p, void *q) {
     }
 
     default:
-      fprintf (stderr, "***** INTERNAL ERROR: invalid tag %d in compare *****\n", ta);
-      exit (255);
+      failure ("invalid tag %d in compare *****\n", ta);
     }
 
     for (; i<la; i++) {
@@ -296,21 +355,50 @@ extern void* Belem (void *p, int i) {
   return (void*) ((int*) a->contents)[i];
 }
 
-extern void* Bstring (void *p) {
-  int n   = BOX(0);
-  data *r = NULL;
+extern void* LmakeString (int length) {
+  int   n = UNBOX(length);
+  data *r;
 
   __pre_gc () ;
   
-  n = strlen (p);
   r = (data*) alloc (n + 1 + sizeof (int));
 
   r->tag = STRING_TAG | (n << 3);
-  strncpy (r->contents, p, n + 1);
 
   __post_gc();
   
   return r->contents;
+}
+
+extern void* Bstring (void *p) {
+  int   n = strlen (p);
+  void *s;
+
+  __pre_gc ();
+  
+  s = LmakeString (BOX(n));  
+  strncpy (s, p, n + 1);
+
+  __post_gc ();
+  
+  return s;
+}
+
+extern void* Lstringcat (void *p) {
+  void *s;
+
+  __pre_gc ();
+  
+  createStringBuf ();
+  stringcat (p);
+
+  s = Bstring (stringBuf.contents);
+  
+  deleteStringBuf ();
+
+  __post_gc ();
+
+  return s;  
 }
 
 extern void* Bstringval (void *p) {
@@ -505,29 +593,28 @@ extern void* Bsta (void *v, int i, void *x) {
   return v;
 }
 
-extern int Lraw (int x) {
-  return UNBOX(x);
+static void fix_unboxed (char *s, va_list va) {
+  size_t *p = va;
+  int i = 0;
+  
+  while (*s) {
+    if (*s == '%') {
+      size_t n = p [i];
+      if (UNBOXED (n)) {
+	p[i] = UNBOX(n);
+      }
+      i++;
+    }
+    s++;
+  }
 }
 
-extern void Lprintf (char *s, ...) {
-  va_list args = (va_list) BOX (NULL);
-
-  //void *p = &s;
-  //char *c = s;
-
-  //printf ("%d\n", ((int*)p)[2]);
-  /*
-  while (*c) {
-    if (*c == '%') {
-      p++;
-      printf ("arg: %d\n", *(int*)p);
-    }
-    c++;
-  }
-  */
-  va_start (args, s);
-  vprintf  (s, args); // vprintf (char *, va_list) <-> printf (char *, ...) 
-  va_end   (args);
+extern void Lfailure (char *s, ...) {
+  va_list args;
+  
+  va_start    (args, s);
+  fix_unboxed (s, args);
+  vfailure    (s, args);
 }
 
 extern void* /*Lstrcat*/ i__Infix_4343 (void *a, void *b) {
@@ -552,22 +639,114 @@ extern void* /*Lstrcat*/ i__Infix_4343 (void *a, void *b) {
   return d->contents;
 }
 
+extern void* Lsprintf (char * fmt, ...) {
+  va_list args;
+  void *s;
+
+  
+  va_start (args, fmt);
+  fix_unboxed (fmt, args);
+  
+  createStringBuf ();
+
+  vprintStringBuf (fmt, args);
+
+  __pre_gc ();
+
+  s = Bstring (stringBuf.contents);
+
+  __post_gc ();
+  
+  deleteStringBuf ();
+
+  return s;
+}
+
 extern void Lfprintf (FILE *f, char *s, ...) {
   va_list args = (va_list) BOX (NULL);
 
-  va_start (args, s);
-  vfprintf (f, s, args);
-  va_end   (args);
+  va_start    (args, s);
+  fix_unboxed (s, args);
+  
+  if (vfprintf (f, s, args) < 0) {
+    failure ("fprintf (...): %s\n", strerror (errno));
+  }
+}
+
+extern void Lprintf (char *s, ...) {
+  va_list args = (va_list) BOX (NULL);
+
+  va_start    (args, s);
+  fix_unboxed (s, args);
+  
+  if (vprintf (s, args) < 0) {
+    failure ("fprintf (...): %s\n", strerror (errno));
+  }
 }
 
 extern FILE* Lfopen (char *f, char *m) {
-  return fopen (f, m);
+  FILE* h = fopen (f, m);
+
+  if (h)
+    return h;
+
+  failure ("fopen (\"%s\", \"%s\"): %s, %s, %s\n", f, m, strerror (errno));
 }
 
 extern void Lfclose (FILE *f) {
   fclose (f);
 }
-   
+
+extern void* LreadLine () {
+  char *buf;
+
+  if (scanf ("%m[^\n]", &buf) == 1) {
+    void * s = Bstring (buf);
+    
+    free (buf);
+    return s;
+  }
+  
+  if (errno != 0)
+    failure ("readLine (): %s\n", strerror (errno));
+
+  return LmakeString (0);
+}
+
+extern void* Lfread (char *fname) {
+  FILE *f = fopen (fname, "r");
+
+  if (f) {
+    if (fseek (f, 0l, SEEK_END) >= 0) {
+      long size = ftell (f);
+      void *s   = LmakeString (size);
+      
+      rewind (f);
+
+      if (fread (s, 1, size, f) == size) {
+	fclose (f);
+	return s;
+      }
+    }
+  }
+
+  failure ("fread (\"%s\"): %s\n", fname, strerror (errno));
+}
+
+extern void Lfwrite (char *fname, char *contents) {
+  FILE *f = fopen (fname, "w");
+
+  if (f) {
+    if (fprintf (f, "%s", contents) < 0);
+    else {
+      fclose (f);
+      return;
+    }
+  }
+
+  failure ("fwrite (\"%s\"): %s\n", fname, strerror (errno));
+}
+
 /* Lread is an implementation of the "read" construct */
 extern int Lread () {
   int result = BOX(0);
