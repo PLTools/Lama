@@ -634,9 +634,9 @@ module Expr =
       basic[def][infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary def infix) atr);
 
       primary[def][infix][atr]:
-        b:base[def][infix][Val] is:(  "[" i:parse[def][infix][Val] "]"                     {`Elem i}
-                                    | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT {`Post f})
-                                    | "(" args:!(Util.list0)[parse def infix Val] ")"      {`Call args}  
+        b:base[def][infix][Val] is:(  "[" i:parse[def][infix][Val] "]"                                                                         {`Elem i}
+                                    | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT args:(-"(" !(Util.list)[parse def infix Val] -")")? {`Post (f, args)})
+                                    | "(" args:!(Util.list0)[parse def infix Val] ")"                                                          {`Call args}  
                                    )+
         => {match (List.hd (List.rev is)), atr with
             | `Elem i, Reff -> true            
@@ -649,22 +649,22 @@ module Expr =
             List.fold_left
               (fun b ->
                 function
-                | `Elem i    -> Elem (b, i)
-                | `Len       -> Length b
-                | `Str       -> StringVal b
-                | `Post f    -> Call (Var f, [b])
-                | `Call args -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args)) 
+                | `Elem i         -> Elem (b, i)
+                | `Len            -> Length b
+                | `Str            -> StringVal b
+                | `Post (f, args) -> Call (Var f, b :: match args with None -> [] | Some args -> args)
+                | `Call args     -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args)) 
               )
               b
               is
           in
           let res = match lastElem, atr with
-                    | `Elem i, Reff -> ElemRef (b, i)
-                    | `Elem i,  _   -> Elem (b, i)
-                    | `Len,     _   -> Length b
-                    | `Str,     _   -> StringVal b
-                    | `Post f,  _   -> Call (Var f, [b])
-                    | `Call args, _ -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args))
+                    | `Elem i        , Reff -> ElemRef (b, i)
+                    | `Elem i        ,  _   -> Elem (b, i)
+                    | `Len           ,  _   -> Length b
+                    | `Str           ,  _   -> StringVal b
+                    | `Post (f, args),  _   -> Call (Var f, b :: match args with None -> [] | Some args -> args)
+                    | `Call args     , _ -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args))
           in
           ignore atr res
         }
