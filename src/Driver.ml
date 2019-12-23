@@ -13,7 +13,8 @@ let parse cmd =
     "string";
     "case"; "of"; "esac"; "when";
     "boxed"; "unboxed"; "string"; "sexp"; "array";
-    "infix"; "infixl"; "infixr"; "at"; "before"; "after"]
+    "infix"; "infixl"; "infixr"; "at"; "before"; "after";
+    "true"; "false"]
   in
   Util.parse
     (object

@@ -673,6 +673,9 @@ module Expr =
         n:DECIMAL                                 => {notRef atr} => {ignore atr (Const n)}
       | s:STRING                                  => {notRef atr} => {ignore atr (String (unquote s))}
       | c:CHAR                                    => {notRef atr} => {ignore atr (Const  (Char.code c))}
+      
+      | c:(%"true" {Const 1} | %"false" {Const 0}) => {notRef atr} => {ignore atr c} 
+       
       | %"infix" s:STRING                         => {notRef atr} => {ignore atr (Var (infix_name @@ unquote s))}
       | %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" body:basic[def][infix][Void]  => {notRef atr} => {ignore atr (Lambda (args, body))}
       | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
@@ -707,9 +710,9 @@ module Expr =
       | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val] => {isVoid atr} => {Repeat (s, e)}
       | %"return" e:basic[def][infix][Val]? => {isVoid atr} => {Return e}
 
-      | %"case" e:parse[def][infix][Val] %"of" bs:!(Util.listBy1)[ostap ("|")][ostap (!(Pattern.parse) -"->" parse[def][infix][atr])] %"esac"
+      | %"case" e:parse[def][infix][Val] %"of" bs:!(Util.listBy1)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[def][infix][atr][parse def])] %"esac"
                                                                      {Case (e, bs)}
-      | %"case" e:parse[def][infix][Val] %"of" bs:(!(Pattern.parse) -"->" parse[def][infix][Void]) => {isVoid atr} => %"esac"
+      | %"case" e:parse[def][infix][Val] %"of" bs:(!(Pattern.parse) -"->" scope[def][infix][Void][parse def]) => {isVoid atr} => %"esac"
                                                                      {Case (e, [bs])}
 
       | -"(" parse[def][infix][atr] -")"
