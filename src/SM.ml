@@ -425,8 +425,8 @@ object (self : 'self)
                       };       
        scope        = init_scope (
                         let rec readdress_to_closure = function
-                          | State.L (xs, _, tl) ->
-                             State.L (xs, (fun _ -> Value.Access (~-1)), readdress_to_closure tl)
+                          | State.L (xs, st, tl) ->
+                             State.L (xs, (fun name -> match st name with Value.Fun _ as x -> x | _ -> Value.Access (~-1)), readdress_to_closure tl)
                           | st -> st
                         in
                         readdress_to_closure st'
@@ -739,7 +739,12 @@ let compile cmd ((imports, infixes), p) =
      env, true, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] 
   in
   let rec compile_fundef env ((name, args, stmt, st) as fd) =
+    (* Printf.eprintf "Compile fundef: %s, state=%s\n" name (show(State.t) (show(Value.designation)) st);                *)
+    (* Printf.eprintf "st (inner) = %s\n" (try show(Value.designation) @@ State.eval st "inner" with _ -> " not found"); *)
     let env             = env#open_fun_scope fd in
+    
+    (*Printf.eprintf "Lookup: %s\n%!" (try show(Value.designation) @@ snd (env#lookup "inner") with _ -> "no inner..."); *)
+
     let env             = List.fold_left (fun env arg -> env#add_arg arg) env args in 
     let lend, env       = env#get_label in
     let env, flag, code = compile_expr lend env stmt in

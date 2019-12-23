@@ -132,7 +132,7 @@ module State =
     | I
     | G of (string * bool) list * (string, 'a) arrow
     | L of (string * bool) list * (string, 'a) arrow * 'a t
-    with show,html
+    with show, html
 
     (* Get the depth level of a state *)
     let rec level = function
