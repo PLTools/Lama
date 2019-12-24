@@ -617,6 +617,12 @@ extern void Lfailure (char *s, ...) {
   vfailure    (s, args);
 }
 
+extern void Bmatch_failure (void *v, char *fname, int line, int col) {
+  createStringBuf ();
+  printValue (v);
+  failure ("match failure at %s:%d:%d, value '%s'\n", fname, line, col, stringBuf.contents);
+}
+
 extern void* /*Lstrcat*/ i__Infix_4343 (void *a, void *b) {
   data *da = (data*) BOX (NULL);
   data *db = (data*) BOX (NULL);
@@ -745,6 +751,22 @@ extern void Lfwrite (char *fname, char *contents) {
   }
 
   failure ("fwrite (\"%s\"): %s\n", fname, strerror (errno));
+}
+
+extern void* Lfst (void *v) {
+  return Belem (v, BOX(0));  
+}
+
+extern void* Lsnd (void *v) {
+  return Belem (v, BOX(1));  
+}
+
+extern void* Lhd (void *v) {
+  return Belem (v, BOX(0));  
+}
+
+extern void* Ltl (void *v) {
+  return Belem (v, BOX(1));  
 }
 
 /* Lread is an implementation of the "read" construct */

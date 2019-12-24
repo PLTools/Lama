@@ -1,3 +1,7 @@
+F,fst;
+F,snd;
+F,hd;
+F,tl;
 F,readLine;
 F,stringcat;
 F,sprintf;

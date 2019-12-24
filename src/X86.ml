@@ -114,7 +114,7 @@ open SM
    Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
    of x86 instructions
 *)
-let compile env code =
+let compile cmd env code =
   (* SM.print_prg code; *)
   flush stdout;
   let suffix = function
@@ -399,6 +399,7 @@ let compile env code =
                   (if f = "main" then [Call "L__gc_init"] else [])   
 
           | END ->
+             env#assert_empty_stack;
              let name = env#fname in
              env#leave, [
                  Label env#epilogue;
@@ -414,6 +415,7 @@ let compile env code =
 
           | RET ->
              let x, env = env#pop in
+             env#assert_empty_stack;
              env, [Mov (x, eax); Jmp env#epilogue]
             
           | CALL (f, n) -> call env f n
@@ -460,7 +462,12 @@ let compile env code =
                 | Sexp    -> ".sexp_tag_patt"
                 | Closure -> ".closure_tag_patt"
                ) 1
-            
+
+          | FAIL (line, col) ->                       
+             let v, env = env#pop in
+             let s, env = env#string cmd#get_infile in
+             env, [Push (L col); Push (L line); Push (M ("$" ^ s)); Push v; Call "Bmatch_failure"; Binop  ("+", L (3 * word_size), esp)]
+             
           | i ->
              invalid_arg (Printf.sprintf "invalid SM insn: %s\n" (GT.show(insn) i))
         in
@@ -651,7 +658,7 @@ class env prg =
 *)
 let genasm cmd prog =
   let sm        = SM.compile cmd prog in
-  let env, code = compile (new env sm) sm in
+  let env, code = compile cmd (new env sm) sm in
   let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
   let globals =
     List.map (fun s -> Meta (Printf.sprintf "\t.globl\t%s" s)) ([gc_start; gc_end] @ env#publics)

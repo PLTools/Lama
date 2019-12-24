@@ -13,6 +13,11 @@ exception Semantic_error of string
 
 let unquote s = String.sub s 1 (String.length s - 2)
 
+module Loc =
+  struct
+    @type t = int * int with show, html
+  end
+  
 (* Values *)
 module Value =
   struct
@@ -276,6 +281,8 @@ module Pattern =
       | c:DECIMAL                                    {Const c}
       | s:STRING                                     {String (unquote s)}
       | c:CHAR                                       {Const  (Char.code c)}
+      | %"true"                                      {Const 1}
+      | %"false"                                     {Const 0}
       | "#" %"boxed"                                 {Boxed}
       | "#" %"unboxed"                               {UnBoxed}
       | "#" %"string"                                {StringTag}
@@ -319,7 +326,7 @@ module Expr =
     (* conditional                *) | If        of t * t * t
     (* loop with a pre-condition  *) | While     of t * t
     (* loop with a post-condition *) | Repeat    of t * t
-    (* pattern-matching           *) | Case      of t * (Pattern.t * t) list
+    (* pattern-matching           *) | Case      of t * (Pattern.t * t) list * Loc.t
     (* return statement           *) | Return    of t option
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
@@ -494,7 +501,7 @@ module Expr =
       | Repeat (s, e) ->
          eval conf (seq (While (Binop ("==", e, Const 0), s)) k) s
       | Return e -> (match e with None -> (st, i, o, []) | Some e -> eval (st, i, o, []) Skip e)
-      | Case (e, bs)->
+      | Case (e, bs, _)->
          let rec branch ((st, i, o, v::vs) as conf) = function
          | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v))
          | (patt, body)::tl ->
@@ -544,23 +551,23 @@ module Expr =
     | Elem (e, i)      -> ElemRef (e, i)
     | Seq  (s1, s2)    -> Seq (s1, propagate_ref s2)
     | If   (e, t1, t2) -> If (e, propagate_ref t1, propagate_ref t2)
-    | Case (e, bs)     -> Case (e, List.map (fun (p, e) -> p, propagate_ref e) bs)
+    | Case (e, bs, l)  -> Case (e, List.map (fun (p, e) -> p, propagate_ref e) bs, l)
     | _                -> raise (Semantic_error "not a destination")
 
     (* Balance values *)
     let rec balance_value = function
-    | Array     es        -> Array     (List.map balance_value es)
-    | Sexp      (s, es)   -> Sexp      (s, List.map balance_value es)
-    | Binop     (o, l, r) -> Binop     (o, balance_value l, balance_value r)
-    | Elem      (b, i)    -> Elem      (balance_value b, balance_value i)
-    | ElemRef   (b, i)    -> ElemRef   (balance_value b, balance_value i)
-    | Length    x         -> Length    (balance_value x)
-    | StringVal x         -> StringVal (balance_value x)
-    | Call      (f, es)   -> Call      (balance_value f, List.map balance_value es)
-    | Assign    (d, s)    -> Assign    (balance_value d, balance_value s)
-    | Seq       (l, r)    -> Seq       (balance_void l, balance_value r)
-    | If        (c, t, e) -> If        (balance_value c, balance_value t, balance_value e)
-    | Case      (e, ps)   -> Case      (balance_value e, List.map (fun (p, e) -> p, balance_value e) ps)
+    | Array     es         -> Array     (List.map balance_value es)
+    | Sexp      (s, es)    -> Sexp      (s, List.map balance_value es)
+    | Binop     (o, l, r)  -> Binop     (o, balance_value l, balance_value r)
+    | Elem      (b, i)     -> Elem      (balance_value b, balance_value i)
+    | ElemRef   (b, i)     -> ElemRef   (balance_value b, balance_value i)
+    | Length    x          -> Length    (balance_value x)
+    | StringVal x          -> StringVal (balance_value x)
+    | Call      (f, es)    -> Call      (balance_value f, List.map balance_value es)
+    | Assign    (d, s)     -> Assign    (balance_value d, balance_value s)
+    | Seq       (l, r)     -> Seq       (balance_void l, balance_value r)
+    | If        (c, t, e)  -> If        (balance_value c, balance_value t, balance_value e)
+    | Case      (e, ps, l) -> Case      (balance_value e, List.map (fun (p, e) -> p, balance_value e) ps, l)
 
     | Return    _
     | While     _
@@ -569,15 +576,15 @@ module Expr =
 
     | e                   -> e
     and balance_void = function
-    | If     (c, t, e) -> If     (balance_value c, balance_void t, balance_void e)
-    | Seq    (l, r)    -> Seq    (balance_void l, balance_void r)
-    | Case   (e, ps)   -> Case   (balance_value e, List.map (fun (p, e) -> p, balance_void e) ps)
-    | While  (e, s)    -> While  (balance_value e, balance_void s)
-    | Repeat (s, e)    -> Repeat (balance_void s, balance_value e)
-    | Return (Some e)  -> Return (Some (balance_value e))
-    | Return None      -> Return None
-    | Skip             -> Skip
-    | e                -> Ignore (balance_value e)
+    | If     (c, t, e)  -> If     (balance_value c, balance_void t, balance_void e)
+    | Seq    (l, r)     -> Seq    (balance_void l, balance_void r)
+    | Case   (e, ps, l) -> Case   (balance_value e, List.map (fun (p, e) -> p, balance_void e) ps, l)
+    | While  (e, s)     -> While  (balance_value e, balance_void s)
+    | Repeat (s, e)     -> Repeat (balance_void s, balance_value e)
+    | Return (Some e)   -> Return (Some (balance_value e))
+    | Return None       -> Return None
+    | Skip              -> Skip
+    | e                 -> Ignore (balance_value e)
 
   (* places ignore if expression should be void *)
   let ignore atr expr = if isVoid atr then Ignore expr else expr
@@ -710,10 +717,10 @@ module Expr =
       | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val] => {isVoid atr} => {Repeat (s, e)}
       | %"return" e:basic[def][infix][Val]? => {isVoid atr} => {Return e}
 
-      | %"case" e:parse[def][infix][Val] %"of" bs:!(Util.listBy1)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[def][infix][atr][parse def])] %"esac"
-                                                                     {Case (e, bs)}
-      | %"case" e:parse[def][infix][Val] %"of" bs:(!(Pattern.parse) -"->" scope[def][infix][Void][parse def]) => {isVoid atr} => %"esac"
-                                                                     {Case (e, [bs])}
+      | %"case" l:$ e:parse[def][infix][Val] %"of" bs:!(Util.listBy1)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[def][infix][atr][parse def])] %"esac"
+                                                                     {Case (e, bs, l#coord)}
+      | %"case" l:$ e:parse[def][infix][Val] %"of" bs:(!(Pattern.parse) -"->" scope[def][infix][Void][parse def]) => {isVoid atr} => %"esac"
+                                                                     {Case (e, [bs], l#coord)}
 
       | -"(" parse[def][infix][atr] -")"
     )

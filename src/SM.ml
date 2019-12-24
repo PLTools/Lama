@@ -30,6 +30,7 @@ open Language
 (* checks the tag and arity of S-expression  *) | TAG     of string * int
 (* checks the tag and size of array          *) | ARRAY   of int
 (* checks various patterns                   *) | PATT    of patt
+(* match failure                             *) | FAIL    of Loc.t
 (* external definition                       *) | EXTERN  of string
 (* public   definition                       *) | PUBLIC  of string
 with show
@@ -206,6 +207,8 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                  eval env (cstack, (Value.of_int @@ match x with Value.Int _ -> 1 | _ -> 0) :: stack', glob, loc, i, o) prg'
     | PATT Closure            -> let x::stack' = stack in
                                  eval env (cstack, (Value.of_int @@ match x with Value.Closure _ -> 1 | _ -> 0) :: stack', glob, loc, i, o) prg'
+    | FAIL l                  -> let x::_ = stack in
+                                 raise (Failure (Printf.sprintf "matching value %s failure at %s" (show(value) x) (show(Loc.t) l)))
    )
 
 (* Top-level evaluation
@@ -712,18 +715,19 @@ let compile cmd ((imports, infixes), p) =
 
   | Expr.Leave              -> env, false, []
                                  
-  | Expr.Case (e, brs) ->
-     let n         = List.length brs - 1 in
-     let lexp, env = env#get_label in
-     let env , fe  , se      = compile_expr lexp env e in
-     let env , _, _, code, _ =
+  | Expr.Case (e, brs, loc) ->
+     let n          = List.length brs - 1 in
+     let lfail, env = env#get_label in
+     let lexp , env = env#get_label in
+     let env  , fe  , se      = compile_expr lexp env e in
+     let env  , _, _, code, fail =
        List.fold_left
          (fun ((env, lab, i, code, continue) as acc) (p, s) ->
              if continue
              then
                let (lfalse, env), jmp =
                  if i = n
-                 then (l, env), []
+                 then (lfail, env), []
                  else env#get_label, [JMP l]
                in
                let env, lfalse', pcode = pattern env lfalse p in
@@ -736,7 +740,7 @@ let compile cmd ((imports, infixes), p) =
          )
          (env, None, 0, [], true) brs
      in
-     env, true, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] 
+     env, true, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] @ if fail then [LABEL lfail; FAIL loc] else []
   in
   let rec compile_fundef env ((name, args, stmt, st) as fd) =
     (* Printf.eprintf "Compile fundef: %s, state=%s\n" name (show(State.t) (show(Value.designation)) st);                *)
