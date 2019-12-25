@@ -278,7 +278,7 @@ module Pattern =
                                                       | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) ps UnBoxed
                                                      }
       | x:LIDENT y:(-"@" parse)?                     {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
-      | c:DECIMAL                                    {Const c}
+      | s:("-")? c:DECIMAL                           {Const (match s with None -> c | _ -> ~-c)}
       | s:STRING                                     {String (unquote s)}
       | c:CHAR                                       {Const  (Char.code c)}
       | %"true"                                      {Const 1}
@@ -641,6 +641,7 @@ module Expr =
       basic[def][infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary def infix) atr);
 
       primary[def][infix][atr]:
+        s:(s:"-"? {match s with None -> fun x -> x | _ -> fun x -> Binop ("-", Const 0, x)})
         b:base[def][infix][Val] is:(  "[" i:parse[def][infix][Val] "]"                                                                         {`Elem i}
                                     | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT args:(-"(" !(Util.list)[parse def infix Val] -")")? {`Post (f, args)})
                                     | "(" args:!(Util.list0)[parse def infix Val] ")"                                                          {`Call args}  
@@ -667,13 +668,13 @@ module Expr =
           in
           let res = match lastElem, atr with
                     | `Elem i        , Reff -> ElemRef (b, i)
-                    | `Elem i        ,  _   -> Elem (b, i)
-                    | `Len           ,  _   -> Length b
-                    | `Str           ,  _   -> StringVal b
-                    | `Post (f, args),  _   -> Call (Var f, b :: match args with None -> [] | Some args -> args)
-                    | `Call args     , _ -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args))
+                    | `Elem i        , _    -> Elem (b, i)
+                    | `Len           , _    -> Length b
+                    | `Str           , _    -> StringVal b
+                    | `Post (f, args), _    -> Call (Var f, b :: match args with None -> [] | Some args -> args)
+                    | `Call args     , _    -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args))
           in
-          ignore atr res
+          ignore atr (s res)
         }
         | base[def][infix][atr];
       base[def][infix][atr]:
@@ -717,11 +718,12 @@ module Expr =
       | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val] => {isVoid atr} => {Repeat (s, e)}
       | %"return" e:basic[def][infix][Val]? => {isVoid atr} => {Return e}
 
-      | %"case" l:$ e:parse[def][infix][Val] %"of" bs:!(Util.listBy1)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[def][infix][atr][parse def])] %"esac"
-                                                                     {Case (e, bs, l#coord)}
-      | %"case" l:$ e:parse[def][infix][Val] %"of" bs:(!(Pattern.parse) -"->" scope[def][infix][Void][parse def]) => {isVoid atr} => %"esac"
-                                                                     {Case (e, [bs], l#coord)}
-
+      | %"case" l:$ e:parse[def][infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[def][infix][atr][parse def])] %"esac"
+                                                                                                                                                 {Case (e, bs, l#coord)}
+      
+(*      | %"case" l:$ e:parse[def][infix][Val] %"of" bs:(!(Pattern.parse) -"->" scope[def][infix][Void][parse def]) => {isVoid atr} => %"esac"
+                                                                     {Case (e, [bs], l#coord)} 
+ *)
       | -"(" parse[def][infix][atr] -")"
     )
 
