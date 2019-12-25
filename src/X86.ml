@@ -659,15 +659,12 @@ class env prg =
 let genasm cmd prog =
   let sm        = SM.compile cmd prog in
   let env, code = compile cmd (new env sm) sm in
-  let gc_start, gc_end = "__gc_data_start", "__gc_data_end" in
   let globals =
-    List.map (fun s -> Meta (Printf.sprintf "\t.globl\t%s" s)) ([gc_start; gc_end] @ env#publics)
+    List.map (fun s -> Meta (Printf.sprintf "\t.globl\t%s" s)) env#publics
   in
-  let data = [Meta "\t.data";
-              Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size);
-              Meta (Printf.sprintf "%s:" gc_start)] @
+  let data = [Meta "\t.section custom_data,\"aw\",@progbits";
+              Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size)] @
               (List.map (fun s -> Meta (Printf.sprintf "%s:\t.int\t1" s)) env#globals) @
-              [Meta (Printf.sprintf "%s:" gc_end)] @
               (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings)
   in
   let asm = Buffer.create 1024 in

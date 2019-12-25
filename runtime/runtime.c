@@ -790,7 +790,7 @@ extern int Lwrite (int n) {
 
 /* GC starts here */
 
-extern const size_t __gc_data_end, __gc_data_start;
+extern const size_t __start_custom_data, __stop_custom_data;
 
 # ifdef __ENABLE_GC__
 
@@ -1004,8 +1004,8 @@ extern void gc_test_and_copy_root (size_t ** root) {
 }
 
 extern void gc_root_scan_data (void) {
-  size_t * p = &__gc_data_start;
-  while  (p != &__gc_data_end) {
+  size_t * p = &__start_custom_data;
+  while  (p != &__stop_custom_data) {
     gc_test_and_copy_root (p);
     p++;
   }
