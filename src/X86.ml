@@ -463,8 +463,8 @@ let compile cmd env code =
                 | Closure -> ".closure_tag_patt"
                ) 1
 
-          | FAIL (line, col) ->                       
-             let v, env = env#pop in
+          | FAIL ((line, col), value) ->                       
+             let v, env = if value then env#peek, env else env#pop in
              let s, env = env#string cmd#get_infile in
              env, [Push (L col); Push (L line); Push (M ("$" ^ s)); Push v; Call "Bmatch_failure"; Binop  ("+", L (3 * word_size), esp)]
              

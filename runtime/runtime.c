@@ -810,7 +810,7 @@ extern void __gc_root_scan_stack ();
 /* ======================================== */
 
 //static size_t SPACE_SIZE = 128;
-static size_t SPACE_SIZE = 1280;
+static size_t SPACE_SIZE = 1024 * 1024;
 # define POOL_SIZE (2*SPACE_SIZE)
 
 static void swap (size_t ** a, size_t ** b) {

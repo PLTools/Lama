@@ -304,6 +304,10 @@ module Expr =
     *)
     @type 'a value  = ('a, 'a value State.t array) Value.t with show, html
     @type 'a config = 'a value State.t * int list * int list * 'a value list with show, html
+    (* Reff : parsed expression should return value Reff (look for ":=");
+       Val : -//- returns simple value;
+       Void : parsed expression should not return any value;  *)
+    @type atr = Reff | Void | Val with show, html
     (* The type for expressions. Note, in regular OCaml there is no "@type..."
        notation, it came from GT.
     *)
@@ -326,7 +330,7 @@ module Expr =
     (* conditional                *) | If        of t * t * t
     (* loop with a pre-condition  *) | While     of t * t
     (* loop with a post-condition *) | Repeat    of t * t
-    (* pattern-matching           *) | Case      of t * (Pattern.t * t) list * Loc.t
+    (* pattern-matching           *) | Case      of t * (Pattern.t * t) list * Loc.t * atr
     (* return statement           *) | Return    of t option
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
@@ -337,11 +341,6 @@ module Expr =
     (* control (for control flow) *) | Control   of (t config, t * t config) arrow
     and decl = [`Local | `Public | `Extern | `PublicExtern ] * [`Fun of string list * t | `Variable of t option]
     with show, html
-
-    (* Reff : parsed expression should return value Reff (look for ":=");
-       Val : -//- returns simple value;
-       Void : parsed expression should not return any value;  *)
-    type atr = Reff | Void | Val
                            
     let notRef  x = match x with Reff -> false | _ -> true
     let isVoid  x = match x with Void -> true  | _ -> false
@@ -501,7 +500,7 @@ module Expr =
       | Repeat (s, e) ->
          eval conf (seq (While (Binop ("==", e, Const 0), s)) k) s
       | Return e -> (match e with None -> (st, i, o, []) | Some e -> eval (st, i, o, []) Skip e)
-      | Case (e, bs, _)->
+      | Case (e, bs, _, _)->
          let rec branch ((st, i, o, v::vs) as conf) = function
          | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v))
          | (patt, body)::tl ->
@@ -547,27 +546,27 @@ module Expr =
 
     (* Propagates *)
     let rec propagate_ref = function
-    | Var   x          -> Ref x
-    | Elem (e, i)      -> ElemRef (e, i)
-    | Seq  (s1, s2)    -> Seq (s1, propagate_ref s2)
-    | If   (e, t1, t2) -> If (e, propagate_ref t1, propagate_ref t2)
-    | Case (e, bs, l)  -> Case (e, List.map (fun (p, e) -> p, propagate_ref e) bs, l)
-    | _                -> raise (Semantic_error "not a destination")
+    | Var   x            -> Ref x
+    | Elem (e, i)        -> ElemRef (e, i)
+    | Seq  (s1, s2)      -> Seq (s1, propagate_ref s2)
+    | If   (e, t1, t2)   -> If (e, propagate_ref t1, propagate_ref t2)
+    | Case (e, bs, l, a) -> Case (e, List.map (fun (p, e) -> p, propagate_ref e) bs, l, a)
+    | _                  -> raise (Semantic_error "not a destination")
 
     (* Balance values *)
     let rec balance_value = function
-    | Array     es         -> Array     (List.map balance_value es)
-    | Sexp      (s, es)    -> Sexp      (s, List.map balance_value es)
-    | Binop     (o, l, r)  -> Binop     (o, balance_value l, balance_value r)
-    | Elem      (b, i)     -> Elem      (balance_value b, balance_value i)
-    | ElemRef   (b, i)     -> ElemRef   (balance_value b, balance_value i)
-    | Length    x          -> Length    (balance_value x)
-    | StringVal x          -> StringVal (balance_value x)
-    | Call      (f, es)    -> Call      (balance_value f, List.map balance_value es)
-    | Assign    (d, s)     -> Assign    (balance_value d, balance_value s)
-    | Seq       (l, r)     -> Seq       (balance_void l, balance_value r)
-    | If        (c, t, e)  -> If        (balance_value c, balance_value t, balance_value e)
-    | Case      (e, ps, l) -> Case      (balance_value e, List.map (fun (p, e) -> p, balance_value e) ps, l)
+    | Array     es            -> Array     (List.map balance_value es)
+    | Sexp      (s, es)       -> Sexp      (s, List.map balance_value es)
+    | Binop     (o, l, r)     -> Binop     (o, balance_value l, balance_value r)
+    | Elem      (b, i)        -> Elem      (balance_value b, balance_value i)
+    | ElemRef   (b, i)        -> ElemRef   (balance_value b, balance_value i)
+    | Length    x             -> Length    (balance_value x)
+    | StringVal x             -> StringVal (balance_value x)
+    | Call      (f, es)       -> Call      (balance_value f, List.map balance_value es)
+    | Assign    (d, s)        -> Assign    (balance_value d, balance_value s)
+    | Seq       (l, r)        -> Seq       (balance_void l, balance_value r)
+    | If        (c, t, e)     -> If        (balance_value c, balance_value t, balance_value e)
+    | Case      (e, ps, l, a) -> Case      (balance_value e, List.map (fun (p, e) -> p, balance_value e) ps, l, a)
 
     | Return    _
     | While     _
@@ -576,15 +575,15 @@ module Expr =
 
     | e                   -> e
     and balance_void = function
-    | If     (c, t, e)  -> If     (balance_value c, balance_void t, balance_void e)
-    | Seq    (l, r)     -> Seq    (balance_void l, balance_void r)
-    | Case   (e, ps, l) -> Case   (balance_value e, List.map (fun (p, e) -> p, balance_void e) ps, l)
-    | While  (e, s)     -> While  (balance_value e, balance_void s)
-    | Repeat (s, e)     -> Repeat (balance_void s, balance_value e)
-    | Return (Some e)   -> Return (Some (balance_value e))
-    | Return None       -> Return None
-    | Skip              -> Skip
-    | e                 -> Ignore (balance_value e)
+    | If     (c, t, e)     -> If     (balance_value c, balance_void t, balance_void e)
+    | Seq    (l, r)        -> Seq    (balance_void l, balance_void r)
+    | Case   (e, ps, l, a) -> Case   (balance_value e, List.map (fun (p, e) -> p, balance_void e) ps, l, a)
+    | While  (e, s)        -> While  (balance_value e, balance_void s)
+    | Repeat (s, e)        -> Repeat (balance_void s, balance_value e)
+    | Return (Some e)      -> Return (Some (balance_value e))
+    | Return None          -> Return None
+    | Skip                 -> Skip
+    | e                    -> Ignore (balance_value e)
 
   (* places ignore if expression should be void *)
   let ignore atr expr = if isVoid atr then Ignore expr else expr
@@ -661,7 +660,7 @@ module Expr =
                 | `Len            -> Length b
                 | `Str            -> StringVal b
                 | `Post (f, args) -> Call (Var f, b :: match args with None -> [] | Some args -> args)
-                | `Call args     -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args)) 
+                | `Call args      -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args)) 
               )
               b
               is
@@ -719,11 +718,7 @@ module Expr =
       | %"return" e:basic[def][infix][Val]? => {isVoid atr} => {Return e}
 
       | %"case" l:$ e:parse[def][infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[def][infix][atr][parse def])] %"esac"
-                                                                                                                                                 {Case (e, bs, l#coord)}
-      
-(*      | %"case" l:$ e:parse[def][infix][Val] %"of" bs:(!(Pattern.parse) -"->" scope[def][infix][Void][parse def]) => {isVoid atr} => %"esac"
-                                                                     {Case (e, [bs], l#coord)} 
- *)
+                                                                                                                                                 {Case (e, bs, l#coord, atr)}      
       | -"(" parse[def][infix][atr] -")"
     )
 
