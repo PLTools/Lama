@@ -641,15 +641,26 @@ module Expr =
 
       primary[def][infix][atr]:
         s:(s:"-"? {match s with None -> fun x -> x | _ -> fun x -> Binop ("-", Const 0, x)})
-        b:base[def][infix][Val] is:(  "[" i:parse[def][infix][Val] "]"                                                                         {`Elem i}
-                                    | -"." (%"length" {`Len} | %"string" {`Str} | f:LIDENT args:(-"(" !(Util.list)[parse def infix Val] -")")? {`Post (f, args)})
-                                    | "(" args:!(Util.list0)[parse def infix Val] ")"                                                          {`Call args}  
-                                   )+
+          b:base[def][infix][Val] is:(  "." f:LIDENT args:(-"(" !(Util.list)[parse def infix Val] -")")? {`Post (f, args)}
+                                      | "." %"length"                                                    {`Len}
+                                      | "." %"string"                                                    {`Str}
+                                      | "[" i:parse[def][infix][Val] "]"                                 {`Elem i}                                    
+                                      | "(" args:!(Util.list0)[parse def infix Val] ")"                  {`Call args}  
+                                     )+
         => {match (List.hd (List.rev is)), atr with
             | `Elem i, Reff -> true            
             |  _,      Reff -> false
             |  _,      _    -> true} =>
-        {
+         {
+          let is =
+            let rec fix_is = function
+            | [ ]                                                 -> []
+            | [x]                                                 -> [x]
+            | `Post (f, None) :: `Call args :: tl when args != [] -> `Post (f, Some args) :: fix_is tl
+            | x :: tl                                             -> x :: fix_is tl
+            in
+            fix_is is
+          in
           let lastElem = List.hd (List.rev is) in
           let is = List.rev (List.tl (List.rev is)) in
           let b =
