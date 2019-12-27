@@ -44,10 +44,10 @@ let show_prg p =
   Buffer.contents b;;
 
 (* Values *)
-@type value = (string, value array list) Value.t with show
+@type value = (string, value array) Value.t with show
       
 (* Local state of the SM *)
-@type local = { args : value array; locals : value array; closure : value array list } with show
+@type local = { args : value array; locals : value array; closure : value array } with show
 
 (* Global state of the SM *)
 @type global = (string, value) arrow 
@@ -81,7 +81,7 @@ let update glob loc z = function
 | Value.Global x -> State.bind x z glob
 | Value.Local  i -> loc.locals.(i) <- z; glob
 | Value.Arg    i -> loc.args.(i) <- z; glob
-| Value.Access i -> (List.hd (loc.closure)).(i) <- z; glob 
+| Value.Access i -> loc.closure.(i) <- z; glob 
 
 let print_stack memo s =
   Printf.eprintf "Memo %!";
@@ -121,7 +121,7 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                                     | Value.Global x -> glob x
                                                     | Value.Local  i -> loc.locals.(i)
                                                     | Value.Arg    i -> loc.args.(i)
-                                                    | Value.Access i -> (List.hd (loc.closure)).(i)) :: stack, glob, loc, i, o) prg'
+                                                    | Value.Access i -> loc.closure.(i)) :: stack, glob, loc, i, o) prg'
 
     | LDA x                   -> eval env (cstack, (Value.Var x) :: stack, glob, loc, i, o) prg'
  
@@ -141,43 +141,38 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                  eval env (cstack, stack', glob, loc, i, o) (if (c = "z" && Value.to_int x = 0) || (c = "nz" && Value.to_int x <> 0) then env#labeled l else prg')
 
     | CLOSURE name            -> let BEGIN (_, _, _, dgs, level) :: _ = env#labeled name in
-                                 assert (level <= List.length loc.closure);
-                                 let closure' = closure_at_level loc.closure level in
                                  let closure =
                                    Array.of_list @@
                                      List.map (
                                          function
                                          | Value.Arg    i -> loc.args.(i)
                                          | Value.Local  i -> loc.locals.(i)
-                                         | Value.Access i -> (List.hd closure').(i)
+                                         | Value.Access i -> loc.closure.(i)
                                          | _              -> invalid_arg "wrong value in CLOSURE")
                                        dgs
                                  in
-                                 eval env (cstack, (Value.Closure ([], name, closure :: closure')) :: stack, glob, loc, i, o) prg'
+                                 eval env (cstack, (Value.Closure ([], name, closure)) :: stack, glob, loc, i, o) prg'
                                  
     | CALL (f, n)             -> let args, stack' = split n stack in
                                  if env#is_label f
                                  then (
                                    let BEGIN (_, _, _, dgs, level) :: _ = env#labeled f in
-                                   (*Printf.eprintf "Call %s, level=%d, #closure=%d\n%!" f level (List.length loc.closure); *)
-                                   assert (level <= List.length loc.closure);
                                    match dgs with
                                    | [] -> eval env ((prg', loc)::cstack, stack', glob, {args    = Array.of_list (List.rev args);
                                                                                          locals  = [||];
-                                                                                         closure = [||] :: closure_at_level loc.closure level}, i, o) (env#labeled f)
+                                                                                         closure = [||]}, i, o) (env#labeled f)
                                    | _  ->
-                                      let closure' = closure_at_level loc.closure level in
                                       let closure =
                                         Array.of_list @@
                                           List.map (
                                             function
                                             | Value.Arg    i -> loc.args.(i)
                                             | Value.Local  i -> loc.locals.(i)
-                                            | Value.Access i -> (List.hd closure').(i)
+                                            | Value.Access i -> loc.closure.(i)
                                             | _              -> invalid_arg "wrong value in CLOSURE")
                                             dgs
                                       in
-                                      eval env ((prg', loc)::cstack, stack', glob, {args = Array.of_list (List.rev args); locals = [||]; closure = closure :: closure'}, i, o) (env#labeled f)
+                                      eval env ((prg', loc)::cstack, stack', glob, {args = Array.of_list (List.rev args); locals = [||]; closure = closure}, i, o) (env#labeled f)
                                  )
                                  else eval env (env#builtin f args ((cstack, stack', glob, loc, i, o) : config)) prg'
 
@@ -265,7 +260,7 @@ let run p i =
            let (st, i, o, r) = Language.Builtin.eval (State.I, i, o, []) (List.map Obj.magic @@ List.rev args) f in
            (cstack, (match r with [r] -> (Obj.magic r)::stack | _ -> Value.Empty :: stack), glob, loc, i, o)
        end      
-      ([], [], (List.fold_left (fun s (name, value) -> State.bind name value s) glob (Builtin.bindings ())), {locals=[||]; args=[||]; closure=[[||]]}, i, [])
+      ([], [], (List.fold_left (fun s (name, value) -> State.bind name value s) glob (Builtin.bindings ())), {locals=[||]; args=[||]; closure=[||]}, i, [])
       p
   in
   o 
