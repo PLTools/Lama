@@ -18,7 +18,7 @@ open Language
 (* a label                                   *) | LABEL   of string
 (* unconditional jump                        *) | JMP     of string
 (* conditional jump                          *) | CJMP    of string * string
-(* begins procedure definition               *) | BEGIN   of string * int * int * Value.designation list
+(* begins procedure definition               *) | BEGIN   of string * int * int * Value.designation list * int
 (* end procedure definition                  *) | END
 (* create a closure                          *) | CLOSURE of string
 (* calls a closure                           *) | CALLC   of int 
@@ -44,10 +44,10 @@ let show_prg p =
   Buffer.contents b;;
 
 (* Values *)
-@type value = (string, value array) Value.t with show
+@type value = (string, value array list) Value.t with show
       
 (* Local state of the SM *)
-@type local = { args : value array; locals : value array; closure : value array } with show
+@type local = { args : value array; locals : value array; closure : value array list } with show
 
 (* Global state of the SM *)
 @type global = (string, value) arrow 
@@ -81,7 +81,7 @@ let update glob loc z = function
 | Value.Global x -> State.bind x z glob
 | Value.Local  i -> loc.locals.(i) <- z; glob
 | Value.Arg    i -> loc.args.(i) <- z; glob
-| Value.Access i -> loc.closure.(i) <- z; glob 
+| Value.Access i -> (List.hd (loc.closure)).(i) <- z; glob 
 
 let print_stack memo s =
   Printf.eprintf "Memo %!";
@@ -99,6 +99,17 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
    Printf.eprintf "   stack=%s\n" (show(list) (show(value)) stack);
    Printf.eprintf "end\n";
    *)
+   let closure_at_level clo n =
+     let rec inner = function
+       | []      -> [], 0
+       | h :: tl ->
+          let tl', m = inner tl in
+          if m = n
+          then tl', n
+          else h :: tl, m + 1
+     in
+     fst (inner clo)
+   in
    (match insn with
     | PUBLIC _ | EXTERN _     -> eval env conf prg'
     | BINOP  op               -> let y::x::stack' = stack in eval env (cstack, (Value.of_int @@ Expr.to_func op (Value.to_int x) (Value.to_int y)) :: stack', glob, loc, i, o) prg'
@@ -110,7 +121,7 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                                     | Value.Global x -> glob x
                                                     | Value.Local  i -> loc.locals.(i)
                                                     | Value.Arg    i -> loc.args.(i)
-                                                    | Value.Access i -> loc.closure.(i)) :: stack, glob, loc, i, o) prg'
+                                                    | Value.Access i -> (List.hd (loc.closure)).(i)) :: stack, glob, loc, i, o) prg'
 
     | LDA x                   -> eval env (cstack, (Value.Var x) :: stack, glob, loc, i, o) prg'
  
@@ -129,37 +140,44 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
     | CJMP  (c, l)            -> let x::stack' = stack in
                                  eval env (cstack, stack', glob, loc, i, o) (if (c = "z" && Value.to_int x = 0) || (c = "nz" && Value.to_int x <> 0) then env#labeled l else prg')
 
-    | CLOSURE name            -> let BEGIN (_, _, _, dgs) :: _ = env#labeled name in
+    | CLOSURE name            -> let BEGIN (_, _, _, dgs, level) :: _ = env#labeled name in
+                                 assert (level <= List.length loc.closure);
+                                 let closure' = closure_at_level loc.closure level in
                                  let closure =
                                    Array.of_list @@
-                                   List.map (
-                                     function
-                                     | Value.Arg    i -> loc.args.(i)
-                                     | Value.Local  i -> loc.locals.(i)
-                                     | Value.Access i -> loc.closure.(i)
-                                     | _              -> invalid_arg "wrong value in CLOSURE")
-                                     dgs
+                                     List.map (
+                                         function
+                                         | Value.Arg    i -> loc.args.(i)
+                                         | Value.Local  i -> loc.locals.(i)
+                                         | Value.Access i -> (List.hd closure').(i)
+                                         | _              -> invalid_arg "wrong value in CLOSURE")
+                                       dgs
                                  in
-                                 eval env (cstack, (Value.Closure ([], name, closure)) :: stack, glob, loc, i, o) prg'
+                                 eval env (cstack, (Value.Closure ([], name, closure :: closure')) :: stack, glob, loc, i, o) prg'
                                  
     | CALL (f, n)             -> let args, stack' = split n stack in
                                  if env#is_label f
                                  then (
-                                   let BEGIN (_, _, _, dgs) :: _ = env#labeled f in
+                                   let BEGIN (_, _, _, dgs, level) :: _ = env#labeled f in
+                                   (*Printf.eprintf "Call %s, level=%d, #closure=%d\n%!" f level (List.length loc.closure); *)
+                                   assert (level <= List.length loc.closure);
                                    match dgs with
-                                   | [] -> eval env ((prg', loc)::cstack, stack', glob, {args = Array.of_list (List.rev args); locals = [||]; closure = [||]}, i, o) (env#labeled f)
+                                   | [] -> eval env ((prg', loc)::cstack, stack', glob, {args    = Array.of_list (List.rev args);
+                                                                                         locals  = [||];
+                                                                                         closure = [||] :: closure_at_level loc.closure level}, i, o) (env#labeled f)
                                    | _  ->
+                                      let closure' = closure_at_level loc.closure level in
                                       let closure =
                                         Array.of_list @@
                                           List.map (
                                             function
                                             | Value.Arg    i -> loc.args.(i)
                                             | Value.Local  i -> loc.locals.(i)
-                                            | Value.Access i -> loc.closure.(i)
+                                            | Value.Access i -> (List.hd closure').(i)
                                             | _              -> invalid_arg "wrong value in CLOSURE")
                                             dgs
                                       in
-                                      eval env ((prg', loc)::cstack, stack', glob, {args = Array.of_list (List.rev args); locals = [||]; closure = closure}, i, o) (env#labeled f)
+                                      eval env ((prg', loc)::cstack, stack', glob, {args = Array.of_list (List.rev args); locals = [||]; closure = closure :: closure'}, i, o) (env#labeled f)
                                  )
                                  else eval env (env#builtin f args ((cstack, stack', glob, loc, i, o) : config)) prg'
 
@@ -173,7 +191,7 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                   | _ -> invalid_arg "not a closure (or a builtin) in CALL: %s\n" @@ show(value) f
                                  )
                                
-    | BEGIN (_, _, locals, _) -> eval env (cstack, stack, glob, {loc with locals  = Array.init locals (fun _ -> Value.Empty)}, i, o) prg'
+    | BEGIN (_, _, locals, _, level) -> eval (env#set_level level) (cstack, stack, glob, {loc with locals  = Array.init locals (fun _ -> Value.Empty)}, i, o) prg'
                                  
     | END                     -> (match cstack with
                                   | (prg', loc')::cstack' -> eval env (cstack', Value.Empty :: stack, glob, loc', i, o) prg'
@@ -228,8 +246,11 @@ class indexer prg =
   in
   let m = make_env M.empty prg in
   object
+    val level = 0
     method is_label l = M.mem l m
     method labeled l = M.find l m
+    method set_level l = {< level = l >}
+    method get_level = level
   end
   
 let run p i = 
@@ -244,7 +265,7 @@ let run p i =
            let (st, i, o, r) = Language.Builtin.eval (State.I, i, o, []) (List.map Obj.magic @@ List.rev args) f in
            (cstack, (match r with [r] -> (Obj.magic r)::stack | _ -> Value.Empty :: stack), glob, loc, i, o)
        end      
-      ([], [], (List.fold_left (fun s (name, value) -> State.bind name value s) glob (Builtin.bindings ())), {locals=[||]; args=[||]; closure=[||]}, i, [])
+      ([], [], (List.fold_left (fun s (name, value) -> State.bind name value s) glob (Builtin.bindings ())), {locals=[||]; args=[||]; closure=[[||]]}, i, [])
       p
   in
   o 
@@ -279,6 +300,7 @@ let check_name_and_add names name mut =
     args         : string list;
     body         : Expr.t;
     scope        : funscope;
+    level        : int
 } with show
        
 @type context =
@@ -295,14 +317,15 @@ let init_scope st = {
     closure     = []
   }
                   
-let to_fundef name args body st = {
+let to_fundef name args body st level = {
     name        = name;
     args        = args;
     body        = body;
     scope       = init_scope st;
+    level       = level;
 }
 
-let from_fundef fd = (fd.name, fd.args, fd.body, fd.scope.st)
+let from_fundef fd = (fd.name, fd.args, fd.body, fd.scope.st, fd.level)
                                   
 let open_scope c fd =
   match c with
@@ -347,6 +370,7 @@ object (self : 'self)
   val scope        = init_scope State.I
   val fundefs      = Top []
   val decls        = []
+  val level        = 0
 
   method private import_imports =
     let paths = cmd#get_include_paths in
@@ -418,13 +442,15 @@ object (self : 'self)
          }
        >}
 
-  method open_fun_scope (name, args, body, st') =
-    {< 
+  method open_fun_scope (name, args, body, st', level) =
+    {<
+       level        = level + 1;
        fundefs      = open_scope fundefs {
                           name        = name;
                           args        = args;
                           body        = body;
-                          scope       = {scope with st = st'}
+                          scope       = {scope with st = st'};
+                          level       = level + 1
                       };       
        scope        = init_scope (
                         let rec readdress_to_closure = function
@@ -501,7 +527,7 @@ object (self : 'self)
 
   method add_lambda (args : string list) (body : Expr.t) =
     let name' = self#fun_internal_name (Printf.sprintf "lambda_%d" lam_index) in
-    {< fundefs = add_fun fundefs (to_fundef name' args body scope.st); lam_index = lam_index + 1 >}, name'
+    {< fundefs = add_fun fundefs (to_fundef name' args body scope.st level); lam_index = lam_index + 1 >}, name'
       
   method add_fun (name : string) (args : string list) (m : [`Local | `Extern | `Public | `PublicExtern]) (body : Expr.t) =
     let name' = self#fun_internal_name name in
@@ -509,7 +535,7 @@ object (self : 'self)
     | `Extern -> self
     | _ ->
        {<
-         fundefs = add_fun fundefs (to_fundef name' args body scope.st)
+         fundefs = add_fun fundefs (to_fundef name' args body scope.st level)
        >}
 
   method lookup name =
@@ -742,7 +768,7 @@ let compile cmd ((imports, infixes), p) =
      in
      env, true, se @ (if fe then [LABEL lexp] else []) @ [DUP] @ (List.flatten @@ List.rev code) @ [JMP l] @ if fail then [LABEL lfail; FAIL (loc, atr != Expr.Void); JMP l] else []
   in
-  let rec compile_fundef env ((name, args, stmt, st) as fd) =
+  let rec compile_fundef env ((name, args, stmt, st, level) as fd) =
     (* Printf.eprintf "Compile fundef: %s, state=%s\n" name (show(State.t) (show(Value.designation)) st);                *)
     (* Printf.eprintf "st (inner) = %s\n" (try show(Value.designation) @@ State.eval st "inner" with _ -> " not found"); *)
     let env             = env#open_fun_scope fd in
@@ -754,7 +780,7 @@ let compile cmd ((imports, infixes), p) =
     let env, flag, code = compile_expr lend env stmt in
     let env, funcode    = compile_fundefs [] env in
     env#close_fun_scope, 
-    ([LABEL name; BEGIN (name, env#nargs, env#nlocals, env#closure)] @
+    ([LABEL name; BEGIN (name, env#nargs, env#nlocals, env#closure, level)] @
      code @
      (if flag then [LABEL lend] else []) @
      [END]) :: funcode
@@ -770,7 +796,7 @@ let compile cmd ((imports, infixes), p) =
   let env, flag, code = compile_expr lend env p in
   let code            = if flag then code @ [LABEL lend] else code in
   let has_main        = List.length code > 0 in
-  let env, prg        = compile_fundefs [if has_main then [LABEL "main"; BEGIN ("main", 0, env#nlocals, [])] @ code @ [END] else []] env in
+  let env, prg        = compile_fundefs [if has_main then [LABEL "main"; BEGIN ("main", 0, env#nlocals, [], 0)] @ code @ [END] else []] env in
   let prg             = (if has_main then [PUBLIC "main"] else []) @ env#get_decls @ List.flatten prg in
   cmd#dump_SM prg;
   prg

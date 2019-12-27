@@ -151,7 +151,7 @@ let compile cmd env code =
     let call env f n =
       let closure =
         try
-          let BEGIN (_, _, _, closure) :: _ = env#labeled f in closure
+          let BEGIN (_, _, _, closure, level) :: _ = env#labeled f in closure
         with Not_found -> []
       in
       match closure with
@@ -224,7 +224,7 @@ let compile cmd env code =
              let pushr, popr =
                List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers 0)
              in
-             let BEGIN (_, _, _, closure) :: _ = env#labeled name in
+             let BEGIN (_, _, _, closure, level) :: _ = env#labeled name in
              let closure_len  = List.length closure in 
              let push_closure =
                List.map (fun d -> Push (env#loc d)) @@ List.rev closure
@@ -383,7 +383,7 @@ let compile cmd env code =
               let x, env = env#pop in
               env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, l)]
 
-          | BEGIN (f, nargs, nlocals, closure) ->
+          | BEGIN (f, nargs, nlocals, closure, level) ->
              env#assert_empty_stack;
              let has_closure = closure <> [] in
              let env  = env#enter f nlocals has_closure in
