@@ -17,6 +17,7 @@ let word_size = 4;;
 @type opnd =
 | R  of int        (* hard register                    *)
 | S  of int        (* a position on the hardware stack *)
+| C                (* a saved closure                  *)
 | M  of string     (* a named memory location          *)
 | L  of int        (* an immediate operand             *)
 | I  of int * opnd (* an indirect operand with offset  *)
@@ -74,6 +75,7 @@ let show instr =
   in
   let rec opnd = function
   | R i      -> regs.(i)
+  | C        -> "4(%ebp)"              
   | S i      -> if i >= 0
                 then Printf.sprintf "-%d(%%ebp)" ((i+1) * word_size)
                 else Printf.sprintf "%d(%%ebp)"  (8+(-i-1) * word_size)
@@ -143,16 +145,20 @@ let compile cmd env code =
         let env, pushs   = push_args env [] n in
         let pushs        = List.rev pushs     in
         let closure, env = env#pop            in
-        let call_closure = [Mov (closure, edx); CallI closure] in
-        env, pushr @ pushs @ call_closure @ [Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr)
+        let call_closure =
+          if on_stack closure
+          then [Mov (closure, edx); Mov (edx, eax); CallI eax]
+          else [Mov (closure, edx); CallI closure]
+        in
+        env, pushr @ pushs @ call_closure @ [Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
       in
       let y, env = env#allocate in env, code @ [Mov (eax, y)]
     in
     let call env f n =
       let closure =
-        try
+        (*try
           let BEGIN (_, _, _, closure) :: _ = env#labeled f in closure
-        with Not_found -> []
+        with Not_found ->*) [] (* !!! *)
       in
       match closure with
       | [] ->
@@ -177,7 +183,7 @@ let compile cmd env code =
              | "Bsta"   -> pushs
              | _        -> List.rev pushs
            in
-           env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr)
+           env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
          in
          let y, env = env#allocate in env, code @ [Mov (eax, y)]
       | _ ->
@@ -209,7 +215,7 @@ let compile cmd env code =
                Binop ("+", L (word_size * List.length push_args), esp);
                Mov (eax, s)
                ] @
-               List.rev popr)
+               List.rev popr) 
     in
     match scode with
     | [] -> env, []
@@ -220,11 +226,10 @@ let compile cmd env code =
           | PUBLIC name -> env#register_public name, []
           | EXTERN name -> env#register_extern name, []
                          
-          | CLOSURE name ->
+          | CLOSURE (name, closure) ->
              let pushr, popr =
                List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers 0)
              in
-             let BEGIN (_, _, _, closure) :: _ = env#labeled name in
              let closure_len  = List.length closure in 
              let push_closure =
                List.map (fun d -> Push (env#loc d)) @@ List.rev closure
@@ -238,7 +243,7 @@ let compile cmd env code =
               Call "Bclosure";
               Binop ("+", L (word_size * (closure_len + 2)), esp); 
               Mov (eax, s)] @
-              List.rev popr)
+              List.rev popr @ env#reload_closure)
              
   	  | CONST n ->
              let s, env' = env#allocate in
@@ -521,7 +526,7 @@ class env prg =
       if has_closure then [Pop edx] else []
 
     method reload_closure =
-      if has_closure then [Mov (S 0, edx)] else []
+      if has_closure then [Mov (C (*S 0*), edx)] else []
       
     method fname = fname
                  

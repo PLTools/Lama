@@ -29,7 +29,7 @@ module Value =
     | Arg    of int
     | Access of int
     | Fun    of string
-    with show,html   
+    with show, html   
 
     @type ('a, 'b) t =
     | Empty
@@ -42,7 +42,7 @@ module Value =
     | Closure of string list * 'a * 'b
     | FunRef  of string * string list * 'a * int
     | Builtin of string
-    with show,html
+    with show, html
 
     let to_int = function
     | Int n -> n

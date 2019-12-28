@@ -434,7 +434,7 @@ extern void* Bclosure (int n, void *entry, ...) {
   r->tag = CLOSURE_TAG | ((n + 1) << 3);
   ((void**) r->contents)[0] = entry;
   
-  va_start(args, n);
+  va_start(args, entry); // n);
   
   for (i = 0; i<n; i++) {
     ai = va_arg(args, int);
