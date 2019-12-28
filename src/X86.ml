@@ -155,67 +155,30 @@ let compile cmd env code =
       let y, env = env#allocate in env, code @ [Mov (eax, y)]
     in
     let call env f n =
-      let closure =
-        (*try
-          let BEGIN (_, _, _, closure) :: _ = env#labeled f in closure
-        with Not_found ->*) [] (* !!! *)
+      let f =
+        match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
       in
-      match closure with
-      | [] ->
-         let f =
-           match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
-         in
-         let pushr, popr =
-           List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
-         in      
-         let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in
-         let env, code =
-           let rec push_args env acc = function
-             | 0 -> env, acc
-             | n -> let x, env = env#pop in
-                    push_args env ((Push x)::acc) (n-1)
-           in
-           let env, pushs = push_args env [] n in
-           let pushs      =
-             match f with
-             | "Barray" -> List.rev @@ (Push (L n)) :: pushs
-             | "Bsexp"  -> List.rev @@ (Push (L n)) :: pushs
-             | "Bsta"   -> pushs
-             | _        -> List.rev pushs
-           in
-           env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
-         in
-         let y, env = env#allocate in env, code @ [Mov (eax, y)]
-      | _ ->
-         let pushr, popr =
-           List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
-         in
-         let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in      
-         let rec push_args env acc = function
-           | 0 -> env, acc
-           | n -> let x, env = env#pop in
-                  push_args env ((Push x)::acc) (n-1)
-         in         
-         let env, push_args = push_args env [] n in
-         let push_args      = List.rev push_args  in         
-         let closure_len    = List.length closure in 
-         let push_closure =
-           List.map (fun d -> Push (env#loc d)) @@ List.rev closure
-         in
-         let s, env = env#allocate in             
-         (env, pushr @
-               push_args @
-               push_closure @
-              [Push (M ("$" ^ f));
-               Push (L closure_len);
-               Call "Bclosure";
-               Binop ("+", L (word_size * (closure_len + 2)), esp); 
-               Mov (eax, edx);
-               CallI edx;
-               Binop ("+", L (word_size * List.length push_args), esp);
-               Mov (eax, s)
-               ] @
-               List.rev popr) 
+      let pushr, popr =
+        List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
+      in      
+      let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in
+      let env, code =
+        let rec push_args env acc = function
+          | 0 -> env, acc
+          | n -> let x, env = env#pop in
+                 push_args env ((Push x)::acc) (n-1)
+        in
+        let env, pushs = push_args env [] n in
+        let pushs      =
+          match f with
+          | "Barray" -> List.rev @@ (Push (L n)) :: pushs
+          | "Bsexp"  -> List.rev @@ (Push (L n)) :: pushs
+          | "Bsta"   -> pushs
+          | _        -> List.rev pushs
+        in
+        env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
+      in
+      let y, env = env#allocate in env, code @ [Mov (eax, y)]
     in
     match scode with
     | [] -> env, []

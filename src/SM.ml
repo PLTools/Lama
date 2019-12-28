@@ -22,7 +22,9 @@ open Language
 (* end procedure definition                  *) | END
 (* create a closure                          *) | CLOSURE of string * Value.designation list
 (* proto closure                             *) | PROTO   of string * string
-(* calls a closure                           *) | CALLC   of int 
+(* proto closure to a possible constant      *) | PPROTO  of string * string
+(* proto call                                *) | PCALLC  of int  
+(* calls a closure                           *) | CALLC   of int  
 (* calls a function/procedure                *) | CALL    of string * int 
 (* returns from a function                   *) | RET     
 (* drops the top element off                 *) | DROP
@@ -737,14 +739,16 @@ let compile cmd ((imports, infixes), p) =
                                
   | Expr.Call (f, args)     -> let lcall, env = env#get_label in
                                (match f with
-                                (*| Expr.Var name ->
+                                | Expr.Var name ->
                                    let env, acc = env#lookup name in
                                    (match acc with
                                     | Value.Fun name ->
-                                       add_code (compile_list lcall env args) lcall false [CALL (name, List.length args)] 
+                                       let env = env#register_call name in
+                                       let env, f, code = add_code (compile_list lcall env args) lcall false [PCALLC (List.length args)]  in
+                                       env, f, PPROTO (name, env#current_function) :: code
                                     | _ ->
                                        add_code (compile_list lcall env (f :: args)) lcall false [CALLC (List.length args)]
-                                   )*)
+                                   )
                                   
                                 | _ -> add_code (compile_list lcall env (f :: args)) lcall false [CALLC (List.length args)]
                                )
@@ -829,15 +833,13 @@ let compile cmd ((imports, infixes), p) =
   let rec compile_fundef env ((name, args, stmt, st) as fd) =
     (* Printf.eprintf "Compile fundef: %s, state=%s\n" name (show(State.t) (show(Value.designation)) st);                *)
     (* Printf.eprintf "st (inner) = %s\n" (try show(Value.designation) @@ State.eval st "inner" with _ -> " not found"); *)
-    let env             = env#open_fun_scope fd in
-    
+    let env             = env#open_fun_scope fd in    
     (*Printf.eprintf "Lookup: %s\n%!" (try show(Value.designation) @@ snd (env#lookup "inner") with _ -> "no inner..."); *)
-
     let env             = List.fold_left (fun env arg -> env#add_arg arg) env args in 
     let lend, env       = env#get_label in
     let env, flag, code = compile_expr lend env stmt in
     let env, funcode    = compile_fundefs [] env in
-    Printf.eprintf "Function: %s, closure: %s\n%!" name (show(list) (show(Value.designation)) env#closure);
+    (*Printf.eprintf "Function: %s, closure: %s\n%!" name (show(list) (show(Value.designation)) env#closure);*)
     let env = env#register_closure name in
     let code =
       ([LABEL name; BEGIN (name, env#nargs, env#nlocals, env#closure)] @
@@ -853,7 +855,24 @@ let compile cmd ((imports, infixes), p) =
        let env, code = compile_fundef env def in
        compile_fundefs (acc @ code) env
   in
-  let rec fix_closures env prg = List.map (function PROTO (f, c) -> CLOSURE (f, env#get_closure (f, c)) | insn -> insn) prg in
+  let fix_closures env prg =
+    let rec inner state = function
+    | []                  -> []
+    | PROTO (f, c) :: tl  -> CLOSURE (f, env#get_closure (f, c)) :: inner state tl                             
+    | PPROTO (f, c) :: tl ->
+       (match env#get_closure (f, c) with
+        | []      -> inner (Some f :: state) tl
+        | closure -> CLOSURE (f, closure) :: inner (None :: state) tl
+       )
+    | PCALLC n :: tl ->
+       (match state with
+        | None :: state'   -> CALLC n  :: inner state' tl
+        | Some f :: state' -> CALL (f, n) :: inner state' tl
+       )
+    | insn :: tl -> insn :: inner state tl
+    in
+    inner [] prg
+  in
   let env             = new env cmd imports in
   let lend, env       = env#get_label in
   let env, flag, code = compile_expr lend env p in
@@ -861,11 +880,15 @@ let compile cmd ((imports, infixes), p) =
   let has_main        = List.length code > 0 in
   let env, prg        = compile_fundefs [if has_main then [LABEL "main"; BEGIN ("main", 0, env#nlocals, [])] @ code @ [END] else []] env in
   let prg             = (if has_main then [PUBLIC "main"] else []) @ env#get_decls @ List.flatten prg in
-  Printf.eprintf "Before propagating closures:\n";
+  (*Printf.eprintf "Before propagating closures:\n";
   Printf.eprintf "%s\n%!" env#show_funinfo;
+   *)
   let env = env#propagate_closures in
+  (*
   Printf.eprintf "After propagating closures:\n";
   Printf.eprintf "%s\n%!" env#show_funinfo;
+   *)
+  (*Printf.eprintf "Before fix:\n%s\n" (show_prg prg);  *)
   let prg = fix_closures env prg in
   cmd#dump_SM prg;
   prg
