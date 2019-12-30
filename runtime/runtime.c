@@ -288,6 +288,13 @@ static void stringcat (void *p) {
   }
 }
 
+extern int LmatchSubString (char *subj, char *patt, int pos) {
+  data *p = TO_DATA(patt);
+  int   n = LEN (p->tag);
+
+  return BOX(strncmp (subj + UNBOX(pos), patt, n) == 0);
+}
+
 extern int Lcompare (void *p, void *q) {
 # define COMPARE_AND_RETURN(x,y) do if (x != y) return BOX(x - y); while (0)
   if (UNBOXED(p)) {

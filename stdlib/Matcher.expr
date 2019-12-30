@@ -1,0 +1,60 @@
+-- Matcher library for Ostap
+
+fun matcherCreate (pos, buf, line, col) {
+  fun show () {
+    return sprintf ("buf : %-40s\npos : %d\nline: %d\ncol : %d\n", buf, pos, line, col)
+  }
+  
+  fun rest () {
+    return buf.length - pos
+  }
+  
+  fun shift (n) {
+    return matcherCreate (pos + n, buf, line, col + n)
+  }
+  
+  fun matchString (s) {
+    return
+      if s.length > rest ()
+      then None
+      elif matchSubString (buf, s, pos) then Some (shift (s.length)) 
+      else None
+      fi
+  }
+
+  fun eof () {
+    return rest () == 0
+  }
+  
+  return [
+     show,
+     eof,
+     matchString
+  ]
+}
+
+fun show (m) {
+  return m [0]
+}
+
+fun eof (m) {
+  return m [1]
+}
+
+fun matchString (m, s) {
+  return m [2] (s)
+}
+
+fun matcherInit (buf) {
+  return matcherCreate (0, buf, 1, 1)
+}
+
+local m = matcherInit ("abc");
+
+printf ("%s", m.show ());
+printf ("eof: %s\n", m.eof ().string);
+printf ("matchString(""u""): %s\n", case m.matchString ("u") of Some (m) -> m.show () | _ -> "None" esac);
+printf ("matchString(""a""): %s\n", case m.matchString ("a") of Some (m) -> m.show () | _ -> "None" esac);
+printf ("matchString(""ab""): %s\n", case m.matchString ("ab") of Some (m) -> m.show () | _ -> "None" esac);
+printf ("matchString(""abc""): %s\n", case m.matchString ("abc") of Some (m) -> m.show () | _ -> "None" esac);
+printf ("matchString(""abcd""): %s\n", case m.matchString ("abcd") of Some (m) -> m.show () | _ -> "None" esac)

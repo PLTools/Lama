@@ -4,6 +4,7 @@ F,hd;
 F,tl;
 F,readLine;
 F,stringcat;
+F,matchSubString;
 F,sprintf;
 F,makeString;
 F,printf;

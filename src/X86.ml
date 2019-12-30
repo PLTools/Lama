@@ -583,6 +583,21 @@ class env prg =
 
     (* registers a string constant *)
     method string x =
+      let escape x =
+        let n   = String.length x     in
+        let buf = Buffer.create (n*2) in
+        let rec iterate i =
+          if i < n
+          then (
+            if x.[i] = '"' then Buffer.add_string buf "\\\""
+            else Buffer.add_char buf x.[i];
+            iterate (i+1)
+          )
+        in
+        iterate 0;
+        Buffer.contents buf
+      in
+      let x = escape x in
       try M.find x stringm, self
       with Not_found ->
         let y = Printf.sprintf "string_%d" scount in

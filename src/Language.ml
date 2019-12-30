@@ -11,8 +11,6 @@ open Combinators
 
 exception Semantic_error of string
 
-let unquote s = String.sub s 1 (String.length s - 2)
-
 module Loc =
   struct
     @type t = int * int with show, html
@@ -279,7 +277,7 @@ module Pattern =
                                                      }
       | x:LIDENT y:(-"@" parse)?                     {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
       | s:("-")? c:DECIMAL                           {Const (match s with None -> c | _ -> ~-c)}
-      | s:STRING                                     {String (unquote s)}
+      | s:STRING                                     {String s}
       | c:CHAR                                       {Const  (Char.code c)}
       | %"true"                                      {Const 1}
       | %"false"                                     {Const 0}
@@ -689,12 +687,12 @@ module Expr =
         | base[def][infix][atr];
       base[def][infix][atr]:
         n:DECIMAL                                 => {notRef atr} => {ignore atr (Const n)}
-      | s:STRING                                  => {notRef atr} => {ignore atr (String (unquote s))}
+      | s:STRING                                  => {notRef atr} => {ignore atr (String s)}
       | c:CHAR                                    => {notRef atr} => {ignore atr (Const  (Char.code c))}
       
       | c:(%"true" {Const 1} | %"false" {Const 0}) => {notRef atr} => {ignore atr c} 
        
-      | %"infix" s:STRING                         => {notRef atr} => {ignore atr (Var (infix_name @@ unquote s))}
+      | %"infix" s:STRING                         => {notRef atr} => {ignore atr (Var (infix_name s))}
       | %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" body:basic[def][infix][Void]  => {notRef atr} => {ignore atr (Lambda (args, body))}
       | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
       | -"{" scope[def][infix][atr][parse def] -"}" 
@@ -855,12 +853,12 @@ module Definition =
     ostap (
       arg : LIDENT;      
       position[pub][ass][coord][newp]:
-        %"at" s:STRING {match ass with `Nona -> Infix.at coord (unquote s) newp pub | _ -> raise (Semantic_error (Printf.sprintf "associativity for infxi '%s' can not be specified (it is inherited from that for '%s')" newp s))}
-        | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord (unquote s) newp ass pub};
+        %"at" s:STRING {match ass with `Nona -> Infix.at coord s newp pub | _ -> raise (Semantic_error (Printf.sprintf "associativity for infxi '%s' can not be specified (it is inherited from that for '%s')" newp s))}
+        | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord s newp ass pub};
       head[infix]:
         m:(%"external" {`Extern} | %"public" e:(%"external")? {match e with None -> `Public | _ -> `PublicExtern})? %"fun" name:LIDENT {unopt_mod m, name, name, infix}
     |   m:(%"public" {`Public})? ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
-        l:$ op:(s:STRING {unquote s})
+        l:$ op:(s:STRING {s})
         md:position[match m with Some _ -> true | _ -> false][ass][l#coord][op] {
           let name = Expr.infix_name op in
           match md (Expr.sem name) infix with
@@ -993,9 +991,9 @@ ostap (
                  | `Fail msg  -> raise (Semantic_error msg)
                in
                match item with
-               | `Infix (_  , op, `At     op') -> insert (unquote op) infix (Infix.at l#coord (unquote op') (unquote op) false)
-               | `Infix (ass, op, `Before op') -> insert (unquote op) infix (Infix.before l#coord (unquote op') (unquote op) ass false)
-               | `Infix (ass, op, `After  op') -> insert (unquote op) infix (Infix.after l#coord (unquote op') (unquote op) ass false)
+               | `Infix (_  , op, `At     op') -> insert op infix (Infix.at l#coord op' op false)
+               | `Infix (ass, op, `Before op') -> insert op infix (Infix.before l#coord op' op ass false)
+               | `Infix (ass, op, `After  op') -> insert op infix (Infix.after l#coord op' op ass false)
                | _                             -> infix
             )
             infix
