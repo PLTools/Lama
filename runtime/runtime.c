@@ -8,6 +8,7 @@
 # include <sys/mman.h>
 # include <assert.h>
 # include <errno.h>
+# include <regex.h>
 
 # define __ENABLE_GC__
 # ifndef __ENABLE_GC__
@@ -293,6 +294,44 @@ extern int LmatchSubString (char *subj, char *patt, int pos) {
   int   n = LEN (p->tag);
 
   return BOX(strncmp (subj + UNBOX(pos), patt, n) == 0);
+}
+
+extern void* Lsubstring (void *subj, int p, int l) {
+  data *d = TO_DATA(subj);
+  int pp = UNBOX (p), ll = UNBOX (l);
+  
+  if (pp + ll <= LEN(d->tag)) {
+    data *r;
+    
+    __pre_gc ();
+  
+    r = (data*) alloc (ll + 1 + sizeof (int));
+
+    r->tag = STRING_TAG | (ll << 3);
+
+    strncpy (r->contents, (char*) subj + pp, ll);
+    
+    __post_gc ();
+
+    return r->contents;    
+  }
+  
+  failure ("substring: index out of bounds (position=%d, length=%d, subject length=%d)", pp, ll, LEN(d->tag));
+}
+
+extern struct re_pattern_buffer *Lregexp (char *regexp) {
+  struct re_pattern_buffer *b = (struct re_pattern_buffer*) malloc (sizeof (struct re_pattern_buffer));
+  int n = re_compile_pattern (regexp, strlen (regexp), b);
+
+  if (n != 0) {
+    failure ("%", strerror (n));
+  };
+
+  return b;
+}
+
+extern int LregexpMatch (struct re_pattern_buffer *b, char *s, int pos) {
+  return BOX (re_match (b, s, LEN(TO_DATA(s)->tag), UNBOX(pos), 0));
 }
 
 extern int Lcompare (void *p, void *q) {
@@ -630,7 +669,7 @@ extern void Bmatch_failure (void *v, char *fname, int line, int col) {
   failure ("match failure at %s:%d:%d, value '%s'\n", fname, line, col, stringBuf.contents);
 }
 
-extern void* /*Lstrcat*/ i__Infix_4343 (void *a, void *b) {
+extern void* /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
   data *da = (data*) BOX (NULL);
   data *db = (data*) BOX (NULL);
   data *d  = (data*) BOX (NULL);
@@ -642,10 +681,12 @@ extern void* /*Lstrcat*/ i__Infix_4343 (void *a, void *b) {
   
   d  = (data *) alloc (sizeof(int) + LEN(da->tag) + LEN(db->tag) + 1);
 
-  d->tag = LEN(da->tag) + LEN(db->tag);
+  d->tag = STRING_TAG | ((LEN(da->tag) + LEN(db->tag)) << 3);
 
-  strcpy (d->contents, da->contents);
-  strcat (d->contents, db->contents);
+  strncpy (d->contents               , da->contents, LEN(da->tag));
+  strncpy (d->contents + LEN(da->tag), db->contents, LEN(db->tag));
+  
+  d->contents[LEN(da->tag) + LEN(db->tag)] = 0;
 
   __post_gc();
   

@@ -589,8 +589,12 @@ class env prg =
         let rec iterate i =
           if i < n
           then (
-            if x.[i] = '"' then Buffer.add_string buf "\\\""
-            else Buffer.add_char buf x.[i];
+            (match x.[i] with
+            | '"'  -> Buffer.add_string buf "\\\""
+            | '\n' -> Buffer.add_string buf "\n"
+            | '\t' -> Buffer.add_string buf "\t"
+            | c    -> Buffer.add_char buf c
+            );
             iterate (i+1)
           )
         in
