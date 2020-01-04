@@ -11,6 +11,8 @@ open Combinators
 
 exception Semantic_error of string
 
+let report_error str = raise (Semantic_error str)
+                     
 module Loc =
   struct
     @type t = int * int with show, html
@@ -159,7 +161,7 @@ module State =
     let undefined x = failwith (Printf.sprintf "Undefined variable: %s" x)
 
     (* Create a state from bindings list *)
-    let from_list l = fun x -> try List.assoc x l with Not_found -> invalid_arg (Printf.sprintf "undefined variable %s" x)
+    let from_list l = fun x -> try List.assoc x l with Not_found -> report_error (Printf.sprintf "undefined variable %s" x)
                              
     (* Bind a variable to a value in a state *)
     let bind x v s = fun y -> if x = y then v else s y
@@ -178,16 +180,16 @@ module State =
     *)
     let update x v s =      
       let rec inner = function
-      | I -> invalid_arg "uninitialized state"
+      | I -> report_error "uninitialized state"
       | G (scope, s) ->
          if is_var x scope
          then G (scope, bind x v s)
-         else invalid_arg (Printf.sprintf "name %s is undefined or does not designate a variable" x)
+         else report_error (Printf.sprintf "name %s is undefined or does not designate a variable" x)
       | L (scope, s, enclosing) ->
          if in_scope x scope
          then if is_var x scope
               then L (scope, bind x v s, enclosing)
-              else invalid_arg (Printf.sprintf "name %s does not designate a variable" x)
+              else report_error (Printf.sprintf "name %s does not designate a variable" x)
          else L (scope, s, inner enclosing)
       in
       inner s      
@@ -195,14 +197,14 @@ module State =
     (* Evals a variable in a state w.r.t. a scope *)
     let rec eval s x =
       match s with
-      | I                       -> invalid_arg "uninitialized state"           
+      | I                       -> report_error "uninitialized state"           
       | G (_, s)                -> s x
       | L (scope, s, enclosing) -> if in_scope x scope then s x else eval enclosing x
 
     (* Drops a scope *)
     let leave st st' =
       let rec get = function
-      | I           -> invalid_arg "uninitialized state"
+      | I           -> report_error "uninitialized state"
       | G _ as st   -> st
       | L (_, _, e) -> get e
       in
@@ -217,7 +219,7 @@ module State =
     (* Creates a new scope, based on a given state *)
     let rec enter st xs =
       match st with
-      | I           -> invalid_arg "uninitialized state"                   
+      | I           -> report_error "uninitialized state"                   
       | G _         -> L (xs, undefined, st)
       | L (_, _, e) -> enter e xs
 
@@ -357,7 +359,7 @@ module Expr =
       match x with
       | Value.Var (Value.Global x) -> State.update x v st
       | Value.Elem (x, i) -> Value.update_elem x i v; st
-      | _                 -> invalid_arg (Printf.sprintf "invalid value %s in update" @@ show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") x)
+      | _                 -> report_error (Printf.sprintf "invalid value %s in update" @@ show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") x)
 
     (* Expression evaluator
 
@@ -481,7 +483,7 @@ module Expr =
                 let st'', i', o', vs'' = eval (st', i, o, []) Skip body in
                 closure.(0) <- st'';
                 (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')                      
-             | _ -> invalid_arg (Printf.sprintf "callee did not evaluate to a function: %s" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") f))
+             | _ -> report_error (Printf.sprintf "callee did not evaluate to a function: %s" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") f))
             ))]))
         
       | Leave  -> eval (State.drop st, i, o, vs) Skip k
@@ -680,7 +682,7 @@ module Expr =
                     | `Len           , _    -> Length b
                     | `Str           , _    -> StringVal b
                     | `Post (f, args), _    -> Call (Var f, b :: match args with None -> [] | Some args -> args)
-                    | `Call args     , _    -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args))
+                    | `Call args     , _    -> (match b with Sexp _ -> invalid_arg "retry!"  | _ -> Call (b, args))
           in
           ignore atr (s res)
         }
@@ -944,7 +946,7 @@ module Interface =
                           (ostap (interface -EOF))
          with
          | `Ok intfs -> Some intfs
-         | `Fail er  -> invalid_arg (Printf.sprintf "malformed interface file '%s': %s" fname er)
+         | `Fail er  -> report_error (Printf.sprintf "malformed interface file '%s': %s" fname er)
         )
       with Sys_error _ -> None                        
 
@@ -959,7 +961,7 @@ module Interface =
       in
       match inner paths with
       | Some (path, intfs) -> path, intfs
-      | None               -> invalid_arg (Printf.sprintf "could not find an interface file for import '%s'" import)
+      | None               -> report_error (Printf.sprintf "could not find an interface file for import '%s'" import)
 
   end
 
