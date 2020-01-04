@@ -367,9 +367,11 @@ let compile cmd env code =
                   (if f = "main" then [Call "L__gc_init"] else [])   
 
           | END ->
+             let x, env = env#pop in
              env#assert_empty_stack;
              let name = env#fname in
              env#leave, [
+                 Mov (x, eax); (*!!*)
                  Label env#epilogue;
                  Mov (ebp, esp);
                  Pop ebp
@@ -382,8 +384,7 @@ let compile cmd env code =
                ]
 
           | RET ->
-             let x, env = env#pop in
-             env#assert_empty_stack;
+             let x = env#peek in
              env, [Mov (x, eax); Jmp env#epilogue]
             
           | CALL (f, n) -> call env f n

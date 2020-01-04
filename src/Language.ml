@@ -307,7 +307,7 @@ module Expr =
     (* Reff : parsed expression should return value Reff (look for ":=");
        Val : -//- returns simple value;
        Void : parsed expression should not return any value;  *)
-    @type atr = Reff | Void | Val with show, html
+    @type atr = Reff | Void | Val | Weak with show, html
     (* The type for expressions. Note, in regular OCaml there is no "@type..."
        notation, it came from GT.
     *)
@@ -342,10 +342,9 @@ module Expr =
     and decl = [`Local | `Public | `Extern | `PublicExtern ] * [`Fun of string list * t | `Variable of t option]
     with show, html
                            
-    let notRef  x = match x with Reff -> false | _ -> true
-    let isVoid  x = match x with Void -> true  | _ -> false
-    let isValue x = match x with Void -> false | _ -> true       (* functions for handling atribute *)
-
+    let notRef = function Reff -> false | _ -> true
+    let isVoid = function Void | Weak -> true  | _ -> false
+    
     (* Available binary operators:
         !!                   --- disjunction
         &&                   --- conjunction
@@ -537,57 +536,21 @@ module Expr =
          in
          eval conf Skip (schedule_list [e; Intrinsic (fun conf -> branch conf bs)])
 
-    (* Expression parser. You can use the following terminals:
-
-         LIDENT  --- a non-empty identifier a-z[a-zA-Z0-9_]* as a string
-         UIDENT  --- a non-empty identifier A-Z[a-zA-Z0-9_]* as a string
-         DECIMAL --- a decimal constant [0-9]+ as a string
-    *)
-
-    (* Propagates *)
-    let rec propagate_ref = function
-    | Var   x            -> Ref x
-    | Elem (e, i)        -> ElemRef (e, i)
-    | Seq  (s1, s2)      -> Seq (s1, propagate_ref s2)
-    | If   (e, t1, t2)   -> If (e, propagate_ref t1, propagate_ref t2)
-    | Case (e, bs, l, a) -> Case (e, List.map (fun (p, e) -> p, propagate_ref e) bs, l, a)
-    | _                  -> raise (Semantic_error "not a destination")
-
-    (* Balance values *)
-    let rec balance_value = function
-    | Array     es            -> Array     (List.map balance_value es)
-    | Sexp      (s, es)       -> Sexp      (s, List.map balance_value es)
-    | Binop     (o, l, r)     -> Binop     (o, balance_value l, balance_value r)
-    | Elem      (b, i)        -> Elem      (balance_value b, balance_value i)
-    | ElemRef   (b, i)        -> ElemRef   (balance_value b, balance_value i)
-    | Length    x             -> Length    (balance_value x)
-    | StringVal x             -> StringVal (balance_value x)
-    | Call      (f, es)       -> Call      (balance_value f, List.map balance_value es)
-    | Assign    (d, s)        -> Assign    (balance_value d, balance_value s)
-    | Seq       (l, r)        -> Seq       (balance_void l, balance_value r)
-    | If        (c, t, e)     -> If        (balance_value c, balance_value t, balance_value e)
-    | Case      (e, ps, l, a) -> Case      (balance_value e, List.map (fun (p, e) -> p, balance_value e) ps, l, a)
-
-    | Return    _
-    | While     _
-    | Repeat    _
-    | Skip        -> raise (Semantic_error "missing value")
-
-    | e                   -> e
-    and balance_void = function
-    | If     (c, t, e)     -> If     (balance_value c, balance_void t, balance_void e)
-    | Seq    (l, r)        -> Seq    (balance_void l, balance_void r)
-    | Case   (e, ps, l, a) -> Case   (balance_value e, List.map (fun (p, e) -> p, balance_void e) ps, l, a)
-    | While  (e, s)        -> While  (balance_value e, balance_void s)
-    | Repeat (s, e)        -> Repeat (balance_void s, balance_value e)
-    | Return (Some e)      -> Return (Some (balance_value e))
-    | Return None          -> Return None
-    | Skip                 -> Skip
-    | e                    -> Ignore (balance_value e)
+  (* Expression parser. You can use the following terminals:
+       LIDENT  --- a non-empty identifier a-z[a-zA-Z0-9_]* as a string
+       UIDENT  --- a non-empty identifier A-Z[a-zA-Z0-9_]* as a string
+       DECIMAL --- a decimal constant [0-9]+ as a string
+  *)
 
   (* places ignore if expression should be void *)
-  let ignore atr expr = if isVoid atr then Ignore expr else expr
+  let ignore atr expr = match atr with Void -> Ignore expr | _ -> expr
 
+  (* places dummy value if required *)
+  let materialize atr expr =
+    match atr with
+    | Weak -> Seq (expr, Const 0)
+    | _    -> expr
+    
   (* semantics for infixes creaed in runtime *)
   let sem s = (fun x atr y -> ignore atr (Call (Var s, [x; y]))), (fun _ -> Val, Val)
 
@@ -630,7 +593,9 @@ module Expr =
       )
       in
       ostap (inner[0][id][atr])
-
+      
+    let atr' = atr
+                 
     (* ======= *)
     ostap (
       parse[def][infix][atr]: h:basic[def][infix][Void] -";" t:parse[def][infix][atr] {Seq (h, t)}
@@ -695,7 +660,7 @@ module Expr =
       | c:(%"true" {Const 1} | %"false" {Const 0}) => {notRef atr} => {ignore atr c} 
        
       | %"infix" s:STRING                         => {notRef atr} => {ignore atr (Var (infix_name s))}
-      | %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" body:basic[def][infix][Void]  => {notRef atr} => {ignore atr (Lambda (args, body))}
+      | %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" body:basic[def][infix][Weak] => {notRef atr} => {ignore atr (Lambda (args, body))}
       | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
       | -"{" scope[def][infix][atr][parse def] -"}" 
       | "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} => {ignore atr (match es with
@@ -708,24 +673,25 @@ module Expr =
                                                                                         }
       | x:LIDENT {if notRef atr then Var x else Ref x}                 
 
-      | {isVoid atr} => %"skip" {Skip}
+      | {isVoid atr} => %"skip" {materialize atr Skip}
 
       | %"if" e:parse[def][infix][Val] %"then" the:scope[def][infix][atr][parse def]
-                                elif:(%"elif" parse[def][infix][Val] %"then" scope[def][infix][atr][parse def])*
-                                   %"else" els:scope[def][infix][atr][parse def] %"fi"
-                                                                     {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif els)}
+       elif:(%"elif" parse[def][infix][Val] %"then" scope[def][infix][atr][parse def])*
+               els:(%"else" scope[def][infix][atr][parse def])? %"fi"
+          {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif (match els with Some e -> e | _ -> materialize atr Skip))}
+      (*
       | %"if" e:parse[def][infix][Val] %"then" the:scope[def][infix][Void][parse def]
                              elif:(%"elif" parse[def][infix][Val] %"then" scope[def][infix][atr][parse def])*
                              => {isVoid atr} => %"fi"
                                                                      {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif Skip)}
-
+       *)
       | %"while" e:parse[def][infix][Val] %"do" s:scope[def][infix][Void][parse def]
-                                            => {isVoid atr} => %"od" {While (e, s)}
+                                            => {isVoid atr} => %"od" {materialize atr (While (e, s))}
 
       | %"for" i:parse[def][infix][Void] "," c:parse[def][infix][Val] "," s:parse[def][infix][Void] %"do" b:scope[def][infix][Void][parse def] => {isVoid atr} => %"od"
-                                                                     {Seq (i, While (c, Seq (b, s)))}
+                                                                     {materialize atr (Seq (i, While (c, Seq (b, s))))}
 
-      | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val] => {isVoid atr} => {Repeat (s, e)}
+      | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val] => {isVoid atr} => {materialize atr (Repeat (s, e))}
       | %"return" e:basic[def][infix][Val]? => {isVoid atr} => {Return e}
 
       | %"case" l:$ e:parse[def][infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[def][infix][atr][parse def])] %"esac"
@@ -876,7 +842,7 @@ module Definition =
         m:(%"local" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
         locs:!(Util.list (local_var m infix expr def)) ";" {locs, infix}
       | - <(m, orig_name, name, infix')> : head[infix] -"(" -args:!(Util.list0 arg) -")"
-        (body:expr[def][infix'][Expr.Void] {
+          (body:expr[def][infix'][Expr.Weak (*Void*)] {
             match m with
             | `Extern -> raise (Semantic_error (Printf.sprintf "body for an external function '%s' can not be specified" orig_name))
             | _       -> [(name, (m, `Fun (args, body)))], infix'
@@ -1007,7 +973,7 @@ ostap (
     is, infix
   };
   parse[cmd]:
-    <(is, infix)> : imports[cmd] <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Void)? {
+    <(is, infix)> : imports[cmd] <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Weak (*Void*))? {
     (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
     };
   definitions[infix]:

@@ -8,4 +8,4 @@ fun traverse (l) {
 
 local x = read ();
 
-traverse ({1, fun () write(100), 2, 3, 4, 5, fun () write (200), 6, 7})
+traverse ({1, fun () {write(100)}, 2, 3, 4, 5, fun () {write (200)}, 6, 7})
