@@ -1,7 +1,6 @@
 -- (C) Dmitry Boulytchev, St. Petersburg State University, JetBrains Research, 2020
 -- Matcher: simple string matching library.
 
-
 -- Create a regular expression representation.
 -- Arguments:
 --    r    --- a string representation for regular expression (as per GNU regexp)
@@ -30,9 +29,19 @@ fun matcherCreate (buf, pos, line, col) {
     return buf.length - pos
   }
 
-  -- Moves the position pointer on given number of characters within one line (i.e. 
+  -- Moves the position pointer on given number of characters.
   fun shift (n) {
-    return matcherCreate (buf, pos + n, line, col + n)
+    local i, l = line, c = col;
+
+    for i := pos, i < n, i := i+1 do
+      case buf [i] of
+        '\n' -> l := l + 1; c := 1
+      | '\t' -> c := c + 8
+      | _    -> c := c + 1
+      esac
+    od;
+    
+    return matcherCreate (buf, pos + n, l, c)
   }
 
   fun matchString (s) {
@@ -53,7 +62,7 @@ fun matcherCreate (buf, pos, line, col) {
       else Fail (sprintf ("%s expected at %d:%d", r[1], line, col))
       fi
   }
-  
+
   fun eof () {
     return rest () == 0
   }
@@ -70,7 +79,7 @@ fun show (m) {
   return m [0] ()
 }
 
-fun eof (m) {
+fun endOf (m) {
   return m [1] ()
 }
 
@@ -78,11 +87,13 @@ fun matchString (m, s) {
   return m [2] (s)
 }
 
+-- Matches against a regexp
 fun matchRegexp (m, r) {
   return m [3] (r)
 }
 
-fun matcherInit (buf) {
+-- Creates a fresh matcher from a string buffer
+public fun matcherInit (buf) {
   return matcherCreate (buf, 0, 1, 1)
 }
 
@@ -90,10 +101,76 @@ fun matcherInit (buf) {
  
 --}
 
-local m = matcherInit ("abc");
+local m = matcherInit ("   -- asdasdakm ,m.,msd .,m.,asd\n    \n\n abc");
 
-local ident = createRegexp ("[a-z][a-zA-Z_]*", "identifier");
-local ws    = createRegexp ("[ \n\t]+", "whitespace");
-local str   = createRegexp ("""\([^""]\|""""\)*""", "string literal");
+local
+  lident  = createRegexp ("[a-z][a-zA-Z_]*", "lowercase identifier"),
+  uident  = createRegexp ("[A-Z][a-zA-Z_]*", "uppercase identifier"),
+  ws      = createRegexp ("\\([ \t\n]\\|--[^\n]*\n\\)*", "whitespace"),
+  str     = createRegexp ("""\([^""]\|""""\)*""", "string literal"),
+  decimal = createRegexp ("[0-9]+", "decimal literal"),
+  chr     = createRegexp ("'[^']'", "character literal");
 
-printf ("ident: %s\n", case m.matchRegexp (ident) of Succ (m, s) -> "(" ++ m.show  ++ ", " ++ s ++ ")" | Fail (err) -> err.string esac)
+fun token (s) {
+  return fun (m) {return m.matchString (s)}
+}
+
+fun lid (m) {
+  return m.matchRegexp (lident)
+}
+
+fun uid (m) {
+  return m.matchRegexp (uident)
+}
+
+fun const (m) {
+  return m.matchRegexp (decimal)
+}
+
+infixl "@" before "*" (p, f) {
+  return fun (m) {
+    return
+      case p (m) of
+        Succ (m, x) -> Succ (m, f (x))
+      | err         -> err
+      esac
+  }
+}
+
+infixr "|>" after "!!" (l, r) {
+  return fun (m) {
+    return 
+      case l (m) of
+        Succ (m, s) -> r (s) (m)
+      | err         -> err
+      esac
+  }
+}
+
+infixr "||" after "|>" (l, r) {
+  return fun (m) {
+    return 
+      case l (m) of
+        s@Succ (_, _) -> s 
+      | err           -> r (m)
+      esac
+  }
+}
+
+local expr = lid   @ fun (s) {return Lid (s)} ||
+             const @ fun (s) {return Dec (s)},
+      assn = lid |> fun (id) {return token (":=") |> fun (s) {return expr @ fun (e) {return Assn (id, e)}}};
+
+printf ("%s\n", assn (matcherInit ("x:=3")).string)
+
+--local ident       = createRegexp ("[a-z][a-zA-Z_]*", "identifier");
+--local ws          = createRegexp ("[ \n\t]+", "whitespace");
+
+--local ws          = createRegexp ("\\([ \t\n]\\|--[^\n]*\n\\)*", "whitespace");
+
+--local str         = createRegexp ("""\([^""]\|""""\)*""", "string literal");
+--local lineComment = createRegexp ("--[^\n]*\n", "line comment");
+
+--printf ("ws: %s\n", case m.matchRegexp (ws) of Succ (m, s) -> "(" ++ m.show  ++ ", " ++ s ++ ")" | Fail (err) -> err.string esac);
+
+

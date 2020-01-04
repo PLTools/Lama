@@ -63,7 +63,24 @@ void __post_gc_subst () {}
 
 # define UNBOXED(x)  (((int) (x)) &  0x0001)
 # define UNBOX(x)    (((int) (x)) >> 1)
-# define BOX(x)     ((((int) (x)) << 1) | 0x0001)
+# define BOX(x)      ((((int) (x)) << 1) | 0x0001)
+
+static void vfailure (char *s, va_list args) {
+  fprintf  (stderr, "*** FAILURE: ");
+  vfprintf (stderr, s, args); // vprintf (char *, va_list) <-> printf (char *, ...)
+  exit     (255);
+}
+
+static void failure (char *s, ...) {
+  va_list args;
+
+  va_start (args, s);
+  vfailure (s, args);
+}
+
+# define ASSERT_BOXED(memo, x)   do if (UNBOXED(x)) failure ("boxed value expected in %s\n", memo); while (0)
+# define ASSERT_UNBOXED(memo, x) do if (!UNBOXED(x)) failure ("unboxed value expected in %s\n", memo); while (0)
+# define ASSERT_STRING(memo, x)  do if (!UNBOXED(x) && TAG(TO_DATA(x)->tag) != STRING_TAG) failure ("sting value expected in %s\n", memo); while (0)
 
 typedef struct {
   int tag; 
@@ -79,6 +96,9 @@ extern void* alloc (size_t);
 
 extern int Blength (void *p) {
   data *a = (data*) BOX (NULL);
+  
+  ASSERT_BOXED(".length", p);
+  
   a = TO_DATA(p);
   return BOX(LEN(a->tag));
 }
@@ -105,19 +125,6 @@ char* de_hash (int n) {
   }
   
   return ++p;
-}
-
-static void vfailure (char *s, va_list args) {
-  fprintf  (stderr, "*** FAILURE: ");
-  vfprintf (stderr, s, args); // vprintf (char *, va_list) <-> printf (char *, ...)
-  exit     (255);
-}
-
-static void failure (char *s, ...) {
-  va_list args;
-
-  va_start (args, s);
-  vfailure (s, args);
 }
 
 typedef struct {
@@ -291,15 +298,25 @@ static void stringcat (void *p) {
 
 extern int LmatchSubString (char *subj, char *patt, int pos) {
   data *p = TO_DATA(patt);
-  int   n = LEN (p->tag);
+  int   n;
 
+  ASSERT_STRING("matchSubString:1", subj);
+  ASSERT_STRING("matchSubString:2", patt);
+  ASSERT_UNBOXED("matchSubString:3", pos);
+  
+  n = LEN (p->tag);
+  
   return BOX(strncmp (subj + UNBOX(pos), patt, n) == 0);
 }
 
 extern void* Lsubstring (void *subj, int p, int l) {
   data *d = TO_DATA(subj);
   int pp = UNBOX (p), ll = UNBOX (l);
-  
+
+  ASSERT_STRING("substring:1", subj);
+  ASSERT_UNBOXED("substring:2", p);
+  ASSERT_UNBOXED("substring:3", l);
+      
   if (pp + ll <= LEN(d->tag)) {
     data *r;
     
@@ -331,6 +348,10 @@ extern struct re_pattern_buffer *Lregexp (char *regexp) {
 }
 
 extern int LregexpMatch (struct re_pattern_buffer *b, char *s, int pos) {
+  ASSERT_BOXED("regexpMatch:1", b);
+  ASSERT_STRING("regexpMatch:2", s);
+  ASSERT_UNBOXED("regexpMatch:3", pos);
+    
   return BOX (re_match (b, s, LEN(TO_DATA(s)->tag), UNBOX(pos), 0));
 }
 
@@ -391,6 +412,10 @@ extern int Lcompare (void *p, void *q) {
 
 extern void* Belem (void *p, int i) {
   data *a = (data *)BOX(NULL);
+
+  ASSERT_BOXED(".elem:1", p);
+  ASSERT_UNBOXED(".elem:2", i);
+  
   a = TO_DATA(p);
   i = UNBOX(i);
   
@@ -405,6 +430,8 @@ extern void* LmakeString (int length) {
   int   n = UNBOX(length);
   data *r;
 
+  ASSERT_UNBOXED("makeStrig", length);
+  
   __pre_gc () ;
   
   r = (data*) alloc (n + 1 + sizeof (int));
@@ -419,7 +446,7 @@ extern void* LmakeString (int length) {
 extern void* Bstring (void *p) {
   int   n = strlen (p);
   void *s;
-
+  
   __pre_gc ();
   
   s = LmakeString (BOX(n));  
@@ -433,6 +460,8 @@ extern void* Bstring (void *p) {
 extern void* Lstringcat (void *p) {
   void *s;
 
+  ASSERT_BOXED("stringcat", p);
+  
   __pre_gc ();
   
   createStringBuf ();
@@ -469,7 +498,7 @@ extern void* Bclosure (int n, void *entry, ...) {
   int     i    = BOX(0),
           ai   = BOX(0);
   data    *r   = (data*) BOX (NULL);
-
+  
   __pre_gc ();
   
 #ifdef DEBUG_PRINT
@@ -566,6 +595,7 @@ extern void* Bsexp (int n, ...) {
 
 extern int Btag (void *d, int t, int n) {
   data *r = (data *) BOX (NULL);
+  
   if (UNBOXED(d)) return BOX(0);
   else {
     r = TO_DATA(d);
@@ -580,6 +610,7 @@ extern int Btag (void *d, int t, int n) {
 
 extern int Barray_patt (void *d, int n) {
   data *r = BOX(NULL);
+  
   if (UNBOXED(d)) return BOX(0);
   else {
     r = TO_DATA(d);
@@ -590,6 +621,9 @@ extern int Barray_patt (void *d, int n) {
 extern int Bstring_patt (void *x, void *y) {
   data *rx = (data *) BOX (NULL),
        *ry = (data *) BOX (NULL);
+  
+  ASSERT_STRING(".string_patt:2", y);
+      
   if (UNBOXED(x)) return BOX(0);
   else {
     rx = TO_DATA(x); ry = TO_DATA(y);
@@ -633,6 +667,9 @@ extern int Bsexp_tag_patt (void *x) {
 }
 
 extern void* Bsta (void *v, int i, void *x) {
+  ASSERT_BOXED(".sta:3", x);
+  ASSERT_UNBOXED(".sta:2", i);
+  
   if (TAG(TO_DATA(x)->tag) == STRING_TAG)((char*) x)[UNBOX(i)] = (char) UNBOX(v);
   else ((int*) x)[UNBOX(i)] = v;
 
@@ -674,6 +711,9 @@ extern void* /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
   data *db = (data*) BOX (NULL);
   data *d  = (data*) BOX (NULL);
 
+  ASSERT_STRING("++:1", a);
+  ASSERT_STRING("++:2", b);
+  
   da = TO_DATA(a);
   db = TO_DATA(b);
 
@@ -697,6 +737,7 @@ extern void* Lsprintf (char * fmt, ...) {
   va_list args;
   void *s;
 
+  ASSERT_STRING("sprintf:1", fmt);
   
   va_start (args, fmt);
   fix_unboxed (fmt, args);
@@ -719,6 +760,9 @@ extern void* Lsprintf (char * fmt, ...) {
 extern void Lfprintf (FILE *f, char *s, ...) {
   va_list args = (va_list) BOX (NULL);
 
+  ASSERT_BOXED("fprintf:1", f);
+  ASSERT_STRING("fprintf:2", s);  
+  
   va_start    (args, s);
   fix_unboxed (s, args);
   
@@ -730,6 +774,8 @@ extern void Lfprintf (FILE *f, char *s, ...) {
 extern void Lprintf (char *s, ...) {
   va_list args = (va_list) BOX (NULL);
 
+  ASSERT_STRING("printf:1", s);
+
   va_start    (args, s);
   fix_unboxed (s, args);
   
@@ -739,8 +785,13 @@ extern void Lprintf (char *s, ...) {
 }
 
 extern FILE* Lfopen (char *f, char *m) {
-  FILE* h = fopen (f, m);
+  FILE* h;
 
+  ASSERT_STRING("fopen:1", f);
+  ASSERT_STRING("fopen:2", m);
+
+  h = fopen (f, m);
+  
   if (h)
     return h;
 
@@ -748,6 +799,8 @@ extern FILE* Lfopen (char *f, char *m) {
 }
 
 extern void Lfclose (FILE *f) {
+  ASSERT_BOXED("fclose", f);
+
   fclose (f);
 }
 
@@ -768,8 +821,12 @@ extern void* LreadLine () {
 }
 
 extern void* Lfread (char *fname) {
-  FILE *f = fopen (fname, "r");
+  FILE *f;
 
+  ASSERT_STRING("fread", fname);
+
+  f = fopen (fname, "r");
+  
   if (f) {
     if (fseek (f, 0l, SEEK_END) >= 0) {
       long size = ftell (f);
@@ -788,7 +845,12 @@ extern void* Lfread (char *fname) {
 }
 
 extern void Lfwrite (char *fname, char *contents) {
-  FILE *f = fopen (fname, "w");
+  FILE *f;
+
+  ASSERT_STRING("fwrite:1", fname);
+  ASSERT_STRING("fwrite:2", contents);
+  
+  f = fopen (fname, "w");
 
   if (f) {
     if (fprintf (f, "%s", contents) < 0);
