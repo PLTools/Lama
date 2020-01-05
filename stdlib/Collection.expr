@@ -1,0 +1,110 @@
+-- MNode (key, list of values, balance factor, left subtree, right subtree)
+-- balance factor = height (left subtree) - height (right subtree)
+
+public fun insert (m, k, v) {
+  fun rot (left, node) {
+    if left
+    then case node of
+           MNode (k, v, _, l, MNode (rk, rv, _, ll, rr)) ->
+             MNode (rk, rv, 0, MNode (k, v, 0, l, ll), rr)
+         esac
+    else case node of
+           MNode (k, v, _, MNode (lk, lv, _, ll, rr), r) ->
+             MNode (lk, lv, 0, ll, MNode (k, v, 0, rr, r))
+         esac
+    fi
+  }
+
+  fun factor (x) {x [2]}
+  
+  fun inner (m, k, v) {
+    case m of
+      {} -> [true, MNode (k, {v}, 0, {}, {})]
+    | MNode (kk, vv, bf, l, r) -> 
+       local c = compare (k, kk);
+       if c == 0
+       then [false, MNode (kk, v : vv, bf, l, r)]
+       else if c < 0
+            then
+              case inner (l, k, v) of
+                [true,  ll] -> if bf < 0
+	                       then [false, MNode (kk, vv, bf + 1, ll, r)]
+	                       elif bf == 1
+			       then if ll.factor > 0
+			            then [false, rot (false, MNode (kk, vv, bf, ll, r))]
+			            else [false, rot (false, MNode (kk, vv, bf, rot (true, ll), r))]
+			            fi
+			       else [true,  MNode (kk, vv, bf + 1, ll, r)] 
+			       fi
+              | [false, ll] -> [false, MNode (kk, vv, bf, ll, r)]
+	      esac		
+            else
+	      case inner (r, k, v) of
+	        [true,  rr] -> if bf > 0
+	                       then [false, MNode (kk, vv, bf - 1, l, rr)]
+			       elif bf == -1
+			       then if rr.factor < 0
+			            then [false, rot (true, MNode (kk, vv, bf, l, rr))]
+			            else [false, rot (true, MNode (kk, vv, bf, l, rot (false, rr)))]
+			            fi				   
+			       else [true,  MNode (kk, vv, bf - 1, l, rr)] 
+			       fi
+              | [false, rr] -> [false, MNode (kk, vv, bf, l, rr)]
+	      esac
+            fi
+       fi	
+    esac
+  }
+
+  (m.inner (k, v)).snd
+} 
+
+public fun find (m, k) {
+  case m of
+    {} -> None
+  | MNode (kk, vv, _, l, r) ->
+     local c = compare (k, kk);
+     if c == 0
+     then case vv of v : _ -> Some (v) | _ -> None esac
+     else find (if c < 0 then l else r fi, k)
+     fi
+  esac
+}
+
+public fun remove (m, k) {
+  case m of
+    {} -> m
+  | MNode (kk, vv, bf, l, r) ->
+     local c = compare (k, kk);
+     if c == 0
+     then case vv of {} -> m | _ : vt -> MNode (kk, vt, l, r) esac
+     else if c < 0
+          then MNode (kk, vv, bf, remove (l, k), r)
+          else MNode (kk, vv, bf, l, remove (r, k))
+          fi
+     fi
+  esac
+}
+
+fun validate (t) {
+  fun inner (t, verify) {
+    case t of
+      {} -> 0
+    | MNode (k, _, bf, l, r) ->
+       if verify (k)
+       then
+	 local lh = validate (l, fun (x) {(*return*) x < k}),
+	       rh = validate (r, fun (x) {(*return*) x > k});
+
+         if bf == lh - rh
+	 then 1 + if lh > rh then lh else rh fi
+	 else failure ("Balance violation on key %s\n", k.string)
+	 fi
+       else failure ("Order violation on key %s\n", k.string)
+       fi
+    esac
+  }
+
+  inner (t, fun (x) {true})
+}
+

@@ -8,7 +8,7 @@
 --             (e.g. "identifier", "string constant", etc.), used for error
 --             reporting
 fun createRegexp (r, name) {
-  return [regexp (r), name]
+  [regexp (r), name]
 }
 
 -- Create an immutable matcher.
@@ -21,12 +21,12 @@ fun createRegexp (r, name) {
 fun matcherCreate (buf, pos, line, col) {
   -- Shows a matcher in a readable form
   fun show () {
-    return sprintf ("buf : %-40s\npos : %d\nline: %d\ncol : %d\n", buf, pos, line, col)
+    sprintf ("buf : %-40s\npos : %d\nline: %d\ncol : %d\n", buf, pos, line, col)
   }
 
   -- Calculates the number of remaining unmatched characters in the buffer
   fun rest () {
-    return buf.length - pos
+    buf.length - pos
   }
 
   -- Moves the position pointer on given number of characters.
@@ -41,65 +41,58 @@ fun matcherCreate (buf, pos, line, col) {
       esac
     od;
     
-    return matcherCreate (buf, pos + n, l, c)
+    matcherCreate (buf, pos + n, l, c)
   }
 
   fun matchString (s) {
-    return
-      if s.length > rest ()
-      then Fail (sprintf ("""%s"" expected at %d:%d", s, line, col))
-      elif matchSubString (buf, s, pos) then Succ (shift (s.length), s) 
-      else Fail (sprintf ("""%s"" expected at %d:%d", s, line, col))
-      fi
+    if s.length > rest ()
+    then Fail (sprintf ("""%s"" expected at %d:%d", s, line, col))
+    elif matchSubString (buf, s, pos) then Succ (shift (s.length), s) 
+    else Fail (sprintf ("""%s"" expected at %d:%d", s, line, col))
+    fi
   }
 
   fun matchRegexp (r) {
     local n;
     
-    return
-      if (n := regexpMatch (r[0], buf, pos)) > 0
-      then Succ (shift (n), substring (buf, pos, n))
-      else Fail (sprintf ("%s expected at %d:%d", r[1], line, col))
-      fi
+    if (n := regexpMatch (r[0], buf, pos)) > 0
+    then Succ (shift (n), substring (buf, pos, n))
+    else Fail (sprintf ("%s expected at %d:%d", r[1], line, col))
+    fi
   }
 
   fun eof () {
-    return rest () == 0
+    rest () == 0
   }
   
-  return [
-     show,
-     eof,
-     matchString,
-     matchRegexp
+  [show,
+   eof,
+   matchString,
+   matchRegexp
   ]
 }
 
 fun show (m) {
-  return m [0] ()
+  m [0] ()
 }
 
 fun endOf (m) {
-  return m [1] ()
+  m [1] ()
 }
 
 fun matchString (m, s) {
-  return m [2] (s)
+  m [2] (s)
 }
 
 -- Matches against a regexp
 fun matchRegexp (m, r) {
-  return m [3] (r)
+  m [3] (r)
 }
 
 -- Creates a fresh matcher from a string buffer
 public fun matcherInit (buf) {
-  return matcherCreate (buf, 0, 1, 1)
+  matcherCreate (buf, 0, 1, 1)
 }
-
---fun parse (a) {
- 
---}
 
 local m = matcherInit ("   -- asdasdakm ,m.,msd .,m.,asd\n    \n\n abc");
 
@@ -112,65 +105,50 @@ local
   chr     = createRegexp ("'[^']'", "character literal");
 
 fun token (s) {
-  return fun (m) {return m.matchString (s)}
+  fun (m) {m.matchString (s)}
 }
 
+
 fun lid (m) {
-  return m.matchRegexp (lident)
+  matchRegexp (m, lident)
 }
 
 fun uid (m) {
-  return m.matchRegexp (uident)
+  matchRegexp (m, uident)
 }
 
 fun const (m) {
-  return m.matchRegexp (decimal)
+  matchRegexp (m, decimal)
 }
 
 infixl "@" before "*" (p, f) {
-  return fun (m) {
-    return
-      case p (m) of
-        Succ (m, x) -> Succ (m, f (x))
-      | err         -> err
-      esac
+  fun (m) {    
+    case p (m) of
+      Succ (m, x) -> Succ (m, f (x))
+    | err         -> err
+    esac
   }
 }
 
 infixr "|>" after "!!" (l, r) {
-  return fun (m) {
-    return 
-      case l (m) of
-        Succ (m, s) -> r (s) (m)
-      | err         -> err
-      esac
+  fun (m) {
+    case l (m) of
+      Succ (m, s) -> r (s) (m)
+    | err         -> err
+    esac
   }
 }
 
 infixr "||" after "|>" (l, r) {
-  return fun (m) {
-    return 
-      case l (m) of
-        s@Succ (_, _) -> s 
-      | err           -> r (m)
-      esac
+  fun (m) {  
+    case l (m) of
+      s@Succ (_, _) -> s 
+    | err           -> r (m)
+    esac
   }
 }
 
-local expr = lid   @ fun (s) {return Lid (s)} ||
-             const @ fun (s) {return Dec (s)},
-      assn = lid |> fun (id) {return token (":=") |> fun (s) {return expr @ fun (e) {return Assn (id, e)}}};
+local expr = lid @ fun (s) {Lid (s)} || const @ fun (s) {Dec (s)},
+      assn = lid |> fun (id) {token (":=") |> fun (s) {expr @ fun (e) {Assn (id, e)}}};
 
-printf ("%s\n", assn (matcherInit ("x:=3")).string)
-
---local ident       = createRegexp ("[a-z][a-zA-Z_]*", "identifier");
---local ws          = createRegexp ("[ \n\t]+", "whitespace");
-
---local ws          = createRegexp ("\\([ \t\n]\\|--[^\n]*\n\\)*", "whitespace");
-
---local str         = createRegexp ("""\([^""]\|""""\)*""", "string literal");
---local lineComment = createRegexp ("--[^\n]*\n", "line comment");
-
---printf ("ws: %s\n", case m.matchRegexp (ws) of Succ (m, s) -> "(" ++ m.show  ++ ", " ++ s ++ ")" | Fail (err) -> err.string esac);
-
-
+printf ("%s\n", case assn (matcherInit ("x:=3")) of Fail (err) -> err | Succ (_, s) -> s.string esac)

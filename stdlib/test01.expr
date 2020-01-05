@@ -1,0 +1,23 @@
+import Collection;
+
+local tree = {}, i;
+
+for i := 100, i >= 1, i := i-1 do
+  tree := insert (tree, i, i);
+  printf ("Inserting: %s\n", i.string);
+  printf ("Result   : %s\n", tree.string)
+od;
+
+tree := {};
+
+for i := 1, i <= 100, i := i+2 do
+  tree := insert (tree, i, i);
+  printf ("Inserting: %s\n", i.string);
+  printf ("Result   : %s\n", tree.string)
+od;
+
+for i := 2, i <= 100, i := i+2 do
+  tree := insert (tree, i, i);
+  printf ("Inserting: %s\n", i.string);
+  printf ("Result   : %s\n", tree.string)
+od 
