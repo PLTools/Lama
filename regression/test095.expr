@@ -1,0 +1,5 @@
+infix "++" at "+" (a, b) { a+b}
+
+local x = read ();
+
+write (infix "++" (2, 3))

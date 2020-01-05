@@ -660,7 +660,7 @@ module Expr =
       | c:(%"true" {Const 1} | %"false" {Const 0}) => {notRef atr} => {ignore atr c} 
        
       | %"infix" s:STRING                         => {notRef atr} => {ignore atr (Var (infix_name s))}
-      | %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" body:basic[def][infix][Weak] => {notRef atr} => {ignore atr (Lambda (args, body))}
+      | %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" "{" body:scope[def][infix][Weak][parse def] "}"=> {notRef atr} => {ignore atr (Lambda (args, body))}
       | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
       | -"{" scope[def][infix][atr][parse def] -"}" 
       | "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} => {ignore atr (match es with
@@ -671,20 +671,14 @@ module Expr =
                                                                                                               | None -> []
                                                                                                               | Some args -> args))
                                                                                         }
-      | x:LIDENT {if notRef atr then Var x else Ref x}                 
+      | x:LIDENT {if notRef atr then ignore atr (Var x) else Ref x}                 
 
       | {isVoid atr} => %"skip" {materialize atr Skip}
 
       | %"if" e:parse[def][infix][Val] %"then" the:scope[def][infix][atr][parse def]
-       elif:(%"elif" parse[def][infix][Val] %"then" scope[def][infix][atr][parse def])*
+              elif:(%"elif" parse[def][infix][Val] %"then" scope[def][infix][atr][parse def])*
                els:(%"else" scope[def][infix][atr][parse def])? %"fi"
           {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif (match els with Some e -> e | _ -> materialize atr Skip))}
-      (*
-      | %"if" e:parse[def][infix][Val] %"then" the:scope[def][infix][Void][parse def]
-                             elif:(%"elif" parse[def][infix][Val] %"then" scope[def][infix][atr][parse def])*
-                             => {isVoid atr} => %"fi"
-                                                                     {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif Skip)}
-       *)
       | %"while" e:parse[def][infix][Val] %"do" s:scope[def][infix][Void][parse def]
                                             => {isVoid atr} => %"od" {materialize atr (While (e, s))}
 
@@ -842,7 +836,7 @@ module Definition =
         m:(%"local" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
         locs:!(Util.list (local_var m infix expr def)) ";" {locs, infix}
       | - <(m, orig_name, name, infix')> : head[infix] -"(" -args:!(Util.list0 arg) -")"
-          (body:expr[def][infix'][Expr.Weak (*Void*)] {
+          ("{" body:expr[def][infix'][Expr.Weak] "}" {
             match m with
             | `Extern -> raise (Semantic_error (Printf.sprintf "body for an external function '%s' can not be specified" orig_name))
             | _       -> [(name, (m, `Fun (args, body)))], infix'
@@ -945,7 +939,7 @@ let eval (_, expr) i =
 
 (* Top-level parser *)
 ostap (
-  imports[cmd]: l:$ is:(%"import" !(Util.list (ostap (LIDENT))) -";")* {
+  imports[cmd]: l:$ is:(%"import" !(Util.list (ostap (UIDENT))) -";")* {
     let is    = "Std" :: List.flatten is in
     let infix =
       List.fold_left
@@ -973,11 +967,11 @@ ostap (
     is, infix
   };
   parse[cmd]:
-    <(is, infix)> : imports[cmd] <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Weak (*Void*))? {
+    <(is, infix)> : imports[cmd] <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Weak)? {
     (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
     };
   definitions[infix]:
-    <(def, infix')> : !(Definition.parse infix Expr.basic definitions) <(defs, infix'')> : definitions[infix'] {
+    <(def, infix')> : !(Definition.parse infix (*Expr.basic*) (fun def infix atr -> Expr.scope def infix atr (Expr.parse def)) definitions) <(defs, infix'')> : definitions[infix'] {
       def @ defs, infix''
      }
   | empty {[], infix}

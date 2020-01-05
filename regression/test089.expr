@@ -1,0 +1,8 @@
+fun test (a, b, c) {
+  local x = a + b, y = b + c;
+  {local e = x + y;
+    e
+  }
+}
+
+write (test (read (), read (), read ()))

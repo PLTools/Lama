@@ -162,7 +162,7 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
     | BEGIN (_, _, locals, _)  -> eval env (cstack, stack, glob, {loc with locals  = Array.init locals (fun _ -> Value.Empty)}, i, o) prg'
                                  
     | END                     -> (match cstack with
-                                  | (prg', loc')::cstack' -> eval env (cstack', Value.Empty :: stack, glob, loc', i, o) prg'
+                                  | (prg', loc')::cstack' -> eval env (cstack', (*Value.Empty ::*) stack, glob, loc', i, o) prg'
                                   | []                    -> conf
                                  )
   
