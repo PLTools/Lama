@@ -1,4 +1,5 @@
 TESTS=$(sort $(basename $(wildcard test*.expr)))
+LIBS=$(sort $(basename $(wildcard Lib*.expr)).o)
 
 RC=../../src/rc.opt
 
@@ -6,8 +7,11 @@ RC=../../src/rc.opt
 
 check: $(TESTS)
 
-$(TESTS): %: %.expr
-	@RC_RUNTIME=../../runtime $(RC) -I . $< && cat $@.input | ./$@ > $@.log && diff -u $@.log orig/$@.log
+%.o: %.expr
+	RC_RUNTIME=../../runtime $(RC) -c -I . $<
+
+$(TESTS): %: %.expr $(LIBS)
+	RC_RUNTIME=../../runtime $(RC) -I . $< && cat $@.input | ./$@ > $@.log && diff -u $@.log orig/$@.log
 
 clean:
-	rm -f test*.log *.s *~ $(TESTS)
+	rm -f test*.log *.i *.o *.s *~ $(TESTS)

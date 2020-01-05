@@ -11,7 +11,8 @@ open Combinators
 
 exception Semantic_error of string
 
-let report_error str = raise (Semantic_error str)
+let report_error ?(loc=None) str =
+  raise (Semantic_error (str ^ match loc with None -> "" | Some (l, c) -> Printf.sprintf " at (%d, %d)" l c))
                      
 module Loc =
   struct
@@ -178,18 +179,18 @@ module State =
     (* Update: non-destructively "modifies" the state s by binding the variable x
        to value v and returns the new state w.r.t. a scope
     *)
-    let update x v s =      
+    let update ?(loc=None) x v s =      
       let rec inner = function
-      | I -> report_error "uninitialized state"
+      | I -> report_error ~loc:loc "uninitialized state"
       | G (scope, s) ->
          if is_var x scope
          then G (scope, bind x v s)
-         else report_error (Printf.sprintf "name %s is undefined or does not designate a variable" x)
+         else report_error ~loc:loc (Printf.sprintf "name %s is undefined or does not designate a variable" x)
       | L (scope, s, enclosing) ->
          if in_scope x scope
          then if is_var x scope
               then L (scope, bind x v s, enclosing)
-              else report_error (Printf.sprintf "name %s does not designate a variable" x)
+              else report_error ~loc:loc (Printf.sprintf "name %s does not designate a variable" x)
          else L (scope, s, inner enclosing)
       in
       inner s      
@@ -316,7 +317,7 @@ module Expr =
     (* array                      *) | Array     of t list
     (* string                     *) | String    of string
     (* S-expressions              *) | Sexp      of string * t list
-    (* variable                   *) | Var       of string
+    (* variable                   *) | Var       of string 
     (* reference (aka "lvalue")   *) | Ref       of string
     (* binary operator            *) | Binop     of string * t * t
     (* element extraction         *) | Elem      of t * t
@@ -551,7 +552,7 @@ module Expr =
     | Weak -> Seq (expr, Const 0)
     | _    -> expr
     
-  (* semantics for infixes creaed in runtime *)
+  (* semantics for infixes created in runtime *)
   let sem s = (fun x atr y -> ignore atr (Call (Var s, [x; y]))), (fun _ -> Val, Val)
 
   let sem_init s = fun x atr y ->
@@ -595,7 +596,8 @@ module Expr =
       ostap (inner[0][id][atr])
       
     let atr' = atr
-                 
+    let not_a_reference s = new Reason.t (Msg.make "not a reference" [||] (Msg.Locator.Point s#coord))
+                            
     (* ======= *)
     ostap (
       parse[def][infix][atr]: h:basic[def][infix][Void] -";" t:parse[def][infix][atr] {Seq (h, t)}
@@ -653,21 +655,21 @@ module Expr =
         }
         | base[def][infix][atr];
       base[def][infix][atr]:
-        n:DECIMAL                                 => {notRef atr} => {ignore atr (Const n)}
-      | s:STRING                                  => {notRef atr} => {ignore atr (String s)}
-      | c:CHAR                                    => {notRef atr} => {ignore atr (Const  (Char.code c))}
+        l:$ n:DECIMAL                              => {notRef atr} :: (not_a_reference l) => {ignore atr (Const n)}
+      | l:$ s:STRING                               => {notRef atr} :: (not_a_reference l)=> {ignore atr (String s)}
+      | l:$ c:CHAR                                 => {notRef atr} :: (not_a_reference l) => {ignore atr (Const  (Char.code c))}
       
-      | c:(%"true" {Const 1} | %"false" {Const 0}) => {notRef atr} => {ignore atr c} 
+      | l:$ c:(%"true" {Const 1} | %"false" {Const 0}) => {notRef atr} :: (not_a_reference l) => {ignore atr c} 
        
-      | %"infix" s:STRING                         => {notRef atr} => {ignore atr (Var (infix_name s))}
-      | %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" "{" body:scope[def][infix][Weak][parse def] "}"=> {notRef atr} => {ignore atr (Lambda (args, body))}
-      | "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} => {ignore atr (Array es)}
+      | l:$ %"infix" s:STRING                         => {notRef atr}  :: (not_a_reference l) => {ignore atr (Var (infix_name s))}
+      | l:$ %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" "{" body:scope[def][infix][Weak][parse def] "}"=> {notRef atr} :: (not_a_reference l) => {ignore atr (Lambda (args, body))}
+      | l:$ "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} :: (not_a_reference l) => {ignore atr (Array es)}
       | -"{" scope[def][infix][atr][parse def] -"}" 
-      | "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} => {ignore atr (match es with
+      | l:$ "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} :: (not_a_reference l) => {ignore atr (match es with
                                                                                       | [] -> Const 0
                                                                                       | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0))
                                                                          }
-      | t:UIDENT args:(-"(" !(Util.list)[parse def infix Val] -")")? => {notRef atr} => {ignore atr (Sexp (t, match args with
+      | l:$ t:UIDENT args:(-"(" !(Util.list)[parse def infix Val] -")")? => {notRef atr} :: (not_a_reference l) => {ignore atr (Sexp (t, match args with
                                                                                                               | None -> []
                                                                                                               | Some args -> args))
                                                                                         }

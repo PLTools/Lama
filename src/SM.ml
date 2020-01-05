@@ -545,7 +545,7 @@ object (self : 'self)
     match m with
     | `Local -> ()
     |  _  ->
-       raise (Semantic_error (Printf.sprintf "external/public definitions ('%s') not allowed in local scopes" name))    
+       report_error (Printf.sprintf "external/public definitions ('%s') not allowed in local scopes" name)    
     
   method add_name (name : string) (m : [`Local | `Extern | `Public | `PublicExtern]) (mut : bool) = {<
       decls = (name, m, false) :: decls;
@@ -598,7 +598,7 @@ object (self : 'self)
          fundefs = add_fun fundefs (to_fundef name' args body scope.st)
        >} # register_fun name'
 
-  method lookup name =
+  method lookup l name =
     match State.eval scope.st name with
     | Value.Access n when n = ~-1 ->
        let index         = scope.acc_index in
@@ -607,7 +607,7 @@ object (self : 'self)
          fundefs = fundefs';
          scope   = {
            scope with
-           st        = State.update name (Value.Access index) scope.st;
+           st        = State.update ~loc:l name (Value.Access index) scope.st;
            acc_index = scope.acc_index + 1;
            closure   = loc :: scope.closure
          }
@@ -683,7 +683,7 @@ let compile cmd ((imports, infixes), p) =
       List.fold_left
         (fun (env, acc) (name, path) ->
            let env = env#add_name name `Local true in
-           let env, dsg = env#lookup name in
+           let env, dsg = env#lookup None name in
            env,
            ([DUP] @
             List.concat (List.map (fun i -> [CONST i; CALL (".elem", 2)]) path) @
@@ -730,8 +730,8 @@ let compile cmd ((imports, infixes), p) =
                                add_code (compile_expr ls env s) ls false [DROP]                             
 
   | Expr.ElemRef (x, i)     -> compile_list l env [x; i]                               
-  | Expr.Var      x         -> let env, acc = env#lookup x in (match acc with Value.Fun name -> env#register_call name, false, [PROTO (name, env#current_function)] | _ -> env, false, [LD acc])
-  | Expr.Ref      x         -> let env, acc = env#lookup x in env, false, [LDA acc]
+  | Expr.Var      x         -> let env, acc = env#lookup None x in (match acc with Value.Fun name -> env#register_call name, false, [PROTO (name, env#current_function)] | _ -> env, false, [LD acc])
+  | Expr.Ref      x         -> let env, acc = env#lookup None x in env, false, [LDA acc]
   | Expr.Const    n         -> env, false, [CONST n]
   | Expr.String   s         -> env, false, [STRING s]
   | Expr.Binop (op, x, y)   -> let lop, env = env#get_label in
@@ -740,7 +740,7 @@ let compile cmd ((imports, infixes), p) =
   | Expr.Call (f, args)     -> let lcall, env = env#get_label in
                                (match f with
                                 | Expr.Var name ->
-                                   let env, acc = env#lookup name in
+                                   let env, acc = env#lookup None name in
                                    (match acc with
                                     | Value.Fun name ->
                                        let env = env#register_call name in

@@ -16,12 +16,14 @@ write (compare (A, B));
 write (compare (B, A));
 write (compare (A (1), A (1, 1)));
 write (compare (A (1, 1), A (1)));
-write (compare (f, f));
-write (compare (f, f(5)));
-write (compare (f(5), f)); 
-write (compare (f(5), f(5)));
-write (compare (f(5), f(6)));
-write (compare (f(6), f(5)));
+
+-- not stable: write (compare (f, f));
+-- not stable: write (compare (f, f(5)));
+-- not stable: write (compare (f(5), f)); 
+-- not stable: write (compare (f(5), f(5)));
+-- not stable: write (compare (f(5), f(6)));
+-- not stable: write (compare (f(6), f(5)));
+
 write (compare ({1, 2, 3}, {1, 2, 3}));
 write (compare ({1, [2], [[3]]}, {1, [2], [[3]]}));
 write (compare ({1, [2], [[3]]}, {1, [2], [3]}));

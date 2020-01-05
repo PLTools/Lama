@@ -68,8 +68,7 @@ fun matcherCreate (buf, pos, line, col) {
   [show,
    eof,
    matchString,
-   matchRegexp
-  ]
+   matchRegexp]  
 }
 
 fun show (m) {
