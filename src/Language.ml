@@ -11,13 +11,21 @@ open Combinators
 
 exception Semantic_error of string
 
-let report_error ?(loc=None) str =
-  raise (Semantic_error (str ^ match loc with None -> "" | Some (l, c) -> Printf.sprintf " at (%d, %d)" l c))
-                     
 module Loc =
   struct
     @type t = int * int with show, html
+
+    module H = Hashtbl.Make (struct type t = string let hash = Hashtbl.hash let equal = (==) end)
+
+    let tab = (H.create 1024 : t H.t)
+          
+    let attach s loc = H.add tab s loc
+    let get          = H.find_opt tab 
+      
   end
+
+let report_error ?(loc=None) str =
+  raise (Semantic_error (str ^ match loc with None -> "" | Some (l, c) -> Printf.sprintf " at (%d, %d)" l c))
   
 (* Values *)
 module Value =
@@ -159,10 +167,10 @@ module State =
       fst @@ inner n st
                     
     (* Undefined state *)
-    let undefined x = failwith (Printf.sprintf "Undefined variable: %s" x)
+    let undefined x = report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
 
     (* Create a state from bindings list *)
-    let from_list l = fun x -> try List.assoc x l with Not_found -> report_error (Printf.sprintf "undefined variable %s" x)
+    let from_list l = fun x -> try List.assoc x l with Not_found -> report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
                              
     (* Bind a variable to a value in a state *)
     let bind x v s = fun y -> if x = y then v else s y
@@ -179,18 +187,18 @@ module State =
     (* Update: non-destructively "modifies" the state s by binding the variable x
        to value v and returns the new state w.r.t. a scope
     *)
-    let update ?(loc=None) x v s =      
+    let update x v s =      
       let rec inner = function
-      | I -> report_error ~loc:loc "uninitialized state"
+      | I -> report_error "uninitialized state"
       | G (scope, s) ->
          if is_var x scope
          then G (scope, bind x v s)
-         else report_error ~loc:loc (Printf.sprintf "name %s is undefined or does not designate a variable" x)
+         else report_error ~loc:(Loc.get x) (Printf.sprintf "name \"%s\" is undefined or does not designate a variable" x)
       | L (scope, s, enclosing) ->
          if in_scope x scope
          then if is_var x scope
               then L (scope, bind x v s, enclosing)
-              else report_error ~loc:loc (Printf.sprintf "name %s does not designate a variable" x)
+              else report_error ~loc:(Loc.get x) (Printf.sprintf "name \"%s\" does not designate a variable" x)
          else L (scope, s, inner enclosing)
       in
       inner s      
@@ -278,7 +286,7 @@ module Pattern =
                                                       | [] -> UnBoxed
                                                       | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) ps UnBoxed
                                                      }
-      | x:LIDENT y:(-"@" parse)?                     {match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
+      | l:$ x:LIDENT y:(-"@" parse)?                 {Loc.attach x l#coord; match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
       | s:("-")? c:DECIMAL                           {Const (match s with None -> c | _ -> ~-c)}
       | s:STRING                                     {String s}
       | c:CHAR                                       {Const  (Char.code c)}
@@ -359,7 +367,7 @@ module Expr =
       match x with
       | Value.Var (Value.Global x) -> State.update x v st
       | Value.Elem (x, i) -> Value.update_elem x i v; st
-      | _                 -> report_error (Printf.sprintf "invalid value %s in update" @@ show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") x)
+      | _                 -> report_error (Printf.sprintf "invalid value \"%s\" in update" @@ show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") x)
 
     (* Expression evaluator
 
@@ -428,7 +436,7 @@ module Expr =
              ([], body, [])
              (List.rev @@
               List.map (function
-                        | (name, (`Extern, _)) -> raise (Semantic_error (Printf.sprintf "external names ('%s') not supported in evaluation" name))
+                        | (name, (`Extern, _)) -> report_error (Printf.sprintf "external names (\"%s\") not supported in evaluation" name)
                         | x -> x
                        )
               defs)
@@ -483,7 +491,7 @@ module Expr =
                 let st'', i', o', vs'' = eval (st', i, o, []) Skip body in
                 closure.(0) <- st'';
                 (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')                      
-             | _ -> report_error (Printf.sprintf "callee did not evaluate to a function: %s" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") f))
+             | _ -> report_error (Printf.sprintf "callee did not evaluate to a function: \"%s\"" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") f))
             ))]))
         
       | Leave  -> eval (State.drop st, i, o, vs) Skip k
@@ -656,13 +664,14 @@ module Expr =
         | base[def][infix][atr];
       base[def][infix][atr]:
         l:$ n:DECIMAL                              => {notRef atr} :: (not_a_reference l) => {ignore atr (Const n)}
-      | l:$ s:STRING                               => {notRef atr} :: (not_a_reference l)=> {ignore atr (String s)}
+      | l:$ s:STRING                               => {notRef atr} :: (not_a_reference l) => {ignore atr (String s)}
       | l:$ c:CHAR                                 => {notRef atr} :: (not_a_reference l) => {ignore atr (Const  (Char.code c))}
       
       | l:$ c:(%"true" {Const 1} | %"false" {Const 0}) => {notRef atr} :: (not_a_reference l) => {ignore atr c} 
        
       | l:$ %"infix" s:STRING                         => {notRef atr}  :: (not_a_reference l) => {ignore atr (Var (infix_name s))}
-      | l:$ %"fun" "(" args:!(Util.list0)[ostap (LIDENT)] ")" "{" body:scope[def][infix][Weak][parse def] "}"=> {notRef atr} :: (not_a_reference l) => {ignore atr (Lambda (args, body))}
+      | l:$ %"fun" "(" args:!(Util.list0)[ostap (l:$ x:LIDENT {Loc.attach x l#coord; x})] ")"
+               "{" body:scope[def][infix][Weak][parse def] "}"=> {notRef atr} :: (not_a_reference l) => {ignore atr (Lambda (args, body))}
       | l:$ "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} :: (not_a_reference l) => {ignore atr (Array es)}
       | -"{" scope[def][infix][atr][parse def] -"}" 
       | l:$ "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} :: (not_a_reference l) => {ignore atr (match es with
@@ -673,7 +682,7 @@ module Expr =
                                                                                                               | None -> []
                                                                                                               | Some args -> args))
                                                                                         }
-      | x:LIDENT {if notRef atr then ignore atr (Var x) else Ref x}                 
+      | l:$ x:LIDENT {Loc.attach x l#coord; if notRef atr then ignore atr (Var x) else Ref x}                 
 
       | {isVoid atr} => %"skip" {materialize atr Skip}
 
@@ -761,7 +770,7 @@ module Infix =
         ce ()
       with Break x -> x
 
-    let no_op op coord = `Fail (Printf.sprintf "infix ``%s'' not found in the scope at %s" op (Msg.Coord.toString coord))
+    let no_op op coord = `Fail (Printf.sprintf "infix \"%s\" not found in the scope" op) 
 
     let kind_of = function true -> Public | _ -> Local
                                                
@@ -815,38 +824,42 @@ module Definition =
     let unopt_mod = function None -> `Local | Some m -> m
       
     ostap (
-      arg : LIDENT;      
+      arg : l:$ x:LIDENT {Loc.attach x l#coord; x};      
       position[pub][ass][coord][newp]:
-        %"at" s:STRING {match ass with `Nona -> Infix.at coord s newp pub | _ -> raise (Semantic_error (Printf.sprintf "associativity for infxi '%s' can not be specified (it is inherited from that for '%s')" newp s))}
+        %"at" s:STRING {match ass with
+                        | `Nona -> Infix.at coord s newp pub
+                        | _     -> report_error ~loc:(Some coord) (Printf.sprintf "associativity for infix \"%s\" can not be specified (it is inherited from that for \"%s\")" newp s)
+           }
         | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord s newp ass pub};
       head[infix]:
-        m:(%"external" {`Extern} | %"public" e:(%"external")? {match e with None -> `Public | _ -> `PublicExtern})? %"fun" name:LIDENT {unopt_mod m, name, name, infix}
+        m:(%"external" {`Extern} | %"public" e:(%"external")? {match e with None -> `Public | _ -> `PublicExtern})? %"fun" l:$ name:LIDENT {Loc.attach name l#coord; unopt_mod m, name, name, infix}
     |   m:(%"public" {`Public})? ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
         l:$ op:(s:STRING {s})
         md:position[match m with Some _ -> true | _ -> false][ass][l#coord][op] {
           let name = Expr.infix_name op in
           match md (Expr.sem name) infix with
           | `Ok infix' -> unopt_mod m, op, name, infix'
-          | `Fail msg  -> raise (Semantic_error msg)
+          | `Fail msg  -> report_error ~loc:(Some l#coord) msg
       };
-      local_var[m][infix][expr][def]: name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {
+      local_var[m][infix][expr][def]: l:$ name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {
+        Loc.attach name l#coord;                                                                  
         match m, value with
-        | `Extern, Some _ -> raise (Semantic_error (Printf.sprintf "initial value for an external variable '%s' can not be specified" name))
+        | `Extern, Some _ -> report_error ~loc:(Some l#coord) (Printf.sprintf "initial value for an external variable \"%s\" can not be specified" name)
         | _               -> name, (m,`Variable value)
       };
-      parse[infix][expr][def]:
+      parse[infix][expr][def]:        
         m:(%"local" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
         locs:!(Util.list (local_var m infix expr def)) ";" {locs, infix}
       | - <(m, orig_name, name, infix')> : head[infix] -"(" -args:!(Util.list0 arg) -")"
-          ("{" body:expr[def][infix'][Expr.Weak] "}" {
+          (l:$ "{" body:expr[def][infix'][Expr.Weak] "}" {
             match m with
-            | `Extern -> raise (Semantic_error (Printf.sprintf "body for an external function '%s' can not be specified" orig_name))
+            | `Extern -> report_error ~loc:(Some l#coord) (Printf.sprintf "body for external function \"%s\" can not be specified" orig_name)
             | _       -> [(name, (m, `Fun (args, body)))], infix'
          } |
-         ";" {
+         l:$ ";" {
             match m with
             | `Extern -> [(name, (m, `Fun (args, Expr.Skip)))], infix'      
-            | _       -> raise (Semantic_error (Printf.sprintf "missing body for the function/infix '%s'" orig_name))
+            | _       -> report_error ~loc:(Some l#coord) (Printf.sprintf "missing body for the function/infix \"%s\"" orig_name)
          })           
     )
 
@@ -908,7 +921,7 @@ module Interface =
                           (ostap (interface -EOF))
          with
          | `Ok intfs -> Some intfs
-         | `Fail er  -> report_error (Printf.sprintf "malformed interface file '%s': %s" fname er)
+         | `Fail er  -> report_error (Printf.sprintf "malformed interface file \"%s\": %s" fname er)
         )
       with Sys_error _ -> None                        
 
@@ -923,7 +936,7 @@ module Interface =
       in
       match inner paths with
       | Some (path, intfs) -> path, intfs
-      | None               -> report_error (Printf.sprintf "could not find an interface file for import '%s'" import)
+      | None               -> report_error (Printf.sprintf "could not find an interface file for import \"%s\"" import)
 
   end
 
@@ -952,7 +965,7 @@ ostap (
                  let name = Expr.infix_name name in
                  match md (Expr.sem name) infix with
                  | `Ok infix' -> infix'
-                 | `Fail msg  -> raise (Semantic_error msg)
+                 | `Fail msg  -> report_error msg
                in
                match item with
                | `Infix (_  , op, `At     op') -> insert op infix (Infix.at l#coord op' op false)
@@ -973,7 +986,7 @@ ostap (
     (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
     };
   definitions[infix]:
-    <(def, infix')> : !(Definition.parse infix (*Expr.basic*) (fun def infix atr -> Expr.scope def infix atr (Expr.parse def)) definitions) <(defs, infix'')> : definitions[infix'] {
+    <(def, infix')> : !(Definition.parse infix (fun def infix atr -> Expr.scope def infix atr (Expr.parse def)) definitions) <(defs, infix'')> : definitions[infix'] {
       def @ defs, infix''
      }
   | empty {[], infix}
