@@ -7,7 +7,7 @@ all:
 	pushd runtime && make && popd
 	pushd stdlib && make && popd
 
-install: ;
+#install: ;
 
 regression:
 	pushd regression && make clean check && popd

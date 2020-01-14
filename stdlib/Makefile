@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 FILES=$(wildcard *.expr)
 ALL=$(sort $(FILES:.expr=.o))
 RC=../src/rc.opt
