@@ -11,4 +11,4 @@ $(TESTS): %: %.expr
 	RC_RUNTIME=../../runtime $(RC) -I .. $< && ./$@ > $@.log && diff $@.log orig/$@.log
 
 clean:
-	$(RM) test*.log *.s *~ $(TESTS)
+	$(RM) test*.log *.s *~ $(TESTS) *.i

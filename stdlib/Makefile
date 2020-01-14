@@ -9,4 +9,5 @@ all: $(ALL)
 
 clean:
 	rm -Rf *.s *.o *.i *~
+	pushd regression && make clean && popd
 
