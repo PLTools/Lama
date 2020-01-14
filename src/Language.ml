@@ -26,7 +26,7 @@ let infix_name infix =
   Buffer.add_string b "i__Infix_";
   Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
   let s = Buffer.contents b in
-  Subst.attach s ("operator " ^ infix);
+  Subst.attach s ("infix " ^ infix);
   s
   
 let sys_infix_name infix =
@@ -34,7 +34,7 @@ let sys_infix_name infix =
   Buffer.add_string b "s__Infix_";
   Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
   let s = Buffer.contents b in
-  Subst.attach s ("operator " ^ infix);
+  Subst.attach s ("infix " ^ infix);
   s
 
 exception Semantic_error of string
@@ -899,7 +899,7 @@ module Definition =
            }
         | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:INFIX {f coord s newp ass pub};
       head[infix]:
-        m:(%"external" {`Extern} | %"public" e:(%"external")? {match e with None -> `Public | _ -> `PublicExtern})? %"fun" l:$ name:LIDENT {Loc.attach name l#coord; unopt_mod m, name, name, infix}
+        m:(%"external" {`Extern} | %"public" e:(%"external")? {match e with None -> `Public | _ -> `PublicExtern})? %"fun" l:$ name:LIDENT {Loc.attach name l#coord; unopt_mod m, name, name, infix, false}
     |   m:(%"public" {`Public})? ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
         l:$ op:(s:INFIX {s})
         md:position[match m with Some _ -> true | _ -> false][ass][l#coord][op] {
@@ -907,7 +907,7 @@ module Definition =
           let name = infix_name op in
           Loc.attach name l#coord;
           match md (Expr.sem name) infix with
-          | `Ok infix' -> unopt_mod m, op, name, infix'
+          | `Ok infix' -> unopt_mod m, op, name, infix', true
           | `Fail msg  -> report_error ~loc:(Some l#coord) msg
       };
       local_var[m][infix][expr][def]: l:$ name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {
@@ -919,10 +919,11 @@ module Definition =
       parse[infix][expr][def]:        
         m:(%"local" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
         locs:!(Util.list (local_var m infix expr def)) ";" {locs, infix}
-      | - <(m, orig_name, name, infix')> : head[infix] -"(" -args:!(Util.list0 arg) -")"
+      | - <(m, orig_name, name, infix', flag)> : head[infix] -"(" -args:!(Util.list0 arg) -")"
           (l:$ "{" body:expr[def][infix'][Expr.Weak] "}" {
+            if flag && List.length args != 2 then report_error ~loc:(Some l#coord) "infix operator should accept two arguments";
             match m with
-            | `Extern -> report_error ~loc:(Some l#coord) (Printf.sprintf "body for external function \"%s\" can not be specified" orig_name)
+            | `Extern -> report_error ~loc:(Some l#coord) (Printf.sprintf "a body for external function \"%s\" can not be specified" (Subst.subst orig_name))
             | _       -> [(name, (m, `Fun (args, body)))], infix'
          } |
          l:$ ";" {
