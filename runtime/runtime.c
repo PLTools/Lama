@@ -1267,8 +1267,7 @@ extern void gc_test_and_copy_root (size_t ** root) {
 
 extern void gc_root_scan_data (void) {
   size_t * p = &__start_custom_data;
-  // while  (p != &__stop_custom_data) {
-  while  (p < &__stop_custom_data) { // fix bug
+  while  (p < &__stop_custom_data) {
     gc_test_and_copy_root (p);
     p++;
   }
