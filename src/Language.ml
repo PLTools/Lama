@@ -8,6 +8,18 @@ open GT
 (* Opening a library for combinator-based syntax analysis *)
 open Ostap
 open Combinators
+   
+let infix_name infix =
+  let b = Buffer.create 64 in
+  Buffer.add_string b "i__Infix_";
+  Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
+  Buffer.contents b
+  
+let sys_infix_name infix =
+  let b = Buffer.create 64 in
+  Buffer.add_string b "s__Infix_";
+  Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
+  Buffer.contents b
 
 exception Semantic_error of string
 
@@ -167,7 +179,13 @@ module State =
       fst @@ inner n st
                     
     (* Undefined state *)
-    let undefined x = report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
+    let undefined x =
+(*      let ops =
+        List.map (fun op -> infix_name op, op)
+
+      in
+      try Value.Var (Value.Fun (List.assoc x ops)) with
+      Not_found -> *) report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
 
     (* Create a state from bindings list *)
     let from_list l = fun x -> try List.assoc x l with Not_found -> report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
@@ -187,7 +205,7 @@ module State =
     (* Update: non-destructively "modifies" the state s by binding the variable x
        to value v and returns the new state w.r.t. a scope
     *)
-    let update x v s =      
+    let update x v s = 
       let rec inner = function
       | I -> report_error "uninitialized state"
       | G (scope, s) ->
@@ -404,12 +422,6 @@ module Expr =
 
     let seq x = function Skip -> x | y -> Seq (x, y)
 
-    let infix_name infix =
-      let b = Buffer.create 64 in
-      Buffer.add_string b "i__Infix_";
-      Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
-      Buffer.contents b
-
     let schedule_list h::tl =
       List.fold_left seq h tl
 
@@ -568,7 +580,7 @@ module Expr =
        match s with
        | ":"  -> Sexp   ("cons", [x; y])
        | ":=" -> Assign (x, y)
-       | _ -> Binop  (s, x, y)
+       | _    -> Binop  (s, x, y)
     )
 
     (* ======= *)
@@ -669,7 +681,7 @@ module Expr =
       
       | l:$ c:(%"true" {Const 1} | %"false" {Const 0}) => {notRef atr} :: (not_a_reference l) => {ignore atr c} 
        
-      | l:$ %"infix" s:STRING                         => {notRef atr}  :: (not_a_reference l) => {ignore atr (Var (infix_name s))}
+      | l:$ %"infix" s:INFIX                       => {notRef atr}  :: (not_a_reference l) => {let name = infix_name s in Loc.attach name l#coord; ignore atr (Var name)}
       | l:$ %"fun" "(" args:!(Util.list0)[ostap (l:$ x:LIDENT {Loc.attach x l#coord; x})] ")"
                "{" body:scope[def][infix][Weak][parse def] "}"=> {notRef atr} :: (not_a_reference l) => {ignore atr (Lambda (args, body))}
       | l:$ "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} :: (not_a_reference l) => {ignore atr (Array es)}
@@ -714,8 +726,12 @@ module Infix =
     @type ass    = [`Lefta | `Righta | `Nona] with show
     @type loc    = [`Before of string | `After of string | `At of string] with show
     @type export = (ass * string * loc) list with show
-      
+    @type showable = (ass * string * kind) list array with show
+                                                                                                     
     type t = ([`Lefta | `Righta | `Nona] * ((Expr.atr -> (Expr.atr * Expr.atr)) * ((string * kind * (Expr.t -> Expr.atr -> Expr.t -> Expr.t)) list))) array
+
+    let show_infix (infix : t) =
+      show(showable) @@ Array.map (fun (ass, (_, l)) -> List.map (fun (str, kind, _) -> ass, str, kind) l) infix
 
     let extract_exports infix =
       let ass_string = function `Lefta -> "L" | `Righta -> "R" | _ -> "I" in
@@ -745,6 +761,9 @@ module Infix =
           (`Before ":=", [])
           exported
       in List.rev exports
+
+    let is_predefined op =      
+      List.exists (fun x -> op = x) [":"; "!!"; "&&"; "=="; "!="; "<="; "<"; ">="; ">"; "+"; "-"; "*" ; "/"; "%"; ":="]
       
     let default : t =
       Array.map (fun (a, s) ->
@@ -780,7 +799,7 @@ module Infix =
           `Ok (Array.init (Array.length infix)
                  (fun j ->
                    if j = i
-                   then let (a, (atr, l)) = infix.(i) in (a, (atr, ((newp, kind_of public, sem) :: l)))
+                   then let (a, (atr, l)) = infix.(i) in (a, ( (*atr*) (fun _ -> Expr.Val, Expr.Val), ((newp, kind_of public, sem) :: (List.filter (fun (op', _, _) -> op' <> newp) l))))
                    else infix.(j)
             ))
         )
@@ -826,17 +845,19 @@ module Definition =
     ostap (
       arg : l:$ x:LIDENT {Loc.attach x l#coord; x};      
       position[pub][ass][coord][newp]:
-        %"at" s:STRING {match ass with
-                        | `Nona -> Infix.at coord s newp pub
-                        | _     -> report_error ~loc:(Some coord) (Printf.sprintf "associativity for infix \"%s\" can not be specified (it is inherited from that for \"%s\")" newp s)
+        %"at" s:INFIX {match ass with
+                       | `Nona -> Infix.at coord s newp pub
+                       | _     -> report_error ~loc:(Some coord) (Printf.sprintf "associativity for infix \"%s\" can not be specified (it is inherited from that for \"%s\")" newp s)
            }
-        | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:STRING {f coord s newp ass pub};
+        | f:(%"before" {Infix.before} | %"after" {Infix.after}) s:INFIX {f coord s newp ass pub};
       head[infix]:
         m:(%"external" {`Extern} | %"public" e:(%"external")? {match e with None -> `Public | _ -> `PublicExtern})? %"fun" l:$ name:LIDENT {Loc.attach name l#coord; unopt_mod m, name, name, infix}
     |   m:(%"public" {`Public})? ass:(%"infix" {`Nona} | %"infixl" {`Lefta} | %"infixr" {`Righta})
-        l:$ op:(s:STRING {s})
+        l:$ op:(s:INFIX {s})
         md:position[match m with Some _ -> true | _ -> false][ass][l#coord][op] {
-          let name = Expr.infix_name op in
+          if m <> None && Infix.is_predefined op then report_error ~loc:(Some l#coord) (Printf.sprintf "redefinition of standard infix operator \"%s\" can not be exported" op);
+          let name = infix_name op in
+          Loc.attach name l#coord;
           match md (Expr.sem name) infix with
           | `Ok infix' -> unopt_mod m, op, name, infix'
           | `Fail msg  -> report_error ~loc:(Some l#coord) msg
@@ -962,7 +983,7 @@ ostap (
           List.fold_left
             (fun infix item ->
                let insert name infix md = 
-                 let name = Expr.infix_name name in
+                 let name = infix_name name in
                  match md (Expr.sem name) infix with
                  | `Ok infix' -> infix'
                  | `Fail msg  -> report_error msg

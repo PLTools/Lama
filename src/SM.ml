@@ -807,7 +807,7 @@ let compile cmd ((imports, infixes), p) =
      let n          = List.length brs - 1 in
      let lfail, env = env#get_label in
      let lexp , env = env#get_label in
-     let env  , fe  , se      = compile_expr lexp env e in
+     let env  , fe  , se         = compile_expr lexp env e in
      let env  , _, _, code, fail =
        List.fold_left
          (fun ((env, lab, i, code, continue) as acc) (p, s) ->

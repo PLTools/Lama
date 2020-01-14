@@ -1,6 +1,6 @@
 local n;
 
-infix "===" at "==" (v1, v2) {
+infix === at == (v1, v2) {
   local s1, s2, i;
   
   s1 := v1.string;
@@ -17,14 +17,14 @@ infix "===" at "==" (v1, v2) {
   fi
 }
 
-infix "?" before "+" (v, l) {
+infix ? before + (v, l) {
   case l of
    {}      ->  0
   | h : tl -> if h === v then 1 else (v ? tl) fi
   esac
 }
 
-infix "+++" at "+" (l1, l2) {
+infix +++ at + (l1, l2) {
   case l1 of
     {}     -> l2
   | h : tl -> (h : tl +++ l2)

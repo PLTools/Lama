@@ -1,4 +1,4 @@
-infixr "**" before "*" (f, g) {
+infixr ** before * (f, g) {
   return fun (x) {return f (g (x))}
 }
 

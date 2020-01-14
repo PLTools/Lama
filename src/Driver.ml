@@ -22,6 +22,7 @@ let parse cmd =
        inherit Util.Lexers.decimal s
        inherit Util.Lexers.string s
        inherit Util.Lexers.char   s
+       inherit Util.Lexers.infix  s
        inherit Util.Lexers.lident kws s
        inherit Util.Lexers.uident kws s
        inherit Util.Lexers.skip [

@@ -1,5 +1,5 @@
 fun f (l) {
-  infix "===" at "==" (a, b) {
+  infix === at == (a, b) {
      a == b
   }
 
