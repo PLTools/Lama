@@ -247,7 +247,7 @@ let scope_label i s = label s ^ "_" ^ string_of_int i
 
 let check_name_and_add names name mut =
   if List.exists (fun (n, _) -> n = name) names
-  then report_error ~loc:(Loc.get name) (Printf.sprintf "name \"%s\" is already defined in the scope" name)
+  then report_error ~loc:(Loc.get name) (Printf.sprintf "name \"%s\" is already defined in the scope" (Subst.subst name))
   else (name, mut) :: names
 ;;
 
@@ -543,7 +543,7 @@ object (self : 'self)
     match m with
     | `Local -> ()
     |  _  ->
-       report_error (Printf.sprintf "external/public definitions (\"%s\") not allowed in local scopes" name)    
+       report_error (Printf.sprintf "external/public definitions (\"%s\") not allowed in local scopes" (Subst.subst name))
     
   method add_name (name : string) (m : [`Local | `Extern | `Public | `PublicExtern]) (mut : bool) = {<
       decls = (name, m, false) :: decls;

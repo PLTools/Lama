@@ -110,7 +110,7 @@ class options args =
   end
   
 let main =
-  (*  try *)
+  try 
     let cmd = new options Sys.argv in
     match (try parse cmd with Language.Semantic_error msg -> `Fail msg) with
     | `Ok prog ->
@@ -119,9 +119,7 @@ let main =
         | `Default | `Compile ->
             ignore @@ X86.build cmd prog
         | _ -> 
-           (* Printf.printf "Program:\n%s\n" (GT.show(Language.Expr.t) prog);*)
-           (*Format.printf "Program\n%s\n%!" (HTML.toHTML ((GT.html(Language.Expr.t)) prog));*)
-	   let rec read acc =
+  	   let rec read acc =
 	     try
 	       let r = read_int () in
 	       Printf.printf "> ";
@@ -137,5 +135,5 @@ let main =
 	   List.iter (fun i -> Printf.printf "%d\n" i) output 
        )
     | `Fail er -> Printf.eprintf "Error: %s\n" er
-(*with Language.Semantic_error msg -> Printf.printf "Error: %s\n" msg *)
+  with Language.Semantic_error msg -> Printf.printf "Error: %s\n" msg 
 

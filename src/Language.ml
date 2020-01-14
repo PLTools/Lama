@@ -8,18 +8,34 @@ open GT
 (* Opening a library for combinator-based syntax analysis *)
 open Ostap
 open Combinators
+
+module Subst =
+  struct
+
+    module H = Hashtbl.Make (struct type t = string let hash = Hashtbl.hash let equal = (=) end)
+
+    let tab = (H.create 1024 : string H.t)
+          
+    let attach infix op = H.add tab infix op
+    let subst  id       = match H.find_opt tab id with None -> id | Some op -> op
+    
+  end
    
 let infix_name infix =
   let b = Buffer.create 64 in
   Buffer.add_string b "i__Infix_";
   Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
-  Buffer.contents b
+  let s = Buffer.contents b in
+  Subst.attach s ("operator " ^ infix);
+  s
   
 let sys_infix_name infix =
   let b = Buffer.create 64 in
   Buffer.add_string b "s__Infix_";
   Seq.iter (fun c -> Buffer.add_string b (string_of_int @@ Char.code c)) @@ String.to_seq infix;
-  Buffer.contents b
+  let s = Buffer.contents b in
+  Subst.attach s ("operator " ^ infix);
+  s
 
 exception Semantic_error of string
 
@@ -180,10 +196,10 @@ module State =
                     
     (* Undefined state *)
     let undefined x =
-      report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
+      report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" (Subst.subst x))
 
     (* Create a state from bindings list *)
-    let from_list l = fun x -> try List.assoc x l with Not_found -> report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
+    let from_list l = fun x -> try List.assoc x l with Not_found -> report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" (Subst.subst x))
                              
     (* Bind a variable to a value in a state *)
     let bind x v s = fun y -> if x = y then v else s y
@@ -206,12 +222,12 @@ module State =
       | G (scope, s) ->
          if is_var x scope
          then G (scope, bind x v s)
-         else report_error ~loc:(Loc.get x) (Printf.sprintf "name \"%s\" is undefined or does not designate a variable" x)
+         else report_error ~loc:(Loc.get x) (Printf.sprintf "name \"%s\" is undefined or does not designate a variable" (Subst.subst x))
       | L (scope, s, enclosing) ->
          if in_scope x scope
          then if is_var x scope
               then L (scope, bind x v s, enclosing)
-              else report_error ~loc:(Loc.get x) (Printf.sprintf "name \"%s\" does not designate a variable" x)
+              else report_error ~loc:(Loc.get x) (Printf.sprintf "name \"%s\" does not designate a variable" (Subst.subst x))
          else L (scope, s, inner enclosing)
       in
       inner s      
@@ -443,7 +459,7 @@ module Expr =
              ([], body, [])
              (List.rev @@
               List.map (function
-                        | (name, (`Extern, _)) -> report_error (Printf.sprintf "external names (\"%s\") not supported in evaluation" name)
+                        | (name, (`Extern, _)) -> report_error (Printf.sprintf "external names (\"%s\") not supported in evaluation" (Subst.subst name))
                         | x -> x
                        )
               defs)
