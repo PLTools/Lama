@@ -1050,8 +1050,10 @@ static int free_pool (pool * p) {
   return munmap((void *)a, b);
 }
 
-static void init_to_space (void) {
-  size_t space_size = SPACE_SIZE * sizeof(size_t);
+static void init_to_space (int flag) {
+  size_t space_size = 0;
+  if (flag) SPACE_SIZE = SPACE_SIZE << 1;
+  space_size     = SPACE_SIZE * sizeof(size_t);
   to_space.begin = mmap (NULL, space_size, PROT_READ | PROT_WRITE,
 			 MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
   if (to_space.begin == MAP_FAILED) {
@@ -1126,23 +1128,24 @@ static void copy_elements (size_t *where, size_t *from, int len) {
 
 }
 
-static void extend_spaces (void) {
+static int extend_spaces (void) {
   void *p = (void *) BOX (NULL);
   size_t old_space_size = SPACE_SIZE        * sizeof(size_t),
          new_space_size = (SPACE_SIZE << 1) * sizeof(size_t);
   p = mremap(to_space.begin, old_space_size, new_space_size, 0);
   if (p == MAP_FAILED) {
-    perror("EROOR: extend_spaces: mmap failed\n");
-    exit (1);
+#ifdef DEBUG_PRINT
+    printf ("extend: extend_spaces: mremap failed\n"); fflush (stdout);
+#endif
+    return 1;
   }
 #ifdef DEBUG_PRINT
-  printf ("extend: %p %p\n", p, to_space.begin);
-  printf ("extend: %p %p\n", to_space.end, current);
-  fflush (stdout);
+  printf ("extend: %p %p %p %p\n", p, to_space.begin, to_space.end, current); fflush (stdout);
 #endif
   to_space.end    += SPACE_SIZE;
   SPACE_SIZE      =  SPACE_SIZE << 1;
   to_space.size   =  SPACE_SIZE;
+  return 0;
 }
 
 extern size_t * gc_copy (size_t *obj) {
@@ -1291,7 +1294,6 @@ extern void init_pool (void) {
 }
 
 static void * gc (size_t size) {
-  init_to_space(); // new
   current = to_space.begin;
 #ifdef DEBUG_PRINT
   printf ("\ngc: current:%p; to_space.b =%p; to_space.e =%p; f_space.b = %p; f_space.e = %p\n",
@@ -1313,7 +1315,10 @@ static void * gc (size_t size) {
     printf ("gc pre-extend_spaces : %p %zu %p \n", current, size, to_space.end);
     fflush (stdout);
 #endif
-    extend_spaces ();
+    if (extend_spaces ()) {
+      init_to_space (1);
+      return gc (size);
+    }
 #ifdef DEBUG_PRINT
     printf ("gc post-extend_spaces: %p %zu %p \n", current, size, to_space.end);
     fflush (stdout);
@@ -1434,6 +1439,7 @@ extern void * alloc (size_t size) {
   printf("gc END\n\n"); fflush (stdout);
   printFromSpace(); fflush (stdout);
 #endif
+  init_to_space (0); // new
   return gc (size);
 }
 # endif
