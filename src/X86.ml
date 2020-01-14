@@ -673,7 +673,7 @@ let build cmd prog =
        else
          let path, intfs = Interface.find import paths in         
          iterate
-           ((import ^ ".o") :: acc)
+           ((Filename.concat path (import ^ ".o")) :: acc)
            (S.add import s)
            ((List.map (function `Import name -> name | _ -> invalid_arg "must not happen") @@
              List.filter (function `Import _ -> true | _ -> false) intfs) @
@@ -689,7 +689,8 @@ let build cmd prog =
      let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
      let buf  = Buffer.create 255 in
      List.iter (fun o -> Buffer.add_string buf o; Buffer.add_string buf " ") objs;
-     Sys.command (Printf.sprintf "gcc -g -m32 -o %s %s.s %s %s/runtime.a" cmd#basename cmd#basename (Buffer.contents buf) inc)
+     let gcc_cmdline = Printf.sprintf "gcc -g -m32 -o %s %s.s %s %s/runtime.a" cmd#basename cmd#basename (Buffer.contents buf) inc in
+     Sys.command gcc_cmdline
   | `Compile ->
      Sys.command (Printf.sprintf "gcc -g -m32 -c %s.s" cmd#basename)
   | _ -> invalid_arg "must not happen"
