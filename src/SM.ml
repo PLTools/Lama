@@ -271,8 +271,6 @@ let check_name_and_add names name mut =
 | Top  of fundef list
 | Item of fundef * fundef list * context
 with show
-
-(* @type funinfo = {parent : string; closure : Value.designation list} with show *)
                                                                        
 let init_scope st = {
     st          = st;

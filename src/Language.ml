@@ -180,12 +180,7 @@ module State =
                     
     (* Undefined state *)
     let undefined x =
-(*      let ops =
-        List.map (fun op -> infix_name op, op)
-
-      in
-      try Value.Var (Value.Fun (List.assoc x ops)) with
-      Not_found -> *) report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
+      report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
 
     (* Create a state from bindings list *)
     let from_list l = fun x -> try List.assoc x l with Not_found -> report_error ~loc:(Loc.get x) (Printf.sprintf "undefined name \"%s\"" x)
@@ -617,6 +612,9 @@ module Expr =
       
     let atr' = atr
     let not_a_reference s = new Reason.t (Msg.make "not a reference" [||] (Msg.Locator.Point s#coord))
+                          
+    (* UGLY! *)
+    let predefined_op : (Obj.t -> Obj.t -> Obj.t) ref = Pervasives.ref (fun _ _ -> invalid_arg "must not happen")
                             
     (* ======= *)
     ostap (
@@ -681,7 +679,18 @@ module Expr =
       
       | l:$ c:(%"true" {Const 1} | %"false" {Const 0}) => {notRef atr} :: (not_a_reference l) => {ignore atr c} 
        
-      | l:$ %"infix" s:INFIX                       => {notRef atr}  :: (not_a_reference l) => {let name = infix_name s in Loc.attach name l#coord; ignore atr (Var name)}
+      | l:$ %"infix" s:INFIX => {notRef atr} :: (not_a_reference l) => {
+          if ((* UGLY! *) Obj.magic !predefined_op) infix s
+          then (
+            if s = ":="
+            then report_error ~loc:(Some l#coord) (Printf.sprintf "can not capture predefined operator \":=\"")
+            else
+              let name = sys_infix_name s in Loc.attach name l#coord; ignore atr (Var name)
+          )            
+          else (
+            let name = infix_name s in Loc.attach name l#coord; ignore atr (Var name)
+          )
+      }
       | l:$ %"fun" "(" args:!(Util.list0)[ostap (l:$ x:LIDENT {Loc.attach x l#coord; x})] ")"
                "{" body:scope[def][infix][Weak][parse def] "}"=> {notRef atr} :: (not_a_reference l) => {ignore atr (Lambda (args, body))}
       | l:$ "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} :: (not_a_reference l) => {ignore atr (Array es)}
@@ -722,10 +731,10 @@ module Expr =
 module Infix =
   struct
     
-    @type kind   = Predefined | Public | Local with show
-    @type ass    = [`Lefta | `Righta | `Nona] with show
-    @type loc    = [`Before of string | `After of string | `At of string] with show
-    @type export = (ass * string * loc) list with show
+    @type kind     = Predefined | Public | Local with show
+    @type ass      = [`Lefta | `Righta | `Nona] with show
+    @type loc      = [`Before of string | `After of string | `At of string] with show
+    @type export   = (ass * string * loc) list with show
     @type showable = (ass * string * kind) list array with show
                                                                                                      
     type t = ([`Lefta | `Righta | `Nona] * ((Expr.atr -> (Expr.atr * Expr.atr)) * ((string * kind * (Expr.t -> Expr.atr -> Expr.t -> Expr.t)) list))) array
@@ -765,6 +774,19 @@ module Infix =
     let is_predefined op =      
       List.exists (fun x -> op = x) [":"; "!!"; "&&"; "=="; "!="; "<="; "<"; ">="; ">"; "+"; "-"; "*" ; "/"; "%"; ":="]
       
+    (*
+    List.iter (fun op ->
+        Printf.eprintf "F,%s\n" (sys_infix_name op);
+        (*
+        Printf.eprintf "// Functional synonym for built-in operator \"%s\";\n" op;
+        Printf.eprintf "int L%s (void *p, void *q) {\n" (sys_infix_name op);
+        Printf.eprintf "  ASSERT_UNBOXED(\"captured %s:1\", p);\n" op;
+        Printf.eprintf "  ASSERT_UNBOXED(\"captured %s:2\", q);\n\n" op;
+        Printf.eprintf "  return BOX(UNBOX(p) %s UNBOX(q));\n" op;
+        Printf.eprintf "}\n\n"        *)
+      ) [":"; "!!"; "&&"; "=="; "!="; "<="; "<"; ">="; ">"; "+"; "-"; "*" ; "/"; "%"]
+     *)
+      
     let default : t =
       Array.map (fun (a, s) ->
         a,
@@ -782,13 +804,23 @@ module Infix =
       |]
 
     exception Break of [`Ok of t | `Fail of string]
-
+      
     let find_op infix op cb ce =
       try
         Array.iteri (fun i (_, (_, l)) -> if List.exists (fun (s, _, _) -> s = op) l then raise (Break (cb i))) infix;
         ce ()
       with Break x -> x
 
+    let predefined_op infix op =      
+      Array.exists
+        (fun (_, (_, l)) ->
+           List.exists (fun (s, p, _) -> s = op && p = Predefined) l
+        )
+        infix;;
+
+    (* UGLY!!! *)
+    Expr.predefined_op := (Obj.magic) predefined_op;;
+                          
     let no_op op coord = `Fail (Printf.sprintf "infix \"%s\" not found in the scope" op) 
 
     let kind_of = function true -> Public | _ -> Local

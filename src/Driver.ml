@@ -110,7 +110,7 @@ class options args =
   end
   
 let main =
-  try
+  (*  try *)
     let cmd = new options Sys.argv in
     match (try parse cmd with Language.Semantic_error msg -> `Fail msg) with
     | `Ok prog ->
@@ -137,5 +137,5 @@ let main =
 	   List.iter (fun i -> Printf.printf "%d\n" i) output 
        )
     | `Fail er -> Printf.eprintf "Error: %s\n" er
-  with Language.Semantic_error msg -> Printf.printf "Error: %s\n" msg
+(*with Language.Semantic_error msg -> Printf.printf "Error: %s\n" msg *)
 

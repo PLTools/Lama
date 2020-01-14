@@ -93,6 +93,124 @@ typedef struct {
 } sexp; 
 
 extern void* alloc (size_t);
+extern void* Bsexp (int n, ...);
+
+// Functional synonym for built-in operator ":";
+void* Ls__Infix_58 (void *p, void *q) {
+  void *res;
+  
+  __pre_gc ();
+
+  res = Bsexp (3, p, q, 848787);
+
+  __post_gc ();
+
+  return res;
+}
+
+// Functional synonym for built-in operator "!!";
+int Ls__Infix_3333 (void *p, void *q) {
+  ASSERT_UNBOXED("captured !!:1", p);
+  ASSERT_UNBOXED("captured !!:2", q);
+
+  return BOX(UNBOX(p) || UNBOX(q));
+}
+
+// Functional synonym for built-in operator "&&";
+int Ls__Infix_3838 (void *p, void *q) {
+  ASSERT_UNBOXED("captured &&:1", p);
+  ASSERT_UNBOXED("captured &&:2", q);
+
+  return BOX(UNBOX(p) && UNBOX(q));
+}
+
+// Functional synonym for built-in operator "==";
+int Ls__Infix_6161 (void *p, void *q) {
+  ASSERT_UNBOXED("captured ==:1", p);
+  ASSERT_UNBOXED("captured ==:2", q);
+
+  return BOX(UNBOX(p) == UNBOX(q));
+}
+
+// Functional synonym for built-in operator "!=";
+int Ls__Infix_3361 (void *p, void *q) {
+  ASSERT_UNBOXED("captured !=:1", p);
+  ASSERT_UNBOXED("captured !=:2", q);
+
+  return BOX(UNBOX(p) != UNBOX(q));
+}
+
+// Functional synonym for built-in operator "<=";
+int Ls__Infix_6061 (void *p, void *q) {
+  ASSERT_UNBOXED("captured <=:1", p);
+  ASSERT_UNBOXED("captured <=:2", q);
+
+  return BOX(UNBOX(p) <= UNBOX(q));
+}
+
+// Functional synonym for built-in operator "<";
+int Ls__Infix_60 (void *p, void *q) {
+  ASSERT_UNBOXED("captured <:1", p);
+  ASSERT_UNBOXED("captured <:2", q);
+
+  return BOX(UNBOX(p) < UNBOX(q));
+}
+
+// Functional synonym for built-in operator ">=";
+int Ls__Infix_6261 (void *p, void *q) {
+  ASSERT_UNBOXED("captured >=:1", p);
+  ASSERT_UNBOXED("captured >=:2", q);
+
+  return BOX(UNBOX(p) >= UNBOX(q));
+}
+
+// Functional synonym for built-in operator ">";
+int Ls__Infix_62 (void *p, void *q) {
+  ASSERT_UNBOXED("captured >:1", p);
+  ASSERT_UNBOXED("captured >:2", q);
+
+  return BOX(UNBOX(p) > UNBOX(q));
+}
+
+// Functional synonym for built-in operator "+";
+int Ls__Infix_43 (void *p, void *q) {
+  ASSERT_UNBOXED("captured +:1", p);
+  ASSERT_UNBOXED("captured +:2", q);
+
+  return BOX(UNBOX(p) + UNBOX(q));
+}
+
+// Functional synonym for built-in operator "-";
+int Ls__Infix_45 (void *p, void *q) {
+  ASSERT_UNBOXED("captured -:1", p);
+  ASSERT_UNBOXED("captured -:2", q);
+
+  return BOX(UNBOX(p) - UNBOX(q));
+}
+
+// Functional synonym for built-in operator "*";
+int Ls__Infix_42 (void *p, void *q) {
+  ASSERT_UNBOXED("captured *:1", p);
+  ASSERT_UNBOXED("captured *:2", q);
+
+  return BOX(UNBOX(p) * UNBOX(q));
+}
+
+// Functional synonym for built-in operator "/";
+int Ls__Infix_47 (void *p, void *q) {
+  ASSERT_UNBOXED("captured /:1", p);
+  ASSERT_UNBOXED("captured /:2", q);
+
+  return BOX(UNBOX(p) / UNBOX(q));
+}
+
+// Functional synonym for built-in operator "%";
+int Ls__Infix_37 (void *p, void *q) {
+  ASSERT_UNBOXED("captured %:1", p);
+  ASSERT_UNBOXED("captured %:2", q);
+
+  return BOX(UNBOX(p) % UNBOX(q));
+}
 
 extern int Blength (void *p) {
   data *a = (data*) BOX (NULL);
