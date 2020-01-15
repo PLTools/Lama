@@ -4,6 +4,8 @@
 -- This package provides a simplistic implementation of immutable set/map/hashtable
 -- data structures.
 
+import List;
+
 fun insert (m, k, v, sort) {
   fun append (v, vs) {
     case sort of
@@ -70,7 +72,7 @@ fun insert (m, k, v, sort) {
   inner (m).snd
 } 
 
-public fun find (m, k, sort) {
+fun find (m, k, sort) {
   fun extract (vv) {
     case sort of
       Map -> case vv of v : _ -> Some (v) | _ -> None esac
@@ -93,7 +95,7 @@ public fun find (m, k, sort) {
   inner (m)
 }
 
-public fun remove (m, k, sort) {
+fun remove (m, k, sort) {
   fun delete (vs) {
     case sort of
       Map -> case vs of {} -> {} | _ : vv -> vv esac
@@ -200,4 +202,28 @@ public fun removeSet (s, v) {
 
 public fun elements (m) {
   contents (m, Set)
+}
+
+public fun union (a, b) {
+  foldl (addSet, a, elements (b))
+}
+
+public fun diff (a, b) {
+  foldl (removeSet, a, elements (b))
+}
+
+public fun listSet (l) {
+  foldl (addSet, emptySet (), l)
+}
+
+public fun iterSet (f, s) {
+  iter (f, elements (s))  
+}
+
+public fun mapSet (f, s) {
+  listSet (map (f, elements (s)))
+}
+
+public fun foldSet (f, acc, s) {
+  foldl (f, acc, elements (s))
 }

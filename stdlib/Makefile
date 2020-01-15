@@ -7,7 +7,7 @@ RC=../src/rc.opt
 all: $(ALL)
 
 %.o: %.expr
-	$(RC) -c $<
+	$(RC) -I . -c $<
 
 clean:
 	rm -Rf *.s *.o *.i *~

@@ -302,3 +302,8 @@ Testing 96  => 0
 Testing 97  => 0
 Testing 98  => 0
 Testing 99  => 0
+List set: MNode (2, 1, -1, MNode (1, 1, 0, 0, 0), MNode (4, 1, 0, MNode (3, 1, 0, 0, 0), MNode (5, 1, 0, 0, 0)))
+Set union: MNode (4, 1, -1, MNode (2, 1, 0, MNode (1, 1, 0, 0, 0), MNode (3, 1, 0, 0, 0)), MNode (33, 1, 0, MNode (11, 1, 0, MNode (5, 1, 0, 0, 0), MNode (22, 1, 0, 0, 0)), MNode (44, 1, -1, 0, MNode (55, 1, 0, 0, 0))))
+Elements: {1, 2, 3, 4, 5, 11, 22, 33, 44, 55}
+Set difference: MNode (4, 1, -1, MNode (2, 1, 0, MNode (1, 0, 0, 0, 0), MNode (3, 0, 0, 0, 0)), MNode (33, 1, 0, MNode (11, 1, 0, MNode (5, 0, 0, 0, 0), MNode (22, 0, 0, 0, 0)), MNode (44, 0, -1, 0, MNode (55, 1, 0, 0, 0))))
+Elements: {2, 4, 11, 33, 55}

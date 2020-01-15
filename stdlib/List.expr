@@ -1,0 +1,91 @@
+public fun foldl (f, acc, l) {
+  case l of
+    {}     -> acc
+  | x : xs -> foldl (f, f (acc, x), xs)
+  esac
+}
+
+public fun foldr (f, acc, l) {
+  case l of
+    {}     -> acc
+  | x : xs -> f (foldr (f, acc, xs), x)
+  esac
+}
+
+public fun iter (f, l) {
+  case l of
+    {}     -> skip
+  | x : xs -> f (x); iter (f, xs)
+  esac
+}
+
+public fun map (f, l) {
+  case l of
+    {}     -> {}
+  | x : xs -> f (x) : map (f, xs)
+  esac
+}
+
+public infix +++ at + (x, y) {
+  case x of
+    {}     -> y
+  | x : xs -> x : xs +++ y
+  esac
+}
+
+public fun reverse (l) {
+  fun inner (acc, l) {
+    case l of
+      {}     -> acc
+    | x : xs -> inner (x : acc, xs)
+    esac
+  }
+
+  inner ({}, l)
+}
+
+public fun assoc (l, x) {
+  case l of
+    {}     -> None
+  | [y, z] : ys -> if compare (x, y) == 0 then Some (z) else assoc (ys, x) fi
+  esac
+}
+
+public fun find (f, l) {
+  case l of
+    {}     -> None
+  | x : xs -> if f (x) then Some (x) else find (f, xs) fi
+  esac
+}
+
+public fun flatten (l) {
+  local res = [0, {}];
+
+  fun append (x) {
+    local new = {x};
+    
+    res [1] := new;
+    res := new
+  }
+
+  iter (fun (x) {iter (append, x)}, l);
+
+  res [1]
+}
+
+public fun zip (a, b) {
+  case [a, b] of
+    [{}, {}]         -> {}
+  | [a : aa, b : bb] -> [a, b] : zip (aa, bb)
+  esac
+}
+
+public fun unzip (a) {
+  case a of
+    {}          -> [{}, {}]
+  | [a, b] : aa ->
+     case unzip (aa) of
+       [aa, bb] -> [a : aa, b : bb]
+     esac
+  esac
+}
