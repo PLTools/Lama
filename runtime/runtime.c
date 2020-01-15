@@ -9,11 +9,14 @@
 # include <assert.h>
 # include <errno.h>
 # include <regex.h>
+# include <limits.h>
 
 # define __ENABLE_GC__
 # ifndef __ENABLE_GC__
 # define alloc malloc
 # endif
+
+# define WORD_SIZE (CHAR_BIT * sizeof(int))
 
 /* # define DEBUG_PRINT 1 */
 
@@ -473,8 +476,108 @@ extern int LregexpMatch (struct re_pattern_buffer *b, char *s, int pos) {
   return BOX (re_match (b, s, LEN(TO_DATA(s)->tag), UNBOX(pos), 0));
 }
 
+extern void* Bstring (void*);
+
+void *Lclone (void *p) {
+  data *res;
+  
+  __pre_gc ();
+  
+  if (UNBOXED(p)) return p;
+  else {
+    data *a = TO_DATA(p), *res;
+    int t   = TAG(a->tag), l = LEN(a->tag);
+
+    switch (t) {
+    case STRING_TAG:
+      res = Bstring (a->contents);
+      break;
+
+    case ARRAY_TAG:      
+    case CLOSURE_TAG:
+      res = (data*) alloc (sizeof(int) * (l+1));
+      strncpy (res, p, sizeof(int) * (l+1));
+      break;
+      
+    case SEXP_TAG:
+      res = (data*) alloc (sizeof(int) * (l+2));
+      strncpy (res, TO_SEXP(p), sizeof(int) * (l+2));
+      break;
+       
+    default:
+      failure ("invalid tag %d in clone *****\n", t);
+    }
+  }  
+
+  __post_gc ();
+
+  return res;
+}
+
+# define HASH_DEPTH 10
+# define HASH_APPEND(acc, x) (((acc + (unsigned) x) << (WORD_SIZE / 2)) | ((acc + (unsigned) x) >> (WORD_SIZE / 2)))
+
+int inner_hash (int depth, unsigned acc, void *p) {
+  if (depth > HASH_DEPTH) return acc;
+
+  if (UNBOXED(p)) return HASH_APPEND(acc, UNBOX(p));
+  else {
+    data *a = TO_DATA(p);
+    int t = TAG(a->tag), l = LEN(a->tag), i;
+
+    acc = HASH_APPEND(acc, t);
+    acc = HASH_APPEND(acc, l);    
+
+    switch (t) {
+    case STRING_TAG: {
+      char *p = a->contents;
+
+      while (p) {
+	acc = HASH_APPEND(acc, (int) *p++);
+      }
+
+      return acc;
+    }
+      
+    case CLOSURE_TAG:
+      acc = HASH_APPEND(acc, ((void**) a->contents)[0]);
+      i = 1;
+      break;
+      
+    case ARRAY_TAG:
+      i = 0;
+      break;
+
+    case SEXP_TAG: {
+#ifndef DEBUG_PRINT
+      int ta = TO_SEXP(p)->tag;
+#else
+      int ta = GET_SEXP_TAG(TO_SEXP(p)->tag);
+#endif
+      acc = HASH_APPEND(acc, ta);
+      i = 0;
+      break;
+    }
+
+    default:
+      failure ("invalid tag %d in hash *****\n", t);
+    }
+
+    for (; i<l; i++) 
+      acc = inner_hash (depth+1, acc, ((void**) a->contents)[i]);
+
+    return acc;
+  }
+}
+
+extern int Lhash (void *p) {
+  return BOX(inner_hash (0, 0, p));
+}
+
 extern int Lcompare (void *p, void *q) {
 # define COMPARE_AND_RETURN(x,y) do if (x != y) return BOX(x - y); while (0)
+  if (p == q) return BOX(0);
+  
   if (UNBOXED(p)) {
     if (UNBOXED(q)) return BOX(UNBOX(p) - UNBOX(q));    
     else return BOX(-1);

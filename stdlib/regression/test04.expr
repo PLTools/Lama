@@ -1,0 +1,34 @@
+import Collection;
+
+local s = emptyMap (), i;
+
+for i := 0, i < 100, i := i+1
+do
+  s := addMap (s, i, i*10);
+  validateColl (s)
+od;
+
+printf ("Map internal structure: %s\n", s.string);
+printf ("Map elements: %s\n", bindings (s).string);
+
+for i := 0, i < 100, i := i+1
+do
+  printf ("Testing %-3d => %s\n", i, findMap (s, i).string);
+  printf ("Testing %-3d => %s\n", i+100, findMap (s, i+100).string)
+od;
+
+for i := 50, i < 150, i := i+1
+do
+  s := removeMap (s, i);
+  validateColl (s)
+od;
+
+printf ("Map internal structure: %s\n", s.string);
+printf ("Map elements: %s\n", bindings (s).string);
+
+for i := 0, i < 100, i := i+1
+do
+  printf ("Testing %-3d => %s\n", i, findMap (s, i).string)
+od;
+
+printf ("List map: %s\n", listMap ({[1, 10], [2, 20], [3, 30], [4, 40], [5, 50]}).string)

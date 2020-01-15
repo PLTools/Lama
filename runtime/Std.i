@@ -1,3 +1,5 @@
+F,clone;
+F,hash;
 F,fst;
 F,snd;
 F,hd;

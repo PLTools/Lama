@@ -6,12 +6,15 @@
 
 import List;
 
-fun insert (m, k, v, sort) {
+fun insertColl (m, k, v, sort) {
   fun append (v, vs) {
     case sort of
       Map  -> v : vs
     | Set  -> v
-    | Hash -> v : vs
+    | Hash -> case find (fun (x) {x == v}, vs) of
+                None -> v : vs
+              | _    -> vs
+	      esac
     esac
   }
   
@@ -72,7 +75,7 @@ fun insert (m, k, v, sort) {
   inner (m).snd
 } 
 
-fun find (m, k, sort) {
+fun findColl (m, k, sort) {
   fun extract (vv) {
     case sort of
       Map -> case vv of v : _ -> Some (v) | _ -> None esac
@@ -95,7 +98,7 @@ fun find (m, k, sort) {
   inner (m)
 }
 
-fun remove (m, k, sort) {
+fun removeColl (m, k, sort) {
   fun delete (vs) {
     case sort of
       Map -> case vs of {} -> {} | _ : vv -> vv esac
@@ -161,43 +164,61 @@ public fun validateColl (t) {
   inner (t, fun (x) {true})
 }
 
+-- Map structure
 public fun emptyMap () {
   {}
 }
 
 public fun addMap (m, k, v) {
-  insert (m, k, v, Map)
+  insertColl (m, k, v, Map)
 }
 
 public fun findMap (m, k) {
-  find (m, k, Map)
+  findColl (m, k, Map)
 }
 
 public fun removeMap (m, k) {
-  remove (m, k, Map)
+  removeColl (m, k, Map)
 }
 
 public fun bindings (m) {
   contents (m, Map)
 }
 
+public fun listMap (l) {
+  foldl (fun (m, p) {addMap (m, p.fst, p.snd)}, emptyMap (), l)
+}
+
+public fun iterMap (f, m) {
+  iter (f, bindings (m))  
+}
+
+public fun mapMap (f, m) {
+  listMap (map (fun (p) {[p.fst, f (p.snd)]}, bindings (m)))
+}
+
+public fun foldMap (f, acc, m) {
+  foldl (f, acc, bindings (m))
+}
+
+-- Set structure
 public fun emptySet () {
   {}
 }
 
 public fun addSet (s, v) {
-  insert (s, v, true, Set)
+  insertColl (s, v, true, Set)
 }
 
 public fun memSet (s, v) {
-  case find (s, v, Set) of
+  case findColl (s, v, Set) of
     None     -> false
   | Some (f) -> f
   esac
 }
 
 public fun removeSet (s, v) {
-  remove (s, v, Set)
+  removeColl (s, v, Set)
 }
 
 public fun elements (m) {
@@ -226,4 +247,13 @@ public fun mapSet (f, s) {
 
 public fun foldSet (f, acc, s) {
   foldl (f, acc, elements (s))
+}
+
+-- Hash structure
+public fun emptyMemo () {
+  [{}]
+}
+
+public fun lookupMemo (m, v) {
+  
 }
