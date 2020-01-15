@@ -6,6 +6,8 @@ RC=../src/rc.opt
 
 all: $(ALL)
 
+Collection.o: List.o
+
 %.o: %.expr
 	$(RC) -I . -c $<
 

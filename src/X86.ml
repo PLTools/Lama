@@ -183,7 +183,7 @@ let compile cmd env code =
     match scode with
     | [] -> env, []
     | instr :: scode' ->
-        let stack = env#show_stack in
+        let stack = "" (* env#show_stack*) in
         let env', code' =
           match instr with
           | PUBLIC name -> env#register_public name, []

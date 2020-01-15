@@ -485,7 +485,7 @@ void *Lclone (void *p) {
   
   if (UNBOXED(p)) return p;
   else {
-    data *a = TO_DATA(p), *res;
+    data *a = TO_DATA(p);
     int t   = TAG(a->tag), l = LEN(a->tag);
 
     switch (t) {
@@ -496,12 +496,15 @@ void *Lclone (void *p) {
     case ARRAY_TAG:      
     case CLOSURE_TAG:
       res = (data*) alloc (sizeof(int) * (l+1));
-      strncpy (res, p, sizeof(int) * (l+1));
+      memcpy (res, a, sizeof(int) * (l+1));
+      res = res->contents;
       break;
       
     case SEXP_TAG:
-      res = (data*) alloc (sizeof(int) * (l+2));
-      strncpy (res, TO_SEXP(p), sizeof(int) * (l+2));
+      res = (sexp*) alloc (sizeof(int) * (l+2));
+      memcpy (res, TO_SEXP(p), sizeof(int) * (l+2));
+      res = res->contents;
+      res = res->contents;
       break;
        
     default:
@@ -1142,7 +1145,7 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-static size_t SPACE_SIZE = 32;
+static size_t SPACE_SIZE = 32 * 1024;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
