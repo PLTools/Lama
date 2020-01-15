@@ -900,6 +900,8 @@ extern void Lprintf (char *s, ...) {
   if (vprintf (s, args) < 0) {
     failure ("fprintf (...): %s\n", strerror (errno));
   }
+
+  fflush (stdout);
 }
 
 extern FILE* Lfopen (char *f, char *m) {

@@ -1,23 +1,33 @@
 import Collection;
 
-local tree = {}, i;
+local s = emptySet (), i;
 
-for i := 100, i >= 1, i := i-1 do
-  tree := insert (tree, i, i);
-  printf ("Inserting: %s\n", i.string);
-  printf ("Result   : %s\n", tree.string)
+for i := 0, i < 100, i := i+1
+do
+  s := addSet (s, i);
+  validateColl (s)
 od;
 
-tree := {};
+printf ("Set internal structure: %s\n", s.string);
+printf ("Set elements: %s\n", elements (s).string);
 
-for i := 1, i <= 100, i := i+2 do
-  tree := insert (tree, i, i);
-  printf ("Inserting: %s\n", i.string);
-  printf ("Result   : %s\n", tree.string)
+for i := 0, i < 100, i := i+1
+do
+  printf ("Testing %-3d => %d\n", i, memSet (s, i));
+  printf ("Testing %-3d => %d\n", i+100, memSet (s, i+100))
 od;
 
-for i := 2, i <= 100, i := i+2 do
-  tree := insert (tree, i, i);
-  printf ("Inserting: %s\n", i.string);
-  printf ("Result   : %s\n", tree.string)
-od 
+for i := 50, i < 150, i := i+1
+do
+  s := removeSet (s, i);
+  validateColl (s)
+od;
+
+printf ("Set internal structure: %s\n", s.string);
+printf ("Set elements: %s\n", elements (s).string);
+
+for i := 0, i < 100, i := i+1
+do
+  printf ("Testing %-3d => %d\n", i, memSet (s, i))
+od
+

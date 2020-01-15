@@ -1,7 +1,18 @@
--- MNode (key, list of values, balance factor, left subtree, right subtree)
--- balance factor = height (left subtree) - height (right subtree)
+-- Collection package.
+-- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
+--
+-- This package provides a simplistic implementation of immutable set/map/hashtable
+-- data structures.
 
-public fun insert (m, k, v) {
+fun insert (m, k, v, sort) {
+  fun append (v, vs) {
+    case sort of
+      Map  -> v : vs
+    | Set  -> v
+    | Hash -> v : vs
+    esac
+  }
+  
   fun rot (left, node) {
     if left
     then case node of
@@ -17,16 +28,16 @@ public fun insert (m, k, v) {
 
   fun factor (x) {x [2]}
   
-  fun inner (m, k, v) {
+  fun inner (m) {
     case m of
-      {} -> [true, MNode (k, {v}, 0, {}, {})]
+      {} -> [true, MNode (k, append (v, {}), 0, {}, {})]
     | MNode (kk, vv, bf, l, r) -> 
        local c = compare (k, kk);
        if c == 0
-       then [false, MNode (kk, v : vv, bf, l, r)]
+       then [false, MNode (kk, append (v, vv), bf, l, r)]
        else if c < 0
             then
-              case inner (l, k, v) of
+              case inner (l) of
                 [true,  ll] -> if bf < 0
 	                       then [false, MNode (kk, vv, bf + 1, ll, r)]
 	                       elif bf == 1
@@ -39,7 +50,7 @@ public fun insert (m, k, v) {
               | [false, ll] -> [false, MNode (kk, vv, bf, ll, r)]
 	      esac		
             else
-	      case inner (r, k, v) of
+	      case inner (r) of
 	        [true,  rr] -> if bf > 0
 	                       then [false, MNode (kk, vv, bf - 1, l, rr)]
 			       elif bf == -1
@@ -56,51 +67,91 @@ public fun insert (m, k, v) {
     esac
   }
 
-  (m.inner (k, v)).snd
+  inner (m).snd
 } 
 
-public fun find (m, k) {
-  case m of
-    {} -> None
-  | MNode (kk, vv, _, l, r) ->
-     local c = compare (k, kk);
-     if c == 0
-     then case vv of v : _ -> Some (v) | _ -> None esac
-     else find (if c < 0 then l else r fi, k)
-     fi
-  esac
+public fun find (m, k, sort) {
+  fun extract (vv) {
+    case sort of
+      Map -> case vv of v : _ -> Some (v) | _ -> None esac
+    | Set -> Some (vv)
+    esac
+  }
+  
+  fun inner (m) {
+    case m of
+      {} -> None
+    | MNode (kk, vv, _, l, r) ->
+       local c = compare (k, kk);
+       if c == 0
+       then extract (vv)
+       else inner (if c < 0 then l else r fi)
+       fi
+    esac
+  }
+
+  inner (m)
 }
 
-public fun remove (m, k) {
-  case m of
-    {} -> m
-  | MNode (kk, vv, bf, l, r) ->
-     local c = compare (k, kk);
-     if c == 0
-     then case vv of {} -> m | _ : vt -> MNode (kk, vt, l, r) esac
-     else if c < 0
-          then MNode (kk, vv, bf, remove (l, k), r)
-          else MNode (kk, vv, bf, l, remove (r, k))
-          fi
-     fi
-  esac
+public fun remove (m, k, sort) {
+  fun delete (vs) {
+    case sort of
+      Map -> case vs of {} -> {} | _ : vv -> vv esac
+    | Set -> false
+    esac
+  }
+  
+  fun inner (m) {
+    case m of
+      {} -> m
+    | MNode (kk, vv, bf, l, r) ->
+       local c = compare (k, kk);
+       if c == 0
+       then MNode (kk, delete (vv), bf, l, r)
+       else if c < 0
+            then MNode (kk, vv, bf, inner (l), r)
+            else MNode (kk, vv, bf, l, inner (r))
+            fi
+       fi
+    esac
+  }
+
+  inner (m)
 }
 
-fun validate (t) {
+fun contents (m, sort) {
+  fun append (k, vs, acc) {
+    case sort of
+      Map -> case vs of {} -> acc | v : _ -> [k, v] : acc esac
+    | Set -> if vs then k : acc else acc fi
+    esac
+  }
+  
+  fun inner (m, acc) {
+    case m of
+      {} -> acc
+    | MNode (k, vv, _, l, r) -> inner (l, append (k, vv, inner (r, acc))) 
+    esac
+  }
+
+  inner (m, {})
+}
+
+public fun validateColl (t) {
   fun inner (t, verify) {
     case t of
       {} -> 0
     | MNode (k, _, bf, l, r) ->
        if verify (k)
        then
-	 local lh = validate (l, fun (x) {(*return*) x < k}),
-	       rh = validate (r, fun (x) {(*return*) x > k});
+	 local lh = validateColl (l, fun (x) {x < k}),
+	       rh = validateColl (r, fun (x) {x > k});
 
          if bf == lh - rh
 	 then 1 + if lh > rh then lh else rh fi
-	 else failure ("Balance violation on key %s\n", k.string)
+	 else failure ("Collection::validateColl: balance violation on key %s\n", k.string)
 	 fi
-       else failure ("Order violation on key %s\n", k.string)
+       else failure ("Collection::validateColl: order violation on key %s\n", k.string)
        fi
     esac
   }
@@ -108,3 +159,45 @@ fun validate (t) {
   inner (t, fun (x) {true})
 }
 
+public fun emptyMap () {
+  {}
+}
+
+public fun addMap (m, k, v) {
+  insert (m, k, v, Map)
+}
+
+public fun findMap (m, k) {
+  find (m, k, Map)
+}
+
+public fun removeMap (m, k) {
+  remove (m, k, Map)
+}
+
+public fun bindings (m) {
+  contents (m, Map)
+}
+
+public fun emptySet () {
+  {}
+}
+
+public fun addSet (s, v) {
+  insert (s, v, true, Set)
+}
+
+public fun memSet (s, v) {
+  case find (s, v, Set) of
+    None     -> false
+  | Some (f) -> f
+  esac
+}
+
+public fun removeSet (s, v) {
+  remove (s, v, Set)
+}
+
+public fun elements (m) {
+  contents (m, Set)
+}

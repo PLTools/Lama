@@ -349,7 +349,7 @@ object (self : 'self)
 
   method private get_parent f = M.find f !funtree
 
-  method private get_closure f = M.find f !closures
+  method get_closure f = M.find f !closures
                                
   method private propagate_for_call (f, c) =
     try 
@@ -420,7 +420,9 @@ object (self : 'self)
   method show_funinfo = funinfo#show_funinfo
 
   method get_closure p = try funinfo#lookup_closure p with Not_found -> []
-                       
+                                                                      
+  method get_fun_closure f = funinfo#get_closure f
+                           
   method propagate_closures = {< funinfo = funinfo#propagate_closures >}
                        
   method register_call f = {< funinfo = funinfo#register_call f self#current_function >}
@@ -855,9 +857,10 @@ let compile cmd ((imports, infixes), p) =
   in
   let fix_closures env prg =
     let rec inner state = function
-    | []                  -> []
-    | PROTO (f, c) :: tl  -> CLOSURE (f, env#get_closure (f, c)) :: inner state tl                             
-    | PPROTO (f, c) :: tl ->
+    | []                       -> []
+    | BEGIN (f, a, l, c) :: tl -> BEGIN (f, a, l, try env#get_fun_closure f with Not_found -> c) :: inner state tl
+    | PROTO (f, c) :: tl       -> CLOSURE (f, env#get_closure (f, c)) :: inner state tl                             
+    | PPROTO (f, c) :: tl      ->
        (match env#get_closure (f, c) with
         | []      -> inner (Some f :: state) tl
         | closure -> CLOSURE (f, closure) :: inner (None :: state) tl
