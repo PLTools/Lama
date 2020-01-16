@@ -689,12 +689,12 @@ extern void* Bstring (void *p) {
   int   n = strlen (p);
   void *s;
   
-  __pre_gc ();
+  //  __pre_gc ();
   
   s = LmakeString (BOX(n));  
   strncpy (s, p, n + 1);
 
-  __post_gc ();
+  //  __post_gc ();
   
   return s;
 }
