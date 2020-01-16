@@ -6,15 +6,14 @@
 
 import List;
 
-fun insertColl (m, k, v, sort) {
+fun insertColl (m, pk, v, sort) {
+  local k = case sort of Hash -> hash (pk) | _ -> pk esac;
+  
   fun append (v, vs) {
     case sort of
       Map  -> v : vs
     | Set  -> v
-    | Hash -> case find (fun (x) {x == v}, vs) of
-                None -> v : vs
-              | _    -> vs
-	      esac
+    | Hash -> [pk, v] : vs
     esac
   }
   
@@ -75,11 +74,17 @@ fun insertColl (m, k, v, sort) {
   inner (m).snd
 } 
 
-fun findColl (m, k, sort) {
+fun findColl (m, pk, sort) {
+  local k = case sort of Hash -> hash (pk) | _ -> pk esac;
+  
   fun extract (vv) {
     case sort of
-      Map -> case vv of v : _ -> Some (v) | _ -> None esac
-    | Set -> Some (vv)
+      Map  -> case vv of v : _ -> Some (v) | _ -> None esac
+    | Set  -> Some (vv)
+    | Hash -> case find (fun (x) {x.fst == pk}, vv) of
+                Some (p) -> Some (p.snd)
+              | None     -> None
+              esac
     esac
   }
   
@@ -98,11 +103,14 @@ fun findColl (m, k, sort) {
   inner (m)
 }
 
-fun removeColl (m, k, sort) {
+fun removeColl (m, pk, sort) {
+  local k = case sort of Hash -> hash (pk) | _ -> pk esac;
+  
   fun delete (vs) {
     case sort of
-      Map -> case vs of {} -> {} | _ : vv -> vv esac
-    | Set -> false
+      Map  -> case vs of {} -> {} | _ : vv -> vv esac
+    | Set  -> false
+    | Hash -> remove (fun (x) {x.fst == pk}, vs)
     esac
   }
   
@@ -249,11 +257,45 @@ public fun foldSet (f, acc, s) {
   foldl (f, acc, elements (s))
 }
 
--- Hash structure
+-- Hash consing
 public fun emptyMemo () {
   [{}]
 }
 
 public fun lookupMemo (m, v) {
-  skip  
+  case v of
+    #unboxed -> v
+  | _ ->
+     case findMap (m[0], v) of
+       Some (w) -> w
+     | None ->
+        case v of
+          #string -> m[0] := addMap (m[0], v, v); v        
+        | _ ->
+          local vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;
+          for skip, i < v.length, i := i + 1 do
+            vc [i] := lookupMemo (m, vc [i])
+          od;
+          m[0] := addMap (m[0], vc, vc);
+          vc
+        esac
+     esac
+  esac
+}
+
+-- Maps of hashed pointers
+public fun emptyHashTab () {
+ {}
+}
+
+public fun addHashTab (t, k, v) {
+  insertColl (t, k, v, Hash)
+}
+
+public fun findHashTab (t, k) {
+  findColl (t, k, Hash)
+}
+
+public fun removeHashTab (t, k) {
+  removeColl (t, k, Hash)
 }

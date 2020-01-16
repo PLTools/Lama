@@ -1,0 +1,22 @@
+import Collection;
+
+fun f (x, y) {
+  fun () {x+y}
+}
+
+local t = emptyMemo (),
+      a = lookupMemo (t, "abc"),
+      b = lookupMemo (t, [1, 2, 3, 4, "abc"]),
+      c = lookupMemo (t, f (5, 6));
+
+printf ("Cached: %d\n", lookupMemo (t, "abc") == a);
+printf ("Cached: %d\n", lookupMemo (t, "abc") == a);
+printf ("Cached: %d\n", lookupMemo (t, "abc") == a);
+
+printf ("Cached: %d\n", lookupMemo (t, [1, 2, 3, 4, "abc"]) == b);
+printf ("Cached: %d\n", lookupMemo (t, [1, 2, 3, 4, "abc"]) == b);
+printf ("Cached: %d\n", lookupMemo (t, [1, 2, 3, 4, "abc"]) == b);
+
+printf ("Cached: %d\n", lookupMemo (t, f (5, 6)) == c);
+printf ("Cached: %d\n", lookupMemo (t, f (5, 6)) == c);
+printf ("Cached: %d\n", lookupMemo (t, f (5, 6)) == c)

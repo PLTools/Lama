@@ -650,6 +650,24 @@ extern void* Belem (void *p, int i) {
   return (void*) ((int*) a->contents)[i];
 }
 
+extern void* LmakeArray (int length) {
+  data *r;
+  int n;
+
+  ASSERT_UNBOXED("makeArray:1", length);
+  
+  __pre_gc ();
+
+  n = UNBOX(length);
+  r = (data*) alloc (sizeof(int) * (n+1));
+
+  r->tag = ARRAY_TAG | (n << 3);
+
+  __post_gc ();
+
+  return r->contents;
+}
+
 extern void* LmakeString (int length) {
   int   n = UNBOX(length);
   data *r;

@@ -916,9 +916,9 @@ module Definition =
         | `Extern, Some _ -> report_error ~loc:(Some l#coord) (Printf.sprintf "initial value for an external variable \"%s\" can not be specified" name)
         | _               -> name, (m,`Variable value)
       };
-      parse[infix][expr][def]:        
+      parse[infix][expr][expr'][def]:
         m:(%"local" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
-        locs:!(Util.list (local_var m infix expr def)) ";" {locs, infix}
+        locs:!(Util.list (local_var m infix expr' def)) ";" {locs, infix}
       | - <(m, orig_name, name, infix', flag)> : head[infix] -"(" -args:!(Util.list0 arg) -")"
           (l:$ "{" body:expr[def][infix'][Expr.Weak] "}" {
             if flag && List.length args != 2 then report_error ~loc:(Some l#coord) "infix operator should accept two arguments";
@@ -1056,7 +1056,9 @@ ostap (
     (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
     };
   definitions[infix]:
-    <(def, infix')> : !(Definition.parse infix (fun def infix atr -> Expr.scope def infix atr (Expr.parse def)) definitions) <(defs, infix'')> : definitions[infix'] {
+    <(def, infix')> : !(Definition.parse infix (fun def infix atr -> Expr.scope def infix atr (Expr.parse def))
+                                               (fun def infix atr -> Expr.basic def infix atr)
+                          definitions) <(defs, infix'')> : definitions[infix'] {
       def @ defs, infix''
      }
   | empty {[], infix}

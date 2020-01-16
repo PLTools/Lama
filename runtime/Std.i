@@ -1,3 +1,4 @@
+F,makeArray;
 F,clone;
 F,hash;
 F,fst;

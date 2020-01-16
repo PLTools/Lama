@@ -1,0 +1,26 @@
+import Collection;
+
+local a = {1, 2, 3}, b = {1, 2, 3}, t = emptyHashTab ();
+
+t := addHashTab (t, a, 100);
+validateColl ();
+printf ("HashTab internal structure: %s\n", t.string);
+
+t := addHashTab (t, b, 200);
+validateColl ();
+printf ("HashTab internal structure: %s\n", t.string);
+
+printf ("Searching: %s\n", findHashTab (t, a).string);
+printf ("Searching: %s\n", findHashTab (t, b).string);
+
+t := addHashTab (t, a, 800);
+validateColl (t);
+
+printf ("Replaced: %s\n", findHashTab (t, a).string);
+
+t := removeHashTab (t, a);
+validateColl (t);
+printf ("Restored: %s\n", findHashTab (t, a).string)
+
+
+

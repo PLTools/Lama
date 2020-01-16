@@ -1,0 +1,9 @@
+import List;
+import Array;
+
+printf ("Flattening: %s\n", flatten ({}).string);
+printf ("Flattening: %s\n", flatten ({{}, {}, {}}).string);
+printf ("Flattening: %s\n", flatten ({1, 2, 3} : {}).string);
+printf ("Flattening: %s\n", flatten ({{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}).string);
+printf ("List to array: %s\n", listArray ({1, 2, 3, 4, 5}).string);
+printf ("Array to list: %s\n", arrayList ([1, 2,3, 4, 5]).string)

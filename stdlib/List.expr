@@ -1,3 +1,10 @@
+public fun size (l) {
+  case l of
+    {}    -> 0
+  | _ : t -> 1 + size (t)
+  esac
+}
+
 public fun foldl (f, acc, l) {
   case l of
     {}     -> acc
@@ -59,13 +66,13 @@ public fun find (f, l) {
 }
 
 public fun flatten (l) {
-  local res = [0, {}];
+  local res = [0, {}], curr = [res];
 
   fun append (x) {
-    local new = {x};
+    local new = x : {};
     
-    res [1] := new;
-    res := new
+    curr [0][1] := new;
+    curr [0] := new    
   }
 
   iter (fun (x) {iter (append, x)}, l);
@@ -87,5 +94,19 @@ public fun unzip (a) {
      case unzip (aa) of
        [aa, bb] -> [a : aa, b : bb]
      esac
+  esac
+}
+
+public fun remove (f, l) {
+  case l of
+    {}    -> {}
+  | h : t -> if f (h) then t else h : remove (f, t) fi
+  esac
+}
+
+public fun filter (f, l) {
+  case l of
+    {}    -> {}
+  | h : t -> if f (h) then h : filter (f, t) else filter (f, t) fi
   esac
 }
