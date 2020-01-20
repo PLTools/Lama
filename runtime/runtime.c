@@ -1163,7 +1163,8 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-static size_t SPACE_SIZE = 32 * 10240;
+// static size_t SPACE_SIZE = 32;
+static size_t SPACE_SIZE = 32 * 1024;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
@@ -1208,7 +1209,7 @@ static void gc_swap_spaces (void) {
 
 # define IS_VALID_HEAP_POINTER(p)\
   (!UNBOXED(p) &&		 \
-  from_space.begin <= p &&	 \
+   from_space.begin <= p &&	 \
    from_space.end   >  p)
 
 # define IN_PASSIVE_SPACE(p)	\
@@ -1386,7 +1387,7 @@ extern size_t * gc_copy (size_t *obj) {
 }
 
 extern void gc_test_and_copy_root (size_t ** root) {
-  if (IS_VALID_HEAP_POINTER(*root) && *root != current && *root != from_space.current && *root != to_space.current ) {
+  if (IS_VALID_HEAP_POINTER(*root)) {
 #ifdef DEBUG_PRINT
     printf ("gc_test_and_copy_root: root %p  *root %p\n", root, *root); fflush (stdout);
 #endif
@@ -1565,7 +1566,7 @@ extern void * alloc (size_t size) {
   printf("gc END\n\n"); fflush (stdout);
   printFromSpace(); fflush (stdout);
 #endif
-  init_to_space (0); // new
+  init_to_space (0);
   return gc (size);
 }
 # endif
