@@ -1,0 +1,24 @@
+import Ref;
+
+public fun id (x) {
+  x
+}
+
+public infixl $ after * (f, x) {
+  f (x)
+}
+
+public infix # at $ (f, g) {
+  fun (x) {
+    f (g (x))
+  }
+}
+
+public fun fix (f) {
+  local knot = ref (0);
+  
+  knot ::= fun () {fun (x) {f (deref (knot) ()) (x)}};
+  
+
+  deref (knot) ()
+}

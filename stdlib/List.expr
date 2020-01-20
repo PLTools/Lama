@@ -1,3 +1,7 @@
+public fun list (x) {
+  x : {}
+}
+
 public fun size (l) {
   case l of
     {}    -> 0

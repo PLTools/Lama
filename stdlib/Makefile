@@ -6,9 +6,13 @@ RC=../src/rc.opt
 
 all: $(ALL)
 
-Collection.o: List.o
+Fun.o: Ref.o
+
+Collection.o: List.o Ref.o
 
 Array.o: List.o
+
+Ostap.o: List.o Collection.o Ref.o Fun.o
 
 %.o: %.expr
 	$(RC) -I . -c $<

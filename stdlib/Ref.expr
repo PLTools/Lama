@@ -1,0 +1,11 @@
+public fun ref (x) {
+  [x]
+}
+
+public fun deref (x) {
+  x[0]
+}
+
+public infix ::= before := (x, y) {
+  x[0] := y
+}

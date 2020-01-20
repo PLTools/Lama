@@ -5,6 +5,7 @@
 -- data structures.
 
 import List;
+import Ref;
 
 fun insertColl (m, pk, v, sort) {
   local k = case sort of Hash -> hash (pk) | _ -> pk esac;
@@ -259,24 +260,24 @@ public fun foldSet (f, acc, s) {
 
 -- Hash consing
 public fun emptyMemo () {
-  [{}]
+  ref ({})
 }
 
 public fun lookupMemo (m, v) {
   case v of
     #unboxed -> v
   | _ ->
-     case findMap (m[0], v) of
+     case findMap (deref (m), v) of
        Some (w) -> w
      | None ->
         case v of
-          #string -> m[0] := addMap (m[0], v, v); v        
+          #string -> m ::= addMap (deref (m), v, v); v        
         | _ ->
           local vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;
           for skip, i < v.length, i := i + 1 do
             vc [i] := lookupMemo (m, vc [i])
           od;
-          m[0] := addMap (m[0], vc, vc);
+          m ::= addMap (deref (m), vc, vc);
           vc
         esac
      esac

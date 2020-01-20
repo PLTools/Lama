@@ -1,0 +1,178 @@
+import List;
+import Collection;
+import Ref;
+import Fun;
+
+fun token_k (x) {
+  fun (k) {
+    fun (s) {
+      case s of
+        h : t -> if compare (h, x) == 0 then k (Succ (x, t)) else k (Fail ("expected " ++ x.string)) fi
+      | _     -> k (Fail ("expected " ++ x.string))
+      esac
+    }
+  }   
+}
+
+fun token (x) {
+  fun (s) {
+    case s of
+      h : t -> if compare (h, x) == 0 then return Succ (list ([x, t]), {}) fi
+    | _     -> skip
+    esac;
+    Fail (list ("expected " ++ x.string))
+  }
+}
+
+fun eof_k (k) {
+  fun (s) {
+    case s of
+      {} -> k (Succ ({}, {}))
+    | _  -> k (Fail ("expected <EOF>"))
+    esac
+  }
+}
+
+fun eof (s) {
+   case s of
+    {} -> Succ (list ([{}, {}]), {})
+  | _  -> Fail (list ("expected <EOF>"))
+  esac
+}
+
+fun empty_k (k) {
+  fun (s) {k (Succ ({}, s))}
+}
+
+fun empty (s) {
+  Succ ({[{}, s]}, {})
+}
+
+infix ** at * (a, b) {
+  case [a, b] of
+    [Succ (r1, e1), Succ (r2, e2)] -> Succ (r1 +++ r2, e1 +++ e2)
+  | [Fail (e1)    , Fail (e2)    ] -> Fail (e1 +++ e2)
+  | [Succ (r1, e1), Fail (e2)    ] -> Succ (r1, e1 +++ e2)
+  | [Fail (e1)    , Succ (r2, e2)] -> Succ (r2, e1 +++ e2)
+  esac
+}
+
+fun alt_k (a, b) {
+  fun (k) {
+    fun (s) {
+      a (k) (s);
+      b (k) (s)
+    }
+  }
+}
+
+fun alt (a, b) {
+  fun (s) {a (s) ** b (s)}
+}
+
+fun seq_nm (a, b) {
+  fun (k) {
+    fun (s) {
+      a (fun (ar) {case ar of Fail (_) -> k (ar) | Succ (x, s) -> b (k) (s) esac}) (s)
+    }
+  }
+}
+
+fun seq_k (a, b) {
+  fun (k) {
+    fun (s) {
+      a (fun (ar) {case ar of Fail (_) -> k (ar) | Succ (x, s) -> b (x) (k) (s) esac}) (s)
+    }
+  }
+}
+
+fun seq (a, b) {
+  fun (s) {
+    case a (s) of
+      r@(Fail (_)) -> r
+    | Succ (r, e)  ->
+        foldl (fun (r, p) {r ** b (p.fst) (p.snd)}, Fail (e), r)
+    esac
+  }
+}
+
+
+--infixr |  before !! (a, b) {alt (a, b)}
+--infixr |> after  |  (a, b) {seq (a, b)}
+
+infixr ||  before !! (a, b) {alt_k (a, b)}
+infixr ||> after  ||  (a, b) {seq_nm (a, b)}
+
+infix @ at * (a, f) {
+  fun (k) {
+    fun (s) {
+      a (fun (x) {k (case x of Fail (_) -> x | Succ (x, s) -> Succ (f (x), s) esac)}) (s)
+    }
+  }
+}
+
+local tab = emptyMemo (), memo_tab = ref (emptyHashTab ());
+
+fun memo (f) {
+  local t;
+  
+  --f := lookupMemo (tab, f);
+  printf ("Memoizing: f=%x\n", f);
+
+  case findHashTab (deref (memo_tab), f) of
+    None      -> t := ref (emptyMap ()); memo_tab ::= addHashTab (deref (memo_tab), f, t)
+  | Some (tt) -> t := tt
+  esac;
+  
+  fun (k) {
+    fun (s) {
+      -- printf ("s=%s\n", s.string);
+      case findMap (deref (t), s) of
+        None  ->
+          t ::= addMap (deref (t), s, [addSet (emptySet (), k), emptySet ()]);
+          f (fun (r) {
+               -- printf ("Result: %s\n", r.string);
+               case findMap (deref (t), s) of
+                 Some ([ks, rs]) ->
+                   if memSet (rs, r)
+                   then skip
+                   else
+                     t ::= addMap (deref (t), s, [ks, addSet (rs, r)]);
+                     iterSet (fun (k) {k (r)}, ks)
+                   fi
+               esac
+             }          
+            )
+            (s)
+      | Some ([ks, rs]) ->
+          t ::= addMap (deref (t), s, [addSet (ks, k), rs]);
+          iterSet (k, rs)
+      esac
+    }
+  }
+}
+
+fun lift (f) {
+  fun (x) {f}
+}
+
+fun observe (name, f) {
+  fun (k) {
+    fun (s) {
+      printf ("%s at %s\n", name, s.string);
+      f (k)(s)
+    }
+  }
+}
+
+fun print (x) {printf ("k: %s\n", x.string)}
+
+local a = token_k ("a");
+
+local as = memo (
+  fun (k) {
+    (empty_k || (as ||> a)) (k) 
+  }
+);
+
+as (print) ({"a", "a"})

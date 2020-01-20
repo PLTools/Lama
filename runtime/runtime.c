@@ -517,7 +517,7 @@ void *Lclone (void *p) {
   return res;
 }
 
-# define HASH_DEPTH 10
+# define HASH_DEPTH 3
 # define HASH_APPEND(acc, x) (((acc + (unsigned) x) << (WORD_SIZE / 2)) | ((acc + (unsigned) x) >> (WORD_SIZE / 2)))
 
 int inner_hash (int depth, unsigned acc, void *p) {
@@ -1163,7 +1163,7 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-static size_t SPACE_SIZE = 32 * 1024;
+static size_t SPACE_SIZE = 32 * 10240;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
