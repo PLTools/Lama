@@ -101,7 +101,7 @@ fun seq (a, b) {
 --infixr |> after  |  (a, b) {seq (a, b)}
 
 infixr ||  before !! (a, b) {alt_k (a, b)}
-infixr ||> after  ||  (a, b) {seq_nm (a, b)}
+infixr ||> after  || (a, b) {seq_k (a, b)}
 
 infix @ at * (a, f) {
   fun (k) {
@@ -171,8 +171,8 @@ local a = token_k ("a");
 
 local as = memo (
   fun (k) {
-    (empty_k || (as ||> a)) (k) 
+    (empty_k @ fun (x) {""} || as ||> fun(as) {a @ fun (a) {as ++ a}}) $ k
   }
 );
 
-as (print) ({"a", "a"})
+(as ||> fun (as) {eof_k @ lift (as)}) (print) ({"a", "a"})

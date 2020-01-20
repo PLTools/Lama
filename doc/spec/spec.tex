@@ -72,11 +72,12 @@
 \renewcommand{\emptyset}{\varnothing}
 \newcommand{\dom}[1]{\mathtt{dom}\;{#1}}
 \newcommand{\primi}[2]{\mathbf{#1}\;{#2}}
-\newcommand{\sial}{S\textit{\lower -.5ex\hbox{I}\kern -.1667em\lower .5ex\hbox {A}}\kern -.125emL\@\xspace}
+\newcommand{\lama}{$\lambda\mbox{\textsc{Algol}}$\xspace}
+%\newcommand{\sial}{S\textit{\lower -.5ex\hbox{I}\kern -.1667em\lower .5ex\hbox {A}}\kern -.125emL\@\xspace}
 \definecolor{light-gray}{gray}{0.90}
 \newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
 
-\lstdefinelanguage{sial}{
+\lstdefinelanguage{lama}{
 keywords={fun, case, esac, do, od, if, then, else, elif, fi, skip, repeat, until, for, local},
 sensitive=true,
 %basicstyle=\small,
@@ -99,12 +100,12 @@ commentstyle=\scriptsize\rmfamily,
 basewidth={0.5em,0.5em},
 fontadjust=true,
 escapechar=!,
-language=sial
+language=lama
 }
 
 \sloppy
 
-\title{\sial Language Definition}
+\title{\lama Language Definition}
 
 \author{Dmitry Boulytchev}
 
