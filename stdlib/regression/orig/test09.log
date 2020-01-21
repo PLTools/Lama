@@ -1,0 +1,5 @@
+Parsing a*| against "aa"... Succ ({"a", "a"})
+Parsing a+| against "aa"... Succ ({"a", "a"})
+Parsing list(a)| against "a"... Succ ({"a"})
+Parsing list(a)| against "a,a"... Succ ({"a", "a"})
+Parsing list0(a)| against ""... Succ (0)

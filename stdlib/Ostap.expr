@@ -2,125 +2,24 @@ import List;
 import Collection;
 import Ref;
 import Fun;
+import Matcher;
 
-fun token_k (x) {
-  fun (k) {
-    fun (s) {
-      case s of
-        h : t -> if compare (h, x) == 0 then k (Succ (x, t)) else k (Fail ("expected " ++ x.string)) fi
-      | _     -> k (Fail ("expected " ++ x.string))
-      esac
-    }
-  }   
+local tab, hct;
+
+public fun initOstap () {
+  tab := ref (emptyHashTab ());
+  hct := emptyMemo ()
 }
-
-fun token (x) {
-  fun (s) {
-    case s of
-      h : t -> if compare (h, x) == 0 then return Succ (list ([x, t]), {}) fi
-    | _     -> skip
-    esac;
-    Fail (list ("expected " ++ x.string))
-  }
-}
-
-fun eof_k (k) {
-  fun (s) {
-    case s of
-      {} -> k (Succ ({}, {}))
-    | _  -> k (Fail ("expected <EOF>"))
-    esac
-  }
-}
-
-fun eof (s) {
-   case s of
-    {} -> Succ (list ([{}, {}]), {})
-  | _  -> Fail (list ("expected <EOF>"))
-  esac
-}
-
-fun empty_k (k) {
-  fun (s) {k (Succ ({}, s))}
-}
-
-fun empty (s) {
-  Succ ({[{}, s]}, {})
-}
-
-infix ** at * (a, b) {
-  case [a, b] of
-    [Succ (r1, e1), Succ (r2, e2)] -> Succ (r1 +++ r2, e1 +++ e2)
-  | [Fail (e1)    , Fail (e2)    ] -> Fail (e1 +++ e2)
-  | [Succ (r1, e1), Fail (e2)    ] -> Succ (r1, e1 +++ e2)
-  | [Fail (e1)    , Succ (r2, e2)] -> Succ (r2, e1 +++ e2)
-  esac
-}
-
-fun alt_k (a, b) {
-  fun (k) {
-    fun (s) {
-      a (k) (s);
-      b (k) (s)
-    }
-  }
-}
-
-fun alt (a, b) {
-  fun (s) {a (s) ** b (s)}
-}
-
-fun seq_nm (a, b) {
-  fun (k) {
-    fun (s) {
-      a (fun (ar) {case ar of Fail (_) -> k (ar) | Succ (x, s) -> b (k) (s) esac}) (s)
-    }
-  }
-}
-
-fun seq_k (a, b) {
-  fun (k) {
-    fun (s) {
-      a (fun (ar) {case ar of Fail (_) -> k (ar) | Succ (x, s) -> b (x) (k) (s) esac}) (s)
-    }
-  }
-}
-
-fun seq (a, b) {
-  fun (s) {
-    case a (s) of
-      r@(Fail (_)) -> r
-    | Succ (r, e)  ->
-        foldl (fun (r, p) {r ** b (p.fst) (p.snd)}, Fail (e), r)
-    esac
-  }
-}
-
-
---infixr |  before !! (a, b) {alt (a, b)}
---infixr |> after  |  (a, b) {seq (a, b)}
-
-infixr ||  before !! (a, b) {alt_k (a, b)}
-infixr ||> after  || (a, b) {seq_k (a, b)}
-
-infix @ at * (a, f) {
-  fun (k) {
-    fun (s) {
-      a (fun (x) {k (case x of Fail (_) -> x | Succ (x, s) -> Succ (f (x), s) esac)}) (s)
-    }
-  }
-}
-
-local tab = emptyMemo (), memo_tab = ref (emptyHashTab ());
 
 fun memo (f) {
   local t;
-  
-  --f := lookupMemo (tab, f);
-  printf ("Memoizing: f=%x\n", f);
 
-  case findHashTab (deref (memo_tab), f) of
-    None      -> t := ref (emptyMap ()); memo_tab ::= addHashTab (deref (memo_tab), f, t)
+  f := lookupMemo (hct, f);
+  
+  --printf ("Memoizing: %x=%s\n", f, f.string);
+  
+  case findHashTab (deref (tab), f) of
+    None      -> t := ref (emptyMap ()); tab ::= addHashTab (deref (tab), f, t)
   | Some (tt) -> t := tt
   esac;
   
@@ -152,11 +51,95 @@ fun memo (f) {
   }
 }
 
-fun lift (f) {
+public fun token (x) {
+  fun (k) {
+    fun (s) {
+      k $ matchString (s, x)
+    }
+  }   
+}
+
+public fun eof (k) {
+  fun (s) {
+    k (endOf (s))
+  }
+}
+
+public fun empty (k) {
+  fun (s) {k (Succ ({}, s))}
+}
+
+public fun alt (a, b) {
+  fun (k) {
+    fun (s) {
+      a (k) (s);
+      b (k) (s)
+    }
+  }
+}
+
+public fun seq (a, b) {
+  fun (k) {
+    fun (s) {
+      a (fun (ar) {
+           case ar of             
+             Succ (x, s) -> b (x) (k) (s)
+           | _           -> k (ar)
+           esac
+         }) (s)
+    }
+  }
+}
+
+public infixr |  before !! (a, b) {alt (a, b)}
+public infixr |> after  |  (a, b) {seq (a, b)}
+
+public infix @ at * (a, f) {
+  fun (k) {
+    fun (s) {
+      a (fun (x) {k (case x of                       
+                       Succ (x, s) -> Succ (f (x), s)
+                     | _           -> x
+                     esac)}) (s)
+    }
+  }
+}
+
+public fun lift (f) {
   fun (x) {f}
 }
 
-fun observe (name, f) {
+public fun bypass (f) {
+  fun (x) {f @ lift (x)}
+}
+
+public fun opt (a) {empty @ lift (None) | a @ fun (x) {Some (x)}}
+
+public fun rep0 (a) {
+  memo (empty @ lift({}) | a |> fun (x) {rep0 (a) @ fun (as) {x : as}})
+}
+
+public fun rep (a) {
+  memo (a |> (fun (x) {rep0 (a) @ fun (as) {x : as}}))
+}
+
+public fun listBy (item, sep) {
+  item |> fun (i) {rep0 (sep |> lift (item)) @ fun (is) {i : is}}
+}
+
+public fun list0By (item, sep) {
+  empty @ lift ({}) | listBy (item, sep)
+}
+
+public fun list (item) {
+  listBy (item, token (","))
+}
+
+public fun list0 (item) {
+  list0By (item, token (","))
+}
+
+public fun observe (name, f) {
   fun (k) {
     fun (s) {
       printf ("%s at %s\n", name, s.string);
@@ -165,14 +148,54 @@ fun observe (name, f) {
   }
 }
 
-fun print (x) {printf ("k: %s\n", x.string)}
+public fun createResult () {
+  local errors   = ref ({}),
+        line     = ref (0),
+        col      = ref (0),
+        value    = ref ({}),
+        hasError = ref (false),
+        hasValue = ref (false);
 
-local a = token_k ("a");
+  fun k (x) {
+    case x of
+      Succ (val, _)    ->
+        if deref (hasValue)
+        then failure (sprintf ("Ostap: ambiguous parsing (%s vs. %s)", deref (value).string, val.string))
+        else
+          hasValue ::= true;
+          value    ::= val
+        fi
+    | Fail (err, l, c) ->
+        if deref (hasError)
+        then
+          local c = compare ([line, col], [l, c]);
 
-local as = memo (
-  fun (k) {
-    (empty_k @ fun (x) {""} || as ||> fun(as) {a @ fun (a) {as ++ a}}) $ k
+          if   c == 0 then errors ::= err : deref (errors)
+          elif c <  0 then errors ::= singleton (err); line ::= l; col ::= c
+          fi
+        else
+          hasError ::= true;
+          errors   ::= singleton (err);
+          line     ::= l;
+          col      ::= c
+        fi
+    esac
   }
-);
 
-(as ||> fun (as) {eof_k @ lift (as)}) (print) ({"a", "a"})
+  fun get () {
+    if   deref (hasValue) then Succ (deref (value))
+    elif deref (hasError) then Fail (deref (errors), deref (line), deref (col))
+    else failure ("Ostap::createAcceptor::get: nothing to return")
+    fi
+  }
+
+  [k, get]
+}
+
+public fun k (acc) {
+  acc [0]
+}
+
+public fun result (acc) {
+  acc [1] ()
+}

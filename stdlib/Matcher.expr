@@ -18,7 +18,7 @@ public fun createRegexp (r, name) {
 --    line, col --- line and column numbers
 -- This function is internal, do not use it directly.
 -- To initially create a matcher use initMatcher function (see below).
-fun matcherCreate (buf, pos, line, col) {
+fun createMatcher (buf, pos, line, col) {
   -- Shows a matcher in a readable form
   fun show () {
     sprintf ("buf : %-40s\npos : %d\nline: %d\ncol : %d\n", buf, pos, line, col)
@@ -41,14 +41,14 @@ fun matcherCreate (buf, pos, line, col) {
       esac
     od;
     
-    matcherCreate (buf, pos + n, l, c)
+    createMatcher (buf, pos + n, l, c)
   }
 
   fun matchString (s) {
     if s.length > rest ()
-    then Fail (sprintf ("""%s"" expected at %d:%d", s, line, col))
-    elif matchSubString (buf, s, pos) then Succ (shift (s.length), s) 
-    else Fail (sprintf ("""%s"" expected at %d:%d", s, line, col))
+    then Fail (sprintf ("""%s"" expected", s), line, col)
+    elif matchSubString (buf, s, pos) then Succ (s, shift (s.length)) 
+    else Fail (sprintf ("""%s"" expected at", s), line, col)
     fi
   }
 
@@ -56,13 +56,16 @@ fun matcherCreate (buf, pos, line, col) {
     local n;
     
     if (n := regexpMatch (r[0], buf, pos)) > 0
-    then Succ (shift (n), substring (buf, pos, n))
-    else Fail (sprintf ("%s expected at %d:%d", r[1], line, col))
+    then Succ (substring (buf, pos, n), shift (n))
+    else Fail (sprintf ("%s expected", r[1]), line, col)
     fi
   }
 
   fun eof () {
-    rest () == 0
+    if rest () == 0
+    then Succ ("", shift (0))
+    else Fail ("EOF expected", line, col)
+    fi
   }
   
   [show,
@@ -89,6 +92,6 @@ public fun matchRegexp (m, r) {
 }
 
 -- Creates a fresh matcher from a string buffer
-public fun matcherInit (buf) {
-  matcherCreate (buf, 0, 1, 1)
+public fun initMatcher (buf) {
+  createMatcher (buf, 0, 1, 1)
 }

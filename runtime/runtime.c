@@ -535,7 +535,7 @@ int inner_hash (int depth, unsigned acc, void *p) {
     case STRING_TAG: {
       char *p = a->contents;
 
-      while (p) {
+      while (*p) {
 	acc = HASH_APPEND(acc, (int) *p++);
       }
 
@@ -1164,7 +1164,7 @@ extern void __gc_root_scan_stack ();
 /* ======================================== */
 
 // static size_t SPACE_SIZE = 32;
-static size_t SPACE_SIZE = 32 * 1024;
+static size_t SPACE_SIZE = 32 * 1024 * 100;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
