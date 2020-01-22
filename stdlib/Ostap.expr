@@ -11,7 +11,11 @@ public fun initOstap () {
   hct := emptyMemo ()
 }
 
-fun memo (f) {
+public fun cleanupOstap () {
+  initOstap ()
+}
+
+public fun memo (f) {
   local t;
 
   f := lookupMemo (hct, f);
@@ -148,7 +152,7 @@ public fun observe (name, f) {
   }
 }
 
-public fun createResult () {
+fun createResult () {
   local errors   = ref ({}),
         line     = ref (0),
         col      = ref (0),
@@ -192,10 +196,26 @@ public fun createResult () {
   [k, get]
 }
 
-public fun k (acc) {
+fun k (acc) {
   acc [0]
 }
 
-public fun result (acc) {
+fun result (acc) {
   acc [1] ()
+}
+
+public fun parse (p, m) {
+  local acc = createResult ();
+
+  p (acc.k) (m);
+
+  acc.result
+}
+
+public fun parseString (p, s) {
+  local acc = createResult ();
+
+  p (acc.k) (initMatcher (s));
+
+  acc.result
 }

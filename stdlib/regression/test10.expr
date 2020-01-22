@@ -1,0 +1,19 @@
+import Ostap;
+import List;
+import Fun;
+
+fun many (a) {
+  memo (
+   fun (k) {
+      empty @ lift({})
+    | many (a) |> fun (as) {a @ fun (x) {as +++ singleton (x)}} $ k
+   }
+  )
+}
+
+local a = token ("a"), b = token ("b");
+local bad_alter = a | a |> fun (x) {b @ fun (y) {x ++ y}}; 
+
+initOstap ();
+printf ("Parsing ""aaa"" with many ... %s\n", parseString (many (a) |> bypass (eof), "aaa").string);
+printf ("Parsing ""ab"" with bad_alter ... %s\n", parseString (bad_alter |> bypass (eof), "ab").string)

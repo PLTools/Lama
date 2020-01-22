@@ -1,0 +1,2 @@
+Parsing "aaa" with many ... Succ ({"a", "a", "a"})
+Parsing "ab" with bad_alter ... Succ ("ab")
