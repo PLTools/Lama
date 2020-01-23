@@ -676,7 +676,8 @@ extern void* LmakeString (int length) {
   
   __pre_gc () ;
   
-  r = (data*) alloc (n + 1 + sizeof (int));
+  // r = (data*) alloc (n + 1 + sizeof (int));
+  r = (data*) alloc ((n) / sizeof(size_t) + 1 + 1);
 
   r->tag = STRING_TAG | (n << 3);
 
@@ -1345,7 +1346,8 @@ extern size_t * gc_copy (size_t *obj) {
 #ifdef DEBUG_PRINT
       printf ("gc_copy:string_tag; len = %d\n", LEN(d->tag) + 1); fflush (stdout);
 #endif
-      current += LEN(d->tag) * sizeof(char) + sizeof (int);
+      // current += LEN(d->tag) * sizeof(char) + sizeof (int);
+      current += (LEN(d->tag) + sizeof(int)) / sizeof(int) + 1;
       *copy = d->tag;
       copy++;
       d->tag = (int) copy;
@@ -1471,7 +1473,8 @@ static void printFromSpace (void) {
   data   * d   = NULL;
   sexp   * s   = NULL;
   size_t   len = 0;
-
+  size_t   elem_number = 0;
+  
   printf ("\nHEAP SNAPSHOT\n===================\n");
   printf ("f_begin = %p, f_end = %p,\n", from_space.begin, from_space.end);
   while (cur < from_space.current) {
@@ -1481,9 +1484,12 @@ static void printFromSpace (void) {
     switch (TAG(d->tag)) {
 
     case STRING_TAG:
-      printf ("(=>%p): STRING\n\t%s\n", d->contents, d->contents);
-      len = LEN(d->tag) + 1;
+      printf ("(=>%p): STRING\n\t%s; len = %i %zu\n",
+	      d->contents, d->contents,
+	      LEN(d->tag), LEN(d->tag) + 1 + sizeof(int));
       fflush (stdout);
+      len = (LEN(d->tag) + sizeof(int)) / sizeof(int) + 1;
+      cur += len;
       break;
 
     case CLOSURE_TAG:
@@ -1497,6 +1503,7 @@ static void printFromSpace (void) {
       len += 1;
       printf ("\n");
       fflush (stdout);
+      cur += len * sizeof(int);
       break;
 
     case ARRAY_TAG:
@@ -1510,6 +1517,7 @@ static void printFromSpace (void) {
       len += 1;
       printf ("\n");
       fflush (stdout);
+      cur += len * sizeof(int);
       break;
 
     case SEXP_TAG:
@@ -1527,10 +1535,12 @@ static void printFromSpace (void) {
       len += 2;
       printf ("\n");
       fflush (stdout);
+      cur += len * sizeof(int);
       break;
 
     case 0:
-      printf ("\nprintFromSpace: end!\n===================\n\n");
+      printf ("\nprintFromSpace: end: %zu elements\n===================\n\n",
+	      elem_number);
       return;
 
     default:
@@ -1539,10 +1549,11 @@ static void printFromSpace (void) {
       fflush (stdout);
       exit   (1);
     }
-    cur += len * sizeof(int);
+    // cur += len * sizeof(int);
     printf ("len = %zu, new cur = %p\n", len, cur);
+    elem_number++;
   }
-  printf ("\nprintFromSpace: end: the whole space is printed!\n===================\n\n");
+  printf ("\nprintFromSpace: end: the whole space is printed: %zu elements\n===================\n\n", elem_number);
   fflush (stdout);
 }
 #endif
