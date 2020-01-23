@@ -1443,6 +1443,7 @@ static void * gc (size_t size) {
     fflush (stdout);
 #endif
     if (extend_spaces ()) {
+      gc_swap_spaces ();
       init_to_space (1);
       return gc (size);
     }
@@ -1560,13 +1561,17 @@ extern void * alloc (size_t size) {
 #endif
     return p;
   }
+  init_to_space (0);
 #ifdef DEBUG_PRINT
   printf ("alloc: call gc: %zu\n", size); fflush (stdout);
   printFromSpace(); fflush (stdout);
-  printf("gc END\n\n"); fflush (stdout);
+  p = gc (size);
+  printf("gc END %p %p %p\n\n", from_space.begin,
+	 from_space.end, from_space.current); fflush (stdout);
   printFromSpace(); fflush (stdout);
-#endif
-  init_to_space (0);
+  return p;
+#else
   return gc (size);
+#endif
 }
 # endif
