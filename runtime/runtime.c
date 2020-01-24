@@ -18,7 +18,7 @@
 
 # define WORD_SIZE (CHAR_BIT * sizeof(int))
 
-/* # define DEBUG_PRINT 1 */
+# define DEBUG_PRINT 1
 
 /* GC pool structure and data; declared here in order to allow debug print */
 typedef struct {
@@ -81,9 +81,13 @@ static void failure (char *s, ...) {
   vfailure (s, args);
 }
 
-# define ASSERT_BOXED(memo, x)   do if (UNBOXED(x)) failure ("boxed value expected in %s\n", memo); while (0)
-# define ASSERT_UNBOXED(memo, x) do if (!UNBOXED(x)) failure ("unboxed value expected in %s\n", memo); while (0)
-# define ASSERT_STRING(memo, x)  do if (!UNBOXED(x) && TAG(TO_DATA(x)->tag) != STRING_TAG) failure ("sting value expected in %s\n", memo); while (0)
+# define ASSERT_BOXED(memo, x)               \
+  do if (UNBOXED(x)) failure ("boxed value expected in %s\n", memo); while (0)
+# define ASSERT_UNBOXED(memo, x)             \
+  do if (!UNBOXED(x)) failure ("unboxed value expected in %s\n", memo); while (0)
+# define ASSERT_STRING(memo, x)              \
+  do if (!UNBOXED(x) && TAG(TO_DATA(x)->tag) \
+	 != STRING_TAG) failure ("sting value expected in %s\n", memo); while (0)
 
 typedef struct {
   int tag; 
@@ -454,11 +458,13 @@ extern void* Lsubstring (void *subj, int p, int l) {
     return r->contents;    
   }
   
-  failure ("substring: index out of bounds (position=%d, length=%d, subject length=%d)", pp, ll, LEN(d->tag));
+  failure ("substring: index out of bounds (position=%d, length=%d, \
+            subject length=%d)", pp, ll, LEN(d->tag));
 }
 
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
-  struct re_pattern_buffer *b = (struct re_pattern_buffer*) malloc (sizeof (struct re_pattern_buffer));
+  struct re_pattern_buffer *b =
+    (struct re_pattern_buffer*) malloc (sizeof (struct re_pattern_buffer));
   int n = re_compile_pattern (regexp, strlen (regexp), b);
 
   if (n != 0) {
@@ -518,7 +524,8 @@ void *Lclone (void *p) {
 }
 
 # define HASH_DEPTH 3
-# define HASH_APPEND(acc, x) (((acc + (unsigned) x) << (WORD_SIZE / 2)) | ((acc + (unsigned) x) >> (WORD_SIZE / 2)))
+# define HASH_APPEND(acc, x) (((acc + (unsigned) x) << (WORD_SIZE / 2)) | \
+			      ((acc + (unsigned) x) >> (WORD_SIZE / 2)))
 
 int inner_hash (int depth, unsigned acc, void *p) {
   if (depth > HASH_DEPTH) return acc;
@@ -676,8 +683,7 @@ extern void* LmakeString (int length) {
   
   __pre_gc () ;
   
-  // r = (data*) alloc (n + 1 + sizeof (int));
-  r = (data*) alloc ((n) / sizeof(size_t) + 1 + 1);
+  r = (data*) alloc (n + 1 + sizeof (int));
 
   r->tag = STRING_TAG | (n << 3);
 
@@ -690,12 +696,12 @@ extern void* Bstring (void *p) {
   int   n = strlen (p);
   void *s;
   
-  //  __pre_gc ();
+  __pre_gc ();
   
   s = LmakeString (BOX(n));  
   strncpy (s, p, n + 1);
 
-  //  __post_gc ();
+  __post_gc ();
   
   return s;
 }
@@ -752,7 +758,7 @@ extern void* Bclosure (int n, void *entry, ...) {
   r->tag = CLOSURE_TAG | ((n + 1) << 3);
   ((void**) r->contents)[0] = entry;
   
-  va_start(args, entry); // n);
+  va_start(args, entry);
   
   for (i = 0; i<n; i++) {
     ai = va_arg(args, int);
@@ -946,7 +952,8 @@ extern void Lfailure (char *s, ...) {
 extern void Bmatch_failure (void *v, char *fname, int line, int col) {
   createStringBuf ();
   printValue (v);
-  failure ("match failure at %s:%d:%d, value '%s'\n", fname, line, col, stringBuf.contents);
+  failure ("match failure at %s:%d:%d, value '%s'\n",
+	   fname, line, col, stringBuf.contents);
 }
 
 extern void* /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
@@ -1164,8 +1171,8 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-// static size_t SPACE_SIZE = 32;
-static size_t SPACE_SIZE = 32 * 1024 * 100;
+static size_t SPACE_SIZE = 32;
+// static size_t SPACE_SIZE = 32 * 1024 * 100;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
@@ -1241,12 +1248,14 @@ static void copy_elements (size_t *where, size_t *from, int len) {
       p = gc_copy ((size_t*) elem);
       *where = p;
 #ifdef DEBUG_PRINT
-      printf ("copy_elements: fix element: %p -> %p\n", elem, *where); fflush (stdout);
+      printf ("copy_elements: fix element: %p -> %p\n", elem, *where);
+      fflush (stdout);
 #endif
       where ++;
     }
 #ifdef DEBUG_PRINT
-    printf ("copy_elements: iteration end: where = %p, *where = %p, i = %d, len = %d\n", where, *where, i, len); fflush (stdout);
+    printf ("copy_elements: iteration end: where = %p, *where = %p, i = %d, \
+             len = %d\n", where, *where, i, len); fflush (stdout);
 #endif
 
   }
@@ -1268,7 +1277,8 @@ static int extend_spaces (void) {
     return 1;
   }
 #ifdef DEBUG_PRINT
-  printf ("extend: %p %p %p %p\n", p, to_space.begin, to_space.end, current); fflush (stdout);
+  printf ("extend: %p %p %p %p\n", p, to_space.begin, to_space.end, current);
+  fflush (stdout);
 #endif
   to_space.end    += SPACE_SIZE;
   SPACE_SIZE      =  SPACE_SIZE << 1;
@@ -1298,7 +1308,8 @@ extern size_t * gc_copy (size_t *obj) {
 
   if (!IN_PASSIVE_SPACE(current) && current != to_space.end) {
 #ifdef DEBUG_PRINT
-    printf("ERROR: gc_copy: out-of-space %p %p %p\n", current, to_space.begin, to_space.end);
+    printf("ERROR: gc_copy: out-of-space %p %p %p\n",
+	   current, to_space.begin, to_space.end);
     fflush(stdout);
 #endif
     perror("ERROR: gc_copy: out-of-space\n");
@@ -1334,7 +1345,7 @@ extern size_t * gc_copy (size_t *obj) {
 #ifdef DEBUG_PRINT
       printf ("gc_copy:array_tag; len =  %zu\n", LEN(d->tag)); fflush (stdout);
 #endif
-      current += (LEN(d->tag) + 1) * sizeof (int);
+      current += ((LEN(d->tag) + 1) * sizeof (int) - 1) / sizeof (size_t) + 1;
       *copy = d->tag;
       copy++;
       i = LEN(d->tag);
@@ -1346,8 +1357,7 @@ extern size_t * gc_copy (size_t *obj) {
 #ifdef DEBUG_PRINT
       printf ("gc_copy:string_tag; len = %d\n", LEN(d->tag) + 1); fflush (stdout);
 #endif
-      // current += LEN(d->tag) * sizeof(char) + sizeof (int);
-      current += (LEN(d->tag) + sizeof(int)) / sizeof(int) + 1;
+      current += (LEN(d->tag) + sizeof(int)) / sizeof(size_t) + 1;
       *copy = d->tag;
       copy++;
       d->tag = (int) copy;
@@ -1361,11 +1371,12 @@ extern size_t * gc_copy (size_t *obj) {
       len1 = LEN(s->contents.tag);
       len2 = LEN(s->tag);
       len3 = LEN(d->tag);
-      printf ("gc_copy:sexp_tag; len1 = %li, len2=%li, len3 = %li\n", len1, len2, len3);
+      printf ("gc_copy:sexp_tag; len1 = %li, len2=%li, len3 = %li\n",
+	      len1, len2, len3);
       fflush (stdout);
 #endif
       i = LEN(s->contents.tag);
-      current += (i + 2) * sizeof (int);
+      current += i + 2;
       *copy = s->tag;
       copy++;
       *copy = d->tag;
@@ -1382,7 +1393,8 @@ extern size_t * gc_copy (size_t *obj) {
     exit (1);
   }
 #ifdef DEBUG_PRINT
-  printf ("gc_copy: %p(%p) -> %p (%p); new-current = %p\n", obj, objj, copy, newobjj, current);
+  printf ("gc_copy: %p(%p) -> %p (%p); new-current = %p\n",
+	  obj, objj, copy, newobjj, current);
   fflush (stdout);
 #endif
   return copy;
@@ -1391,7 +1403,8 @@ extern size_t * gc_copy (size_t *obj) {
 extern void gc_test_and_copy_root (size_t ** root) {
   if (IS_VALID_HEAP_POINTER(*root)) {
 #ifdef DEBUG_PRINT
-    printf ("gc_test_and_copy_root: root %p  *root %p\n", root, *root); fflush (stdout);
+    printf ("gc_test_and_copy_root: root %p  *root %p\n", root, *root);
+    fflush (stdout);
 #endif
     *root = gc_copy (*root);
   }
@@ -1425,7 +1438,8 @@ extern void init_pool (void) {
 static void * gc (size_t size) {
   current = to_space.begin;
 #ifdef DEBUG_PRINT
-  printf ("\ngc: current:%p; to_space.b =%p; to_space.e =%p; f_space.b = %p; f_space.e = %p\n",
+  printf ("\ngc: current:%p; to_space.b =%p; to_space.e =%p; \
+           f_space.b = %p; f_space.e = %p\n",
 	  current, to_space.begin, to_space.end, from_space.begin, from_space.end);
   fflush (stdout);
 #endif
@@ -1435,6 +1449,9 @@ static void * gc (size_t size) {
 #endif
   __gc_root_scan_stack ();
   if (!IN_PASSIVE_SPACE(current)) {
+    printf ("gc: ASSERT: !IN_PASSIVE_SPACE(current) to_begin = %p to_end = %p \
+             current = %p\n", to_space.begin, to_space.end, current);
+    fflush (stdout);
     perror ("ASSERT: !IN_PASSIVE_SPACE(current)\n");
     exit   (1);
   }
@@ -1460,7 +1477,8 @@ static void * gc (size_t size) {
   gc_swap_spaces ();
   from_space.current = current + size;
 #ifdef DEBUG_PRINT
-  printf ("gc: end: (allocate!) return %p; from_space.current %p; from_space.end %p \n\n",
+  printf ("gc: end: (allocate!) return %p; from_space.current %p; \
+           from_space.end %p \n\n",
 	  current, from_space.current, from_space.end);
   fflush (stdout);
 #endif
@@ -1488,8 +1506,7 @@ static void printFromSpace (void) {
 	      d->contents, d->contents,
 	      LEN(d->tag), LEN(d->tag) + 1 + sizeof(int));
       fflush (stdout);
-      len = (LEN(d->tag) + sizeof(int)) / sizeof(int) + 1;
-      cur += len;
+      len = (LEN(d->tag) - 1) / sizeof(size_t) + 2;
       break;
 
     case CLOSURE_TAG:
@@ -1503,7 +1520,6 @@ static void printFromSpace (void) {
       len += 1;
       printf ("\n");
       fflush (stdout);
-      cur += len * sizeof(int);
       break;
 
     case ARRAY_TAG:
@@ -1517,7 +1533,6 @@ static void printFromSpace (void) {
       len += 1;
       printf ("\n");
       fflush (stdout);
-      cur += len * sizeof(int);
       break;
 
     case SEXP_TAG:
@@ -1535,7 +1550,6 @@ static void printFromSpace (void) {
       len += 2;
       printf ("\n");
       fflush (stdout);
-      cur += len * sizeof(int);
       break;
 
     case 0:
@@ -1549,22 +1563,26 @@ static void printFromSpace (void) {
       fflush (stdout);
       exit   (1);
     }
-    // cur += len * sizeof(int);
+    cur += len;
     printf ("len = %zu, new cur = %p\n", len, cur);
     elem_number++;
   }
-  printf ("\nprintFromSpace: end: the whole space is printed: %zu elements\n===================\n\n", elem_number);
+  printf ("\nprintFromSpace: end: the whole space is printed:\
+            %zu elements\n===================\n\n", elem_number);
   fflush (stdout);
 }
 #endif
 
 #ifdef __ENABLE_GC__
+// alloc: allocates `size` bytes in heap
 extern void * alloc (size_t size) {
   void * p = (void*)BOX(NULL);
-  if (from_space.current + size < from_space.end) {
+  size = (size - 1) / sizeof(size_t) + 1; // convert bytes to words
 #ifdef DEBUG_PRINT
-    printf ("alloc: current: %p %zu", from_space.current, size); fflush (stdout);
+    printf ("alloc: current: %p %zu words!", from_space.current, size);
+    fflush (stdout);
 #endif
+  if (from_space.current + size < from_space.end) {
     p = (void*) from_space.current;
     from_space.current += size;
 #ifdef DEBUG_PRINT
