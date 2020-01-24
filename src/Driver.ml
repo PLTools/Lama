@@ -32,7 +32,7 @@ let parse cmd =
        ] s
      end
     )
-    (ostap (p:!(Language.parse cmd) -EOF))
+    (if cmd#is_workaround then ostap (p:!(Language.constparse cmd) -EOF) else ostap (p:!(Language.parse cmd) -EOF))
 
 exception Commandline_error of string
   
@@ -46,6 +46,9 @@ class options args =
     val infile = ref (None : string option)
     val paths  = ref [try Sys.getenv "RC_RUNTIME" with _ -> "../runtime"]
     val mode   = ref (`Default : [`Default | `Eval | `SM | `Compile ])
+    (* Workaround until Ostap starts to memoize properly *)
+    val const  = ref false
+    (* end of the workaround *)
     val dump   = ref 0
     val help   = ref false
     initializer
@@ -53,6 +56,9 @@ class options args =
         match self#peek with
         | Some opt ->
            (match opt with
+            (* Workaround until Ostap starts to memoize properly *)
+            | "-w"  -> self#set_workaround
+            (* end of the workaround *)
             | "-c"  -> self#set_mode `Compile
             | "-I"  -> (match self#peek with None -> raise (Commandline_error "path expected after '-I' specifier") | Some path -> self#add_include_path path)
             | "-s"  -> self#set_mode `SM
@@ -68,6 +74,11 @@ class options args =
            loop ()
         | None -> ()
       in loop ()
+    (* Workaround until Ostap starts to memoize properly *)
+    method is_workaround = !const   
+    method private set_workaround =
+      const := true
+    (* end of the workaround *)
     method private set_dump mask =
       dump := !dump lor mask
     method private set_infile name =

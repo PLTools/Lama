@@ -741,7 +741,23 @@ module Expr =
       | -"(" parse[def][infix][atr] -")"
     )
 
-    end
+    (* Workaround until Ostap starts to memoize properly *)
+    ostap (
+      constexpr:
+        n:DECIMAL                                          {Const n}
+      | s:STRING                                           {String s}
+      | c:CHAR                                             {Const (Char.code c)}      
+      | %"true"                                            {Const 1}
+      | %"false"                                           {Const 0}       
+      | "[" es:!(Util.list0)[constexpr] "]"                {Array es}
+      | "{" es:!(Util.list0)[constexpr] "}"                {match es with [] -> Const 0 | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0)}
+      | t:UIDENT args:(-"(" !(Util.list)[constexpr] -")")? {Sexp (t, match args with None -> [] | Some args -> args)}
+      | l:$ x:LIDENT                                       {Loc.attach x l#coord; Var x}
+      | -"(" constexpr -")"
+    )
+    (* end of the workaround *)
+
+  end
 
 (* Infix helpers *)
 module Infix =
@@ -885,7 +901,7 @@ module Infix =
 module Definition =
   struct
 
-    (* The type for a definition: aither a function/infix, or a local variable *)
+    (* The type for a definition: either a function/infix, or a local variable *)
     type t = string * [`Fun of string list * Expr.t | `Variable of Expr.t option]
 
     let unopt_mod = function None -> `Local | Some m -> m
@@ -910,6 +926,13 @@ module Definition =
           | `Ok infix' -> unopt_mod m, op, name, infix', true
           | `Fail msg  -> report_error ~loc:(Some l#coord) msg
       };
+      (* Workaround until Ostap starts to memoize properly *)
+      const_var: l:$ name:LIDENT "=" value:!(Expr.constexpr) {
+        Loc.attach name l#coord;
+        name, (`Public, `Variable (Some value))
+       };
+      constdef: %"public" d:!(Util.list (const_var)) ";" {d};
+      (* end of the workaround *)
       local_var[m][infix][expr][def]: l:$ name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {
         Loc.attach name l#coord;                                                                  
         match m, value with
@@ -1051,6 +1074,9 @@ ostap (
     in
     is, infix
   };
+  (* Workaround until Ostap starts to memoize properly *)
+  constparse[cmd]: <(is, infix)> : imports[cmd] d:!(Definition.constdef) {(is, []), Expr.Scope (d, Expr.Skip)};
+  (* end of the workaround *)
   parse[cmd]:
     <(is, infix)> : imports[cmd] <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Weak)? {
     (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
