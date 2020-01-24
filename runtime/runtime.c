@@ -18,7 +18,7 @@
 
 # define WORD_SIZE (CHAR_BIT * sizeof(int))
 
-# define DEBUG_PRINT 1
+/* # define DEBUG_PRINT 1 */
 
 /* GC pool structure and data; declared here in order to allow debug print */
 typedef struct {
@@ -1171,8 +1171,8 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-static size_t SPACE_SIZE = 32;
-// static size_t SPACE_SIZE = 32 * 1024 * 100;
+// static size_t SPACE_SIZE = 32;
+static size_t SPACE_SIZE = 32 * 1024 * 100;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
