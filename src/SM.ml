@@ -878,9 +878,9 @@ let compile cmd ((imports, infixes), p) =
   let lend, env       = env#get_label in
   let env, flag, code = compile_expr lend env p in
   let code            = if flag then code @ [LABEL lend] else code in
-  let has_main        = List.length code > 0 in
-  let env, prg        = compile_fundefs [if has_main then [LABEL "main"; BEGIN ("main", 0, env#nlocals, [])] @ code @ [END] else []] env in
-  let prg             = (if has_main then [PUBLIC "main"] else []) @ env#get_decls @ List.flatten prg in
+  let topname         = cmd#topname in
+  let env, prg        = compile_fundefs [[LABEL topname; BEGIN (topname, 0, env#nlocals, [])] @ code @ [END]] env in
+  let prg             = [PUBLIC topname] @ env#get_decls @ List.flatten prg in
   (*Printf.eprintf "Before propagating closures:\n";
   Printf.eprintf "%s\n%!" env#show_funinfo;
    *)

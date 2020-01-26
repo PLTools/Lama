@@ -104,7 +104,11 @@ class options args =
       | Some name -> name
     method get_help = !help
     method get_include_paths = !paths
-    method basename = Filename.chop_suffix self#get_infile ".expr"
+    method basename = Filename.chop_suffix (Filename.basename self#get_infile) ".expr"
+    method topname =
+      match !mode with
+      | `Compile -> "init" ^ self#basename
+      | _ -> "main"
     method dump_file ext contents =
       let name = self#basename in
       let outf = open_out (Printf.sprintf "%s.%s" name ext) in

@@ -372,7 +372,7 @@ module Expr =
     (* return statement           *) | Return    of t option
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
-    (* entering the scope         *) | Scope     of (string * decl) list * t
+    (* entering the scope         *) | Scope     of (string * decl) list * t 
     (* lambda expression          *) | Lambda    of string list * t
     (* leave a scope              *) | Leave
     (* intrinsic (for evaluation) *) | Intrinsic of (t config, t config) arrow
@@ -1075,11 +1075,11 @@ ostap (
     is, infix
   };
   (* Workaround until Ostap starts to memoize properly *)
-  constparse[cmd]: <(is, infix)> : imports[cmd] d:!(Definition.constdef) {(is, []), Expr.Scope (d, Expr.Skip)};
+  constparse[cmd]: <(is, infix)> : imports[cmd] d:!(Definition.constdef) {(is, []), Expr.Scope (d, Expr.materialize Expr.Weak Expr.Skip)};
   (* end of the workaround *)
   parse[cmd]:
     <(is, infix)> : imports[cmd] <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Weak)? {
-    (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.Skip | Some e -> e)
+    (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.materialize Expr.Weak Expr.Skip | Some e -> e)
     };
   definitions[infix]:
     <(def, infix')> : !(Definition.parse infix (fun def infix atr -> Expr.scope def infix atr (Expr.parse def))

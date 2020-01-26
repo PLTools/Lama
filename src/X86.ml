@@ -64,14 +64,15 @@ type instr =
 (* Instruction printer *)
 let show instr =
   let binop = function
-  | "+"   -> "addl"
-  | "-"   -> "subl"
-  | "*"   -> "imull"
-  | "&&"  -> "andl"
-  | "!!"  -> "orl"
-  | "^"   -> "xorl"
-  | "cmp" -> "cmpl"
-  | _     -> failwith "unknown binary operator"
+  | "+"    -> "addl"
+  | "-"    -> "subl"
+  | "*"    -> "imull"
+  | "&&"   -> "andl"
+  | "!!"   -> "orl"
+  | "^"    -> "xorl"
+  | "cmp"  -> "cmpl"
+  | "test" -> "test"
+  | _      -> failwith "unknown binary operator"
   in
   let rec opnd = function
   | R i      -> regs.(i)
@@ -116,7 +117,7 @@ open SM
    Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
    of x86 instructions
 *)
-let compile cmd env code =
+let compile cmd env imports code =
   (* SM.print_prg code; *)
   flush stdout;
   let suffix = function
@@ -356,6 +357,17 @@ let compile cmd env code =
              let has_closure = closure <> [] in
              let env  = env#enter f nlocals has_closure in
              env, (if has_closure then [Push edx] else []) @
+                  (if f = cmd#topname
+                   then
+                     [Mov   (M "_init", eax);
+                      Binop ("test", eax, eax);
+                      CJmp  ("z", "_continue");
+                      Ret;
+                      Label "_continue";
+                      Mov (L 1, M "_init");
+                     ]
+                   else []
+                  ) @                  
                   [Push ebp;
                    Mov (esp, ebp);
                    Binop ("-", M ("$" ^ env#lsize), esp);
@@ -364,7 +376,14 @@ let compile cmd env code =
 	           Mov (M ("$" ^ (env#allocated_size)), ecx);
 	           Repmovsl
                   ] @
-                  (if f = "main" then [Call "L__gc_init"] else [])   
+                  (if f = "main"
+                   then [Call "L__gc_init"]
+                   else []
+                  ) @
+                  (if f = cmd#topname
+                   then List.map (fun i -> Call ("init" ^ i)) (List.filter (fun i -> i <> "Std") imports)
+                   else []
+                  )    
 
           | END ->
              let x, env = env#pop in
@@ -646,11 +665,13 @@ class env prg =
 *)
 let genasm cmd prog =
   let sm        = SM.compile cmd prog in
-  let env, code = compile cmd (new env sm) sm in
+  let env, code = compile cmd (new env sm) (fst (fst prog)) sm in
   let globals =
     List.map (fun s -> Meta (Printf.sprintf "\t.globl\t%s" s)) env#publics
   in
-  let data = [Meta "\t.section custom_data,\"aw\",@progbits";
+  let data = [Meta "\t.data";
+              Meta "_init:\t.int 0";
+              Meta "\t.section custom_data,\"aw\",@progbits";
               Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size)] @
               (List.map (fun s -> Meta (Printf.sprintf "%s:\t.int\t1" s)) env#globals) @
               (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings)

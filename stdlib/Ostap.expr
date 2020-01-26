@@ -11,10 +11,6 @@ public fun initOstap () {
   hct := emptyMemo ()
 }
 
-public fun cleanupOstap () {
-  initOstap ()
-}
-
 public fun memo (f) {
   local t;
 
@@ -219,3 +215,5 @@ public fun parseString (p, s) {
 
   acc.result
 }
+
+initOstap ()

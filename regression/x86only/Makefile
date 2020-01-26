@@ -1,5 +1,5 @@
 TESTS=$(sort $(basename $(wildcard test*.expr)))
-LIBS=$(sort $(basename $(wildcard Lib*.expr)).o)
+LIBS=$(patsubst %.expr,%.o, $(sort $(wildcard Lib*.expr)))
 
 RC=../../src/rc.opt
 

@@ -12,7 +12,9 @@ Collection.o: List.o Ref.o
 
 Array.o: List.o
 
-Ostap.o: List.o Collection.o Ref.o Fun.o
+Ostap.o: List.o Collection.o Ref.o Fun.o Matcher.o
+
+Expr.o: Ostap.o
 
 %.o: %.expr
 	$(RC) -I . -c $<

@@ -482,10 +482,9 @@ extern int LregexpMatch (struct re_pattern_buffer *b, char *s, int pos) {
   return BOX (re_match (b, s, LEN(TO_DATA(s)->tag), UNBOX(pos), 0));
 }
 
-extern void* Bstring (void*);
-
 void *Lclone (void *p) {
   data *res;
+  int n;
   
   __pre_gc ();
   
@@ -496,7 +495,11 @@ void *Lclone (void *p) {
 
     switch (t) {
     case STRING_TAG:
-      res = Bstring (a->contents);
+      n = strlen (a->contents);      
+      res = (data*) alloc (n + 1 + sizeof (int));
+      res->tag = STRING_TAG | (n << 3);
+      strncpy (res->contents, a->contents, n + 1);
+      res = res->contents;
       break;
 
     case ARRAY_TAG:      
@@ -679,7 +682,7 @@ extern void* LmakeString (int length) {
   int   n = UNBOX(length);
   data *r;
 
-  ASSERT_UNBOXED("makeStrig", length);
+  ASSERT_UNBOXED("makeString", length);
   
   __pre_gc () ;
   
@@ -694,21 +697,24 @@ extern void* LmakeString (int length) {
 
 extern void* Bstring (void *p) {
   int   n = strlen (p);
-  void *s;
+  data *s;
   
   __pre_gc ();
   
-  s = LmakeString (BOX(n));  
-  strncpy (s, p, n + 1);
+  s = (data*) alloc (n + 1 + sizeof (int));
+  s->tag = STRING_TAG | (n << 3);
+
+  strncpy (s->contents, p, n + 1);
 
   __post_gc ();
   
-  return s;
+  return s->contents;
 }
 
 extern void* Lstringcat (void *p) {
-  void *s;
-
+  data *s;
+  int n;
+  
   ASSERT_BOXED("stringcat", p);
   
   __pre_gc ();
@@ -716,30 +722,41 @@ extern void* Lstringcat (void *p) {
   createStringBuf ();
   stringcat (p);
 
-  s = Bstring (stringBuf.contents);
+  n = strlen (stringBuf.contents);
+  
+  s = (data*) alloc (n + 1 + sizeof (int));
+  s->tag = STRING_TAG | (n << 3);
+
+  strncpy (s->contents, stringBuf.contents, n + 1);
   
   deleteStringBuf ();
 
   __post_gc ();
 
-  return s;  
+  return s->contents;  
 }
 
 extern void* Bstringval (void *p) {
-  void *s = (void *) BOX (NULL);
+  data *s;
+  int n;
 
   __pre_gc () ;
   
   createStringBuf ();
   printValue (p);
 
-  s = Bstring (stringBuf.contents);
+  n = strlen (stringBuf.contents);
+  
+  s = (data*) alloc (n + 1 + sizeof (int));
+  s->tag = STRING_TAG | (n << 3);
+
+  strncpy (s->contents, stringBuf.contents, n + 1);
   
   deleteStringBuf ();
 
   __post_gc ();
 
-  return s;
+  return s->contents;
 }
 
 extern void* Bclosure (int n, void *entry, ...) {
@@ -985,7 +1002,8 @@ extern void* /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
 
 extern void* Lsprintf (char * fmt, ...) {
   va_list args;
-  void *s;
+  data *s;
+  int n;
 
   ASSERT_STRING("sprintf:1", fmt);
   
@@ -998,13 +1016,17 @@ extern void* Lsprintf (char * fmt, ...) {
 
   __pre_gc ();
 
-  s = Bstring (stringBuf.contents);
+  n = strlen (stringBuf.contents);
+  s = (data*) alloc (n + 1 + sizeof (int));
+  s->tag = STRING_TAG | (n << 3);
+
+  strncpy (s->contents, stringBuf.contents, n + 1);
 
   __post_gc ();
   
   deleteStringBuf ();
 
-  return s;
+  return s->contents;
 }
 
 extern void Lfprintf (FILE *f, char *s, ...) {
@@ -1060,10 +1082,21 @@ extern void* LreadLine () {
   char *buf;
 
   if (scanf ("%m[^\n]", &buf) == 1) {
-    void * s = Bstring (buf);
+    data * s;
+    int n = strlen (buf);
+
+    __pre_gc ();
+  
+    s = (data*) alloc (n + 1 + sizeof (int));
+    s->tag = STRING_TAG | (n << 3);
+
+    strncpy (s->contents, buf, n + 1);
+
+    __post_gc ();
     
     free (buf);
-    return s;
+    
+    return s->contents;
   }
   
   if (errno != 0)
