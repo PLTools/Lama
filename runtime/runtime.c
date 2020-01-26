@@ -102,6 +102,35 @@ typedef struct {
 extern void* alloc (size_t);
 extern void* Bsexp (int n, ...);
 
+void *global_sysargs;
+
+void set_args (int argc, char *argv[]) {
+  data *a;
+  int n = argc;
+  int i;
+  
+  __pre_gc ();
+
+  a = (data*) alloc (sizeof(int) * (n+1));
+  a->tag = ARRAY_TAG | (n << 3);
+
+  for (i=0; i<n; i++) {
+    data *s;
+    int k = strlen (argv[i]);
+    
+    s = (data*) alloc (k + 1 + sizeof (int));
+    s->tag = STRING_TAG | (k << 3);
+
+    strncpy (s->contents, argv[i], k + 1);
+
+    ((int*)a->contents)[i] = s->contents;
+  }
+  
+  __post_gc ();
+
+  global_sysargs = a->contents;
+}
+
 // Functional synonym for built-in operator ":";
 void* Ls__Infix_58 (void *p, void *q) {
   void *res;
