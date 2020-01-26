@@ -1,0 +1,73 @@
+import Ostap;
+import List;
+import Fun;
+
+--- ops -> fun (x, y) {x `op` y}
+fun altl (ps) {
+  case ps of
+    p : ps -> foldl (infix |, p, ps)
+  esac
+}
+
+public fun expr (ops, opnd) {
+  fun inner (ops) {
+    case ops of
+      {}         -> opnd
+    | level : tl ->
+        local lops = altl (level),
+              next = inner (tl);
+        
+        fun this (k) {
+           next |> fun (l) {lops |> fun (op) {this @ fun (r) {op (l, r)}}}
+         | next
+         $ k
+        }
+
+        this
+    esac  
+  }
+
+  inner (ops)
+}
+
+(*
+Just some memo from OCaml's Ostap. Will be removed when done.
+
+let left  f c x a y = f (c x) a y
+    let right f c x a y = c (f x a y)
+
+fun expr (ops, opnd, atr) {
+}
+
+
+    ops = [is_nona, (atrs, alt_parser at the level),
+           ...
+          ]
+    let expr f ops opnd atr =
+      let ops =
+        Array.map
+          (fun (assoc, (atrs, list)) ->
+            let g = match assoc with `Lefta | `Nona -> left | `Righta -> right in
+            assoc = `Nona, (atrs, altl (List.map (fun (oper, sema) -> ostap (!(oper) {g sema})) list))
+          )
+          ops
+      in
+      let atrr i atr = snd (fst (snd ops.(i)) atr) in
+      let atrl i atr = fst (fst (snd ops.(i)) atr) in
+      let n      = Array.length ops  in
+      let op   i = snd (snd ops.(i)) in
+      let nona i = fst ops.(i)      in
+      let id   x = x                in
+      let ostap (
+        inner[l][c][atr]: f[ostap (
+          {n = l                } => x:opnd[atr] {c x}
+        | {n > l && not (nona l)} => (-x:inner[l+1][id][atrl l atr] -o:op[l] y:inner[l][o c x atr][atrr l atr] |
+                                       x:inner[l+1][id][atr] {c x})
+        | {n > l && nona l} => (x:inner[l+1][id][atrl l atr] o:op[l] y:inner[l+1][id][atrr l atr] {c (o id x atr y)} |
+                                x:inner[l+1][id][atr] {c x})
+          )]
+      )
+      in
+      ostap (inner[0][id][atr])d
+
+*)
