@@ -1047,7 +1047,7 @@ let eval (_, expr) i =
 
 (* Top-level parser *)
 ostap (
-  imports[cmd]: l:$ is:(%"import" !(Util.list)[ostap (UIDENT)]) -";")* {
+  imports[cmd]: l:$ is:(%"import" !(Util.list [ostap (UIDENT)]) -";")* {
     let is    = "Std" :: List.flatten is in
     let infix =
       List.fold_left
