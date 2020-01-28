@@ -513,7 +513,7 @@ void *Lclone (void *p) {
 #ifdef DEBUG_PRINT
       printf ("Lclone: string\n"); fflush (stdout);
 #endif
-      res = Bstring (a->contents);
+      res = Bstring (TO_DATA(p)->contents);
       break;
 
     case ARRAY_TAG:      
@@ -522,7 +522,7 @@ void *Lclone (void *p) {
       printf ("Lclone: closure or array\n"); fflush (stdout);
 #endif
       res = (data*) alloc (sizeof(int) * (l+1));
-      memcpy (res, a, sizeof(int) * (l+1));
+      memcpy (res, TO_DATA(p), sizeof(int) * (l+1));
       res = res->contents;
       break;
       
