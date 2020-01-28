@@ -511,17 +511,22 @@ void *Lclone (void *p) {
     switch (t) {
     case STRING_TAG:
 #ifdef DEBUG_PRINT
-      printf ("Lclone: string\n"); fflush (stdout);
+      printf ("Lclone: string1 %p %p\n", &p, p); fflush (stdout);
 #endif
       res = Bstring (TO_DATA(p)->contents);
-      break;
+#ifdef DEBUG_PRINT
+      printf ("Lclone: string2 %p %p\n", &p, p); fflush (stdout);
+#endif      break;
 
     case ARRAY_TAG:      
     case CLOSURE_TAG:
 #ifdef DEBUG_PRINT
-      printf ("Lclone: closure or array\n"); fflush (stdout);
+      printf ("Lclone: closure or array %p %p\n", &p, p); fflush (stdout);
 #endif
+      
+      SET_EXTRA_ROOT (&p);
       res = (data*) alloc (sizeof(int) * (l+1));
+      CLEAR_EXTRA_ROOT;
       memcpy (res, TO_DATA(p), sizeof(int) * (l+1));
       res = res->contents;
       break;
@@ -726,7 +731,7 @@ extern void* Bstring (void *p) {
   
   __pre_gc ();
 #ifdef DEBUG_PRINT
-  printf ("Bstring: call LmakeString %p %p %i\n", p, s, n); fflush(stdout);
+  printf ("Bstring: call LmakeString %s %p %p %i\n", p, p, s, n); fflush(stdout);
 #endif
   SET_EXTRA_ROOT (&p);
   s = LmakeString (BOX(n));  
@@ -1195,13 +1200,26 @@ extern void set_args (int argc, char *argv[]) {
   
   __pre_gc ();
 
+#ifdef DEBUG_PRINT
+  printf ("set_args: call: n = %i %p %p\n", n, &p, p); fflush(stdout);
+#endif
+
   p = LmakeArray (BOX(n));
   SET_EXTRA_ROOT (&p);
   
-  for (i=0; i<n; i++) {    
+  for (i=0; i<n; i++) {
+#ifdef DEBUG_PRINT
+    printf ("set_args: iteration %i %p %p ->\n", i, &p, p); fflush(stdout);
+#endif
     ((int*)p) [i] = Bstring (argv[i]);
+#ifdef DEBUG_PRINT
+    printf ("set_args: iteration %i <- %p %p\n", i, &p, p); fflush(stdout);
+#endif
   }
-  
+#ifdef DEBUG_PRINT
+  printf ("set_args: end\n", n, &p, p); fflush(stdout);
+#endif
+
   __post_gc ();
 
   global_sysargs = p;
@@ -1392,7 +1410,7 @@ extern size_t * gc_copy (size_t *obj) {
       printf ("gc_copy:closure_tag; len =  %zu\n", LEN(d->tag)); fflush (stdout);
 #endif
       i = LEN(d->tag);
-      current += (LEN(d->tag) + 1) * sizeof (int);
+      current += LEN(d->tag) + 1;
       *copy = d->tag;
       copy++;
       d->tag = (int) copy;
@@ -1466,6 +1484,10 @@ extern void gc_test_and_copy_root (size_t ** root) {
 #endif
     *root = gc_copy (*root);
   }
+#ifdef DEBUG_PRINT
+    printf ("gc_test_and_copy_root: INVALID HEAP POINTER root %p  *root %p\n", root, *root);
+    fflush (stdout);
+#endif
 }
 
 extern void gc_root_scan_data (void) {
