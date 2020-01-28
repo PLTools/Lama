@@ -498,7 +498,9 @@ extern void* Bstring (void*);
 void *Lclone (void *p) {
   data *res;
   int n;
-  
+#ifdef DEBUG_PRINT
+  printf ("Lclone arg: %p %p\n", &p, p); fflush (stdout);
+#endif
   __pre_gc ();
   
   if (UNBOXED(p)) return p;
@@ -508,17 +510,26 @@ void *Lclone (void *p) {
 
     switch (t) {
     case STRING_TAG:
+#ifdef DEBUG_PRINT
+      printf ("Lclone: string\n"); fflush (stdout);
+#endif
       res = Bstring (a->contents);
       break;
 
     case ARRAY_TAG:      
     case CLOSURE_TAG:
+#ifdef DEBUG_PRINT
+      printf ("Lclone: closure or array\n"); fflush (stdout);
+#endif
       res = (data*) alloc (sizeof(int) * (l+1));
       memcpy (res, a, sizeof(int) * (l+1));
       res = res->contents;
       break;
       
     case SEXP_TAG:
+#ifdef DEBUG_PRINT
+      printf ("Lclone: sexp\n"); fflush (stdout);
+#endif
       res = (sexp*) alloc (sizeof(int) * (l+2));
       memcpy (res, TO_SEXP(p), sizeof(int) * (l+2));
       res = res->contents;
@@ -528,10 +539,15 @@ void *Lclone (void *p) {
     default:
       failure ("invalid tag %d in clone *****\n", t);
     }
-  }  
+  }
+#ifdef DEBUG_PRINT
+  printf ("Lclone ends1\n"); fflush (stdout);
+#endif
 
   __post_gc ();
-
+#ifdef DEBUG_PRINT
+  printf ("Lclone ends2\n"); fflush (stdout);
+#endif
   return res;
 }
 
@@ -706,15 +722,25 @@ extern void* LmakeString (int length) {
 
 extern void* Bstring (void *p) {
   int   n = strlen (p);
-  data *s;
+  data *s = NULL;
   
   __pre_gc ();
-
+#ifdef DEBUG_PRINT
+  printf ("Bstring: call LmakeString %p %p %i\n", p, s, n); fflush(stdout);
+#endif
+  SET_EXTRA_ROOT (&p);
   s = LmakeString (BOX(n));  
+#ifdef DEBUG_PRINT
+  printf ("Bstring: call strncpy: %p %p %i\n", p, s, n); fflush(stdout);
+#endif
   strncpy (s, p, n + 1);
+#ifdef DEBUG_PRINT
+  printf ("Bstring: ends\n"); fflush(stdout);
+#endif
 
   __post_gc ();
   
+  CLEAR_EXTRA_ROOT;
   return s;
 }
 
@@ -1164,20 +1190,21 @@ extern int Lwrite (int n) {
 
 extern void set_args (int argc, char *argv[]) {
   data *a;
-  int n = argc;
+  int n = argc, *p = NULL;
   int i;
   
   __pre_gc ();
 
-  SET_EXTRA_ROOT (LmakeArray (BOX(n)));
+  p = LmakeArray (BOX(n));
+  SET_EXTRA_ROOT (&p);
   
   for (i=0; i<n; i++) {    
-    ((int*)EXTRA_ROOT) [i] = Bstring (argv[i]);
+    ((int*)p) [i] = Bstring (argv[i]);
   }
   
   __post_gc ();
 
-  global_sysargs = EXTRA_ROOT;
+  global_sysargs = p;
   CLEAR_EXTRA_ROOT;
 }
 
@@ -1202,8 +1229,8 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-// static size_t SPACE_SIZE = 32;
-static size_t SPACE_SIZE = 32 * 1024 * 100;
+static size_t SPACE_SIZE = 16;
+// static size_t SPACE_SIZE = 32 * 1024 * 100;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
@@ -1466,7 +1493,7 @@ extern void init_pool (void) {
   to_space.size      = NULL;
 }
 
-static void * gc (size_t size) {
+static void* gc (size_t size) {
   current = to_space.begin;
 #ifdef DEBUG_PRINT
   printf ("\ngc: current:%p; to_space.b =%p; to_space.e =%p; \
@@ -1479,6 +1506,8 @@ static void * gc (size_t size) {
   printf ("gc: data is scanned\n"); fflush (stdout);
 #endif
   __gc_root_scan_stack ();
+  if (EXTRA_ROOT != BOX(0))
+    gc_test_and_copy_root (EXTRA_ROOT);
   if (!IN_PASSIVE_SPACE(current)) {
     printf ("gc: ASSERT: !IN_PASSIVE_SPACE(current) to_begin = %p to_end = %p \
              current = %p\n", to_space.begin, to_space.end, current);
@@ -1626,8 +1655,8 @@ extern void * alloc (size_t size) {
   printf ("alloc: call gc: %zu\n", size); fflush (stdout);
   printFromSpace(); fflush (stdout);
   p = gc (size);
-  printf("gc END %p %p %p\n\n", from_space.begin,
-	 from_space.end, from_space.current); fflush (stdout);
+  printf("gc END %p %p %p %p\n\n", from_space.begin,
+	 from_space.end, from_space.current, p); fflush (stdout);
   printFromSpace(); fflush (stdout);
   return p;
 #else
