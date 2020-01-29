@@ -69,11 +69,54 @@ void __post_gc_subst () {}
 # define BOX(x)      ((((int) (x)) << 1) | 0x0001)
 
 /* GC extra roots */
-static void *extra_root = BOX(0);
+#define MAX_EXTRA_ROOTS_NUMBER 16
+typedef struct {
+  int current_free;
+  int n;
+  size_t * roots;
+} extra_roots_pool;
 
-# define CLEAR_EXTRA_ROOT  do extra_root = BOX(0); while (0)
-# define SET_EXTRA_ROOT(n) do extra_root = n; while (0)
-# define EXTRA_ROOT        extra_root
+static extra_roots_pool extra_roots;
+
+void clear_extra_roots (void) {
+  extra_roots.current_free = 0;
+}
+
+void push_extra_root (size_t * p) {
+#ifdef DEBUG_PRINT
+  printf ("push_extra_root %p %p\n", p, &p); fflush (stdout);
+#endif
+  if (extra_roots.current_free >= extra_roots.n) {
+    perror ("ERROR: push_extra_roots: extra_roots_pool overflow");
+    exit   (1);
+  }
+  extra_roots.roots[extra_roots.current_free] = p;
+  extra_roots.current_free++;
+}
+
+void pop_extra_root (size_t * p) {
+#ifdef DEBUG_PRINT
+  printf ("pop_extra_root %p %p\n", p, &p); fflush (stdout);
+#endif
+  if (extra_roots.current_free == 0) {
+    perror ("ERROR: pop_extra_root: extra_roots are empty");
+    exit   (1);
+  }
+  extra_roots.current_free--;
+  if (extra_roots.roots[extra_roots.current_free] != p) {
+#ifdef DEBUG_PRINT
+    printf ("%i %p %p", extra_roots.current_free,
+	    extra_roots.roots[extra_roots.current_free], p);
+    fflush (stdout);
+#endif
+    perror ("ERROR: pop_extra_root: stack invariant violation");
+    exit   (1);
+  }
+}
+
+/* # define CLEAR_EXTRA_ROOT  do extra_root = BOX(0); while (0) */
+/* # define SET_EXTRA_ROOT(n) do extra_root = n; while (0) */
+/* # define EXTRA_ROOT        extra_root */
 
 /* end */
 
@@ -508,6 +551,7 @@ void *Lclone (void *p) {
     data *a = TO_DATA(p);
     int t   = TAG(a->tag), l = LEN(a->tag);
 
+    push_extra_root (&p);
     switch (t) {
     case STRING_TAG:
 #ifdef DEBUG_PRINT
@@ -523,10 +567,7 @@ void *Lclone (void *p) {
 #ifdef DEBUG_PRINT
       printf ("Lclone: closure or array %p %p\n", &p, p); fflush (stdout);
 #endif
-      
-      SET_EXTRA_ROOT (&p);
       res = (data*) alloc (sizeof(int) * (l+1));
-      CLEAR_EXTRA_ROOT;
       memcpy (res, TO_DATA(p), sizeof(int) * (l+1));
       res = res->contents;
       break;
@@ -544,6 +585,7 @@ void *Lclone (void *p) {
     default:
       failure ("invalid tag %d in clone *****\n", t);
     }
+    pop_extra_root (&p);
   }
 #ifdef DEBUG_PRINT
   printf ("Lclone ends1\n"); fflush (stdout);
@@ -731,21 +773,21 @@ extern void* Bstring (void *p) {
   
   __pre_gc ();
 #ifdef DEBUG_PRINT
-  printf ("Bstring: call LmakeString %s %p %p %i\n", p, p, s, n); fflush(stdout);
+  printf ("Bstring: call LmakeString %s %p %p %p %i\n", p, &p, p, s, n);
+  fflush(stdout);
 #endif
-  SET_EXTRA_ROOT (&p);
+  push_extra_root (&p);
   s = LmakeString (BOX(n));  
+  pop_extra_root(&p);
 #ifdef DEBUG_PRINT
-  printf ("Bstring: call strncpy: %p %p %i\n", p, s, n); fflush(stdout);
+  printf ("Bstring: call strncpy: %p %p %p %i\n", &p, p, s, n); fflush(stdout);
 #endif
   strncpy (s, p, n + 1);
 #ifdef DEBUG_PRINT
   printf ("Bstring: ends\n"); fflush(stdout);
 #endif
-
   __post_gc ();
   
-  CLEAR_EXTRA_ROOT;
   return s;
 }
 
@@ -1202,10 +1244,13 @@ extern void set_args (int argc, char *argv[]) {
 
 #ifdef DEBUG_PRINT
   printf ("set_args: call: n = %i %p %p\n", n, &p, p); fflush(stdout);
+  for (i = 0; i<n;i++)
+    printf("%s ", argv[i]);
+  printf("EE\n\n");
 #endif
 
   p = LmakeArray (BOX(n));
-  SET_EXTRA_ROOT (&p);
+  push_extra_root (&p);
   
   for (i=0; i<n; i++) {
 #ifdef DEBUG_PRINT
@@ -1219,11 +1264,10 @@ extern void set_args (int argc, char *argv[]) {
 #ifdef DEBUG_PRINT
   printf ("set_args: end\n", n, &p, p); fflush(stdout);
 #endif
-
+  pop_extra_root (&p);
   __post_gc ();
 
   global_sysargs = p;
-  CLEAR_EXTRA_ROOT;
 }
 
 /* GC starts here */
@@ -1484,10 +1528,10 @@ extern void gc_test_and_copy_root (size_t ** root) {
 #endif
     *root = gc_copy (*root);
   }
-#ifdef DEBUG_PRINT
-    printf ("gc_test_and_copy_root: INVALID HEAP POINTER root %p  *root %p\n", root, *root);
-    fflush (stdout);
-#endif
+/* #ifdef DEBUG_PRINT */
+/*   printf ("gc_test_and_copy_root: INVALID HEAP POINTER root %p  *root %p\n", root, *root); */
+/*   fflush (stdout); */
+/* #endif */
 }
 
 extern void gc_root_scan_data (void) {
@@ -1496,6 +1540,12 @@ extern void gc_root_scan_data (void) {
     gc_test_and_copy_root (p);
     p++;
   }
+}
+
+static void init_extra_roots (void) {
+  extra_roots.current_free = 0;
+  extra_roots.n = MAX_EXTRA_ROOTS_NUMBER;
+  extra_roots.roots = (size_t*) malloc (sizeof(size_t) * MAX_EXTRA_ROOTS_NUMBER);
 }
 
 extern void init_pool (void) {
@@ -1513,6 +1563,7 @@ extern void init_pool (void) {
   to_space.current   = NULL;
   to_space.end       = NULL;
   to_space.size      = NULL;
+  init_extra_roots ();
 }
 
 static void* gc (size_t size) {
@@ -1528,8 +1579,28 @@ static void* gc (size_t size) {
   printf ("gc: data is scanned\n"); fflush (stdout);
 #endif
   __gc_root_scan_stack ();
-  if (EXTRA_ROOT != BOX(0))
-    gc_test_and_copy_root (EXTRA_ROOT);
+/*   if (EXTRA_ROOT != BOX(0)) { */
+/* #ifdef DEBUG_PRINT */
+/*     printf ("gc: EXTRA ROOT %p %p\n", EXTRA_ROOT, (int**)EXTRA_ROOT); fflush (stdout); */
+/* #endif */
+/*     gc_test_and_copy_root (EXTRA_ROOT); */
+/*   } else { */
+/* #ifdef DEBUG_PRINT */
+/*     printf ("gc: NO EXTRA ROOT\n"); fflush (stdout); */
+/* #endif */
+/*   } */
+  for (int i = 0; i < extra_roots.current_free; i++) {
+#ifdef DEBUG_PRINT
+    printf ("gc: extra_root № %i: %p %p\n", i, extra_roots.roots[i],
+	    (size_t*) extra_roots.roots[i]);
+    fflush (stdout);
+#endif
+    gc_test_and_copy_root (extra_roots.roots[i]);
+  }
+#ifdef DEBUG_PRINT
+  printf ("gc: no more extra roots\n"); fflush (stdout);
+#endif
+
   if (!IN_PASSIVE_SPACE(current)) {
     printf ("gc: ASSERT: !IN_PASSIVE_SPACE(current) to_begin = %p to_end = %p \
              current = %p\n", to_space.begin, to_space.end, current);
