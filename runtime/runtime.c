@@ -1263,6 +1263,7 @@ extern void set_args (int argc, char *argv[]) {
   __post_gc ();
 
   global_sysargs = p;
+  push_extra_root (&global_sysargs);
 }
 
 /* GC starts here */
