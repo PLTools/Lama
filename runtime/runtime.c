@@ -69,11 +69,10 @@ void __post_gc_subst () {}
 # define BOX(x)      ((((int) (x)) << 1) | 0x0001)
 
 /* GC extra roots */
-#define MAX_EXTRA_ROOTS_NUMBER 16
+#define MAX_EXTRA_ROOTS_NUMBER 4
 typedef struct {
   int current_free;
-  int n;
-  size_t * roots;
+  size_t roots[MAX_EXTRA_ROOTS_NUMBER];
 } extra_roots_pool;
 
 static extra_roots_pool extra_roots;
@@ -86,7 +85,7 @@ void push_extra_root (size_t * p) {
 #ifdef DEBUG_PRINT
   printf ("push_extra_root %p %p\n", p, &p); fflush (stdout);
 #endif
-  if (extra_roots.current_free >= extra_roots.n) {
+  if (extra_roots.current_free >= MAX_EXTRA_ROOTS_NUMBER) {
     perror ("ERROR: push_extra_roots: extra_roots_pool overflow");
     exit   (1);
   }
@@ -113,10 +112,6 @@ void pop_extra_root (size_t * p) {
     exit   (1);
   }
 }
-
-/* # define CLEAR_EXTRA_ROOT  do extra_root = BOX(0); while (0) */
-/* # define SET_EXTRA_ROOT(n) do extra_root = n; while (0) */
-/* # define EXTRA_ROOT        extra_root */
 
 /* end */
 
@@ -1542,10 +1537,8 @@ extern void gc_root_scan_data (void) {
   }
 }
 
-static void init_extra_roots (void) {
+static inline void init_extra_roots (void) {
   extra_roots.current_free = 0;
-  extra_roots.n = MAX_EXTRA_ROOTS_NUMBER;
-  extra_roots.roots = (size_t*) malloc (sizeof(size_t) * MAX_EXTRA_ROOTS_NUMBER);
 }
 
 extern void init_pool (void) {
