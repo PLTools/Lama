@@ -1,0 +1,28 @@
+import Ostap;
+import Expr;
+import Fun;
+import List;
+
+local a   = token ("a") @ lift(fun (a) {if a then "a" else "b" fi}),
+      eq  = [token ("="), fun (l, r) {fun (a) {Eq  (l (a), r (a))}}], 
+      add = [token ("+"), fun (l, r) {fun (a) {Add (l (a), r (a))}}],
+      sub = [token ("-"), fun (l, r) {fun (a) {Sub (l (a), r (a))}}],
+      mul = [token ("*"), fun (l, r) {fun (a) {Mul (l (a), r (a))}}],
+      div = [token ("/"), fun (l, r) {fun (a) {Div (l (a), r (a))}}],      
+      exp = expr ({[Nona, singleton (eq)], [Right, {add, sub}], [Left, {mul, div}]}, a) (id);
+
+fun unpack (x, y) {
+  case x of
+    Fail (_) -> x
+  | Succ (z) -> Succ (z (y))
+  esac
+}
+
+printf ("%s\n", unpack (parseString (exp |> bypass (eof), "a=a"), true).string);
+printf ("%s\n", unpack (parseString (exp |> bypass (eof), "a=a"), false).string); 
+
+printf ("%s\n", unpack (parseString (exp |> bypass (eof), "a*a=a*a"), true).string);
+printf ("%s\n", unpack (parseString (exp |> bypass (eof), "a*a=a*a"), false).string);
+
+printf ("%s\n", unpack (parseString (exp |> bypass (eof), "a*a+a/a-a*a=a*a-a"), true).string);
+printf ("%s\n", unpack (parseString (exp |> bypass (eof), "a*a+a/a-a*a=a*a-a"), false).string)
