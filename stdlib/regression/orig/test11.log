@@ -1,6 +1,6 @@
 Succ ("a")
 Succ (Add ("a", "a"))
 Succ (Sub ("a", "a"))
-Succ (Add ("a", Sub ("a", "a")))
+Succ (Sub (Add ("a", "a"), "a"))
 Succ (Add ("a", Mul ("a", "a")))
 Succ (Sub (Mul ("a", "a"), Div ("a", "a")))

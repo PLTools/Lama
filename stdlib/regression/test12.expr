@@ -1,0 +1,20 @@
+import Ostap;
+import Expr;
+import Fun;
+
+fun gen (depth) {
+  if depth == 0
+  then "a"
+  else gen (depth-1) ++ "*" ++ gen (depth-1)
+  fi    
+}
+
+local a   = token ("a"),
+      add = [token ("+"), fun (l, r) {Add (l, r)}],
+      sub = [token ("-"), fun (l, r) {Sub (l, r)}],
+      mul = [token ("*"), fun (l, r) {Mul (l, r)}],
+      div = [token ("/"), fun (l, r) {Div (l, r)}],      
+      exp = expr ({[left, {add, sub}], [left, {mul, div}]}, a) (id),
+      i;
+
+printf ("%s\n", parseString (exp |> bypass (eof), gen (10)).string)

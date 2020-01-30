@@ -1162,7 +1162,7 @@ extern void* Lfread (char *fname) {
   if (f) {
     if (fseek (f, 0l, SEEK_END) >= 0) {
       long size = ftell (f);
-      void *s   = LmakeString (size);
+      void *s   = LmakeString (BOX(size));
       
       rewind (f);
 
@@ -1287,8 +1287,7 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-static size_t SPACE_SIZE = 16;
-// static size_t SPACE_SIZE = 32 * 1024 * 100;
+static size_t SPACE_SIZE = 16 * 1024;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 

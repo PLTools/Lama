@@ -4,7 +4,11 @@ import Ref;
 import Fun;
 import Matcher;
 
-local tab, hct;
+local tab, hct, log = false;
+
+public fun logOn () {
+  log := true
+}
 
 public fun initOstap () {
   tab := ref (emptyHashTab ());
@@ -16,21 +20,22 @@ public fun memo (f) {
 
   f := lookupMemo (hct, f);
   
-  --printf ("Memoizing: %x=%s\n", f, f.string);
+  if log then printf ("Memoizing: %x=%s\n", f, f.string) fi;
   
   case findHashTab (deref (tab), f) of
-    None      -> t := ref (emptyMap ()); tab ::= addHashTab (deref (tab), f, t)
+    None      -> if log then printf ("new table...\n") fi; t := ref (emptyMap ()); tab ::= addHashTab (deref (tab), f, t)
   | Some (tt) -> t := tt
   esac;
   
   fun (k) {
     fun (s) {
-      -- printf ("s=%s\n", s.string);
+      local t = case findHashTab (deref (tab), f) of Some (t) -> t esac;
+      if log then printf ("Applying memoized parser to %s\n", s.string) fi;
       case findMap (deref (t), s) of
         None  ->
           t ::= addMap (deref (t), s, [addSet (emptySet (), k), emptySet ()]);
           f (fun (r) {
-               -- printf ("Result: %s\n", r.string);
+               if log then printf ("Running continuation with result %s\n", r.string) fi;
                case findMap (deref (t), s) of
                  Some ([ks, rs]) ->
                    if memSet (rs, r)
@@ -72,6 +77,7 @@ public fun empty (k) {
 public fun alt (a, b) {
   fun (k) {
     fun (s) {
+      if log then printf ("Running alt at %s\n", s.string) fi;
       a (k) (s);
       b (k) (s)
     }
@@ -81,11 +87,12 @@ public fun alt (a, b) {
 public fun seq (a, b) {
   fun (k) {
     fun (s) {
+      if log then printf ("Running seq at %s\n", s.string) fi;
       a (fun (ar) {
-           case ar of             
-             Succ (x, s) -> b (x) (k) (s)
-           | _           -> k (ar)
-           esac
+                  case ar of             
+                    Succ (x, s) -> b (x) (k) (s)
+                  | _           -> k (ar)
+                  esac
          }) (s)
     }
   }
@@ -116,11 +123,13 @@ public fun bypass (f) {
 public fun opt (a) {empty @ lift (None) | a @ fun (x) {Some (x)}}
 
 public fun rep0 (a) {
-  memo (empty @ lift({}) | a |> fun (x) {rep0 (a) @ fun (as) {x : as}})
+  --memo
+  (empty @ lift({}) | a |> fun (x) {rep0 (a) @ fun (as) {x : as}})
 }
 
 public fun rep (a) {
-  memo (a |> (fun (x) {rep0 (a) @ fun (as) {x : as}}))
+  --memo
+  (a |> (fun (x) {rep0 (a) @ fun (as) {x : as}}))
 }
 
 public fun listBy (item, sep) {
@@ -185,7 +194,7 @@ fun createResult () {
   fun get () {
     if   deref (hasValue) then Succ (deref (value))
     elif deref (hasError) then Fail (deref (errors), deref (line), deref (col))
-    else failure ("Ostap::createAcceptor::get: nothing to return")
+    else failure ("Ostap::createAcceptor::get: nothing to return\n")
     fi
   }
 
