@@ -4,27 +4,27 @@ import Ref;
 import Fun;
 import Matcher;
 
-local tab, hct, log = false;
+local tab, hct, restab, log = false;
 
 public fun logOn () {
   log := true
 }
 
 public fun initOstap () {
-  tab := ref (emptyHashTab ());
-  hct := emptyMemo ()
+  tab    := ref (emptyHashTab ());
+  restab := emptyMemo ();
+  hct    := emptyMemo ()
 }
 
 public fun memo (f) {
-  local t;
-
   f := lookupMemo (hct, f);
   
   if log then printf ("Memoizing: %x=%s\n", f, f.string) fi;
   
   case findHashTab (deref (tab), f) of
-    None      -> if log then printf ("new table...\n") fi; t := ref (emptyMap ()); tab ::= addHashTab (deref (tab), f, t)
-  | Some (tt) -> t := tt
+    None      -> if log then printf ("new table...\n") fi;
+                 tab ::= addHashTab (deref (tab), f, ref (emptyMap ()))
+  | Some (tt) -> skip
   esac;
   
   fun (k) {
@@ -35,6 +35,7 @@ public fun memo (f) {
         None  ->
           t ::= addMap (deref (t), s, [addSet (emptySet (), k), emptySet ()]);
           f (fun (r) {
+               r := lookupMemo (restab, r);
                if log then printf ("Running continuation with result %s\n", r.string) fi;
                case findMap (deref (t), s) of
                  Some ([ks, rs]) ->

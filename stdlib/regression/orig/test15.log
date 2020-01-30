@@ -1,0 +1,4 @@
+Succ (Eq ("a", "a"))
+Succ (Eq (Mul ("a", "a"), Mul ("a", "a")))
+Succ (Eq (Add (Mul ("a", "a"), Sub (Div ("a", "a"), Mul ("a", "a"))), Sub (Mul ("a", "a"), "a")))
+Fail ({""*" expected at"}, 1, 2)

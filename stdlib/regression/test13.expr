@@ -1,0 +1,14 @@
+import Ostap;
+import Expr;
+import Fun;
+
+local a   = token ("a"),
+      add = [token ("+"), fun (l, r) {Add (l, r)}],
+      sub = [token ("-"), fun (l, r) {Sub (l, r)}],
+      mul = [token ("*"), fun (l, r) {Mul (l, r)}],
+      div = [token ("/"), fun (l, r) {Div (l, r)}],      
+      exp = expr ({[Right, {add, sub}], [Left, {mul, div}]}, a) (id);
+
+printf ("%s\n", parseString (exp |> bypass (eof), "a+a-a").string);
+printf ("%s\n", parseString (exp |> bypass (eof), "a*a/a*a").string);
+printf ("%s\n", parseString (exp |> bypass (eof), "a*a+a/a-a*a").string)

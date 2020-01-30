@@ -7,7 +7,7 @@ local a   = token ("a"),
       sub = [token ("-"), fun (l, r) {Sub (l, r)}],
       mul = [token ("*"), fun (l, r) {Mul (l, r)}],
       div = [token ("/"), fun (l, r) {Div (l, r)}],      
-      exp = expr ({[left, {add, sub}], [left, {mul, div}]}, a) (id);
+      exp = expr ({[Left, {add, sub}], [Left, {mul, div}]}, a) (id);
 
 printf ("%s\n", parseString (exp |> bypass (eof), "a").string);
 printf ("%s\n", parseString (exp |> bypass (eof), "a+a").string);

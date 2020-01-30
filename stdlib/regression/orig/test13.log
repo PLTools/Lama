@@ -1,0 +1,3 @@
+Succ (Add ("a", Sub ("a", "a")))
+Succ (Mul (Div (Mul ("a", "a"), "a"), "a"))
+Succ (Add (Mul ("a", "a"), Sub (Div ("a", "a"), Mul ("a", "a"))))

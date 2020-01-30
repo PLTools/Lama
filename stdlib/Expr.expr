@@ -22,9 +22,10 @@ public fun right (f) {
 fun altl (level) {
   case level of
     [assoc, ps] ->
+       local assfun = case assoc of Left -> left | Right -> right | Nona -> left esac;
        case map (fun (p) {
                    case p of
-                     [op, sema] -> op @ lift(assoc (sema))
+                     [op, sema] -> op @ lift(assfun (sema))
                    esac
                  }, ps) of
          p : ps -> foldl (infix |, p, ps)
@@ -39,14 +40,24 @@ public fun expr (ops, opnd) {
     | level : tl ->
         local lops = altl (level),
               next = inner (tl);
-        
-        fun this (c) {
-           next (id) |> fun (l) {lops |> fun (op) {this (op (c, l))}}
-         | next (id) @ c
-         -- $ k
-        }
 
-        this
+        case level.fst of
+          Nona ->
+           fun this (c) {
+             next (id) |> fun (l) {lops |> fun (op) {next (id) @ fun (r) {c (op)(id, l)(r)}}}
+           | next (id) @ c
+           }
+
+           this
+
+        | _    ->
+           fun this (c) {
+             next (id) |> fun (l) {lops |> fun (op) {this (op (c, l))}}
+           | next (id) @ c
+           }
+
+           this
+        esac
     esac  
   }
 
