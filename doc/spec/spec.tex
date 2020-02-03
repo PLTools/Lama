@@ -1,4 +1,4 @@
-\documentclass{article}
+\documentclass{book}
 
 \usepackage{amssymb, amsmath}
 \usepackage{alltt}
@@ -26,6 +26,8 @@
 \usepackage{subcaption}
 \usepackage{placeins}
 \usepackage{xspace}
+\usepackage{ostap}
+\usepackage{bm}
 
 \makeatletter
 
@@ -77,6 +79,13 @@
 \definecolor{light-gray}{gray}{0.90}
 \newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
 
+\newcommand{\defterm}[1]{\textit{#1}}
+\newcommand{\nonterm}[1]{\textit{#1}}
+\newcommand{\term}[1]{\graybox{#1}}
+\newcommand{\token}[1]{\textsc{#1}}
+\newcommand{\alt}{\s\mid\s}
+\newcommand{\s}{\:\:}
+
 \lstdefinelanguage{lama}{
 keywords={fun, case, esac, do, od, if, then, else, elif, fi, skip, repeat, until, for, local},
 sensitive=true,
@@ -113,8 +122,8 @@ language=lama
 
 \maketitle
 
-\input{01.general_characteristic}
-\input{02.notation}
-\input{03.values}
+\input{01.introduction}
+\input{02.abstract_syntax_and_semantics}
+\input{03.concrete_syntax}
 
 \end{document}
