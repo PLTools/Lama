@@ -86,30 +86,32 @@
 \newcommand{\alt}{\s\mid\s}
 \newcommand{\s}{\:\:}
 
-\lstdefinelanguage{lama}{
-keywords={fun, case, esac, do, od, if, then, else, elif, fi, skip, repeat, until, for, local},
+\lstdefinelanguage{alm}{
+keywords={skip,if,then,else,elif,fi,while,do,od,repeat,until,for,fun,local,public,return,import,length,
+string,case,of,esac,when,boxed,unboxed,string,sexp,array,infix,infixl,infixr,at,before,after,true,false},
 sensitive=true,
-%basicstyle=\small,
-commentstyle=\scriptsize\rmfamily,
+basicstyle=\small,
+%commentstyle=\scriptsize\rmfamily,
 keywordstyle=\ttfamily\bfseries,
 identifierstyle=\ttfamily,
 basewidth={0.5em,0.5em},
 columns=fixed,
 fontadjust=true,
 literate={->}{{$\to$}}3,
-morecomment=[s]{(*}{*)}
+morecomment=[s][\ttfamily]{(*}{*)},
+morecomment=[l][\ttfamily]{--}
 }
 
 \lstset{
 mathescape=true,
-%basicstyle=\small,
+basicstyle=\small,
 identifierstyle=\ttfamily,
 keywordstyle=\bfseries,
 commentstyle=\scriptsize\rmfamily,
 basewidth={0.5em,0.5em},
 fontadjust=true,
 escapechar=!,
-language=lama
+language=alm
 }
 
 \sloppy

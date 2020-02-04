@@ -1,71 +1,26 @@
 \chapter{Concrete Syntax}
 
-\begin{figure}[t]
-  \[
-    \begin{array}{rcl}
-      \defterm{compilationUnit}  & : & \nonterm{import}^\star\s\nonterm{scopeExpression}\\
-      \defterm{import}           & : & \term{import}\s\token{UIDENT}\s\term{;}
-    \end{array}
-  \]
-  \caption{Compilation unit concrete syntax}
-\end{figure}
+In this chapter we describe the concrete syntax of the language as it is recognized by the parser. In the
+syntactic description we will use extended Backus-Naur form with the following conventions:
 
-\begin{figure}[t]
-  \[
-    \begin{array}{rcll}
-      \defterm{expression}        & : & \nonterm{basicExpression}\s(\s\term{;}\s\nonterm{expression}\s)&\\
-      \defterm{basicExpression}   & : & \nonterm{binaryExpression}&\\
-      \defterm{binaryExpression}  & : & \nonterm{binaryOperand}\s\token{INFIX}\s\nonterm{binaryOperand}&\alt\\
-                                  &   & \nonterm{binaryOperand}&\\
-      \defterm{binaryOperand}     & : & \nonterm{binaryExpression}&\alt\\
-                                  &   & [\s\term{-}\s]\s\nonterm{postfixExpression}&\\
-      \defterm{postfixExpression} & : & \nonterm{primary}&\alt\\
-                                  &   & \nonterm{postfixExpression}\s\term{(}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\s\term{)}&\alt\\
-                                  &   & \nonterm{postfixExpression}\s\term{[}\s\nonterm{expression}\s\term{]}&\alt\\
-                                  &   & \nonterm{postfixExpression}\s\term{.}\s\term{length}&\alt\\
-                                  &   & \nonterm{postfixExpression}\s\term{.}\s\term{string}&\\      
+\begin{itemize}
+\item nonterminals are presented in \nonterm{italics};
+\item concrete terminals are \term{grayed out};
+\item classes of terminals are \token{CAPITALIZED};
+\item a postfix ``$^\star$'' designates zero-or-more repetitions;
+\item square brackets ``$[\dots]$'' designate zero-or-one repetition;
+\item round brackets ``$(\dots)$'' are used for grouping;
+\item alteration is denoted by ``$\alt$'', sequencing by juxaposition;
+\item a colon ``$:$'' separates a nonterminal being defined from its definition.
+\end{itemize}
 
-      \defterm{primary}           & : & \token{DECIMAL}&\alt\\
-                                  &   & \token{STRING}&\alt\\
-                                  &   & \token{CHAR}&\alt\\
-                                  &   & \token{LIDENT}&\alt\\
-                                  &   & \term{true}&\alt\\
-                                  &   & \term{false}&\alt\\
-                                  &   & \term{infix}\s\token{INFIX}&\alt\\
-                                  &   & \term{skip}&\alt\\
-                                  &   & \term{fun}\s\term{(}\s\nonterm{functionArguments}\s\term{)}\s\nonterm{functionBody}&\alt\\
-                                  &   & \term{\{}\s\nonterm{scopeExpression}\s\term{\}}&\alt\\
-                                  &   & \nonterm{listExpression}&\alt\\
-                                  &   & \nonterm{arrayExpression}&\alt\\
-                                  &   & \nonterm{S-expression}&\alt\\
-                                  &   & \nonterm{ifExpression}&\alt\\
-                                  &   & \nonterm{whileExpression}&\alt\\
-                                  &   & \nonterm{repeatExpression}&\alt\\
-                                  &   & \nonterm{forExpression}&\alt\\
-                                  &   & \nonterm{caseExpression}&\alt\\
-                                  &   & \term{(}\s\nonterm{expression}\s\term{)}&
-    \end{array}
-  \]
-  \caption{Expression concrete syntax}
-\end{figure}
+In the description below we will take an in-line code samples in blockquotes "..." which are not considered as a
+part of concrete syntax.
 
-
-\begin{figure}[t]
-  \[
-    \begin{array}{rcl}
-      \defterm{scopeExpression}                & : & \nonterm{definition}^\star\s\nonterm{expression}\\
-      \defterm{definition}                     & : & \nonterm{variableDefinition}\alt\nonterm{functionDefinition}\alt\nonterm{infixDefinition}\\
-      \defterm{variableDefinition}             & : & (\s\term{local}\alt\term{public}\s)\s\nonterm{variableDefinitionSequence}\s\term{;}\\
-      \defterm{variableDefinitionSequence}     & : & \nonterm{variableDefinitionSequenceItem}\s(\s\term{,}\s\nonterm{variableDefinitionSequenceItem}\s)^\star\\
-      \defterm{variableDefinitionSequenceItem} & : & \token{LIDENT}\s[\s\term{=}\s\nonterm{basicExpression}\s]\\
-      \defterm{functionDefinition}             & : & [\s\term{public}\s]\s\term{fun}\s\token{LIDENT}\s\term{(}\s\nonterm{functionArguments}\s\term{)}\s\nonterm{functionBody}\\
-      \defterm{functionArguments}              & : & [\s\token{LIDENT}\s(\s\term{,}\s\token{LIDENT}\s)^\star\s]\\
-      \defterm{functionBody}                   & : & \term{\{}\s\nonterm{scopeExpression}\s\term{\}}
-    \end{array}
-  \]
-  \caption{Scope expression concrete syntax}
-\end{figure}
-
+\input{03.01.lexical_structure}
+\input{03.02.compilation_units}
+\input{03.03.scope_expressions}
+\input{03.04.expressions}
 
 \begin{figure}[t]
   \[

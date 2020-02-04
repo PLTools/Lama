@@ -1,0 +1,45 @@
+\begin{figure}[t]
+  \[
+    \begin{array}{rcll}
+      \defterm{expression}        & : & \nonterm{basicExpression}\s(\s\term{;}\s\nonterm{expression}\s)&\\
+      \defterm{basicExpression}   & : & \nonterm{binaryExpression}&\\
+      \defterm{binaryExpression}  & : & \nonterm{binaryOperand}\s\token{INFIX}\s\nonterm{binaryOperand}&\alt\\
+                                  &   & \nonterm{binaryOperand}&\\
+      \defterm{binaryOperand}     & : & \nonterm{binaryExpression}&\alt\\
+                                  &   & [\s\term{-}\s]\s\nonterm{postfixExpression}&\\
+      \defterm{postfixExpression} & : & \nonterm{primary}&\alt\\
+                                  &   & \nonterm{postfixExpression}\s\term{(}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\s\term{)}&\alt\\
+                                  &   & \nonterm{postfixExpression}\s\term{[}\s\nonterm{expression}\s\term{]}&\alt\\
+                                  &   & \nonterm{postfixExpression}\s\term{.}\s\term{length}&\alt\\
+                                  &   & \nonterm{postfixExpression}\s\term{.}\s\term{string}&\\      
+      \defterm{primary}           & : & \token{DECIMAL}&\alt\\
+                                  &   & \token{STRING}&\alt\\
+                                  &   & \token{CHAR}&\alt\\
+                                  &   & \token{LIDENT}&\alt\\
+                                  &   & \term{true}&\alt\\
+                                  &   & \term{false}&\alt\\
+                                  &   & \term{infix}\s\token{INFIX}&\alt\\
+                                  &   & \term{skip}&\alt\\
+                                  &   & \term{return}\s[\s\nonterm{basicExpression}\s]&\alt\\
+                                  &   & \term{fun}\s\term{(}\s\nonterm{functionArguments}\s\term{)}\s\nonterm{functionBody}&\alt\\
+                                  &   & \term{\{}\s\nonterm{scopeExpression}\s\term{\}}&\alt\\
+                                  &   & \nonterm{listExpression}&\alt\\
+                                  &   & \nonterm{arrayExpression}&\alt\\
+                                  &   & \nonterm{S-expression}&\alt\\
+                                  &   & \nonterm{ifExpression}&\alt\\
+                                  &   & \nonterm{whileExpression}&\alt\\
+                                  &   & \nonterm{repeatExpression}&\alt\\
+                                  &   & \nonterm{forExpression}&\alt\\
+                                  &   & \nonterm{caseExpression}&\alt\\
+                                  &   & \term{(}\s\nonterm{expression}\s\term{)}&
+    \end{array}
+  \]
+  \caption{Expression concrete syntax}
+  \label{expressions}
+\end{figure}
+
+\section{Expressions}
+\label{sec:expressions}
+
+Expressions 
+

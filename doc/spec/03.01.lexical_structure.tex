@@ -1,0 +1,110 @@
+\section{Lexical Structure}
+
+The character set for the language is \textsc{ASCII}, case-sensitive. In the following lexical description we will use
+the GNU Regexp syntax~\cite{GNULib} in lexical definitions.
+
+\subsection{Whitespaces and Comments}
+
+Whitespaces and comments are \textsc{ASCII} sequences which serve as delimiters for other tokens but otherwise are
+ignored.
+
+The following characters are treated as whitespaces:
+
+\begin{itemize}
+\item blank character "\texttt{ }";
+\item newline character "\texttt{\textbackslash n}";
+\item tabulation character "\texttt{\textbackslash t}".
+\end{itemize}
+
+Additionally, two kinds of comments are recognized:
+
+\begin{itemize}
+\item end-of-line comment "\texttt{--}" escapes the rest of the line, including itself;
+\item block comment "\texttt{(*} ... \texttt{*)}" escapes all the text between
+  "\texttt{(*}" and "\texttt{*)}".
+\end{itemize}
+
+There is a number of specific cases which have to be considered explicitly.
+
+First, block comments can be properly nested. Then, the occurencies of comment symbols inside string literals (see below) do not
+considered as comments.
+
+End-of-line comment encountered \emph{outside} of a block comment escapes block comment symbols:
+
+\begin{lstlisting}
+    -- the following symbols are not considered as a block comment: (*
+    -- same here: *)
+\end{lstlisting}
+
+Similarly, an end-of-line comment encountered inside a block comment is escaped:
+
+\begin{lstlisting}
+    (* Block comment starts here ...
+       -- and ends here: *)
+\end{lstlisting}
+
+\subsection{Identifiers and Constants}
+
+The language distinguishes identifiers, signed decimal literals, string and character literals (see Fig.~\ref{idents_and_consts}). There are
+two kinds of identifiers: those beginning with uppercase characters (\token{UIDENT}) and lowercase characters (\token{LIDENT}).
+
+String literals cannot span multiple lines; a blockquote character (") inside a string literal has to be doubled to prevent from
+being considered as this literal's delimiter.
+
+Character literals as a rule are comprised of a single \textsc{ASCII} character; if this character is a quote (') it has to be doubled. Additionally
+two-character abbreviations "\textbackslash t" and "\textbackslash n" are recognized and converted into a single-character representation.
+
+\begin{figure}[t]
+  \[
+  \begin{array}{rcl}
+    \token{UIDENT} & = &\mbox{\texttt{[A-Z][a-zA-Z\_0-9]*}}\\
+    \token{LIDENT} & = &\mbox{\texttt{[a-z][a-zA-Z\_0-9]*}}\\
+    \token{DECIMAL}& = &\mbox{\texttt{-?[0-9]+}}\\
+    \token{STRING} & = &\mbox{\texttt{"([\^{}\textbackslash"]|"")*"}}\\
+    \token{CHAR}   & = &\mbox{\texttt{'([\^{}']|''|\textbackslash n|\textbackslash t)'}}
+  \end{array}
+  \]
+  \caption{Identifiers and constants}
+  \label{idents_and_consts}
+\end{figure}
+
+
+\subsection{Keywords}
+
+The following identifiers are reserved for keywords:
+
+\begin{lstlisting}
+    after   array   at      before  boxed   case    do      elif    else
+    esac    false   fi      for     fun     if      import  infix   infixl
+    infixr  length  local   od      of      public  repeat  return  sexp
+    skip    string  string  then    true    unboxed until   when    while
+\end{lstlisting}
+
+\subsection{Infix Operators}
+
+Infix operators defined as follows:
+
+\[
+\token{INFIX}=\mbox{\texttt{[+*/\%\$\#@!|\&\^{}~?<>:=\textbackslash-]+}}
+\]
+
+There is a predefined set of built-in infix operators (see~\ref{binary_expressions}); additionally
+an end-used can define custom infix operators (see~\ref{custom_infix}). Note, sometimes 
+additional whitespaces are required to disambiguate infix operator applications. For example, if a
+custom infix operator "\lstinline|+-|" is defined, then the expression "\lstinline|a +- b|" can no longer be
+considered as "\lstinline|a +(-b)|". Note also that a custom operator "\lstinline|--|" can not be
+defined due to lexical conventions.
+
+\subsection{Delimiters}
+
+The following symbols are treated as delimiters:
+
+\begin{lstlisting}
+    .       ,         (        )        {        }
+    ;       #         ->
+\end{lstlisting}
+
+Despite custom infix operators can coincide with delimiters "\lstinline|#|" and "\lstinline|->|" they can
+never clash as both these delimiters can not be encountered in expressions.
+
+
