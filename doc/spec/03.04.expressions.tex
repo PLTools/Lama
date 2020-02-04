@@ -41,5 +41,83 @@
 \section{Expressions}
 \label{sec:expressions}
 
-Expressions 
+The syntax definition for expressions is shown on Fig.~\ref{expressions}. The top-level construct is \emph{sequential composition}, expressed
+using right-associative conective "\term{;}". The basic blocks of sequential composition have the form of \nonterm{binaryExpression}, which is
+a composition of infix operators and operands. The description above is given in a highly ambiguous form as it does not specify explicitly the
+precedence and associativity of infix operators. The precedences and associativity of predefined built-in infix operators are shown
+on Fig.~\ref{builtin_infixes} with the precedence level increasing top-to-bottom.
+
+Apart from assignment and list constructor all other built-in infix operators operate on signed integers; in conjunction and disjunction
+any non-zero value is treated as truth and zero as falsity, and the result respects this convention.
+
+The assignment operator is unique among all others in the sense that it requires its left operand to designate a \emph{reference}. This
+property is syntactically ensured using an inference system shown on Fig.~\ref{reference_inference}; here $\mathcal{R}\,(e)$ designates the
+property ``$e$ is a reference''. The result of assignment operator coincides with its right operand, thus
+
+\begin{lstlisting}
+    x := y := 3
+\end{lstlisting}
+
+assigns 3 to both "\lstinline|x|" and "\lstinline|y|".
+
+There are four postfix forms of expressions:
+
+\begin{itemize}
+\item function call, designated as postfix form "\lstinline|($arg_1, \dots, arg_k$)|";
+\item array element selection, designated as "\lstinline|[$index$]|";
+\item built-in primitive "\lstinline|.string|", returning the string representation of the value;
+\item built-in primitive "\lstinline|.length|", returning the length of boxed value.
+\end{itemize}
+
+Multiple postfixes are allowed, for example
+
+\begin{lstlisting}
+    x () [3] (1, 2, 3) . string
+    x . string [4]
+    x . length . string
+    x . string . length
+\end{lstlisting}
+
+The basic form of expression is \nonterm{primary}.
+
+Some other examples with comments:
+
+\begin{tabular}{ll}
+  "\lstinline|x !! y && z + 3|" & is equivalent to "\lstinline|x !! (y && (z + 3))|"\\
+  "\lstinline|x == y < 4|"      & invalid \\
+  "\lstinline|x [y := 8] := 6|" & is equivalent to "\lstinline|y := 8; x [8] := 6|"\\
+  "\lstinline|(write (3); x) := (write (4); z)|" & is equivalent to "\lstinline|write (3); write (4); x := z|"
+\end{tabular}
+
+
+\begin{figure}
+  \begin{tabular}{c|l|l}
+    infix operator(s) & description & associativity \\
+    \hline
+    \lstinline|:=|                                                                                & assignment                         & right-associative \\
+    \lstinline|:|                                                                                 & list constructor                   & right-associative \\
+    \lstinline|!!|                                                                                & disjunction                        & left-associative  \\
+    \lstinline|&&|                                                                                & conjunction                        & left-associative  \\
+    \lstinline|==|, \lstinline|!=|,  \lstinline|<=|, \lstinline|<|, \lstinline|>=|, \lstinline|>| & integer comparisons                & non-associative   \\
+    \lstinline|+|, \lstinline|-|                                                                  & addition, subtraction              & left-associative  \\
+    \lstinline|*|, \lstinline|/|, \lstinline|%|                                                   & multiplication, quotent, remainder & left-associative
+  \end{tabular}
+\caption{The precedence and associativity of built-in infix operators}
+\label{builtin_infixes}
+\end{figure}
+
+\begin{figure}
+  \newcommand{\Ref}[1]{\mathcal{R}\,({#1})}
+  \renewcommand{\arraystretch}{4}
+  \[
+    \begin{array}{cc}
+      \Ref{x},\,x\;\mbox{is a variable}&\dfrac{\Ref{e}}{\Ref{\lstinline|$e$ [$\dots$]|}}\\
+      \dfrac{\Ref{e_i}}{\Ref{\mbox{\lstinline|if $\dots$ then $\;e_1\;$ else $\;e_2\;$ fi|}}} & \dfrac{\Ref{e_i}}{\Ref{\mbox{\lstinline|case $\dots$ of $\;\dots\;$ -> $\;e_1\;\dots\;\dots\;$ -> $\;e_k\;$ esac|}}}\\
+      \multicolumn{2}{c}{\dfrac{\Ref{e}}{\Ref{\lstinline|$\dots\;$;$\;e$|}}}
+    \end{array}
+  \]
+  \caption{Reference inference system}
+  \label{reference_inference}
+\end{figure}
+
 

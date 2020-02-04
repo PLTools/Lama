@@ -1,4 +1,5 @@
 \section{Lexical Structure}
+\label{sec:lexical_structure}
 
 The character set for the language is \textsc{ASCII}, case-sensitive. In the following lexical description we will use
 the GNU Regexp syntax~\cite{GNULib} in lexical definitions.
@@ -26,7 +27,7 @@ Additionally, two kinds of comments are recognized:
 
 There is a number of specific cases which have to be considered explicitly.
 
-First, block comments can be properly nested. Then, the occurencies of comment symbols inside string literals (see below) do not
+First, block comments can be properly nested. Then, the occurencies of comment symbols inside string literals (see below) are not
 considered as comments.
 
 End-of-line comment encountered \emph{outside} of a block comment escapes block comment symbols:
@@ -92,7 +93,7 @@ There is a predefined set of built-in infix operators (see~\ref{binary_expressio
 an end-used can define custom infix operators (see~\ref{custom_infix}). Note, sometimes 
 additional whitespaces are required to disambiguate infix operator applications. For example, if a
 custom infix operator "\lstinline|+-|" is defined, then the expression "\lstinline|a +- b|" can no longer be
-considered as "\lstinline|a +(-b)|". Note also that a custom operator "\lstinline|--|" can not be
+considered as "\lstinline|a +(-b)|". Note also that a custom operator containing "\lstinline|--|" can not be
 defined due to lexical conventions.
 
 \subsection{Delimiters}
@@ -105,6 +106,6 @@ The following symbols are treated as delimiters:
 \end{lstlisting}
 
 Despite custom infix operators can coincide with delimiters "\lstinline|#|" and "\lstinline|->|" they can
-never clash as both these delimiters can not be encountered in expressions.
+never clash as neither of these delimiters can be encountered in expressions in infix operator position.
 
 
