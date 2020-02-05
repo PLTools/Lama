@@ -19,9 +19,9 @@
                                   &   & \term{true}&\alt\\
                                   &   & \term{false}&\alt\\
                                   &   & \term{infix}\s\token{INFIX}&\alt\\
-                                  &   & \term{skip}&\alt\\
-                                  &   & \term{return}\s[\s\nonterm{basicExpression}\s]&\alt\\
                                   &   & \term{fun}\s\term{(}\s\nonterm{functionArguments}\s\term{)}\s\nonterm{functionBody}&\alt\\
+                                  &   & \term{skip}&\alt\\
+                                  &   & \term{return}\s[\s\nonterm{basicExpression}\s]&\alt\\                                 
                                   &   & \term{\{}\s\nonterm{scopeExpression}\s\term{\}}&\alt\\
                                   &   & \nonterm{listExpression}&\alt\\
                                   &   & \nonterm{arrayExpression}&\alt\\
@@ -40,55 +40,6 @@
 
 \section{Expressions}
 \label{sec:expressions}
-
-The syntax definition for expressions is shown on Fig.~\ref{expressions}. The top-level construct is \emph{sequential composition}, expressed
-using right-associative conective "\term{;}". The basic blocks of sequential composition have the form of \nonterm{binaryExpression}, which is
-a composition of infix operators and operands. The description above is given in a highly ambiguous form as it does not specify explicitly the
-precedence and associativity of infix operators. The precedences and associativity of predefined built-in infix operators are shown
-on Fig.~\ref{builtin_infixes} with the precedence level increasing top-to-bottom.
-
-Apart from assignment and list constructor all other built-in infix operators operate on signed integers; in conjunction and disjunction
-any non-zero value is treated as truth and zero as falsity, and the result respects this convention.
-
-The assignment operator is unique among all others in the sense that it requires its left operand to designate a \emph{reference}. This
-property is syntactically ensured using an inference system shown on Fig.~\ref{reference_inference}; here $\mathcal{R}\,(e)$ designates the
-property ``$e$ is a reference''. The result of assignment operator coincides with its right operand, thus
-
-\begin{lstlisting}
-    x := y := 3
-\end{lstlisting}
-
-assigns 3 to both "\lstinline|x|" and "\lstinline|y|".
-
-There are four postfix forms of expressions:
-
-\begin{itemize}
-\item function call, designated as postfix form "\lstinline|($arg_1, \dots, arg_k$)|";
-\item array element selection, designated as "\lstinline|[$index$]|";
-\item built-in primitive "\lstinline|.string|", returning the string representation of the value;
-\item built-in primitive "\lstinline|.length|", returning the length of boxed value.
-\end{itemize}
-
-Multiple postfixes are allowed, for example
-
-\begin{lstlisting}
-    x () [3] (1, 2, 3) . string
-    x . string [4]
-    x . length . string
-    x . string . length
-\end{lstlisting}
-
-The basic form of expression is \nonterm{primary}.
-
-Some other examples with comments:
-
-\begin{tabular}{ll}
-  "\lstinline|x !! y && z + 3|" & is equivalent to "\lstinline|x !! (y && (z + 3))|"\\
-  "\lstinline|x == y < 4|"      & invalid \\
-  "\lstinline|x [y := 8] := 6|" & is equivalent to "\lstinline|y := 8; x [8] := 6|"\\
-  "\lstinline|(write (3); x) := (write (4); z)|" & is equivalent to "\lstinline|write (3); write (4); x := z|"
-\end{tabular}
-
 
 \begin{figure}
   \begin{tabular}{c|l|l}
@@ -119,5 +70,213 @@ Some other examples with comments:
   \caption{Reference inference system}
   \label{reference_inference}
 \end{figure}
+
+The syntax definition for expressions is shown on Fig.~\ref{expressions}. The top-level construct is \emph{sequential composition}, expressed
+using right-associative conective "\term{;}". The basic blocks of sequential composition have the form of \nonterm{binaryExpression}, which is
+a composition of infix operators and operands. The description above is given in a highly ambiguous form as it does not specify explicitly the
+precedence and associativity of infix operators. The precedences and associativity of predefined built-in infix operators are shown
+on Fig.~\ref{builtin_infixes} with the precedence level increasing top-to-bottom.
+
+Apart from assignment and list constructor all other built-in infix operators operate on signed integers; in conjunction and disjunction
+any non-zero value is treated as truth and zero as falsity, and the result respects this convention.
+
+The assignment operator is unique among all others in the sense that it requires its left operand to designate a \emph{reference}. This
+property is syntactically ensured using an inference system shown on Fig.~\ref{reference_inference}; here $\mathcal{R}\,(e)$ designates the
+property ``$e$ is a reference''. The result of assignment operator coincides with its right operand, thus
+
+\begin{lstlisting}
+    x := y := 3
+\end{lstlisting}
+
+assigns 3 to both "\lstinline|x|" and "\lstinline|y|".
+
+\subsection{Postifix Expressions}
+
+There are four postfix forms of expressions:
+
+\begin{itemize}
+\item function call, designated as postfix form "\lstinline|($arg_1, \dots, arg_k$)|";
+\item array element selection, designated as "\lstinline|[$index$]|";
+\item built-in primitive "\lstinline|.string|", returning the string representation of the value;
+\item built-in primitive "\lstinline|.length|", returning the length of boxed value.
+\end{itemize}
+
+Multiple postfixes are allowed, for example
+
+\begin{lstlisting}
+    x () [3] (1, 2, 3) . string
+    x . string [4]
+    x . length . string
+    x . string . length
+\end{lstlisting}
+
+The basic form of expression is \nonterm{primary}. The simplest form of primary is an identifier or constant. Keywords \lstinline|true| and \lstinline|false|
+designate integer constants 1 and 0 respectively, character constant is implicitly converted into its ASCII code.  String constants designate arrays
+of one-byte characters. Infix constants allow to reference a functional value associated with corresponding infix operator, and functional constant (\emph{lambda-expression})
+designates a anonymous functional value in the form of closure.
+
+\subsection{\lstinline|skip| and \lstinline|return| Expressions}
+
+Expression \lstinline|skip| can be used to designate a no-value when no action is needed (for example, in the body of unit which contains only declarations).
+\lstinline|return| expression can be used to immediately copmlete the execution of current function call; optional return value can be specified.
+
+\subsection{Arrays, Lists, and S-expresions}
+
+\begin{figure}[t]
+  \[
+    \begin{array}{rcl}
+      \defterm{arrayExpression} & : & \term{[}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\s\term{]}\\
+      \defterm{listExpression}  & : & \term{\{}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\s\term{\}}\\
+      \defterm{S-expression}    & : & \token{UIDENT}\s[\s\term{(}\s\nonterm{expression}\s[\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\term{)}\s]
+    \end{array}
+  \]
+  \caption{Array, list, and S-expressions concrete syntax}  
+  \label{composite_expressions}
+\end{figure}
+
+There are three forms of expressions to specify composite values: arrays, lists and S-expressions (see Fig.~\ref{composite_expressions}). Note, it is impossible
+to specify one-element list as "\lstinline|{$e$}|" since it is treated as scope expression. Instead, the form "\lstinline|$e$:{}|" can be used; alternatively, standard
+unit "\lstinline|List|" (see~\ref{sec:standard_library_list}) defines function "\lstinline|singleton|" which serves for the same purpose.
+
+\subsection{Conditional Expressions}
+
+\begin{figure}[t]
+  \[
+    \begin{array}{rcll}
+      \defterm{ifExpression}  & : & \term{if}\s\nonterm{expression}\s\term{then}\s\nonterm{scopeExpression}\s[\s\nonterm{elsePart}\s]\s\term{fi}&\\
+      \defterm{elsePart}      & : & \term{elif}\s\nonterm{expression}\s\term{then}\s\nonterm{scopeExpression}\s[\s\nonterm{elsePart}\s]&\alt\\
+                              &   & \term{else}\s\nonterm{scopeExpression}&
+    \end{array}
+  \]
+  \caption{If-expression concrete syntax}
+  \label{if_expression}
+\end{figure}
+
+Conditional expression branches the control depending in the value of a certain expression; the value zero is treated as falsity, nonzero as truth. The
+extended form
+
+\begin{lstlisting}
+    if $\;c_1\;$ then $\;e1\;$
+    elif $\;c_2\;$ then $\;e_2\;$
+    ...
+    else $\;e_{k+1}\;$
+    fi
+\end{lstlisting}
+
+is equivalent to the nested form
+
+\begin{lstlisting}
+    if $\;c_1\;$ then $\;e1\;$
+    else if $\;c_2\;$ then $\;e_2\;$
+    ...
+    else $\;e_{k+1}\;$
+    fi
+\end{lstlisting}
+
+\subsection{Loop Expressions}
+
+\begin{figure}[t]
+  \[
+    \begin{array}{rcl}
+      \defterm{whileExpression}  & : & \term{while}\s\nonterm{expression}\s\term{do}\s\nonterm{scopeExpression}\s\term{od}\\
+      \defterm{repeatExpression} & : & \term{repeat}\s\nonterm{scopeExpression}\s\term{until}\s\nonterm{basicExpression}\\
+      \defterm{forExpression}    & : & \term{for}\s\nonterm{expression}\s\term{,}\s\nonterm{expression}\s\term{,}\s\nonterm{expression}\\
+                                 &   & \term{do}\nonterm{scopeExpresssion}\s\term{od}
+    \end{array}
+  \]
+  \caption{Loop expressions concrete syntax}
+  \label{loop_expression}
+\end{figure}
+
+There are three forms of loop expressions~--- "\lstinline|while|", "\lstinline|repeat|", and "\lstinline|for|", among which "\lstinline|while|" is the
+basic one (see Fig.~\ref{loop_expression}). In "\lstinline|while|" expression the evaluation of the body is repeated as long as the evaluation of condition provides
+a non-zero value. The condition is evaluated before the body on each iteration of the loop, and the body is evaluated in the context of
+condition evaluation results.
+
+The construct "\lstinline|repeat $\;e\;$ until $\;c$|" is derived and operationally equivalent to
+
+\begin{lstlisting}
+    $e\;$; while $\;c\;$ == 0 do $\;e\;$ od
+\end{lstlisting}
+
+However, the top-level local declarations in the body of "\lstinline|repeat|"-loop are visible in the condition expression:
+
+\begin{lstlisting}
+    repeat local x = read () until x 
+\end{lstlisting}
+
+
+The construct "\lstinline|for $\;i\;$, $\;c\;$, $\;s\;$ do $\;e\;$ od|" is also derived and operationally equivalent to
+
+\begin{lstlisting}
+    $i\;$; while $\;c\;$ do $\;e\;$; $\;s\;$ od
+\end{lstlisting}
+
+However, the top-level local definitions of the the first expression ("$i$") are visible in the rest of the construct:
+
+\begin{lstlisting}
+    for local i = 0, i < 10, i := i + 1 do write (i) od
+\end{lstlisting}
+
+\subsection{Pattern Matching}
+
+Pattern matching construct delivers a way to discriminate on a structure of a value. This structure is specified by
+means of \emph{patterns} (see Fig.~\ref{pattern}). 
+
+\begin{figure}[t]
+  \[
+    \begin{array}{rcll}
+      \defterm{pattern}         & : & \nonterm{consPattern}\alt\nonterm{simplePattern}&\\
+      \defterm{consPattern}     & : & \nonterm{simplePattern}\s\term{:}\s\nonterm{pattern}&\\
+      \defterm{simplePattern}   & : & \nonterm{wildcardPattern} & \alt\\
+                                &   & \nonterm{S-exprPattern} & \alt \\
+                                &   & \nonterm{arrayPattern} & \alt \\
+                                &   & \nonterm{listPattern} & \alt \\
+                                &   & \token{LIDENT}\s[\s\term{@}\s\nonterm{pattern} \s] & \alt \\
+                                &   & [\s\term{-}\s]\s\token{DECIMAL}& \alt \\
+                                &   & \token{STRING} & \alt \\
+                                &   & \token{CHAR} & \alt \\
+                                &   & \term{true} & \alt \\
+                                &   & \term{false} & \alt \\
+                                &   & \term{\#}\s\term{boxed} & \alt \\
+                                &   & \term{\#}\s\term{unboxed} & \alt \\
+                                &   & \term{\#}\s\term{string} & \alt \\
+                                &   & \term{\#}\s\term{array} & \alt \\
+                                &   & \term{\#}\s\term{sexp} & \alt \\
+                                &   & \term{\#}\s\term{fun} & \alt \\
+                                &   & \term{(}\s\nonterm{pattern}\s\term{)} & \\
+      \defterm{wildcardPattern} & : & \term{\_} &\\
+      \defterm{S-exprPattern}   & : & \token{UIDENT}\s[\s\term{(}\s\nonterm{pattern}\s(\s\term{,}\s\nonterm{pattern})^\star\s\term{)}\s] &\\
+      \defterm{arrayPattern}    & : & \term{[}\s[\s\nonterm{pattern}\s(\s\term{,}\s\nonterm{pattern})^\star\s]\s\term{]} &\\
+      \defterm{listPattern}     & : & \term{\{}\s[\s\nonterm{pattern}\s(\s\term{,}\s\nonterm{pattern})^\star\s]\s\term{\}} &
+    \end{array}
+  \]
+  \caption{Pattern concrete syntax}
+  \label{pattern}
+\end{figure}
+
+\begin{figure}[t]
+  \[
+    \begin{array}{rcl}
+      \defterm{caseExpression}  & : & \term{case}\s\nonterm{expression}\s\term{of}\s\nonterm{caseBranches}\s\term{esac}\\
+      \defterm{caseBranches}    & : & \nonterm{caseBranch}\s[\s(\s\term{$\mid$}\s\nonterm{caseBranch}\s)^\star\s]\\
+      \defterm{caseBranch}      & : & \nonterm{pattern}\s\term{$\rightarrow$}\s\nonterm{scopeExpression}
+    \end{array}
+  \]
+  \caption{Case-expression concrete syntax}
+  \label{case_expression}
+\end{figure}
+
+\subsection{Examples}
+\label{sec:expression_examples}
+
+Some other examples with comments:
+
+\begin{tabular}{ll}
+  "\lstinline|x !! y && z + 3|" & is equivalent to "\lstinline|x !! (y && (z + 3))|"\\
+  "\lstinline|x == y < 4|"      & invalid \\
+  "\lstinline|x [y := 8] := 6|" & is equivalent to "\lstinline|y := 8; x [8] := 6|"\\
+  "\lstinline|(write (3); x) := (write (4); z)|" & is equivalent to "\lstinline|write (3); write (4); x := z|"
+\end{tabular}
 
 
