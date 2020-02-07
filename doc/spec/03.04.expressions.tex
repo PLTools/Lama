@@ -220,9 +220,6 @@ However, the top-level local definitions of the the first expression ("$i$") are
 
 \subsection{Pattern Matching}
 
-Pattern matching construct delivers a way to discriminate on a structure of a value. This structure is specified by
-means of \emph{patterns} (see Fig.~\ref{pattern}). 
-
 \begin{figure}[t]
   \[
     \begin{array}{rcll}
@@ -254,6 +251,38 @@ means of \emph{patterns} (see Fig.~\ref{pattern}).
   \caption{Pattern concrete syntax}
   \label{pattern}
 \end{figure}
+
+Pattern matching is introduced into the language by the mean of \emph{case-expression} (see Fig.~\ref{case_expression}). A case-expression
+evaluates an expression, called \emph{scrutinee}, and performs branching depending on its structure. This structure is specified by
+means of \emph{patterns} (see Fig.~\ref{pattern}). If succeeded, a matching against a pattern delivers a
+set of bindings~--- variables with their bindings to the (sub)values of the scrutinee.
+
+The semantics of patterns is as follows:
+
+\begin{itemize}
+\item a pattern "\lstinline|$p_1$:$p_2$|" matches a list with a head matched with $p_1$ and a tail matched with $p_2$;
+\item wildcard pattern "\lstinline|_|" matches every value;
+\item S-expression pattern "\lstinline|$C\;$ ($p_1$,$\dots$,$\;p_k$)|" matches a value with corresponding top-level
+  tag ("$C$") and arguments matched by subpatterns $p_i$ respectively; note, patterns can discriminate on the
+  number of arguments for the same constructor, thus the same tag with different number of arguments can be
+  used in different branches of the same case expression (see below);
+\item array and list patterns match arrays and lists of the specified length with each element matched with
+  corresponding subpattern;
+\item an identifier matches every value and binds itself to that value in the corresponding branch of
+  case-expression (see below);
+\item a "\lstinline|$x$@$p$|"-pattern matches what pattern $p$ matches, and additionally binds the
+  matched value to the identifier $x$;
+\item constant patterns match corresponding constants;
+\item six "\lstinline|#|"-patterns match values of corresponding shapes (boxed, unboxed, string, array, S-expression or
+  closure) regardless their content;
+  \item round brackets can be used for grouping.
+\end{itemize}
+
+All identifiers, occured in a pattern, have to be pairwise distinct.
+
+The matching against patterns in case-expression is performed deterministically in a top-down manner: a pattern
+is matched against only if all previous matchings were unsuccesful. If no matching pattern is found, the execution
+of the program stops with an error.
 
 \begin{figure}[t]
   \[
