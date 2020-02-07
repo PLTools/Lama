@@ -1,0 +1,7 @@
+1. BOX the int argument in Bsta, Belem and Barray (x86).
+2. Implement eta-conversion construct.
+3. Implement lazy construct.
+4. Make the expression in the scope expression optional everywhere.
+4. Implement better scoping in repeat .. until and for .. loops:
+   a. make top-level local definitions of repeat body visible in the condition;
+   b. make the first expression after for... scope expression, extend the scope to the rest of the construct.

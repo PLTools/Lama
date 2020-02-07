@@ -1,4 +1,5 @@
-\chapter{Concrete Syntax}
+\chapter{Concrete Syntax and\\
+Informal Semantics}
 \label{sec:concrete_syntax}
 
 In this chapter we describe the concrete syntax of the language as it is recognized by the parser. In the
@@ -23,81 +24,5 @@ part of concrete syntax.
 \input{03.03.scope_expressions}
 \input{03.04.expressions}
 
-\begin{figure}[t]
-  \[
-    \begin{array}{rcll}
-      \defterm{pattern}         & : & \nonterm{consPattern}\alt\nonterm{simplePattern}&\\
-      \defterm{consPattern}     & : & \nonterm{simplePattern}\s\term{:}\s\nonterm{pattern}&\\
-      \defterm{simplePattern}   & : & \nonterm{wildcardPattern} & \alt\\
-                                &   & \nonterm{S-exprPattern} & \alt \\
-                                &   & \nonterm{arrayPattern} & \alt \\
-                                &   & \nonterm{listPattern} & \alt \\
-                                &   & \token{LIDENT}\s[\s\term{@}\s\nonterm{pattern} \s] & \alt \\
-                                &   & [\s\term{-}\s]\s\token{DECIMAL}& \alt \\
-                                &   & \token{STRING} & \alt \\
-                                &   & \token{CHAR} & \alt \\
-                                &   & \term{true} & \alt \\
-                                &   & \term{false} & \alt \\
-                                &   & \term{\#}\s\term{boxed} & \alt \\
-                                &   & \term{\#}\s\term{unboxed} & \alt \\
-                                &   & \term{\#}\s\term{string} & \alt \\
-                                &   & \term{\#}\s\term{array} & \alt \\
-                                &   & \term{\#}\s\term{sexp} & \alt \\
-                                &   & \term{\#}\s\term{fun} & \alt \\
-                                &   & \term{(}\s\nonterm{pattern}\s\term{)} & \\
-      \defterm{wildcardPattern} & : & \term{\_} &\\
-      \defterm{S-exprPattern}   & : & \token{UIDENT}\s[\s\term{(}\s\nonterm{pattern}\s(\s\term{,}\s\nonterm{pattern})^\star\s\term{)}\s] &\\
-      \defterm{arrayPattern}    & : & \term{[}\s[\s\nonterm{pattern}\s(\s\term{,}\s\nonterm{pattern})^\star\s]\s\term{]} &\\
-      \defterm{listPattern}     & : & \term{\{}\s[\s\nonterm{pattern}\s(\s\term{,}\s\nonterm{pattern})^\star\s]\s\term{\}} &
-    \end{array}
-  \]
-  \caption{Pattern concrete syntax}
-\end{figure}
-
-\begin{figure}[t]
-  \[
-    \begin{array}{rcll}
-      \defterm{ifExpression}  & : & \term{if}\s\nonterm{expression}\s\term{then}\s\nonterm{scopeExpression}\s[\s\nonterm{elsePart}\s]\s\term{fi}&\\
-      \defterm{elsePart}      & : & \term{elif}\s\nonterm{expression}\s\term{then}\s\nonterm{scopeExpression}\s[\s\nonterm{elsePart}\s]&\alt\\
-                              &   & \term{else}\s\nonterm{scopeExpression}&
-    \end{array}
-  \]
-  \caption{If-expression concrete syntax}
-\end{figure}
-
-\begin{figure}[t]
-  \[
-    \begin{array}{rcl}
-      \defterm{whileExpression}  & : & \term{while}\s\nonterm{expression}\s\term{do}\s\nonterm{scopeExpression}\s\term{od}\\
-      \defterm{repeatExpression} & : & \term{repeat}\s\nonterm{scopeExpression}\s\term{until}\s\nonterm{basicExpression}\\
-      \defterm{forExpression}    & : & \term{for}\s\nonterm{expression}\s\term{,}\s\nonterm{expression}\s\term{,}\s\nonterm{expression}\\
-                                 &   & \term{do}\nonterm{scopeExpresssion}\s\term{od}
-    \end{array}
-  \]
-  \caption{Loop expressions concrete syntax}  
-\end{figure}
-
-\begin{figure}[t]
-  \[
-    \begin{array}{rcl}
-      \defterm{arrayExpression} & : & \term{[}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\s\term{]}\\
-      \defterm{listExpression}  & : & \term{\{}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\s\term{\}}\\
-      \defterm{S-expression}    & : & \token{UIDENT}\s[\s\term{(}\s\nonterm{expression}\s[\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\term{)}\s]
-    \end{array}
-  \]
-  \caption{Array, list, and S-expressions concrete syntax}  
-\end{figure}
-
-
-\begin{figure}[t]
-  \[
-    \begin{array}{rcl}
-      \defterm{caseExpression}  & : & \term{case}\s\nonterm{expression}\s\term{of}\s\nonterm{caseBranches}\s\term{esac}\\
-      \defterm{caseBranches}    & : & \nonterm{caseBranch}\s[\s(\s\term{$\mid$}\s\nonterm{caseBranch}\s)^\star\s]\\
-      \defterm{caseBranch}      & : & \nonterm{pattern}\s\term{$\rightarrow$}\s\nonterm{scopeExpression}
-    \end{array}
-  \]
-  \caption{Case-expression concrete syntax}
-\end{figure}
 
 
