@@ -20,6 +20,16 @@
 
 /* # define DEBUG_PRINT 1 */
 
+#ifdef DEBUG_PRINT 1
+int indent = 0;
+inline void print_indent (void) {
+  for (int i = 0; i < indent; i++) printf (" ");
+  printf("| ");
+}
+#endif
+
+extern size_t __gc_stack_top, __gc_stack_bottom;
+
 /* GC pool structure and data; declared here in order to allow debug print */
 typedef struct {
   size_t * begin;
@@ -69,7 +79,7 @@ void __post_gc_subst () {}
 # define BOX(x)      ((((int) (x)) << 1) | 0x0001)
 
 /* GC extra roots */
-#define MAX_EXTRA_ROOTS_NUMBER 4
+#define MAX_EXTRA_ROOTS_NUMBER 16
 typedef struct {
   int current_free;
   size_t roots[MAX_EXTRA_ROOTS_NUMBER];
@@ -83,6 +93,7 @@ void clear_extra_roots (void) {
 
 void push_extra_root (size_t * p) {
 #ifdef DEBUG_PRINT
+  indent++; print_indent ();
   printf ("push_extra_root %p %p\n", p, &p); fflush (stdout);
 #endif
   if (extra_roots.current_free >= MAX_EXTRA_ROOTS_NUMBER) {
@@ -91,10 +102,14 @@ void push_extra_root (size_t * p) {
   }
   extra_roots.roots[extra_roots.current_free] = p;
   extra_roots.current_free++;
+#ifdef DEBUG_PRINT
+  indent--;
+#endif
 }
 
 void pop_extra_root (size_t * p) {
 #ifdef DEBUG_PRINT
+  indent++; print_indent ();
   printf ("pop_extra_root %p %p\n", p, &p); fflush (stdout);
 #endif
   if (extra_roots.current_free == 0) {
@@ -104,6 +119,7 @@ void pop_extra_root (size_t * p) {
   extra_roots.current_free--;
   if (extra_roots.roots[extra_roots.current_free] != p) {
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("%i %p %p", extra_roots.current_free,
 	    extra_roots.roots[extra_roots.current_free], p);
     fflush (stdout);
@@ -111,6 +127,9 @@ void pop_extra_root (size_t * p) {
     perror ("ERROR: pop_extra_root: stack invariant violation");
     exit   (1);
   }
+#ifdef DEBUG_PRINT
+  indent--;
+#endif
 }
 
 /* end */
@@ -157,7 +176,11 @@ void* Ls__Infix_58 (void *p, void *q) {
   
   __pre_gc ();
 
+  push_extra_root(&p);
+  push_extra_root(&q);
   res = Bsexp (3, p, q, 848787);
+  pop_extra_root(&q);
+  pop_extra_root(&p);
 
   __post_gc ();
 
@@ -285,6 +308,7 @@ char* de_hash (int n) {
   p = &buf[5];
 
 #ifdef DEBUG_PRINT
+  indent++; print_indent ();
   printf ("de_hash: tag: %d\n", n); fflush (stdout);
 #endif
   
@@ -292,11 +316,16 @@ char* de_hash (int n) {
 
   while (n != 0) {
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("char: %c\n", chars [n & 0x003F]); fflush (stdout);
 #endif
     *p-- = chars [n & 0x003F];
     n = n >> 6;
   }
+
+#ifdef DEBUG_PRINT
+  indent--;
+#endif
   
   return ++p;
 }
@@ -495,8 +524,10 @@ extern void* Lsubstring (void *subj, int p, int l) {
     data *r;
     
     __pre_gc ();
-  
+
+    push_extra_root (&subj);
     r = (data*) alloc (ll + 1 + sizeof (int));
+    pop_extra_root (&subj);
 
     r->tag = STRING_TAG | (ll << 3);
 
@@ -537,6 +568,8 @@ void *Lclone (void *p) {
   data *res;
   int n;
 #ifdef DEBUG_PRINT
+  register int * ebp asm ("ebp");
+  indent++; print_indent ();
   printf ("Lclone arg: %p %p\n", &p, p); fflush (stdout);
 #endif
   __pre_gc ();
@@ -550,17 +583,21 @@ void *Lclone (void *p) {
     switch (t) {
     case STRING_TAG:
 #ifdef DEBUG_PRINT
-      printf ("Lclone: string1 %p %p\n", &p, p); fflush (stdout);
+      print_indent ();
+      printf ("Lclone: string1 &p=%p p=%p\n", &p, p); fflush (stdout);
 #endif
       res = Bstring (TO_DATA(p)->contents);
 #ifdef DEBUG_PRINT
+      print_indent ();
       printf ("Lclone: string2 %p %p\n", &p, p); fflush (stdout);
-#endif      break;
+#endif
+      break;
 
     case ARRAY_TAG:      
     case CLOSURE_TAG:
 #ifdef DEBUG_PRINT
-      printf ("Lclone: closure or array %p %p\n", &p, p); fflush (stdout);
+      print_indent ();
+      printf ("Lclone: closure or array &p=%p p=%p ebp=%p\n", &p, p, ebp); fflush (stdout);
 #endif
       res = (data*) alloc (sizeof(int) * (l+1));
       memcpy (res, TO_DATA(p), sizeof(int) * (l+1));
@@ -569,7 +606,7 @@ void *Lclone (void *p) {
       
     case SEXP_TAG:
 #ifdef DEBUG_PRINT
-      printf ("Lclone: sexp\n"); fflush (stdout);
+      print_indent (); printf ("Lclone: sexp\n"); fflush (stdout);
 #endif
       res = (sexp*) alloc (sizeof(int) * (l+2));
       memcpy (res, TO_SEXP(p), sizeof(int) * (l+2));
@@ -583,12 +620,14 @@ void *Lclone (void *p) {
     pop_extra_root (&p);
   }
 #ifdef DEBUG_PRINT
-  printf ("Lclone ends1\n"); fflush (stdout);
+  print_indent (); printf ("Lclone ends1\n"); fflush (stdout);
 #endif
 
   __post_gc ();
 #ifdef DEBUG_PRINT
+  print_indent ();
   printf ("Lclone ends2\n"); fflush (stdout);
+  indent--;
 #endif
   return res;
 }
@@ -768,6 +807,7 @@ extern void* Bstring (void *p) {
   
   __pre_gc ();
 #ifdef DEBUG_PRINT
+  indent++; print_indent ();
   printf ("Bstring: call LmakeString %s %p %p %p %i\n", p, &p, p, s, n);
   fflush(stdout);
 #endif
@@ -775,11 +815,14 @@ extern void* Bstring (void *p) {
   s = LmakeString (BOX(n));  
   pop_extra_root(&p);
 #ifdef DEBUG_PRINT
-  printf ("Bstring: call strncpy: %p %p %p %i\n", &p, p, s, n); fflush(stdout);
+  print_indent ();
+  printf ("\tBstring: call strncpy: %p %p %p %i\n", &p, p, s, n); fflush(stdout);
 #endif
   strncpy (s, p, n + 1);
 #ifdef DEBUG_PRINT
-  printf ("Bstring: ends\n"); fflush(stdout);
+  print_indent ();
+  printf ("\tBstring: ends\n"); fflush(stdout);
+  indent--;
 #endif
   __post_gc ();
   
@@ -796,7 +839,9 @@ extern void* Lstringcat (void *p) {
   createStringBuf ();
   stringcat (p);
 
+  push_extra_root(&p);
   s = Bstring (stringBuf.contents);
+  pop_extra_root(&p);
   
   deleteStringBuf ();
 
@@ -813,7 +858,9 @@ extern void* Bstringval (void *p) {
   createStringBuf ();
   printValue (p);
 
+  push_extra_root(&p);
   s = Bstring (stringBuf.contents);
+  pop_extra_root(&p);
   
   deleteStringBuf ();
 
@@ -826,15 +873,22 @@ extern void* Bclosure (int n, void *entry, ...) {
   va_list args = (va_list) BOX (NULL);
   int     i    = BOX(0),
           ai   = BOX(0);
+  register int * ebp asm ("ebp");
+  size_t * argss = NULL;
   data    *r   = (data*) BOX (NULL);
   
   __pre_gc ();
-  
 #ifdef DEBUG_PRINT
+  indent++; print_indent ();
   printf ("Bclosure: create n = %d\n", n); fflush(stdout);
 #endif
-  r = (data*) alloc (sizeof(int) * (n+2));
+  argss = (ebp + 12);
+  for (i = 0; i<n; i++, argss++) {
+    push_extra_root (argss);
+  }
 
+  r = (data*) alloc (sizeof(int) * (n+2));
+  
   r->tag = CLOSURE_TAG | ((n + 1) << 3);
   ((void**) r->contents)[0] = entry;
   
@@ -849,6 +903,17 @@ extern void* Bclosure (int n, void *entry, ...) {
 
   __post_gc();
 
+  argss--;
+  for (i = 0; i<n; i++, argss--) {
+    pop_extra_root (argss);
+  }
+
+#ifdef DEBUG_PRINT
+  print_indent ();
+  printf ("Bclosure: ends\n", n); fflush(stdout);
+  indent--;
+#endif
+
   return r->contents;
 }
 
@@ -861,6 +926,7 @@ extern void* Barray (int n, ...) {
   __pre_gc ();
   
 #ifdef DEBUG_PRINT
+  indent++; print_indent ();
   printf ("Barray: create n = %d\n", n); fflush(stdout);
 #endif
   r = (data*) alloc (sizeof(int) * (n+1));
@@ -877,7 +943,9 @@ extern void* Barray (int n, ...) {
   va_end(args);
 
   __post_gc();
-  
+#ifdef DEBUG_PRINT
+  indent--;
+#endif
   return r->contents;
 }
 
@@ -892,6 +960,7 @@ extern void* Bsexp (int n, ...) {
   __pre_gc () ;
   
 #ifdef DEBUG_PRINT
+  indent++; print_indent ();
   printf("Bsexp: allocate %zu!\n",sizeof(int) * (n+1)); fflush (stdout);
 #endif
   r = (sexp*) alloc (sizeof(int) * (n+1));
@@ -913,6 +982,9 @@ extern void* Bsexp (int n, ...) {
 
 #ifdef DEBUG_PRINT
   r->tag = SEXP_TAG | ((r->tag) << 3);
+  print_indent ();
+  printf("Bsexp: ends\n"); fflush (stdout);
+  indent--;
 #endif
 
   va_end(args);
@@ -1048,8 +1120,12 @@ extern void* /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
   db = TO_DATA(b);
 
   __pre_gc () ;
-  
+
+  push_extra_root (&a);
+  push_extra_root (&b);
   d  = (data *) alloc (sizeof(int) + LEN(da->tag) + LEN(db->tag) + 1);
+  pop_extra_root (&b);
+  pop_extra_root (&a);
 
   d->tag = STRING_TAG | ((LEN(da->tag) + LEN(db->tag)) << 3);
 
@@ -1078,7 +1154,9 @@ extern void* Lsprintf (char * fmt, ...) {
 
   __pre_gc ();
 
+  push_extra_root (&fmt);
   s = Bstring (stringBuf.contents);
+  pop_extra_root (&fmt);
 
   __post_gc ();
   
@@ -1238,10 +1316,11 @@ extern void set_args (int argc, char *argv[]) {
   __pre_gc ();
 
 #ifdef DEBUG_PRINT
-  printf ("set_args: call: n = %i %p %p\n", n, &p, p); fflush(stdout);
-  for (i = 0; i<n;i++)
+  indent++; print_indent ();
+  printf ("set_args: call: n=%i &p=%p p=%p: ", n, &p, p); fflush(stdout);
+  for (i = 0; i < n; i++)
     printf("%s ", argv[i]);
-  printf("EE\n\n");
+  printf("EE\n");
 #endif
 
   p = LmakeArray (BOX(n));
@@ -1249,21 +1328,26 @@ extern void set_args (int argc, char *argv[]) {
   
   for (i=0; i<n; i++) {
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("set_args: iteration %i %p %p ->\n", i, &p, p); fflush(stdout);
 #endif
     ((int*)p) [i] = Bstring (argv[i]);
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("set_args: iteration %i <- %p %p\n", i, &p, p); fflush(stdout);
 #endif
   }
-#ifdef DEBUG_PRINT
-  printf ("set_args: end\n", n, &p, p); fflush(stdout);
-#endif
+
   pop_extra_root (&p);
   __post_gc ();
 
   global_sysargs = p;
   push_extra_root (&global_sysargs);
+#ifdef DEBUG_PRINT
+  print_indent ();
+  printf ("set_args: end\n", n, &p, p); fflush(stdout);
+  indent--;
+#endif
 }
 
 /* GC starts here */
@@ -1287,7 +1371,8 @@ extern void __gc_root_scan_stack ();
 /*           Mark-and-copy                  */
 /* ======================================== */
 
-static size_t SPACE_SIZE = 16 * 1024;
+static size_t SPACE_SIZE = 16;
+// static size_t SPACE_SIZE = 16 * 1024;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
@@ -1317,6 +1402,7 @@ static void init_to_space (int flag) {
 
 static void gc_swap_spaces (void) {
 #ifdef DEBUG_PRINT
+  indent++; print_indent ();
   printf ("gc_swap_spaces\n"); fflush (stdout);
 #endif
   free_pool (&from_space);
@@ -1328,6 +1414,9 @@ static void gc_swap_spaces (void) {
   to_space.current = NULL;
   to_space.end     = NULL;
   to_space.size    = NULL;
+#ifdef DEBUG_PRINT
+  indent--;
+#endif
 }
 
 # define IS_VALID_HEAP_POINTER(p)\
@@ -1348,6 +1437,7 @@ static void copy_elements (size_t *where, size_t *from, int len) {
   int    i = 0;
   void * p = NULL;
 #ifdef DEBUG_PRINT
+  indent++; print_indent ();
   printf ("copy_elements: start; len = %d\n", len); fflush (stdout);
 #endif
   for (i = 0; i < len; i++) {
@@ -1356,26 +1446,31 @@ static void copy_elements (size_t *where, size_t *from, int len) {
       *where = elem;
       where++;
 #ifdef DEBUG_PRINT
-      printf ("copy_elements: copy NON ptr: %zu\n", elem); fflush (stdout);
+      print_indent ();	
+      printf ("copy_elements: copy NON ptr: %zu %p \n", elem, elem); fflush (stdout);
 #endif
     }
     else {
-      p = gc_copy ((size_t*) elem);
-      *where = p;
 #ifdef DEBUG_PRINT
+      print_indent ();	
       printf ("copy_elements: fix element: %p -> %p\n", elem, *where);
       fflush (stdout);
 #endif
+      p = gc_copy ((size_t*) elem);
+      *where = p;
       where ++;
     }
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("copy_elements: iteration end: where = %p, *where = %p, i = %d, \
              len = %d\n", where, *where, i, len); fflush (stdout);
 #endif
 
   }
 #ifdef DEBUG_PRINT
-  printf ("copy_elements: end\n"); fflush (stdout);
+  print_indent ();
+  printf ("\tcopy_elements: end\n"); fflush (stdout);
+  indent--;
 #endif
 
 }
@@ -1385,15 +1480,21 @@ static int extend_spaces (void) {
   size_t old_space_size = SPACE_SIZE        * sizeof(size_t),
          new_space_size = (SPACE_SIZE << 1) * sizeof(size_t);
   p = mremap(to_space.begin, old_space_size, new_space_size, 0);
+#ifdef DEBUG_PRINT
+  indent++; print_indent ();
+#endif
   if (p == MAP_FAILED) {
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("extend: extend_spaces: mremap failed\n"); fflush (stdout);
 #endif
     return 1;
   }
 #ifdef DEBUG_PRINT
+  print_indent ();
   printf ("extend: %p %p %p %p\n", p, to_space.begin, to_space.end, current);
   fflush (stdout);
+  indent--;
 #endif
   to_space.end    += SPACE_SIZE;
   SPACE_SIZE      =  SPACE_SIZE << 1;
@@ -1410,19 +1511,23 @@ extern size_t * gc_copy (size_t *obj) {
   int len1, len2, len3;
   void * objj;
   void * newobjj = (void*)current;
+  indent++; print_indent ();
   printf ("gc_copy: %p cur = %p starts\n", obj, current);
   fflush (stdout);
 #endif
 
   if (!IS_VALID_HEAP_POINTER(obj)) {
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("gc_copy: invalid ptr: %p\n", obj); fflush (stdout);
+    indent--;
 #endif
     return obj;
   }
 
   if (!IN_PASSIVE_SPACE(current) && current != to_space.end) {
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf("ERROR: gc_copy: out-of-space %p %p %p\n",
 	   current, to_space.begin, to_space.end);
     fflush(stdout);
@@ -1433,8 +1538,10 @@ extern size_t * gc_copy (size_t *obj) {
 
   if (IS_FORWARD_PTR(d->tag)) {
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("gc_copy: IS_FORWARD_PTR: return! %p -> %p\n", obj, (size_t *) d->tag);
     fflush(stdout);
+    indent--;
 #endif
     return (size_t *) d->tag;
   }
@@ -1446,10 +1553,13 @@ extern size_t * gc_copy (size_t *obj) {
   switch (TAG(d->tag)) {
     case CLOSURE_TAG:
 #ifdef DEBUG_PRINT
+      print_indent ();
       printf ("gc_copy:closure_tag; len =  %zu\n", LEN(d->tag)); fflush (stdout);
 #endif
       i = LEN(d->tag);
-      current += LEN(d->tag) + 1;
+      // current += LEN(d->tag) + 1;
+      // current += ((LEN(d->tag) + 1) * sizeof(int) -1) / sizeof(size_t) + 1;
+      current += i+1;
       *copy = d->tag;
       copy++;
       d->tag = (int) copy;
@@ -1458,6 +1568,7 @@ extern size_t * gc_copy (size_t *obj) {
     
     case ARRAY_TAG:
 #ifdef DEBUG_PRINT
+      print_indent ();
       printf ("gc_copy:array_tag; len =  %zu\n", LEN(d->tag)); fflush (stdout);
 #endif
       current += ((LEN(d->tag) + 1) * sizeof (int) - 1) / sizeof (size_t) + 1;
@@ -1470,6 +1581,7 @@ extern size_t * gc_copy (size_t *obj) {
 
     case STRING_TAG:
 #ifdef DEBUG_PRINT
+      print_indent ();
       printf ("gc_copy:string_tag; len = %d\n", LEN(d->tag) + 1); fflush (stdout);
 #endif
       current += (LEN(d->tag) + sizeof(int)) / sizeof(size_t) + 1;
@@ -1486,6 +1598,7 @@ extern size_t * gc_copy (size_t *obj) {
       len1 = LEN(s->contents.tag);
       len2 = LEN(s->tag);
       len3 = LEN(d->tag);
+      print_indent ();
       printf ("gc_copy:sexp_tag; len1 = %li, len2=%li, len3 = %li\n",
 	      len1, len2, len3);
       fflush (stdout);
@@ -1502,31 +1615,44 @@ extern size_t * gc_copy (size_t *obj) {
 
   default:
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("ERROR: gc_copy: weird tag: %p", TAG(d->tag)); fflush (stdout);
+    indent--;
 #endif
     perror ("ERROR: gc_copy: weird tag");
     exit (1);
+    return (obj);
   }
 #ifdef DEBUG_PRINT
+  print_indent ();
   printf ("gc_copy: %p(%p) -> %p (%p); new-current = %p\n",
 	  obj, objj, copy, newobjj, current);
   fflush (stdout);
+  indent--;
 #endif
   return copy;
 }
 
 extern void gc_test_and_copy_root (size_t ** root) {
+#ifdef DEBUG_PRINT
+    indent++;
+#endif
   if (IS_VALID_HEAP_POINTER(*root)) {
 #ifdef DEBUG_PRINT
-    printf ("gc_test_and_copy_root: root %p  *root %p\n", root, *root);
+    print_indent ();
+    printf ("gc_test_and_copy_root: root %p top=%p bot=%p  *root %p \n", root, __gc_stack_top, __gc_stack_bottom, *root);
     fflush (stdout);
 #endif
     *root = gc_copy (*root);
   }
-/* #ifdef DEBUG_PRINT */
-/*   printf ("gc_test_and_copy_root: INVALID HEAP POINTER root %p  *root %p\n", root, *root); */
-/*   fflush (stdout); */
-/* #endif */
+#ifdef DEBUG_PRINT
+  else {
+    print_indent ();
+    printf ("gc_test_and_copy_root: INVALID HEAP POINTER root %p  *root %p\n", root, *root);
+    fflush (stdout);
+  }
+  indent--;
+#endif
 }
 
 extern void gc_root_scan_data (void) {
@@ -1562,28 +1688,22 @@ extern void init_pool (void) {
 static void* gc (size_t size) {
   current = to_space.begin;
 #ifdef DEBUG_PRINT
-  printf ("\ngc: current:%p; to_space.b =%p; to_space.e =%p; \
-           f_space.b = %p; f_space.e = %p\n",
-	  current, to_space.begin, to_space.end, from_space.begin, from_space.end);
+  print_indent ();
+  printf ("gc: current:%p; to_space.b =%p; to_space.e =%p; \
+           f_space.b = %p; f_space.e = %p; __gc_stack_top=%p; __gc_stack_bottom=%p\n",
+	  current, to_space.begin, to_space.end, from_space.begin, from_space.end,
+	  __gc_stack_top, __gc_stack_bottom);
   fflush (stdout);
 #endif
-  gc_root_scan_data    ();
+  gc_root_scan_data ();
 #ifdef DEBUG_PRINT
+  print_indent ();
   printf ("gc: data is scanned\n"); fflush (stdout);
 #endif
   __gc_root_scan_stack ();
-/*   if (EXTRA_ROOT != BOX(0)) { */
-/* #ifdef DEBUG_PRINT */
-/*     printf ("gc: EXTRA ROOT %p %p\n", EXTRA_ROOT, (int**)EXTRA_ROOT); fflush (stdout); */
-/* #endif */
-/*     gc_test_and_copy_root (EXTRA_ROOT); */
-/*   } else { */
-/* #ifdef DEBUG_PRINT */
-/*     printf ("gc: NO EXTRA ROOT\n"); fflush (stdout); */
-/* #endif */
-/*   } */
   for (int i = 0; i < extra_roots.current_free; i++) {
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf ("gc: extra_root № %i: %p %p\n", i, extra_roots.roots[i],
 	    (size_t*) extra_roots.roots[i]);
     fflush (stdout);
@@ -1591,6 +1711,7 @@ static void* gc (size_t size) {
     gc_test_and_copy_root (extra_roots.roots[i]);
   }
 #ifdef DEBUG_PRINT
+  print_indent ();
   printf ("gc: no more extra roots\n"); fflush (stdout);
 #endif
 
@@ -1604,7 +1725,8 @@ static void* gc (size_t size) {
 
   while (current + size >= to_space.end) {
 #ifdef DEBUG_PRINT
-    printf ("gc pre-extend_spaces : %p %zu %p \n", current, size, to_space.end);
+    print_indent ();
+    printf ("gc: pre-extend_spaces : %p %zu %p \n", current, size, to_space.end);
     fflush (stdout);
 #endif
     if (extend_spaces ()) {
@@ -1613,7 +1735,8 @@ static void* gc (size_t size) {
       return gc (size);
     }
 #ifdef DEBUG_PRINT
-    printf ("gc post-extend_spaces: %p %zu %p \n", current, size, to_space.end);
+    print_indent ();
+    printf ("gc: post-extend_spaces: %p %zu %p \n", current, size, to_space.end);
     fflush (stdout);
 #endif
   }
@@ -1623,10 +1746,12 @@ static void* gc (size_t size) {
   gc_swap_spaces ();
   from_space.current = current + size;
 #ifdef DEBUG_PRINT
+  print_indent ();
   printf ("gc: end: (allocate!) return %p; from_space.current %p; \
            from_space.end %p \n\n",
 	  current, from_space.current, from_space.end);
   fflush (stdout);
+  indent--;
 #endif
   return (void *) current;
 }
@@ -1652,7 +1777,7 @@ static void printFromSpace (void) {
 	      d->contents, d->contents,
 	      LEN(d->tag), LEN(d->tag) + 1 + sizeof(int));
       fflush (stdout);
-      len = (LEN(d->tag) - 1) / sizeof(size_t) + 2;
+      len = (LEN(d->tag) + sizeof(int)) / sizeof(size_t) + 1;
       break;
 
     case CLOSURE_TAG:
@@ -1725,25 +1850,31 @@ extern void * alloc (size_t size) {
   void * p = (void*)BOX(NULL);
   size = (size - 1) / sizeof(size_t) + 1; // convert bytes to words
 #ifdef DEBUG_PRINT
-    printf ("alloc: current: %p %zu words!", from_space.current, size);
-    fflush (stdout);
+  indent++; print_indent ();
+  printf ("alloc: current: %p %zu words!", from_space.current, size);
+  fflush (stdout);
 #endif
   if (from_space.current + size < from_space.end) {
     p = (void*) from_space.current;
     from_space.current += size;
 #ifdef DEBUG_PRINT
+    print_indent ();
     printf (";new current: %p \n", from_space.current); fflush (stdout);
+    indent--;
 #endif
     return p;
   }
   init_to_space (0);
 #ifdef DEBUG_PRINT
+  print_indent ();
   printf ("alloc: call gc: %zu\n", size); fflush (stdout);
   printFromSpace(); fflush (stdout);
   p = gc (size);
-  printf("gc END %p %p %p %p\n\n", from_space.begin,
+  print_indent ();
+  printf("alloc: gc END %p %p %p %p\n\n", from_space.begin,
 	 from_space.end, from_space.current, p); fflush (stdout);
   printFromSpace(); fflush (stdout);
+  indent--;
   return p;
 #else
   return gc (size);

@@ -11,6 +11,8 @@ __gc_stack_top:	        .long	0
 			.globl	__post_gc
 			.globl	L__gc_init
 			.globl	__gc_root_scan_stack
+			.globl	__gc_stack_top
+			.globl	__gc_stack_bottom
 			.extern	init_pool
 			.extern	gc_test_and_copy_root
 			.text
