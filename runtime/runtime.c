@@ -20,9 +20,9 @@
 
 /* # define DEBUG_PRINT 1 */
 
-#ifdef DEBUG_PRINT 1
+#ifdef DEBUG_PRINT
 int indent = 0;
-inline void print_indent (void) {
+void print_indent (void) {
   for (int i = 0; i < indent; i++) printf (" ");
   printf("| ");
 }
@@ -1127,6 +1127,9 @@ extern void* /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
   pop_extra_root (&b);
   pop_extra_root (&a);
 
+  da = TO_DATA(a);
+  db = TO_DATA(b);
+  
   d->tag = STRING_TAG | ((LEN(da->tag) + LEN(db->tag)) << 3);
 
   strncpy (d->contents               , da->contents, LEN(da->tag));
