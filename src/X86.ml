@@ -669,12 +669,18 @@ let genasm cmd prog =
   let globals =
     List.map (fun s -> Meta (Printf.sprintf "\t.globl\t%s" s)) env#publics
   in
-  let data = [Meta "\t.data";
-              Meta "_init:\t.int 0";
+  let data = [Meta "\t.data"] @
+             (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings) @
+             [Meta "_init:\t.int 0";
               Meta "\t.section custom_data,\"aw\",@progbits";
               Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size)] @
-              (List.map (fun s -> Meta (Printf.sprintf "%s:\t.int\t1" s)) env#globals) @
-              (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings)
+              (List.map (fun s -> Meta (Printf.sprintf "%s:\t.int\t1" s)) env#globals)
+  (* let data = [Meta "\t.data";
+   *             Meta "_init:\t.int 0";
+   *             Meta "\t.section custom_data,\"aw\",@progbits";
+   *             Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size)] @
+   *             (List.map (fun s -> Meta (Printf.sprintf "%s:\t.int\t1" s)) env#globals) @
+   *             (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings) *)
   in
   let asm = Buffer.create 1024 in
   List.iter
