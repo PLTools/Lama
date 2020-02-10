@@ -1,0 +1,41 @@
+\chapter{Driver Options and Separate Compilation}
+\label{sec:driver}
+
+Driver is a command-line unitility "\texttt{lamac}" which controls the invocation of the compiler. The
+general format of invocation is
+
+\begin{lstlisting}
+    lamac $\;options\; filename$
+\end{lstlisting}
+
+Only one file name can be processed at once, the file name and the options can be specified in
+arbitrary order.
+
+The driver operates in a few modes:
+
+\begin{itemize}
+\item Interpreter mode. Performs an interpretation of a source program using the reference source-level interpreter ("\texttt{-i}") or
+  compiles and runs a source on the stack machine ("\texttt{-s}"). In this mode separate compilation is not supported, thus no external
+  units can be accessed (including "\lstinline|Std|"), only the standard set of builtins is available. 
+\item Native mode, compilation ("\lstinline{-c}"). Compiles a source file into native code and writes an object file. All referenced
+  external unit interfaces must have to be accessible; however no linking is performed and no executable is built.
+\item Native mode, build (default). Same as for the native compilation, but additionally performs linking with the runtime library and
+  all external units object files, generating executable.
+\end{itemize}
+
+Additionally, the following options can be given to the driver:
+
+\begin{itemize}
+\item "\texttt{-I $path$}"~--- specifies a path to look for external units. Multiples instances of this option can be given in driver's
+  invocation, and the paths are looked up in that order.
+\item "\texttt{-dp}"~--- forced the driver to dump the AST of compiled unit. The dump is written in the file with the same
+  basename as the source one, with the extension replaced with "\texttt{.ast}".
+\item "\texttt{-ds}"~--- forces the driver to sump stack machine code. The option is only in effect in stack interpreter on
+  native mode. The sump is written in the file "\texttt{.sm}".
+\item "\texttt{-v}"~--- makes the dirver to print the version of the compiler.
+\item "\texttt{-h}"~--- makes the driver to print the helpon options.
+\end{itemize}
+
+Apart from the paths specified by the "\texttt{-I}" option the driver uses the environment variable "\texttt{LAMA\_STD}"
+to locate the runtime and standard libraries (see~\ref{sec:stdlib}). Thus, the units from standard libraries are accessible
+without any "-I" option given.
