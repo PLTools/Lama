@@ -5,51 +5,78 @@ The standard library is comprised of the runtime for the language and the set of
 
 \section{Unit \texttt{Std}}
 
-The unit "\texttt{Std}" provides the interface for the runtime of the language. The implementation of
-entities, defined in "\texttt{Std}", reside in the runtime itself. The import of "\texttt{Std}"
+The unit "\lstinline|Std|" provides the interface for the runtime of the language. The implementation of
+entities, defined in "\lstinline|Std|", resides in the runtime itself. The import of "\lstinline|Std|"
 is added implicitly by the compiler and can not be specified by an end user.
 
 The following declarations are accessible:
 
-\paragraph{\lstinline|fun read ()|}~--- reads an integer value from the standard input, printing a prompt "\texttt{>}".
+\descr{\lstinline|fun read ()|}{Reads an integer value from the standard input, printing a prompt "\lstinline|>|".}
 
-\paragraph{\lstinline|fun write (int)|}~--- writes an integer value to the standard output.
+\descr{\lstinline|fun write (int)|}{Writes an integer value to the standard output.}
 
-\paragraph{\lstinline|sysargs|}~--- a variable which holds an array of command-lines arguments of the application (including the
-name of the executable itself).
+\descr{\lstinline|sysargs|}{A variable which holds an array of command-line arguments of the application (including the
+name of the executable itself).}
 
-\paragraph{\lstinline|fun makeArray (size)|}~--- creates a fresh array of a given length. The elements of the array are left uninitialized.
+\descr{\lstinline|fun makeArray (size)|}{Creates a fresh array of a given length. The elements of the array are left uninitialized.}
 
-\paragraph{\lstinline|fun makeString (size)|}~--- creates a fresh string of a given length. The elements of the string are left uninitialized.
+\descr{\lstinline|fun makeString (size)|}{Creates a fresh string of a given length. The elements of the string are left uninitialized.}
 
-\paragraph{\lstinline|fun stringcat (list)|}~--- takes a list of strings and returns the concatenates all its elements.
+\descr{\lstinline|fun stringcat (list)|}{Takes a list of strings and returns the concatenates all its elements.}
 
-\paragraph{\lstinline|fun matchSubString (subj, patt, pos)|}~--- takes two strings "\texttt{subj}" and "\text{patt}" and integer position "\texttt{pos}" and
-checks if a substing of "\texttt{subj}" starting at position "\texttt{pos}" is equal to "\text{patt}"; returns integer value.
+\descr{\lstinline|fun matchSubString (subj, patt, pos)|}{Takes two strings "\lstinline|subj|" and "\lstinline|patt|" and integer position "\lstinline|pos|" and
+checks if a substing of "\lstinline|subj|" starting at position "\lstinline|pos|" is equal to "\lstinline|patt|"; returns integer value.}
 
-\lstinline|fun sprintf (fmt, ...)|
-\lstinline|fun substring (str, pos, len)|
-\lstinline|infix ++ at + (str1, str2)|
+\descr{\lstinline|fun sprintf (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib}) and a variable number of arguments and
+returns a string, acquired via processing these arguments according to the format string. Note: indexed arguments are not supported.}
 
-\lstinline|fun clone (value)|
-\lstinline|fun hash (value)|
-\lstinline|fun compare (value1, value2)|
+\descr{\lstinline|fun substring (str, pos, len)|}{Takes a string, an integer position and length, and returs a substring of requested length of
+  given string starting from given position. Raises an error if the original string is shorter then \lstinline|pos+len-1|.}
 
-\lstinline|fun fst (value)|
-\lstinline|fun snd (value)|
-\lstinline|fun hd (value)|
-\lstinline|fun tl (value)|
+\descr{\lstinline|infix ++ at + (str1, str2)|}{String concatenation infix operator.}
 
-\lstinline|fun readLine ()|
-\lstinline|fun printf (fmt, ...)|
-\lstinline|fun fopen (fname, mode)|
-\lstinline|fun fclose (file)|
-\lstinline|fun fread (fname)|
-\lstinline|fun fwrite (fname, contents)|
-\lstinline|fun fprintf (file, fmt, ...)|
+\descr{\lstinline|fun clone (value)|}{Performs a shallow cloning of the argument value.}
 
-\lstinline|fun regexp (str)|
-\lstinline|fun regexpMatch (pattern, subj, pos)|
+\descr{\lstinline|fun hash (value)|}{Returns integer hash for the argument value; also works for cyclic data structures.}
 
-\lstinline|fun failure (fmt, ...)|
+\descr{\lstinline|fun compare (value1, value2)|}{Performs a structural deep comparison of two values. Determines a
+  linear order relation for every pairs of values. Returns \lstinline|0| if the values are structurally equal, negative or
+  positive integers otherwise. May not work for cyclic data structures.}
+
+\descr{\lstinline|fun fst (value)|}{Returns the first subvalue for a given boxed value.}
+
+\descr{\lstinline|fun snd (value)|}{Returns the second subvalue for a given boxed value.}
+
+\descr{\lstinline|fun hd (value)|}{Returns the head of a given list.}
+
+\descr{\lstinline|fun tl (value)|}{Return the tail of a given list.}
+
+\descr{\lstinline|fun readLine ()|}{Reads a line from the standard input and returns it as a string.}
+
+\descr{\lstinline|fun printf (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib} and a variable number of arguments and
+prints these arguments on the standard output, according to the format string.}
+
+\descr{\lstinline|fun fopen (fname, mode)|}{Opens a file of given name in a given mode. Both arguments are strings, the return value is
+an external pointer to file structure.}
+
+\descr{\lstinline|fun fclose (file)|}{Closes a file. The file argument should be that acquired by "\lstinline|fopen|" function.}
+
+\descr{\lstinline|fun fread (fname)|}{Reads a file content and returns it as a string. The argument is a file name as a string, the file
+is automatically open and closed within the call.}
+
+\descr{\lstinline|fun fwrite (fname, contents)|}{Writes a file. The arguments are file name and the contents to write as strings. The file
+is automatically created and closed within the call.}
+
+\descr{\lstinline|fun fprintf (file, fmt, ...)|}{Same as "\lstinline|printf|", but outputs to a given file. The file argument should be that acquired
+  by \lstinline|fopen| function.}
+
+\descr{\lstinline|fun regexp (str)|}{Compiles a string representation of a regular expression (as per GNULib's regexp~\cite{GNULib}) into
+  an internal representation. The return value is a external pointer to the internal representation.}
+
+\descr{\lstinline|fun regexpMatch (pattern, subj, pos)|}{Matches a string "\lstinline{subj}", starting from the position "\lstinline|pos|",
+  against a pattern "\lstinline{pattern}". The pattern is an external pointer to a compiled representation, returned by the
+  function "\lstinline|regexp|". The return value is the number of matched characters.}
+
+\descr{\lstinline|fun failure (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib}, and a variable number of parameters,
+  prints these parameters according to the format string on the standard error and exits. Note: indexed arguments are not supported.)}
 

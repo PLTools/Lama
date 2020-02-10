@@ -27,6 +27,7 @@
 \usepackage{placeins}
 \usepackage{xspace}
 \usepackage{bm}
+\usepackage{enumitem}
 
 \makeatletter
 
@@ -84,6 +85,8 @@
 \newcommand{\token}[1]{\textsc{#1}}
 \newcommand{\alt}{\s\mid\s}
 \newcommand{\s}{\:\:}
+
+\newcommand{\descr}[2]{\smallskip{#1}\begin{itemize}[noitemsep,topsep=0pt]\item[]{#2}\end{itemize}}
 
 \lstdefinelanguage{alm}{
 keywords={skip,if,then,else,elif,fi,while,do,od,repeat,until,for,fun,local,public,return,import,length,
