@@ -80,3 +80,73 @@ is automatically created and closed within the call.}
 \descr{\lstinline|fun failure (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib}, and a variable number of parameters,
   prints these parameters according to the format string on the standard error and exits. Note: indexed arguments are not supported.)}
 
+\section{Unit \texttt{Array}}
+
+Array processing functions:
+
+\descr{\lstinline|fun initArray (n, f)|}{Takes an integer value "\lstinline|n|" and a function "\lstinline|f|" and creates an array
+  \[
+     \mbox{\lstinline|[f (0), f (1), ..., f (n-1)]|}
+  \]
+}
+
+\descr{\lstinline|fun mapArray (f, a)|}{Maps a function "\lstinline|f|" over an array "\lstinline|a|" and returns a new array.}
+
+\descr{\lstinline|fun arrayList (a)|}{Converts an array to list (preserving the order of elements).}
+
+\descr{\lstinline|fun listArray (l)|}{Converts a list to array (preserving the order of elements).}
+
+\descr{\lstinline|fun foldlArray (f, acc, a)|}{Folds an array "\lstinline|a|" with a function "\lstinline|f|" and initial value "\lstinline|acc|"
+  is the left-to-right manner.}
+
+\descr{\lstinline|fun foldrArray (f, acc, a)|}{Folds an array "\lstinline|a|" with a function "\lstinline|f|" and initial value "\lstinline|acc|"
+  is the right-to-left manner.}
+
+\descr{\lstinline|fun iterArray (f, a)|}{Applies a function "\lstinline|f|" to each element of an array "\lstinline|a|"; does not return a value.}
+
+\descr{\lstinline|fun iteriArray (f, a)|}{Applies a function "\lstinline|f|" to each element of an array "\lstinline|a|" and its index (index first);
+  does not return a value.}
+
+\section{Unit \texttt{Collection}}
+
+Collections, implemented as AVL-trees. Three types of collections are provided: sets of ordered elements, maps of ordered keys 
+
+
+\section{Unit \texttt{Fun}}
+
+Some generic functional stuff:
+
+\descr{\lstinline|fun id (x)|}{The identify function.}
+
+\descr{\lstinline[mathescape=false]|infixl $ after := (f, x)|}{Left-associative infix for function application.}
+
+\descr{\lstinline|infix # after * (f, g)|}{Non-associative infix for functional composition.}
+
+\newsavebox\factbox
+
+\begin{lrbox}{\factbox}
+\begin{lstlisting}
+    fix (fun (f) { 
+           fun (n) { 
+             if n == 1 then 1 else n * f (n-1) fi
+           }
+         })     
+\end{lstlisting}
+\end{lrbox}
+
+\descr{\lstinline|fun fix (f)|}{Fixpoint combinator. The argument is a knot-accepting function, thus a factorial can be
+  defined as
+
+  \usebox\factbox
+}
+
+\section{Unit \texttt{Lazy}}
+
+\section{Unit \texttt{List}}
+
+\section{Unit \texttt{Matcher}}
+
+\section{Unit \texttt{Ostap}}
+
+\section{Unit \texttt{Ref}}
+
