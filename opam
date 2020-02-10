@@ -1,27 +1,31 @@
-opam-version: "1.2"
-authors: "dboulytchev@gmail.com"
+opam-version: "2.0"
+name: "Lama"
+version: "0.3"
+
+synopsis: "Lama programming system"
 maintainer: "dboulytchev@gmail.com"
-version:  "0.3"
+authors: "dboulytchev@gmail.com"
 homepage: "https://github.com/dboulytchev/compiler-workout"
 bug-reports: "https://github.com/dboulytchev/compiler-workout/issues"
-dev-repo:    "git+https://github.com/dboulytchev/compiler-workout.git"
-
-build: [
-  [make "-f" "Makefile" ]
-]
-
-remove:  ["ocamlfind" "remove" "compiler-workout"]
-flags: [ light-uninstall ]
-
-build-test: [
-  [make "-f" "Makefile" "regression"]
-]
 
 depends: [
-  "ocamlbuild" {build}
-  "ocamlfind"
-  "camlp5" {= "7.05"}
-  "ostap" {= "0.3"}
-  "GT" {= "0.0.1"}
-  "re" {= "1.7.2"}
+  "ocaml"       { >= "4.07.1" } 
+  "ocamlfind"   { build } 
+  "camlp5"      { >= "7.05"}
+  "ostap"       { >= "0.3"}
+  "GT"          { >= "0.2"}
 ]
+
+build: [
+  [make "-f" "Makefile"]
+  [make "-f" "Makefile" "regression"] {with-test}
+]
+
+#remove: ["ocamlfind" "remove" "compiler-workout"]
+#flags: light-uninstall
+
+dev-repo: "git+https://github.com/JetBrains-Research/Lama.git"
+url {
+  src: "git+https://github.com/JetBrains-Research/Lama.git#fcf"
+}
+
