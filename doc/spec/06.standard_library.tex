@@ -1,1 +1,55 @@
 \chapter{Standard Library}
+\label{sec:stdlib}
+
+The standard library is comprised of the runtime for the language and the set of pre-shipped units written in \lama itself.
+
+\section{Unit \texttt{Std}}
+
+The unit "\texttt{Std}" provides the interface for the runtime of the language. The implementation of
+entities, defined in "\texttt{Std}", reside in the runtime itself. The import of "\texttt{Std}"
+is added implicitly by the compiler and can not be specified by an end user.
+
+The following declarations are accessible:
+
+\paragraph{\lstinline|fun read ()|}~--- reads an integer value from the standard input, printing a prompt "\texttt{>}".
+
+\paragraph{\lstinline|fun write (int)|}~--- writes an integer value to the standard output.
+
+\paragraph{\lstinline|sysargs|}~--- a variable which holds an array of command-lines arguments of the application (including the
+name of the executable itself).
+
+\paragraph{\lstinline|fun makeArray (size)|}~--- creates a fresh array of a given length. The elements of the array are left uninitialized.
+
+\paragraph{\lstinline|fun makeString (size)|}~--- creates a fresh string of a given length. The elements of the string are left uninitialized.
+
+\paragraph{\lstinline|fun stringcat (list)|}~--- takes a list of strings and returns the concatenates all its elements.
+
+\paragraph{\lstinline|fun matchSubString (subj, patt, pos)|}~--- takes two strings "\texttt{subj}" and "\text{patt}" and integer position "\texttt{pos}" and
+checks if a substing of "\texttt{subj}" starting at position "\texttt{pos}" is equal to "\text{patt}"; returns integer value.
+
+\lstinline|fun sprintf (fmt, ...)|
+\lstinline|fun substring (str, pos, len)|
+\lstinline|infix ++ at + (str1, str2)|
+
+\lstinline|fun clone (value)|
+\lstinline|fun hash (value)|
+\lstinline|fun compare (value1, value2)|
+
+\lstinline|fun fst (value)|
+\lstinline|fun snd (value)|
+\lstinline|fun hd (value)|
+\lstinline|fun tl (value)|
+
+\lstinline|fun readLine ()|
+\lstinline|fun printf (fmt, ...)|
+\lstinline|fun fopen (fname, mode)|
+\lstinline|fun fclose (file)|
+\lstinline|fun fread (fname)|
+\lstinline|fun fwrite (fname, contents)|
+\lstinline|fun fprintf (file, fmt, ...)|
+
+\lstinline|fun regexp (str)|
+\lstinline|fun regexpMatch (pattern, subj, pos)|
+
+\lstinline|fun failure (fmt, ...)|
+

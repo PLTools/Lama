@@ -23,12 +23,20 @@ The driver operates in a few modes:
   all external units object files, generating executable.
 \end{itemize}
 
+In the native modes, the driver also creates import files ("\texttt{.i}") which are required for external units import to
+work properly. These files has to reside in the same directory as object files for corresponding units.
+
+Each natively compiled object file implicitly references all imported units; the top-level expression of each
+unit is compiled into \emph{unit initialization procedure}, which calls unit initialization procedures of
+all imported units in the same order these unites were imported. It is guaranteed that unit initialization
+procedure for each unit will be called only once (regardless of the imports' shape for the whole application).
+
 Additionally, the following options can be given to the driver:
 
 \begin{itemize}
 \item "\texttt{-I $path$}"~--- specifies a path to look for external units. Multiples instances of this option can be given in driver's
   invocation, and the paths are looked up in that order.
-\item "\texttt{-dp}"~--- forced the driver to dump the AST of compiled unit. The dump is written in the file with the same
+\item "\texttt{-dp}"~--- forces the driver to dump the AST of compiled unit. The dump is written in the file with the same
   basename as the source one, with the extension replaced with "\texttt{.ast}".
 \item "\texttt{-ds}"~--- forces the driver to sump stack machine code. The option is only in effect in stack interpreter on
   native mode. The sump is written in the file "\texttt{.sm}".
@@ -38,4 +46,4 @@ Additionally, the following options can be given to the driver:
 
 Apart from the paths specified by the "\texttt{-I}" option the driver uses the environment variable "\texttt{LAMA\_STD}"
 to locate the runtime and standard libraries (see~\ref{sec:stdlib}). Thus, the units from standard libraries are accessible
-without any "-I" option given.
+without any "\texttt{-I}" option given.

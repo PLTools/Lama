@@ -1,7 +1,7 @@
 all:
 	pdflatex spec.tex
-	bibtem spec
-	pdflatex.tex
+	bibtex spec
+	pdflatex spec.tex
 
 clean:
-	rm -Rf *~ *.log *.aux
+	rm -Rf *~ *.log *.aux *.toc *.bbl *.blg *.out
