@@ -312,6 +312,75 @@ Return value represents parsing result as per "\lstinline|Ostap|".}
 
 \section{Unit \texttt{Ostap}}
 
+Unit "\lstinline|Ostap|" implements monadic parser combinators in continuation-passing style with memoization~\cite{MonPC,MemoParsing,Meerkat}.
+A parser is a function of the shape
+
+\begin{lstlisting}
+    fun (k) {
+      fun (s) {...}
+    }
+\end{lstlisting}
+
+where "\lstinline|k|"~--- a \emph{continuation}, "\lstinline|s|"~--- an input stream. A parser returns either "\lstinline|Succ (v, s)|", where "\lstinline|v|"~--- some value,
+representing the result of parsing, "\lstinline|s|"~--- residual input stream, or "\lstinline|Fail (err, line, col)|", where "\lstinline|err|"~--- a string, describing
+a parser error, "\lstinline|line|", "\lstinline|col|"~--- line and column at which the error was encountered.
+
+The unit describes some primitive parsers and combinators which allow to construct new parsers from existing ones.
+
+\descr{\lstinline|fun initOstap ()|}{Clears and initializes the internal memoization tables. Called implicitly at unit initiliation time.}
+
+\descr{\lstinline|fun memo (f)|}{Takes a parser "\lstinline|a|" and returns its memoized version. Needed for some parsers (for expamle, left-recursive ones).}
+
+\descr{\lstinline|fun token (x)|}{Takes a string and returns a parser which recognizes exactly this string.}
+
+\descr{\lstinline|fun eof (k)|}{A parser which recognizes the end of stream.}
+
+\descr{\lstinline|fun empty (k)|}{A parser which recognizes empty string.}
+
+\descr{\lstinline|fun alt (a, b)|}{A parser combinator which constructs a parser alternating between "\lstinline|a|" and "\lstinline|b|".}
+
+\descr{\lstinline|fun seq (a, b)|}{A parser combinator which construct a sequential composition of "\lstinline|a|" and "\lstinline|b|". While
+  "\lstinline|a|" is a reqular parser,  "\lstinline|b|" is a \emph{function} which takes the result of parsing by "\lstinline|a|" and
+returns a parser (\emph{monadicity}).}
+
+\descr{\lstinline|infixr \| before !! (a, b)|}{Infix synonym for "\lstinline|alt|".}
+    
+\descr{\lstinline|infixr \|> after \| (a, b)|}{Infix synonym for "\lstinline|seq|".}
+
+\descr{\lstinline|infix @ at * (a, f)|}{An operation which attaches a semantics action "\lstinline|f|" to a parser "\lstinline|a|". Returns a
+parser which behaves exactly as "\lstinline|a|", but additionally applies "\lstinline|f|" to the result if the parsing is succesfull.}
+
+\descr{\lstinline|fun lift (f)|}{Lifts "\lstinline|f|" into a function which ignores its argument.}
+
+\descr{\lstinline|fun bypass (f)|}{Convert "\lstinline|f|" into a function which parser with "\lstinline|f|" but returns its argument.
+  Literally, "\lstinline|bypass (f) = fun (x) {f @ lift (x)}|"}
+
+\descr{\lstinline|fun opt (a)|}{For a parser "\lstinline|a|" returns a parser which parser either "\lstinline|a|" of empty string.}
+
+\descr{\lstinline|fun rep0 (a)|}{For a parser "\lstinline|a|" returns a parser which parser a zero or more repetitions of "\lstinline|a|"}
+
+\descr{\lstinline|fun rep (a)|}{For a parser "\lstinline|a|" returns a parser which parser a one or more repetitions of "\lstinline|a|"}
+
+\descr{\lstinline|fun listBy (item, sep)|}{Constructs a parser which parses a non-empty list of "\lstinline|item|" delimited by "\lstinline|sep|".} 
+
+\descr{\lstinline|fun list0By (item, sep)|}{Constructs a parser which parses a possibly empty list of "\lstinline|item|" delimited by "\lstinline|sep|".} 
+
+\descr{\lstinline|fun list (item)|}{Constructs a parser which parses a non-empty list of "\lstinline|item|" delimited by ",".} 
+
+\descr{\lstinline|fun list0 (item)|}{Constructs a parser which parses a possibly empty list of "\lstinline|item|" delimited by ",".} 
+
+\descr{\lstinline|fun parse (p, m)|}{Parsers a matcher "\lstinline|m|" with a parser "\lstinline|p|". Returns ether "\lstinline|Succ (v)|" where
+  "\lstinline|v|"~--- a parsed value, or "\lstinline|Fail (err, line, col)|", where "\lstinline|err|"~--- a stirng describing parse error, "\lstinline|line|",
+  "\lstinline|col|"~--- this error's coordinates. This function may fail if detects the ambiguity of parsing.}
+
+\descr{\lstinline|fun parseString (p, s)|}{Parsers a string "\lstinline|s|" with a parser "\lstinline|p|". Returns ether "\lstinline|Succ (v)|" where
+  "\lstinline|v|"~--- a parsed value, or "\lstinline|Fail (err, line, col)|", where "\lstinline|err|"~--- a stirng describing parse error, "\lstinline|line|",
+  "\lstinline|col|"~--- this error's coordinates. This function may fail if detects the ambiguity of parsing.}
+
+\descr{\lstinline|fun expr (ops, opnd)|}{A super-combinator to generate infix expression parsers. The argument "\lstinline|opnd|" parses primary operand, "\lstinline|ops|" is
+  a list of infix operator descriptors.
+}
+
 \section{Unit \texttt{Ref}}
 
 The unit provides an emulation for first-class references.
