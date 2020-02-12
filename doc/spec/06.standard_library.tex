@@ -377,8 +377,28 @@ parser which behaves exactly as "\lstinline|a|", but additionally applies "\lsti
   "\lstinline|v|"~--- a parsed value, or "\lstinline|Fail (err, line, col)|", where "\lstinline|err|"~--- a stirng describing parse error, "\lstinline|line|",
   "\lstinline|col|"~--- this error's coordinates. This function may fail if detects the ambiguity of parsing.}
 
+\newsavebox\exprbox
+
+\begin{lrbox}{\exprbox}
+\begin{lstlisting}
+    {[Left, {[token ("+"), fun (l, r) {Add (l, r)}],
+             [token ("-"), fun (l, r) {Sub (l, r)}]
+            }],
+     [Left, {[token ("*"), fun (l, r) {Mul (l, r)}],
+             [token ("/"), fun (l, r) {Div (l, r)}]
+            }]}
+\end{lstlisting}
+\end{lrbox}
+
 \descr{\lstinline|fun expr (ops, opnd)|}{A super-combinator to generate infix expression parsers. The argument "\lstinline|opnd|" parses primary operand, "\lstinline|ops|" is
-  a list of infix operator descriptors.
+  a list of infix operator descriptors. Each element of the list describes one \emph{precedence level} with precedence increasing from head to tail. A descriptor on
+  each level is a pair, where the first element describes the associativity at the given level ("\lstinline|Left|", "\lstinline|Right|" or "\lstinline|None|") and
+  the second element is a list of pairs~--- a parser for an infix operator and the semantics action (a two-argument function). For example,
+
+  \usebox\exprbox
+
+  specifies two levels of precedence, both left-associative, with infix operators "\lstinline|+|" and "\lstinline|-|" at the first level and
+  "\lstinline|*|" and "\lstinline|/|" at the second. The semantics for these operators constructs abstract sytax trees.
 }
 
 \section{Unit \texttt{Ref}}
