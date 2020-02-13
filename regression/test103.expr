@@ -1,0 +1,4 @@
+repeat
+  local n = read ();
+  write (n)
+until n > 0

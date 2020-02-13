@@ -178,7 +178,7 @@ void* Ls__Infix_58 (void *p, void *q) {
 
   push_extra_root(&p);
   push_extra_root(&q);
-  res = Bsexp (3, p, q, 848787);
+  res = Bsexp (BOX(3), p, q, 848787);
   pop_extra_root(&q);
   pop_extra_root(&p);
 
@@ -779,6 +779,8 @@ extern void* LmakeArray (int length) {
 
   r->tag = ARRAY_TAG | (n << 3);
 
+  memset (r->contents, 0, n * sizeof(int));
+  
   __post_gc ();
 
   return r->contents;
@@ -869,13 +871,13 @@ extern void* Bstringval (void *p) {
   return s;
 }
 
-extern void* Bclosure (int n, void *entry, ...) {
-  va_list args = (va_list) BOX (NULL);
-  int     i    = BOX(0),
-          ai   = BOX(0);
+extern void* Bclosure (int bn, void *entry, ...) {
+  va_list args; 
+  int     i, ai;
   register int * ebp asm ("ebp");
-  size_t * argss = NULL;
-  data    *r   = (data*) BOX (NULL);
+  size_t  *argss;
+  data    *r; 
+  int     n = UNBOX(bn);
   
   __pre_gc ();
 #ifdef DEBUG_PRINT
@@ -917,12 +919,12 @@ extern void* Bclosure (int n, void *entry, ...) {
   return r->contents;
 }
 
-extern void* Barray (int n, ...) {
-  va_list args = (va_list) BOX (NULL);
-  int     i    = BOX(0),
-          ai   = BOX(0);
-  data    *r   = (data*) BOX (NULL);
-
+extern void* Barray (int bn, ...) {
+  va_list args; 
+  int     i, ai; 
+  data    *r; 
+  int     n = UNBOX(bn);
+    
   __pre_gc ();
   
 #ifdef DEBUG_PRINT
@@ -949,13 +951,14 @@ extern void* Barray (int n, ...) {
   return r->contents;
 }
 
-extern void* Bsexp (int n, ...) {
-  va_list args = (va_list) BOX (NULL);
-  int     i    = BOX(0);
-  int     ai   = BOX(0);
-  size_t * p   = NULL;
-  sexp   *r    = (sexp*) BOX (NULL);
-  data   *d    = (data *) BOX (NULL);
+extern void* Bsexp (int bn, ...) {
+  va_list args; 
+  int     i;    
+  int     ai;  
+  size_t *p;  
+  sexp   *r;  
+  data   *d;  
+  int n = UNBOX(bn);
 
   __pre_gc () ;
   
@@ -995,27 +998,27 @@ extern void* Bsexp (int n, ...) {
 }
 
 extern int Btag (void *d, int t, int n) {
-  data *r = (data *) BOX (NULL);
+  data *r; 
   
   if (UNBOXED(d)) return BOX(0);
   else {
     r = TO_DATA(d);
 #ifndef DEBUG_PRINT
-    return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == t && LEN(r->tag) == n);
+    return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == UNBOX(t) && LEN(r->tag) == UNBOX(n));
 #else
     return BOX(TAG(r->tag) == SEXP_TAG &&
-	     GET_SEXP_TAG(TO_SEXP(d)->tag) == t && LEN(r->tag) == n);
+               GET_SEXP_TAG(TO_SEXP(d)->tag) == UNBOX(t) && LEN(r->tag) == UNBOX(n));
 #endif
   }
 }
 
 extern int Barray_patt (void *d, int n) {
-  data *r = BOX(NULL);
+  data *r; 
   
   if (UNBOXED(d)) return BOX(0);
   else {
     r = TO_DATA(d);
-    return BOX(TAG(r->tag) == ARRAY_TAG && LEN(r->tag) == n);
+    return BOX(TAG(r->tag) == ARRAY_TAG && LEN(r->tag) == UNBOX(n));
   }
 }
 

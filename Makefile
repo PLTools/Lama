@@ -1,3 +1,6 @@
+EXECUTABLE = src/rc.opt
+INSTALL ?= install -v
+MKDIR ?= mkdir
 SHELL := /bin/bash
 
 .PHONY: all regression
@@ -7,7 +10,17 @@ all:
 	pushd runtime && make && popd
 	pushd stdlib && make && popd
 
-#install: ;
+STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.expr runtime/runtime.a runtime/Std.i)
+#$(info $(STD_FILES))
+
+install: all
+	$(INSTALL) $(EXECUTABLE) `opam var bin`
+	$(MKDIR) -p `opam var share`/Lama
+	$(INSTALL) $(STD_FILES) `opam var share`/Lama/
+
+uninstall:
+	$(RM) -r `opam var share`/Lama
+	$(RM) `opam var bin`/$(EXECUTABLE)
 
 regression:
 	pushd regression && make clean check && popd

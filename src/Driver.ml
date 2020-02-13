@@ -44,7 +44,7 @@ class options args =
   object (self)
     val i      = ref 1
     val infile = ref (None : string option)
-    val paths  = ref [try Sys.getenv "RC_RUNTIME" with _ -> "../runtime"]
+    val paths  = ref [X86.get_std_path ()]
     val mode   = ref (`Default : [`Default | `Eval | `SM | `Compile ])
     (* Workaround until Ostap starts to memoize properly *)
     val const  = ref false

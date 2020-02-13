@@ -128,7 +128,8 @@ let compile cmd env imports code =
   | ">=" -> "ge"
   | ">"  -> "g"
   | _    -> failwith "unknown operator"
-  in 
+  in
+  let box n = (n lsl 1) lor 1 in 
   let rec compile' env scode =
     let on_stack = function S _ -> true | _ -> false in
     let mov x s = if on_stack x && on_stack s then [Mov (x, eax); Mov (eax, s)] else [Mov (x, s)]  in
@@ -172,8 +173,8 @@ let compile cmd env imports code =
         let env, pushs = push_args env [] n in
         let pushs      =
           match f with
-          | "Barray" -> List.rev @@ (Push (L n)) :: pushs
-          | "Bsexp"  -> List.rev @@ (Push (L n)) :: pushs
+          | "Barray" -> List.rev @@ (Push (L (box n))) :: pushs
+          | "Bsexp"  -> List.rev @@ (Push (L (box n))) :: pushs
           | "Bsta"   -> pushs
           | _        -> List.rev pushs
         in
@@ -203,7 +204,7 @@ let compile cmd env imports code =
               pushr @
               push_closure @
               [Push (M ("$" ^ name));
-              Push (L closure_len);
+              Push (L (box closure_len));
               Call "Bclosure";
               Binop ("+", L (word_size * (closure_len + 2)), esp); 
               Mov (eax, s)] @
@@ -211,7 +212,7 @@ let compile cmd env imports code =
              
   	  | CONST n ->
              let s, env' = env#allocate in
-	     (env', [Mov (L ((n lsl 1) lor 1), s)])
+	     (env', [Mov (L (box n), s)])
 
           | STRING s ->
              let s, env = env#string s in
@@ -431,12 +432,12 @@ let compile cmd env imports code =
              let s1, env = env#allocate in
              let s2, env = env#allocate in
              let env, code = call env ".tag" 3 in
-             env, [Mov (L env#hash t, s1); Mov (L n, s2)] @ code
+             env, [Mov (L (box (env#hash t)), s1); Mov (L (box n), s2)] @ code
 
           | ARRAY n ->
              let s, env    = env#allocate in
              let env, code = call env ".array_patt" 2 in
-             env, [Mov (L n, s)] @ code
+             env, [Mov (L (box n), s)] @ code
 
           | PATT StrCmp -> call env ".string_patt" 2
 
@@ -454,7 +455,7 @@ let compile cmd env imports code =
           | FAIL ((line, col), value) ->                       
              let v, env = if value then env#peek, env else env#pop in
              let s, env = env#string cmd#get_infile in
-             env, [Push (L col); Push (L line); Push (M ("$" ^ s)); Push v; Call "Bmatch_failure"; Binop  ("+", L (3 * word_size), esp)]
+             env, [Push (L (box col)); Push (L (box line)); Push (M ("$" ^ s)); Push v; Call "Bmatch_failure"; Binop  ("+", L (3 * word_size), esp)]
              
           | i ->
              invalid_arg (Printf.sprintf "invalid SM insn: %s\n" (GT.show(insn) i))
@@ -688,6 +689,11 @@ let genasm cmd prog =
     (globals @ data @ [Meta "\t.text"] @ code);
   Buffer.contents asm
 
+let get_std_path () =
+  match Sys.getenv_opt "RC_RUNTIME" with
+  | Some s -> s
+  | None   -> "../runtime"
+                                      
 (* Builds a program: generates the assembler file and compiles it with the gcc toolchain *)
 let build cmd prog =
   let find_objects imports paths =
@@ -710,7 +716,7 @@ let build cmd prog =
   in
   cmd#dump_file "s" (genasm cmd prog);
   cmd#dump_file "i" (Interface.gen prog);
-  let inc  = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
+  let inc  = get_std_path () in
   match cmd#get_mode with
   | `Default ->
      let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in

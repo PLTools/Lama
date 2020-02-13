@@ -20,7 +20,8 @@ build: [
   [make "-f" "Makefile"]
   [make "-f" "Makefile" "regression"] {with-test}
 ]
-
+install: [make "install"]
+    
 #remove: ["ocamlfind" "remove" "compiler-workout"]
 #flags: light-uninstall
 
