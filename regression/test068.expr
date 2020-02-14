@@ -1,4 +1,4 @@
-fun lazy (f) {
+fun makeLazy (f) {
   local flag = 0, value = 0;
 
   return fun () {
@@ -12,7 +12,7 @@ fun lazy (f) {
   }
 }
 
-local l = lazy (fun () {write (1); return 800});
+local l = makeLazy (fun () {write (1); return 800});
 local x = read ();
 
 write (l ());

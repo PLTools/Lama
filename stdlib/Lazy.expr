@@ -1,4 +1,4 @@
-public fun lazy (f) {
+public fun makeLazy (f) {
   local value, set = false;
   
   fun () {

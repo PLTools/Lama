@@ -631,7 +631,7 @@ module Expr =
                           
     (* UGLY! *)
     let predefined_op : (Obj.t -> Obj.t -> Obj.t) ref = Pervasives.ref (fun _ _ -> invalid_arg "must not happen")
-                            
+                
     (* ======= *)
     ostap (
       parse[def][infix][atr]: h:basic[def][infix][Void] -";" t:parse[def][infix][atr] {Seq (h, t)}
@@ -731,8 +731,14 @@ module Expr =
       | %"while" e:parse[def][infix][Val] %"do" s:scope[def][infix][Void][parse def]
                                             => {isVoid atr} => %"od" {materialize atr (While (e, s))}
 
-      | %"for" i:parse[def][infix][Void] "," c:parse[def][infix][Val] "," s:parse[def][infix][Void] %"do" b:scope[def][infix][Void][parse def] => {isVoid atr} => %"od"
-                                                                     {materialize atr (Seq (i, While (c, Seq (b, s))))}
+      | %"for" i:scope[def][infix][Void][parse def] ","
+               c:parse[def][infix][Val]             ","
+               s:parse[def][infix][Void] %"do" b:scope[def][infix][Void][parse def] => {isVoid atr} => %"od"
+               {materialize atr
+                  (match i with
+                  | Scope (defs, i) -> Scope (defs, Seq (i, While (c, Seq (b, s))))
+                  | _               -> Seq (i, While (c, Seq (b, s))))
+               }
 
       | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val] => {isVoid atr} => {
           materialize atr @@
@@ -753,7 +759,9 @@ module Expr =
       | %"return" e:basic[def][infix][Val]? => {isVoid atr} => {Return e}
 
       | %"case" l:$ e:parse[def][infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[def][infix][atr][parse def])] %"esac"
-                                                                                                                                                 {Case (e, bs, l#coord, atr)}      
+                                                                                                                                                       {Case (e, bs, l#coord, atr)}
+      | l:$ %"lazy" e:basic[def][infix][Val] => {notRef atr} :: (not_a_reference l) => {ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
+      
       | -"(" parse[def][infix][atr] -")"
     )
 

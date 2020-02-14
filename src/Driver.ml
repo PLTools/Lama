@@ -14,7 +14,7 @@ let parse cmd =
     "case"; "of"; "esac"; "when";
     "boxed"; "unboxed"; "string"; "sexp"; "array";
     "infix"; "infixl"; "infixr"; "at"; "before"; "after";
-    "true"; "false"]
+    "true"; "false"; "lazy"]
   in
   Util.parse
     (object

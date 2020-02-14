@@ -1,4 +1,8 @@
+local x;
+
 repeat
   local n = read ();
-  write (n)
-until n > 0
+  x := n
+until n > 0;
+
+write (x)
