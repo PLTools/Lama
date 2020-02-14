@@ -631,23 +631,27 @@ module Expr =
                           
     (* UGLY! *)
     let predefined_op : (Obj.t -> Obj.t -> Obj.t) ref = Pervasives.ref (fun _ _ -> invalid_arg "must not happen")
-                
+
+    let defCell = Pervasives.ref 0 
+                                                      
     (* ======= *)
-    ostap (
-      parse[def][infix][atr]: h:basic[def][infix][Void] -";" t:parse[def][infix][atr] {Seq (h, t)}
-                              | basic[def][infix][atr];
-      scope[def][infix][atr][e]: <(d, infix')> : def[infix] expr:e[infix'][atr] {Scope (d, expr)} |
+    let makeParser, makeBasicParser, makeScopeParser =
+      let def s   = let Some def = Obj.magic !defCell in def s in
+      let ostap (
+      parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)}
+                              | basic[infix][atr];
+      scope[infix][atr]: <(d, infix')> : def[infix] expr:parse[infix'][atr] {Scope (d, expr)} |
                                  <(d, infix')> : def[infix] => {d <> []} => {Scope (d, materialize atr Skip)}; 
 
-      basic[def][infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary def infix) atr);
+      basic[infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary infix) atr);
 
-      primary[def][infix][atr]:
+      primary[infix][atr]:
           s:(s:"-"? {match s with None -> fun x -> x | _ -> fun x -> Binop ("-", Const 0, x)})  
-          b:base[def][infix][Val] is:(  "." f:LIDENT args:(-"(" !(Util.list)[parse def infix Val] -")")? {`Post (f, args)}
-                                      | "." %"length"                                                    {`Len}
-                                      | "." %"string"                                                    {`Str}
-                                      | "[" i:parse[def][infix][Val] "]"                                 {`Elem i}                                    
-                                      | "(" args:!(Util.list0)[parse def infix Val] ")"                  {`Call args}  
+          b:base[infix][Val] is:(  "." f:LIDENT args:(-"(" !(Util.list)[parse infix Val] -")")? {`Post (f, args)}
+                                      | "." %"length"                                           {`Len}
+                                      | "." %"string"                                           {`Str}
+                                      | "[" i:parse[infix][Val] "]"                             {`Elem i}                                    
+                                      | "(" args:!(Util.list0)[parse infix Val] ")"             {`Call args}  
           )+
         => {match (List.hd (List.rev is)), atr with
             | `Elem i, Reff -> true            
@@ -688,8 +692,8 @@ module Expr =
           in
           ignore atr (s res)
         }
-      | base[def][infix][atr];
-      base[def][infix][atr]:
+      | base[infix][atr];
+      base[infix][atr]:
         l:$ n:DECIMAL                              => {notRef atr} :: (not_a_reference l) => {ignore atr (Const n)}
       | l:$ s:STRING                               => {notRef atr} :: (not_a_reference l) => {ignore atr (String s)}
       | l:$ c:CHAR                                 => {notRef atr} :: (not_a_reference l) => {ignore atr (Const  (Char.code c))}
@@ -709,14 +713,14 @@ module Expr =
           )
       }
       | l:$ %"fun" "(" args:!(Util.list0)[ostap (l:$ x:LIDENT {Loc.attach x l#coord; x})] ")"
-               "{" body:scope[def][infix][Weak][parse def] "}"=> {notRef atr} :: (not_a_reference l) => {ignore atr (Lambda (args, body))}
-      | l:$ "[" es:!(Util.list0)[parse def infix Val] "]" => {notRef atr} :: (not_a_reference l) => {ignore atr (Array es)}
-      | -"{" scope[def][infix][atr][parse def] -"}" 
-      | l:$ "{" es:!(Util.list0)[parse def infix Val] "}" => {notRef atr} :: (not_a_reference l) => {ignore atr (match es with
+               "{" body:scope[infix][Weak] "}"=> {notRef atr} :: (not_a_reference l) => {ignore atr (Lambda (args, body))}
+      | l:$ "[" es:!(Util.list0)[parse infix Val] "]" => {notRef atr} :: (not_a_reference l) => {ignore atr (Array es)}
+      | -"{" scope[infix][atr] -"}" 
+      | l:$ "{" es:!(Util.list0)[parse infix Val] "}" => {notRef atr} :: (not_a_reference l) => {ignore atr (match es with
                                                                                       | [] -> Const 0
                                                                                       | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0))
                                                                          }
-      | l:$ t:UIDENT args:(-"(" !(Util.list)[parse def infix Val] -")")? => {notRef atr} :: (not_a_reference l) => {ignore atr (Sexp (t, match args with
+      | l:$ t:UIDENT args:(-"(" !(Util.list)[parse infix Val] -")")? => {notRef atr} :: (not_a_reference l) => {ignore atr (Sexp (t, match args with
                                                                                                               | None -> []
                                                                                                               | Some args -> args))
                                                                                         }
@@ -724,23 +728,23 @@ module Expr =
 
       | {isVoid atr} => %"skip" {materialize atr Skip}
 
-      | %"if" e:parse[def][infix][Val] %"then" the:scope[def][infix][atr][parse def]
-              elif:(%"elif" parse[def][infix][Val] %"then" scope[def][infix][atr][parse def])*
-               els:(%"else" scope[def][infix][atr][parse def])? %"fi"
+      | %"if" e:parse[infix][Val] %"then" the:scope[infix][atr]
+        elif:(%"elif" parse[infix][Val] %"then" scope[infix][atr])*
+        els:(%"else" scope[infix][atr])? %"fi"
           {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif (match els with Some e -> e | _ -> materialize atr Skip))}
-      | %"while" e:parse[def][infix][Val] %"do" s:scope[def][infix][Void][parse def]
+      | %"while" e:parse[infix][Val] %"do" s:scope[infix][Void]
                                             => {isVoid atr} => %"od" {materialize atr (While (e, s))}
 
-      | %"for" i:scope[def][infix][Void][parse def] ","
-               c:parse[def][infix][Val]             ","
-               s:parse[def][infix][Void] %"do" b:scope[def][infix][Void][parse def] => {isVoid atr} => %"od"
+      | %"for" i:scope[infix][Void] ","
+               c:parse[infix][Val]             ","
+               s:parse[infix][Void] %"do" b:scope[infix][Void] => {isVoid atr} => %"od"
                {materialize atr
                   (match i with
                   | Scope (defs, i) -> Scope (defs, Seq (i, While (c, Seq (b, s))))
                   | _               -> Seq (i, While (c, Seq (b, s))))
                }
 
-      | %"repeat" s:scope[def][infix][Void][parse def] %"until" e:basic[def][infix][Val] => {isVoid atr} => {
+      | %"repeat" s:scope[infix][Void] %"until" e:basic[infix][Val] => {isVoid atr} => {
           materialize atr @@
             match s with
             | Scope (defs, s) ->
@@ -756,14 +760,16 @@ module Expr =
                Scope (defs, Repeat (s, e))
             | _  -> Repeat (s, e)
       }
-      | %"return" e:basic[def][infix][Val]? => {isVoid atr} => {Return e}
+      | %"return" e:basic[infix][Val]? => {isVoid atr} => {Return e}
 
-      | %"case" l:$ e:parse[def][infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[def][infix][atr][parse def])] %"esac"
+      | %"case" l:$ e:parse[infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[infix][atr])] %"esac"
                                                                                                                                                        {Case (e, bs, l#coord, atr)}
-      | l:$ %"lazy" e:basic[def][infix][Val] => {notRef atr} :: (not_a_reference l) => {ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
+      | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
       
-      | -"(" parse[def][infix][atr] -")"
-    )
+      | -"(" parse[infix][atr] -")"
+    ) in (fun def -> defCell := Obj.magic !def; parse),
+         (fun def -> defCell := Obj.magic !def; basic),
+         (fun def -> defCell := Obj.magic !def; scope)
 
     (* Workaround until Ostap starts to memoize properly *)
     ostap (
@@ -929,8 +935,19 @@ module Definition =
     type t = string * [`Fun of string list * Expr.t | `Variable of Expr.t option]
 
     let unopt_mod = function None -> `Local | Some m -> m
-      
+
     ostap (
+      (* Workaround until Ostap starts to memoize properly *)
+      const_var: l:$ name:LIDENT "=" value:!(Expr.constexpr) {
+        Loc.attach name l#coord;
+        name, (`Public, `Variable (Some value))
+       };
+      constdef: %"public" d:!(Util.list (const_var)) ";" {d}
+      (* end of the workaround *)
+    )
+                                                      
+    let makeParser exprBasic exprScope =
+    let ostap (
       arg : l:$ x:LIDENT {Loc.attach x l#coord; x};      
       position[pub][ass][coord][newp]:
         %"at" s:INFIX {match ass with
@@ -950,24 +967,18 @@ module Definition =
           | `Ok infix' -> unopt_mod m, op, name, infix', true
           | `Fail msg  -> report_error ~loc:(Some l#coord) msg
       };
-      (* Workaround until Ostap starts to memoize properly *)
-      const_var: l:$ name:LIDENT "=" value:!(Expr.constexpr) {
-        Loc.attach name l#coord;
-        name, (`Public, `Variable (Some value))
-       };
-      constdef: %"public" d:!(Util.list (const_var)) ";" {d};
-      (* end of the workaround *)
-      local_var[m][infix][expr][def]: l:$ name:LIDENT value:(-"=" expr[def][infix][Expr.Val])? {
+      local_var[m][infix]: l:$ name:LIDENT value:(-"=" exprBasic[infix][Expr.Val])? {
         Loc.attach name l#coord;                                                                  
         match m, value with
         | `Extern, Some _ -> report_error ~loc:(Some l#coord) (Printf.sprintf "initial value for an external variable \"%s\" can not be specified" name)
         | _               -> name, (m,`Variable value)
       };
-      parse[infix][expr][expr'][def]:
+
+      parse[infix]:
         m:(%"local" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
-          locs:!(Util.list (local_var m infix expr' def)) next:";" {locs, infix}
+          locs:!(Util.list (local_var m infix)) next:";" {locs, infix}
       | - <(m, orig_name, name, infix', flag)> : head[infix] -"(" -args:!(Util.list0 arg) -")"
-          (l:$ "{" body:expr[def][infix'][Expr.Weak] "}" {
+          (l:$ "{" body:exprScope[infix'][Expr.Weak] "}" {
             if flag && List.length args != 2 then report_error ~loc:(Some l#coord) "infix operator should accept two arguments";
             match m with
             | `Extern -> report_error ~loc:(Some l#coord) (Printf.sprintf "a body for external function \"%s\" can not be specified" (Subst.subst orig_name))
@@ -978,7 +989,7 @@ module Definition =
             | `Extern -> [(name, (m, `Fun (args, Expr.Skip)))], infix' 
             | _       -> report_error ~loc:(Some l#coord) (Printf.sprintf "missing body for the function/infix \"%s\"" orig_name)
          })           
-    )
+    ) in parse
 
   end
   
@@ -1070,46 +1081,71 @@ let eval (_, expr) i =
   o
 
 (* Top-level parser *)
+
 ostap (
   imports[cmd]: l:$ is:(%"import" !(Util.list (ostap (UIDENT))) -";")* {
-    let is    = "Std" :: List.flatten is in
-    let infix =
-      List.fold_left
-        (fun infix import ->
-          List.fold_left
-            (fun infix item ->
-               let insert name infix md = 
-                 let name = infix_name name in
-                 match md (Expr.sem name) infix with
-                 | `Ok infix' -> infix'
-                 | `Fail msg  -> report_error msg
-               in
-               match item with
-               | `Infix (_  , op, `At     op') -> insert op infix (Infix.at l#coord op' op false)
-               | `Infix (ass, op, `Before op') -> insert op infix (Infix.before l#coord op' op ass false)
-               | `Infix (ass, op, `After  op') -> insert op infix (Infix.after l#coord op' op ass false)
-               | _                             -> infix
-            )
-            infix
-            (snd (Interface.find import cmd#get_include_paths))
-        )
-        Infix.default
-        is
-    in
-    is, infix
-  };
-  (* Workaround until Ostap starts to memoize properly *)
-  constparse[cmd]: <(is, infix)> : imports[cmd] d:!(Definition.constdef) {(is, []), Expr.Scope (d, Expr.materialize Expr.Weak Expr.Skip)};
-  (* end of the workaround *)
-  parse[cmd]:
-    <(is, infix)> : imports[cmd] <(d, infix')> : definitions[infix] expr:!(Expr.parse definitions infix' Expr.Weak)? {
-    (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.materialize Expr.Weak Expr.Skip | Some e -> e)
-    };
-  definitions[infix]:
-    <(def, infix')> : !(Definition.parse infix (fun def infix atr -> Expr.scope def infix atr (Expr.parse def))
-                                               (fun def infix atr -> Expr.basic def infix atr)
-                                               definitions) <(defs, infix'')> : definitions[infix'] {
-      def @ defs, infix''
-     }
-  | empty {[], infix}
+  let is    = "Std" :: List.flatten is in
+  let infix =
+    List.fold_left
+      (fun infix import ->
+        List.fold_left
+          (fun infix item ->
+             let insert name infix md = 
+               let name = infix_name name in
+               match md (Expr.sem name) infix with
+               | `Ok infix' -> infix'
+               | `Fail msg  -> report_error msg
+             in
+             match item with
+             | `Infix (_  , op, `At     op') -> insert op infix (Infix.at l#coord op' op false)
+             | `Infix (ass, op, `Before op') -> insert op infix (Infix.before l#coord op' op ass false)
+             | `Infix (ass, op, `After  op') -> insert op infix (Infix.after l#coord op' op ass false)
+             | _                             -> infix
+          )
+          infix
+          (snd (Interface.find import cmd#get_include_paths))
+      )
+      Infix.default
+      is
+  in
+  is, infix
+};
+
+(* Workaround until Ostap starts to memoize properly *)
+    constparse[cmd]: <(is, infix)> : imports[cmd] d:!(Definition.constdef) {(is, []), Expr.Scope (d, Expr.materialize Expr.Weak Expr.Skip)}
+(* end of the workaround *)
 )
+
+let parse cmd =
+  let makeDefinitions exprBasic exprScope =
+    let def = Definition.makeParser exprBasic exprScope in
+    let ostap (
+      definitions[infix]:
+         <(def, infix')> : def[infix] <(defs, infix'')> : definitions[infix'] {
+           def @ defs, infix''
+         }
+      | empty {[], infix}
+    )
+    in
+    definitions
+  in
+
+  let definitions   = Pervasives.ref None                in
+  let expr        s = Expr.makeParser      definitions s in
+  let exprBasic   s = Expr.makeBasicParser definitions s in
+  let exprScope   s = Expr.makeScopeParser definitions s in
+  
+  definitions := Some (makeDefinitions exprBasic exprScope);
+
+  let Some definitions = !definitions in
+  
+  let ostap (
+      parse[cmd]:
+        <(is, infix)> : imports[cmd]
+        <(d, infix')> : definitions[infix] 
+        expr:expr[infix'][Expr.Weak]? {
+            (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.materialize Expr.Weak Expr.Skip | Some e -> e)
+          }
+        )
+  in
+  parse cmd
