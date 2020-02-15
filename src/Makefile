@@ -2,13 +2,16 @@ TOPFILE = lamac
 OCAMLC = ocamlfind c
 OCAMLOPT = ocamlfind opt
 OCAMLDEP = ocamlfind dep
-SOURCES = Language.ml SM.ml X86.ml Driver.ml
+SOURCES = Language.ml SM.ml X86.ml version.ml Driver.ml
 CAMLP5 = -syntax camlp5o -package ostap.syntax,GT.syntax.all
 PXFLAGS = $(CAMLP5)
 BFLAGS = -rectypes -g
 OFLAGS = $(BFLAGS)
 
-all: .depend $(TOPFILE)
+all: version .depend $(TOPFILE)
+
+version:
+	echo "let version = \"Version `git rev-parse --abbrev-ref HEAD`, `git rev-parse --short HEAD`, `git rev-parse --verify HEAD |git show --no-patch --no-notes --pretty='%cd'`\"" > version.ml
 
 .depend: $(SOURCES)
 	$(OCAMLDEP) $(PXFLAGS) *.ml > .depend

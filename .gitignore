@@ -2,3 +2,5 @@
 *.cmi
 *.cmx
 *.o
+version.ml
+
