@@ -2,10 +2,10 @@ public fun makeLazy (f) {
   local value, set = false;
   
   fun () {
-     if set
-     then value
-     else set := true; value := f (); value
-     fi
+    if set
+    then value
+    else set := true; value := f (); value
+    fi
   } 
 }
 

@@ -635,16 +635,13 @@ module Expr =
     let defCell = Pervasives.ref 0 
                                                       
     (* ======= *)
+    let makeParsers env = 
     let makeParser, makeBasicParser, makeScopeParser =
       let def s   = let Some def = Obj.magic !defCell in def s in
       let ostap (
-      parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)}
-                              | basic[infix][atr];
-      scope[infix][atr]: <(d, infix')> : def[infix] expr:parse[infix'][atr] {Scope (d, expr)} |
-                                 <(d, infix')> : def[infix] => {d <> []} => {Scope (d, materialize atr Skip)}; 
-
+      parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)} | basic[infix][atr];
+      scope[infix][atr]: <(d, infix')> : def[infix] expr:parse[infix'][atr] {Scope (d, expr)} | <(d, infix')> : def[infix] => {d <> []} => {Scope (d, materialize atr Skip)}; 
       basic[infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary infix) atr);
-
       primary[infix][atr]:
           s:(s:"-"? {match s with None -> fun x -> x | _ -> fun x -> Binop ("-", Const 0, x)})  
           b:base[infix][Val] is:(  "." f:LIDENT args:(-"(" !(Util.list)[parse infix Val] -")")? {`Post (f, args)}
@@ -761,16 +758,16 @@ module Expr =
             | _  -> Repeat (s, e)
       }
       | %"return" e:basic[infix][Val]? => {isVoid atr} => {Return e}
-
-      | %"case" l:$ e:parse[infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[infix][atr])] %"esac"
-                                                                                                                                                       {Case (e, bs, l#coord, atr)}
-      | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
-      
+      | %"case" l:$ e:parse[infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[infix][atr])] %"esac"{Case (e, bs, l#coord, atr)}
+      | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {env#add_lazy; ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
+      | l:$ %"eta"  e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {let name = env#get_tmp in ignore atr (Lambda ([name], Call (e, [Var name])))}      
       | -"(" parse[infix][atr] -")"
     ) in (fun def -> defCell := Obj.magic !def; parse),
          (fun def -> defCell := Obj.magic !def; basic),
          (fun def -> defCell := Obj.magic !def; scope)
-
+    in
+    makeParser, makeBasicParser, makeScopeParser
+                                   
     (* Workaround until Ostap starts to memoize properly *)
     ostap (
       constexpr:
@@ -1130,10 +1127,24 @@ let parse cmd =
     definitions
   in
 
-  let definitions   = Pervasives.ref None                in
-  let expr        s = Expr.makeParser      definitions s in
-  let exprBasic   s = Expr.makeBasicParser definitions s in
-  let exprScope   s = Expr.makeScopeParser definitions s in
+  let definitions   = Pervasives.ref None in
+  
+  let env =
+    object
+      val lazy_used = Pervasives.ref false
+      val tmp_index = Pervasives.ref 0
+                    
+      method add_lazy = lazy_used := true
+      method get_tmp  = let index = !tmp_index in incr tmp_index; Printf.sprintf "__tmp%d" index
+      method is_lazy  = !lazy_used
+    end
+  in
+  
+  let (makeParser, makeBasicParser, makeScopeParser) = Expr.makeParsers env in
+  
+  let expr        s = makeParser      definitions s in
+  let exprBasic   s = makeBasicParser definitions s in
+  let exprScope   s = makeScopeParser definitions s in
   
   definitions := Some (makeDefinitions exprBasic exprScope);
 
@@ -1144,7 +1155,7 @@ let parse cmd =
         <(is, infix)> : imports[cmd]
         <(d, infix')> : definitions[infix] 
         expr:expr[infix'][Expr.Weak]? {
-            (is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.materialize Expr.Weak Expr.Skip | Some e -> e)
+            ((if env#is_lazy then "Lazy" :: is else is), Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.materialize Expr.Weak Expr.Skip | Some e -> e)
           }
         )
   in
