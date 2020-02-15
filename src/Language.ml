@@ -709,8 +709,28 @@ module Expr =
             let name = infix_name s in Loc.attach name l#coord; ignore atr (Var name)
           )
       }
+      (*
       | l:$ %"fun" "(" args:!(Util.list0)[ostap (l:$ x:LIDENT {Loc.attach x l#coord; x})] ")"
                "{" body:scope[infix][Weak] "}"=> {notRef atr} :: (not_a_reference l) => {ignore atr (Lambda (args, body))}
+       *)
+      | l:$ %"fun" "(" args:!(Util.list0)[Pattern.parse] ")"
+           "{" body:scope[infix][Weak] "}"=> {notRef atr} :: (not_a_reference l) => {
+          let args, body =
+            List.fold_right
+              (fun arg (args, body) ->
+                 match arg with
+                 | Pattern.Named (name, Pattern.Wildcard) -> name :: args, body
+                 | Pattern.Wildcard -> env#get_tmp :: args, body
+                 | p ->
+                    let arg = env#get_tmp in
+                    arg :: args, Case (Var arg, [p, body], l#coord, Weak)
+              )
+              args
+              ([], body)
+          in
+          ignore atr (Lambda (args, body))
+      }
+
       | l:$ "[" es:!(Util.list0)[parse infix Val] "]" => {notRef atr} :: (not_a_reference l) => {ignore atr (Array es)}
       | -"{" scope[infix][atr] -"}" 
       | l:$ "{" es:!(Util.list0)[parse infix Val] "}" => {notRef atr} :: (not_a_reference l) => {ignore atr (match es with
@@ -943,9 +963,9 @@ module Definition =
       (* end of the workaround *)
     )
                                                       
-    let makeParser exprBasic exprScope =
+    let makeParser env exprBasic exprScope =
     let ostap (
-      arg : l:$ x:LIDENT {Loc.attach x l#coord; x};      
+      arg : l:$ x:LIDENT {Loc.attach x l#coord; x};       
       position[pub][ass][coord][newp]:
         %"at" s:INFIX {match ass with
                        | `Nona -> Infix.at coord s newp pub
@@ -974,16 +994,30 @@ module Definition =
       parse[infix]:
         m:(%"local" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
           locs:!(Util.list (local_var m infix)) next:";" {locs, infix}
-      | - <(m, orig_name, name, infix', flag)> : head[infix] -"(" -args:!(Util.list0 arg) -")"
+    | - <(m, orig_name, name, infix', flag)> : head[infix] -"(" -args:!(Util.list0)[Pattern.parse] -")"
           (l:$ "{" body:exprScope[infix'][Expr.Weak] "}" {
             if flag && List.length args != 2 then report_error ~loc:(Some l#coord) "infix operator should accept two arguments";
             match m with
             | `Extern -> report_error ~loc:(Some l#coord) (Printf.sprintf "a body for external function \"%s\" can not be specified" (Subst.subst orig_name))
-            | _       -> [(name, (m, `Fun (args, body)))], infix'
+            | _       ->
+               let args, body =
+                 List.fold_right
+                   (fun arg (args, body) ->
+                     match arg with
+                     | Pattern.Named (name, Pattern.Wildcard) -> name :: args, body
+                     | Pattern.Wildcard -> env#get_tmp :: args, body
+                     | p ->
+                        let arg = env#get_tmp in
+                        arg :: args, Expr.Case (Expr.Var arg, [p, body], l#coord, Expr.Weak)
+                   )
+                   args
+                   ([], body)
+               in
+               [(name, (m, `Fun (args, body)))], infix'
          } |
          l:$ ";" {
             match m with
-            | `Extern -> [(name, (m, `Fun (args, Expr.Skip)))], infix' 
+            | `Extern -> [(name, (m, `Fun ((List.map (fun _ -> env#get_tmp) args), Expr.Skip)))], infix' 
             | _       -> report_error ~loc:(Some l#coord) (Printf.sprintf "missing body for the function/infix \"%s\"" orig_name)
          })           
     ) in parse
@@ -1114,8 +1148,19 @@ ostap (
 )
 
 let parse cmd =
-  let makeDefinitions exprBasic exprScope =
-    let def = Definition.makeParser exprBasic exprScope in
+  let env =
+    object
+      val lazy_used = Pervasives.ref false
+      val tmp_index = Pervasives.ref 0
+                    
+      method add_lazy = lazy_used := true
+      method get_tmp  = let index = !tmp_index in incr tmp_index; Printf.sprintf "__tmp%d" index
+      method is_lazy  = !lazy_used
+    end
+  in
+
+  let makeDefinitions env exprBasic exprScope =
+    let def = Definition.makeParser env exprBasic exprScope in
     let ostap (
       definitions[infix]:
          <(def, infix')> : def[infix] <(defs, infix'')> : definitions[infix'] {
@@ -1127,18 +1172,7 @@ let parse cmd =
     definitions
   in
 
-  let definitions   = Pervasives.ref None in
-  
-  let env =
-    object
-      val lazy_used = Pervasives.ref false
-      val tmp_index = Pervasives.ref 0
-                    
-      method add_lazy = lazy_used := true
-      method get_tmp  = let index = !tmp_index in incr tmp_index; Printf.sprintf "__tmp%d" index
-      method is_lazy  = !lazy_used
-    end
-  in
+  let definitions = Pervasives.ref None in
   
   let (makeParser, makeBasicParser, makeScopeParser) = Expr.makeParsers env in
   
@@ -1146,7 +1180,7 @@ let parse cmd =
   let exprBasic   s = makeBasicParser definitions s in
   let exprScope   s = makeScopeParser definitions s in
   
-  definitions := Some (makeDefinitions exprBasic exprScope);
+  definitions := Some (makeDefinitions env exprBasic exprScope);
 
   let Some definitions = !definitions in
   
