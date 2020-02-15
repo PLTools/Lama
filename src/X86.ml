@@ -692,7 +692,7 @@ let genasm cmd prog =
 let get_std_path () =
   match Sys.getenv_opt "LAMA" with
   | Some s -> s
-  | None   -> "../runtime"
+  | None   -> Stdpath.path
                                       
 (* Builds a program: generates the assembler file and compiles it with the gcc toolchain *)
 let build cmd prog =

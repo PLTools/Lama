@@ -17,7 +17,7 @@ Ostap.o: List.o Collection.o Ref.o Fun.o Matcher.o
 Expr.o: Ostap.o
 
 %.o: %.lama
-	$(LAMAC) -I . -c $<
+	LAMA=../runtime $(LAMAC) -I . -c $<
 
 clean:
 	rm -Rf *.s *.o *.i *~

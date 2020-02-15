@@ -3,4 +3,5 @@
 *.cmx
 *.o
 version.ml
+stdpath.ml
 
