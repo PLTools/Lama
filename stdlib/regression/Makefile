@@ -1,14 +1,14 @@
-TESTS=$(sort $(basename $(wildcard test*.expr)))
+TESTS=$(sort $(basename $(wildcard test*.lama)))
 
-RC=../../src/rc.opt
+LAMAC=../../src/lamac
 
 .PHONY: check $(TESTS)
 
 check: $(TESTS)
 
-$(TESTS): %: %.expr
+$(TESTS): %: %.lama
 	@echo $@
-	RC_RUNTIME=../../runtime $(RC) -I .. -ds -dp $< && ./$@ > $@.log && diff $@.log orig/$@.log
+	LAMA=../../runtime $(LAMAC) -I .. -ds -dp $< && ./$@ > $@.log && diff $@.log orig/$@.log
 
 clean:
 	$(RM) test*.log *.s *~ $(TESTS) *.i

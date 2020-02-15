@@ -1,4 +1,4 @@
-EXECUTABLE = src/rc.opt
+EXECUTABLE = src/lamac
 INSTALL ?= install -v
 MKDIR ?= mkdir
 SHELL := /bin/bash
@@ -10,7 +10,7 @@ all:
 	pushd runtime && make && popd
 	pushd stdlib && make && popd
 
-STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.expr runtime/runtime.a runtime/Std.i)
+STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.lama runtime/runtime.a runtime/Std.i)
 #$(info $(STD_FILES))
 
 install: all

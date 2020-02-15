@@ -1,17 +1,17 @@
-TESTS=$(sort $(basename $(wildcard test*.expr)))
-LIBS=$(patsubst %.expr,%.o, $(sort $(wildcard Lib*.expr)))
+TESTS=$(sort $(basename $(wildcard test*.lama)))
+LIBS=$(patsubst %.lama,%.o, $(sort $(wildcard Lib*.lama)))
 
-RC=../../src/rc.opt
+LAMAC=../../src/lamac
 
 .PHONY: check $(TESTS) 
 
 check: $(TESTS)
 
-%.o: %.expr
-	RC_RUNTIME=../../runtime $(RC) -c -I . $<
+%.o: %.lama
+	LAMA=../../runtime $(LAMAC) -c -I . $<
 
-$(TESTS): %: %.expr $(LIBS)
-	RC_RUNTIME=../../runtime $(RC) -I . $< && cat $@.input | ./$@ > $@.log && diff -u $@.log orig/$@.log
+$(TESTS): %: %.lama $(LIBS)
+	LAMA=../../runtime $(LAMAC) -I . $< && cat $@.input | ./$@ > $@.log && diff -u $@.log orig/$@.log
 
 clean:
 	rm -f test*.log *.i *.o *.s *~ $(TESTS)

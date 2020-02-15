@@ -690,7 +690,7 @@ let genasm cmd prog =
   Buffer.contents asm
 
 let get_std_path () =
-  match Sys.getenv_opt "RC_RUNTIME" with
+  match Sys.getenv_opt "LAMA" with
   | Some s -> s
   | None   -> "../runtime"
                                       

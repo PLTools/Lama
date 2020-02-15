@@ -1,4 +1,4 @@
-TOPFILE = rc
+TOPFILE = lamac
 OCAMLC = ocamlfind c
 OCAMLOPT = ocamlfind opt
 OCAMLDEP = ocamlfind dep
@@ -8,13 +8,13 @@ PXFLAGS = $(CAMLP5)
 BFLAGS = -rectypes -g
 OFLAGS = $(BFLAGS)
 
-all: .depend $(TOPFILE).opt
+all: .depend $(TOPFILE)
 
 .depend: $(SOURCES)
 	$(OCAMLDEP) $(PXFLAGS) *.ml > .depend
 
-$(TOPFILE).opt: $(SOURCES:.ml=.cmx)
-	$(OCAMLOPT) -o $(TOPFILE).opt $(OFLAGS) $(LIBS:.cma=.cmxa) -linkpkg -package ostap $(SOURCES:.ml=.cmx)
+$(TOPFILE): $(SOURCES:.ml=.cmx)
+	$(OCAMLOPT) -o $(TOPFILE) $(OFLAGS) $(LIBS:.cma=.cmxa) -linkpkg -package ostap $(SOURCES:.ml=.cmx)
 
 $(TOPFILE).byte: $(SOURCES:.ml=.cmo)
 	$(OCAMLC) -o $(TOPFILE).byte $(BFLAGS) $(LIBS) -linkpkg -package ostap $(SOURCES:.ml=.cmo) 
