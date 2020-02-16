@@ -1,7 +1,7 @@
 \begin{figure}[t]
   \[
     \begin{array}{rcl}
-      \defterm{scopeExpression}                & : & \nonterm{definition}^\star\s\nonterm{expression}\\
+      \defterm{scopeExpression}                & : & \nonterm{definition}^\star\s[\s\nonterm{expression}\s]\\
       \defterm{definition}                     & : & \nonterm{variableDefinition}\alt\nonterm{functionDefinition}\alt\nonterm{infixDefinition}\\
       \defterm{variableDefinition}             & : & (\s\term{local}\alt\term{public}\s)\s\nonterm{variableDefinitionSequence}\s\term{;}\\
       \defterm{variableDefinitionSequence}     & : & \nonterm{variableDefinitionSequenceItem}\s(\s\term{,}\s\nonterm{variableDefinitionSequenceItem}\s)^\star\\

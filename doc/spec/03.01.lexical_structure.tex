@@ -14,6 +14,7 @@ The following characters are treated as whitespaces:
 \begin{itemize}
 \item blank character "\texttt{ }";
 \item newline character "\texttt{\textbackslash n}";
+\item carriage return character "\texttt{\textbackslash r}";
 \item tabulation character "\texttt{\textbackslash t}".
 \end{itemize}
 
@@ -76,9 +77,10 @@ The following identifiers are reserved for keywords:
 
 \begin{lstlisting}
     after   array   at      before  boxed   case    do      elif    else
-    esac    false   fi      for     fun     if      import  infix   infixl
-    infixr  length  local   od      of      public  repeat  return  sexp
-    skip    string  string  then    true    unboxed until   when    while
+    esac    eta     false   fi      for     fun     if      import  infix
+    infixl  infixr  lazy    length  local   od      of      public  repeat
+    return  sexp    skip    string  string  then    true    unboxed until
+    when    while
 \end{lstlisting}
 
 \subsection{Infix Operators}

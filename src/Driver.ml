@@ -26,7 +26,7 @@ let parse cmd =
        inherit Util.Lexers.lident kws s
        inherit Util.Lexers.uident kws s
        inherit Util.Lexers.skip [
-	 Matcher.Skip.whitespaces " \t\n";
+	 Matcher.Skip.whitespaces " \t\n\r";
 	 Matcher.Skip.lineComment "--";
 	 Matcher.Skip.nestedComment "(*" "*)"
        ] s

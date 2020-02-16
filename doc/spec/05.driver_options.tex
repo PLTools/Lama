@@ -39,11 +39,11 @@ Additionally, the following options can be given to the driver:
 \item "\texttt{-dp}"~--- forces the driver to dump the AST of compiled unit. The dump is written in the file with the same
   basename as the source one, with the extension replaced with "\texttt{.ast}".
 \item "\texttt{-ds}"~--- forces the driver to sump stack machine code. The option is only in effect in stack interpreter on
-  native mode. The sump is written in the file "\texttt{.sm}".
+  native mode. The dump is written in the file "\texttt{.sm}".
 \item "\texttt{-v}"~--- makes the dirver to print the version of the compiler.
-\item "\texttt{-h}"~--- makes the driver to print the helpon options.
+\item "\texttt{-h}"~--- makes the driver to print the help on the options.
 \end{itemize}
 
-Apart from the paths specified by the "\texttt{-I}" option the driver uses the environment variable "\texttt{LAMA\_STD}"
+Apart from the paths specified by the "\texttt{-I}" option the driver uses the environment variable "\texttt{LAMA}"
 to locate the runtime and standard libraries (see~\ref{sec:stdlib}). Thus, the units from standard libraries are accessible
 without any "\texttt{-I}" option given.
