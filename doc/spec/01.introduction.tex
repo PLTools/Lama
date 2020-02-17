@@ -1,5 +1,23 @@
 \chapter{Introduction}
 
-\input{01.01.general_characteristics}
-\input{01.02.notation}
-\input{01.03.values}
+\lama is a programming language developed by JetBrains Research for education purposes. Its general characteristics are:
+
+\begin{itemize}
+\item procedural with first-class functions~--- functions can be passed as arguments, placed in data structures,
+  returned and constructed at runtime via closures mechanism;
+\item with lexical static scoping;
+\item strict~--- all arguments of function application are evaluated before function body;
+\item imperative~--- variables can be re-assigned, function calls can have side effects;
+\item untyped~--- no static type checking is performed;
+\item with S-expressions and pattern-matching;
+\item with user-defined infix operators, including those defined in local scopes;
+\item with automatic memory management (garbage collection).
+\end{itemize}
+
+The name \lama is an acronym for $\lambda\textsc{-Algol}$ since the language has borrowed the syntactic shape of
+operators from \textsc{Algol-68}; \textsc{Haskell}~\cite{haskell} and \textsc{OCaml}~\cite{ocaml} can be
+mentioned as other languages of inspiration.
+
+%\input{01.01.general_characteristics}
+%\input{01.02.notation}
+%\input{01.03.values}

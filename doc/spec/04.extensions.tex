@@ -94,6 +94,39 @@ where "$x$"~--- a fresh variable which does not occur free in "$e$".
 
 \section{Dot Notation}
 
-\section{Mutable Closures}
+A function call
+
+\begin{lstlisting}
+    $f$ ($e_1$, ..., $e_k$)
+\end{lstlisting}
+
+where $f$~--- an identifier~--- can be rewritten as
+
+\begin{lstlisting}
+    $e_1$.$f$ ($e_2$, ..., $e_k$)
+\end{lstlisting}
+
+In particular, a call to a one-argument function $f (e)$ can be rewritten as $e.f$.
 
 \section{Patterns in Function Arguments}
+
+Patterns can be used in function argument specification: a declaration
+
+\begin{lstlisting}
+    fun f ($p_1$, ..., $p_k$) { e }
+\end{lstlisting}
+
+is equivalent to
+
+\begin{lstlisting}
+    fun f ($x_1$, ..., $x_k$) {
+      case $x_1$ of
+        $p_1$ -> case $x_2$ of
+                   ... -> e
+                 esac
+      esac
+    }
+\end{lstlisting}
+
+where $x_i$~--- fresh variables, not free in $e$.
+
