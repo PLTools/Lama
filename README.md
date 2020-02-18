@@ -1,6 +1,6 @@
 # Lama
 
-![lama](lama.tif) is a programming language developed by JetBrains Research for educational purposes as an exemplary language to introduce
+![lama](lama.png) is a programming language developed by JetBrains Research for educational purposes as an exemplary language to introduce
 the domain of programming languages, compilers and tools. Its general characteristics are:
 
 * procedural with first-class functions - functions can be passed as arguments, placed in data structures,
