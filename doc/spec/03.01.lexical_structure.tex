@@ -28,7 +28,7 @@ Additionally, two kinds of comments are recognized:
 
 There is a number of specific cases which have to be considered explicitly.
 
-First, block comments can be properly nested. Then, the occurencies of comment symbols inside string literals (see below) are not
+First, block comments can be properly nested. Then, the occurrences of comment symbols inside string literals (see below) are not
 considered as comments.
 
 End-of-line comment encountered \emph{outside} of a block comment escapes block comment symbols:
@@ -91,11 +91,11 @@ Infix operators defined as follows:
 \token{INFIX}=\mbox{\texttt{[+*/\%\$\#@!|\&\^{}~?<>:=\textbackslash-]+}}
 \]
 
-There is a predefined set of built-in infix operators (see~\ref{binary_expressions}); additionally
-an end-used can define custom infix operators (see~\ref{custom_infix}). Note, sometimes 
+There is a predefined set of built-in infix operators (see Fig.~\ref{builtin_infixes}); additionally
+an end-used can define custom infix operators (see Section~\ref{sec:custom_infix}). Note, sometimes 
 additional whitespaces are required to disambiguate infix operator applications. For example, if a
 custom infix operator "\lstinline|+-|" is defined, then the expression "\lstinline|a +- b|" can no longer be
-considered as "\lstinline|a +(-b)|". Note also that a custom operator containing "\lstinline|--|" can not be
+recognized as "\lstinline|a +(-b)|". Note also that a custom operator containing "\lstinline|--|" can not be
 defined due to lexical conventions.
 
 \subsection{Delimiters}

@@ -1,4 +1,81 @@
-\begin{figure}[t]
+\section{Expressions}
+\label{sec:expressions}
+
+The syntax definition for expressions is shown on Fig.~\ref{expressions}. The top-level construct is \emph{sequential composition}, expressed
+using right-associative connective "\term{;}". The basic blocks of sequential composition have the form of \nonterm{binaryExpression}, which is
+a composition of infix operators and operands. The description above is given in a highly ambiguous form as it does not specify explicitly the
+precedence and associativity of infix operators. The precedences and associativity of predefined built-in infix operators are shown
+on Fig.~\ref{builtin_infixes} with the precedence level increasing top-to-bottom.
+
+\begin{figure}[h]
+  \begin{tabular}{c|l|l}
+    infix operator(s) & description & associativity \\
+    \hline
+    \lstinline|:=|                                                                                & assignment                         & right-associative \\
+    \lstinline|:|                                                                                 & list constructor                   & right-associative \\
+    \lstinline|!!|                                                                                & disjunction                        & left-associative  \\
+    \lstinline|&&|                                                                                & conjunction                        & left-associative  \\
+    \lstinline|==|, \lstinline|!=|,  \lstinline|<=|, \lstinline|<|, \lstinline|>=|, \lstinline|>| & integer comparisons                & non-associative   \\
+    \lstinline|+|, \lstinline|-|                                                                  & addition, subtraction              & left-associative  \\
+    \lstinline|*|, \lstinline|/|, \lstinline|%|                                                   & multiplication, quotient, remainder & left-associative
+  \end{tabular}
+\caption{The precedence and associativity of built-in infix operators}
+\label{builtin_infixes}
+\end{figure}
+
+Apart from assignment and list constructor all other built-in infix operators operate on signed integers; in conjunction and disjunction
+any non-zero value is treated as truth and zero as falsity, and the result respects this convention.
+
+The assignment operator is unique among all others in the sense that it requires its left operand to designate a \emph{reference}. This
+property is syntactically ensured using an inference system shown on Fig.~\ref{reference_inference}; here $\mathcal{R}\,(e)$ designates the
+property ``$e$ is a reference''. The result of assignment operator coincides with its right operand, thus
+
+\begin{lstlisting}
+    x := y := 3
+\end{lstlisting}
+
+assigns 3 to both "\lstinline|x|" and "\lstinline|y|".
+
+\begin{figure}[h]
+  \newcommand{\Ref}[1]{\mathcal{R}\,({#1})}
+  \renewcommand{\arraystretch}{4}
+  \[
+    \begin{array}{cc}
+      \Ref{x},\,x\;\mbox{is a variable}&\dfrac{\Ref{e}}{\Ref{\lstinline|$e$ [$\dots$]|}}\\
+      \dfrac{\Ref{e_i}}{\Ref{\mbox{\lstinline|if $\dots$ then $\;e_1\;$ else $\;e_2\;$ fi|}}} & \dfrac{\Ref{e_i}}{\Ref{\mbox{\lstinline|case $\dots$ of $\;\dots\;$ -> $\;e_1\;\dots\;\dots\;$ -> $\;e_k\;$ esac|}}}\\
+      \multicolumn{2}{c}{\dfrac{\Ref{e}}{\Ref{\lstinline|$\dots\;$;$\;e$|}}}
+    \end{array}
+  \]
+  \caption{Reference inference system}
+  \label{reference_inference}
+\end{figure}
+
+\subsection{Postfix Expressions}
+
+There are four postfix forms of expressions:
+
+\begin{itemize}
+\item function call, designated as postfix form "\lstinline|($arg_1, \dots, arg_k$)|";
+\item array element selection, designated as "\lstinline|[$index$]|";
+\item built-in primitive "\lstinline|.string|", returning the string representation of a value;
+\item built-in primitive "\lstinline|.length|", returning the length of a boxed value.
+\end{itemize}
+
+Multiple postfixes are allowed, for example
+
+\begin{lstlisting}
+    x () [3] (1, 2, 3) . string
+    x . string [4]
+    x . length . string
+    x . string . length
+\end{lstlisting}
+
+The basic form of expression is \nonterm{primary}. The simplest form of primary is an identifier or constant. Keywords \lstinline|true| and \lstinline|false|
+designate integer constants 1 and 0 respectively, character constant is implicitly converted into its ASCII code.  String constants designate arrays
+of one-byte characters. Infix constants allow to reference a functional value associated with corresponding infix operator, and functional constant (\emph{lambda-expression})
+designates an anonymous functional value in the form of closure.
+
+\begin{figure}[h]
   \[
     \begin{array}{rcll}
       \defterm{expression}        & : & \nonterm{basicExpression}\s(\s\term{;}\s\nonterm{expression}\s)&\\
@@ -38,91 +115,15 @@
   \label{expressions}
 \end{figure}
 
-\section{Expressions}
-\label{sec:expressions}
-
-\begin{figure}
-  \begin{tabular}{c|l|l}
-    infix operator(s) & description & associativity \\
-    \hline
-    \lstinline|:=|                                                                                & assignment                         & right-associative \\
-    \lstinline|:|                                                                                 & list constructor                   & right-associative \\
-    \lstinline|!!|                                                                                & disjunction                        & left-associative  \\
-    \lstinline|&&|                                                                                & conjunction                        & left-associative  \\
-    \lstinline|==|, \lstinline|!=|,  \lstinline|<=|, \lstinline|<|, \lstinline|>=|, \lstinline|>| & integer comparisons                & non-associative   \\
-    \lstinline|+|, \lstinline|-|                                                                  & addition, subtraction              & left-associative  \\
-    \lstinline|*|, \lstinline|/|, \lstinline|%|                                                   & multiplication, quotent, remainder & left-associative
-  \end{tabular}
-\caption{The precedence and associativity of built-in infix operators}
-\label{builtin_infixes}
-\end{figure}
-
-\begin{figure}
-  \newcommand{\Ref}[1]{\mathcal{R}\,({#1})}
-  \renewcommand{\arraystretch}{4}
-  \[
-    \begin{array}{cc}
-      \Ref{x},\,x\;\mbox{is a variable}&\dfrac{\Ref{e}}{\Ref{\lstinline|$e$ [$\dots$]|}}\\
-      \dfrac{\Ref{e_i}}{\Ref{\mbox{\lstinline|if $\dots$ then $\;e_1\;$ else $\;e_2\;$ fi|}}} & \dfrac{\Ref{e_i}}{\Ref{\mbox{\lstinline|case $\dots$ of $\;\dots\;$ -> $\;e_1\;\dots\;\dots\;$ -> $\;e_k\;$ esac|}}}\\
-      \multicolumn{2}{c}{\dfrac{\Ref{e}}{\Ref{\lstinline|$\dots\;$;$\;e$|}}}
-    \end{array}
-  \]
-  \caption{Reference inference system}
-  \label{reference_inference}
-\end{figure}
-
-The syntax definition for expressions is shown on Fig.~\ref{expressions}. The top-level construct is \emph{sequential composition}, expressed
-using right-associative conective "\term{;}". The basic blocks of sequential composition have the form of \nonterm{binaryExpression}, which is
-a composition of infix operators and operands. The description above is given in a highly ambiguous form as it does not specify explicitly the
-precedence and associativity of infix operators. The precedences and associativity of predefined built-in infix operators are shown
-on Fig.~\ref{builtin_infixes} with the precedence level increasing top-to-bottom.
-
-Apart from assignment and list constructor all other built-in infix operators operate on signed integers; in conjunction and disjunction
-any non-zero value is treated as truth and zero as falsity, and the result respects this convention.
-
-The assignment operator is unique among all others in the sense that it requires its left operand to designate a \emph{reference}. This
-property is syntactically ensured using an inference system shown on Fig.~\ref{reference_inference}; here $\mathcal{R}\,(e)$ designates the
-property ``$e$ is a reference''. The result of assignment operator coincides with its right operand, thus
-
-\begin{lstlisting}
-    x := y := 3
-\end{lstlisting}
-
-assigns 3 to both "\lstinline|x|" and "\lstinline|y|".
-
-\subsection{Postifix Expressions}
-
-There are four postfix forms of expressions:
-
-\begin{itemize}
-\item function call, designated as postfix form "\lstinline|($arg_1, \dots, arg_k$)|";
-\item array element selection, designated as "\lstinline|[$index$]|";
-\item built-in primitive "\lstinline|.string|", returning the string representation of the value;
-\item built-in primitive "\lstinline|.length|", returning the length of boxed value.
-\end{itemize}
-
-Multiple postfixes are allowed, for example
-
-\begin{lstlisting}
-    x () [3] (1, 2, 3) . string
-    x . string [4]
-    x . length . string
-    x . string . length
-\end{lstlisting}
-
-The basic form of expression is \nonterm{primary}. The simplest form of primary is an identifier or constant. Keywords \lstinline|true| and \lstinline|false|
-designate integer constants 1 and 0 respectively, character constant is implicitly converted into its ASCII code.  String constants designate arrays
-of one-byte characters. Infix constants allow to reference a functional value associated with corresponding infix operator, and functional constant (\emph{lambda-expression})
-designates an anonymous functional value in the form of closure.
-
+\FloatBarrier
 \subsection{\texttt{skip} and \texttt{return} Expressions}
 
 Expression \lstinline|skip| can be used to designate a no-value when no action is needed (for example, in the body of unit which contains only declarations).
-\lstinline|return| expression can be used to immediately copmlete the execution of current function call; optional return value can be specified.
+\lstinline|return| expression can be used to immediately complete the execution of current function call; optional return value can be specified.
 
-\subsection{Arrays, Lists, and S-expresions}
+\subsection{Arrays, Lists, and S-expressions}
 
-\begin{figure}[t]
+\begin{figure}[h]
   \[
     \begin{array}{rcl}
       \defterm{arrayExpression} & : & \term{[}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\s\term{]}\\
@@ -135,12 +136,12 @@ Expression \lstinline|skip| can be used to designate a no-value when no action i
 \end{figure}
 
 There are three forms of expressions to specify composite values: arrays, lists and S-expressions (see Fig.~\ref{composite_expressions}). Note, it is impossible
-to specify one-element list as "\lstinline|{$e$}|" since it is treated as scope expression. Instead, the form "\lstinline|$e$:{}|" can be used; alternatively, standard
-unit "\lstinline|List|" (see~\ref{sec:standard_library_list}) defines function "\lstinline|singleton|" which serves for the same purpose.
+to specify one-element list as "\lstinline|{$e$}|" since it is treated as scope expression. Instead, the form "\lstinline|$e$:{}|" can be used; alternatively, a standard
+unit "\lstinline|List|" (see~Section~\ref{sec:std:list}) defines function "\lstinline|singleton|" which serves for the same purpose.
 
 \subsection{Conditional Expressions}
 
-\begin{figure}[t]
+\begin{figure}[h]
   \[
     \begin{array}{rcll}
       \defterm{ifExpression}  & : & \term{if}\s\nonterm{expression}\s\term{then}\s\nonterm{scopeExpression}\s[\s\nonterm{elsePart}\s]\s\term{fi}&\\
@@ -152,7 +153,7 @@ unit "\lstinline|List|" (see~\ref{sec:standard_library_list}) defines function "
   \label{if_expression}
 \end{figure}
 
-Conditional expression branches the control depending in the value of a certain expression; the value zero is treated as falsity, nonzero as truth. The
+Conditional expression branches the control depending in the value of a certain expression; the value zero is treated as falsity, nonzero as truth. An
 extended form
 
 \begin{lstlisting}
@@ -163,7 +164,7 @@ extended form
     fi
 \end{lstlisting}
 
-is equivalent to the nested form
+is equivalent to a nested form
 
 \begin{lstlisting}
     if $\;c_1\;$ then $\;e1\;$
@@ -172,6 +173,8 @@ is equivalent to the nested form
     else $\;e_{k+1}\;$
     fi
 \end{lstlisting}
+
+\FloatBarrier
 
 \subsection{Loop Expressions}
 
@@ -215,7 +218,7 @@ The construct "\lstinline|for $\;i\;$, $\;c\;$, $\;s\;$ do $\;e\;$ od|" is also 
 However, the top-level local definitions of the the first expression ("$i$") are visible in the rest of the construct:
 
 \begin{lstlisting}
-    for local i = 0, i < 10, i := i + 1 do write (i) od
+    for local i; i := 0, i < 10, i := i + 1 do write (i) od
 \end{lstlisting}
 
 \subsection{Pattern Matching}
@@ -278,10 +281,10 @@ The semantics of patterns is as follows:
   \item round brackets can be used for grouping.
 \end{itemize}
 
-All identifiers, occured in a pattern, have to be pairwise distinct.
+All identifiers, occurred in a pattern, have to be pairwise distinct.
 
 The matching against patterns in case-expression is performed deterministically in a top-down manner: a pattern
-is matched against only if all previous matchings were unsuccesful. If no matching pattern is found, the execution
+is matched against only if all previous matchings were unsuccessful. If no matching pattern is found, the execution
 of the program stops with an error.
 
 \begin{figure}[t]
@@ -296,16 +299,16 @@ of the program stops with an error.
   \label{case_expression}
 \end{figure}
 
-\subsection{Examples}
-\label{sec:expression_examples}
-
-Some other examples with comments:
-
-\begin{tabular}{ll}
-  "\lstinline|x !! y && z + 3|" & is equivalent to "\lstinline|x !! (y && (z + 3))|"\\
-  "\lstinline|x == y < 4|"      & invalid \\
-  "\lstinline|x [y := 8] := 6|" & is equivalent to "\lstinline|y := 8; x [8] := 6|"\\
-  "\lstinline|(write (3); x) := (write (4); z)|" & is equivalent to "\lstinline|write (3); write (4); x := z|"
-\end{tabular}
+%\subsection{Examples}
+%\label{sec:expression_examples}
+%
+%Some other examples with comments:
+%
+%\begin{tabular}{ll}
+%  "\lstinline|x !! y && z + 3|" & is equivalent to "\lstinline|x !! (y && (z + 3))|"\\
+%  "\lstinline|x == y < 4|"      & invalid \\
+%  "\lstinline|x [y := 8] := 6|" & is equivalent to "\lstinline|y := 8; x [8] := 6|"\\
+%  "\lstinline|(write (3); x) := (write (4); z)|" & is equivalent to "\lstinline|write (3); write (4); x := z|"
+%\end{tabular}
 
 

@@ -26,12 +26,12 @@ name of the executable itself).}
 \descr{\lstinline|fun stringcat (list)|}{Takes a list of strings and returns the concatenates all its elements.}
 
 \descr{\lstinline|fun matchSubString (subj, patt, pos)|}{Takes two strings "\lstinline|subj|" and "\lstinline|patt|" and integer position "\lstinline|pos|" and
-checks if a substing of "\lstinline|subj|" starting at position "\lstinline|pos|" is equal to "\lstinline|patt|"; returns integer value.}
+checks if a substring of "\lstinline|subj|" starting at position "\lstinline|pos|" is equal to "\lstinline|patt|"; returns integer value.}
 
 \descr{\lstinline|fun sprintf (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib}) and a variable number of arguments and
 returns a string, acquired via processing these arguments according to the format string. Note: indexed arguments are not supported.}
 
-\descr{\lstinline|fun substring (str, pos, len)|}{Takes a string, an integer position and length, and returs a substring of requested length of
+\descr{\lstinline|fun substring (str, pos, len)|}{Takes a string, an integer position and length, and returns a substring of requested length of
   given string starting from given position. Raises an error if the original string is shorter then \lstinline|pos+len-1|.}
 
 \descr{\lstinline|infix ++ at + (str1, str2)|}{String concatenation infix operator.}
@@ -130,8 +130,7 @@ returned.}
 no binding is found, and "\lstinline|Some (v)|" if "\lstinline|k|" is bound to "\lstinline|v|".}
 
 \descr{\lstinline|fun removeMap (m, k)|}{Removes the binding for "\lstinline|k|" from the map "\lstinline|m|" and returns a new map. This function
-restores a value which was previously bound to "\lstinline|k|". If there were no binding for "\lstinline|k|" in "\lstinline|m|" then "\lstinline|m|"
-is returned unchanged.}
+restores a value which was previously bound to "\lstinline|k|".}
 
 \descr{\lstinline|fun bindings (m)|}{Returns all bindings for the map "\lstinline|m|" as a list of key-value pairs, in key-ascending order.}
 
@@ -156,8 +155,7 @@ Sets are immutable structures with the following interface:
 \descr{\lstinline|fun memSet (s, v)|}{Tests if an element "\lstinline|v|" is contained in the set "\lstinline|s|". Returns zero if
 there is no such element and non-zero otherwise.}
 
-\descr{\lstinline|fun removeSet (s, v)|}{Removes an element "\lstinline|v|" from the set "\lstinline|s|" and returns a new set. Returns the
-same set if there were nothing to remove.}
+\descr{\lstinline|fun removeSet (s, v)|}{Removes an element "\lstinline|v|" from the set "\lstinline|s|" and returns a new set.}
 
 \descr{\lstinline|fun elements (s)|}{Returns a list of elements of a given set in ascending order.}
 
@@ -174,7 +172,7 @@ enumerated in ascending order.}
 \descr{\lstinline|fun mapSet (f, s)|}{Applies a function "\lstinline|f|" to each element of the set "\lstinline|s|" and returns a new set of images. The
 elements are enumerated in an ascending order.}
 
-\descr{\lstinline|fun foldSet (f, acc, s)|}{Folds a set "\lstinline|s|" unsing the function "\lstinline|f|" and initial value "\lstinline|acc|". The function
+\descr{\lstinline|fun foldSet (f, acc, s)|}{Folds a set "\lstinline|s|" using the function "\lstinline|f|" and initial value "\lstinline|acc|". The function
 "\lstinline|f|" takes two arguments~--- an accumulator and an element of the set. The elements of set are enumerated in an ascending order.}
 
 \subsection{Memoization Tables}
@@ -202,7 +200,7 @@ new hash table.}
 if no binding is found and "\lstinline|Some (v)|" otherwise, where "\lstinline|v|" is a bound value.}
 
 \descr{\lstinline|fun removeHashTab (t, k)|}{Removes a binding for the key "\lstinline|k|" from hash table "\lstinline|t|" and returns a new hash table.
-  The previous binding for "\lstinline|k|" (if any) is restored. If there is no binding for "\lstinline|k|" returns unchanged hash table.}
+  The previous binding for "\lstinline|k|" (if any) is restored.}
 
 \section{Unit \texttt{Fun}}
 
@@ -233,7 +231,7 @@ The unit defines some generic functional stuff:
 }
 
 \section{Unit \texttt{Lazy}}
-\label{sec:lazy}
+\label{sec:std:lazy}
 
 The unit provides primitives for lazy evaluation.
 
@@ -242,6 +240,7 @@ The unit provides primitives for lazy evaluation.
 \descr{\lstinline|fun force (f)|}{Returns a suspended value, forcing its evaluation if needed.}
 
 \section{Unit \texttt{List}}
+\label{sec:std:list}
 
 The unit provides some list-manipulation functions. None of the functions mutate their arguments.
 

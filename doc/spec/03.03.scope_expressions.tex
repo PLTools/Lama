@@ -1,14 +1,17 @@
 \begin{figure}[t]
   \[
-    \begin{array}{rcl}
-      \defterm{scopeExpression}                & : & \nonterm{definition}^\star\s[\s\nonterm{expression}\s]\\
-      \defterm{definition}                     & : & \nonterm{variableDefinition}\alt\nonterm{functionDefinition}\alt\nonterm{infixDefinition}\\
-      \defterm{variableDefinition}             & : & (\s\term{local}\alt\term{public}\s)\s\nonterm{variableDefinitionSequence}\s\term{;}\\
-      \defterm{variableDefinitionSequence}     & : & \nonterm{variableDefinitionSequenceItem}\s(\s\term{,}\s\nonterm{variableDefinitionSequenceItem}\s)^\star\\
-      \defterm{variableDefinitionSequenceItem} & : & \token{LIDENT}\s[\s\term{=}\s\nonterm{basicExpression}\s]\\
-      \defterm{functionDefinition}             & : & [\s\term{public}\s]\s\term{fun}\s\token{LIDENT}\s\term{(}\s\nonterm{functionArguments}\s\term{)}\s\nonterm{functionBody}\\
-      \defterm{functionArguments}              & : & [\s\token{LIDENT}\s(\s\term{,}\s\token{LIDENT}\s)^\star\s]\\
-      \defterm{functionBody}                   & : & \term{\{}\s\nonterm{scopeExpression}\s\term{\}}
+    \begin{array}{rclc}
+      \defterm{scopeExpression}                & : & \nonterm{definition}^\star\s[\s\nonterm{expression}\s]&\\
+      \defterm{definition}                     & : & \nonterm{variableDefinition}&\alt\\
+                                               &   & \nonterm{functionDefinition}&\alt\\
+                                               &   & \nonterm{infixDefinition}&\\
+      \defterm{variableDefinition}             & : & (\s\term{local}\alt\term{public}\s)\s\nonterm{variableDefinitionSequence}\s\term{;}&\\
+      \defterm{variableDefinitionSequence}     & : & \nonterm{variableDefinitionItem}\s(\s\term{,}\s\nonterm{variableDefinitionItem}\s)^\star&\\
+      \defterm{variableDefinitionItem}         & : & \token{LIDENT}\s[\s\term{=}\s\nonterm{basicExpression}\s]&\\
+      \defterm{functionDefinition}             & : & [\s\term{public}\s]\s\term{fun}\s\token{LIDENT}\s\term{(}\s\nonterm{functionArguments}\s\term{)}&\\
+                                               &   & \phantom{XXXXX}\nonterm{functionBody}&\\
+      \defterm{functionArguments}              & : & [\s\token{LIDENT}\s(\s\term{,}\s\token{LIDENT}\s)^\star\s]&\\
+      \defterm{functionBody}                   & : & \term{\{}\s\nonterm{scopeExpression}\s\term{\}}&
     \end{array}
   \]
   \caption{Scope expression concrete syntax}
@@ -75,7 +78,7 @@ However, a definition is a nested scope can override a definition in an enclosin
       skip         -- here x is associated with the function
     };
 
-    skip -- here x is asociated with the variable
+    skip -- here x is associated with the variable
 \end{lstlisting}
 
 A function can freely use all visible definitions; in particular, functions defined in the
@@ -94,10 +97,10 @@ same scope can be mutually recursive:
     skip
 \end{lstlisting}
 
-A variable, defined in a scope, can be attributed with an expression, calcualting its initial value.
+A variable, defined in a scope, can be attributed with an expression, calculating its initial value.
 These expressions, however, are evaluated in the order of variable declaration. Thus, while
 technically it is possible to have forward references in the initialization expression, their
-behaviour is undefined. For example:
+behavior is undefined. For example:
 
 \begin{lstlisting}
     local x = y + 2; -- undefined, as y is not yet initialized at this point
