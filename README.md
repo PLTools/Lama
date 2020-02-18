@@ -5,12 +5,12 @@
 \lama is a programming language developed by JetBrains Research for educational purposes as an exemplary language to introduce
 the domain of programming languages, compilers and tools. Its general characteristics are:
 
-* procedural with first-class functions~--- functions can be passed as arguments, placed in data structures,
-  returned and ``constructed'' at runtime via closure mechanism;
+* procedural with first-class functions - functions can be passed as arguments, placed in data structures,
+  returned and "constructed" at runtime via closure mechanism;
 * with lexical static scoping;
-* strict~--- all arguments of function application are evaluated before function body;
-* imperative~--- variables can be re-assigned, function calls can have side effects;
-* untyped~--- no static type checking is performed;
+* strict - all arguments of function application are evaluated before function body;
+* imperative - variables can be re-assigned, function calls can have side effects;
+* untyped - no static type checking is performed;
 * with S-expressions and pattern-matching;
 * with user-defined infix operators, including those defined in local scopes;
 * with automatic memory management (garbage collection).
