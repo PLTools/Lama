@@ -134,7 +134,16 @@ class options args =
       close_out outf
     method dump_AST ast =
       if (!dump land dump_ast) > 0
-      then self#dump_file "ast" (GT.show(Language.Expr.t) ast)
+      then (
+        let buf = Buffer.create 1024 in
+        Buffer.add_string buf "<html>";
+        Buffer.add_string buf (Printf.sprintf "<title> %s </title>" self#get_infile);
+        Buffer.add_string buf "<body><li>";
+        GT.html(Language.Expr.t) ast buf;
+        Buffer.add_string buf "</li></body>";
+        Buffer.add_string buf "</html>";
+        self#dump_file "html" (Buffer.contents buf)
+      )
       else ()
     method dump_SM sm  =
       if (!dump land dump_sm) > 0
