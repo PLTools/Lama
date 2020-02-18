@@ -13,7 +13,7 @@ the domain of programming languages, compilers and tools. Its general characteri
 * with user-defined infix operators, including those defined in local scopes;
 * with automatic memory management (garbage collection).
 
-The name ![lama](lama.png) is an acronym for ![lama](lalgol.png) since the language has borrowed the syntactic shape of
+The name ![lama](lama.png) is an acronym for *Lambda-Algol* since the language has borrowed the syntactic shape of
 operators from **Algol-68**; [**Haskell**](www.haskell.org) and [**OCaml**](www.ocaml.org) can be
 mentioned as other languages of inspiration.
 
