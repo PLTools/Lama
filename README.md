@@ -1,6 +1,6 @@
 # Lama
 
-![equation](http://www.sciweavers.org/tex2img.php?eq=%24%5Clambda%5Ckern%20-.1667em%5Clower%20-.5ex%5Chbox%7B%24a%24%7D%5Ckern%20-.1000em%5Clower%20.2ex%5Chbox%7B%24%5Cmathcal%20M%24%7D%5Ckern%20-.1000em%5Clower%20-.5ex%5Chbox%7B%24a%24%7D%24&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=0]
+![equation](http://www.sciweavers.org/tex2img.php?eq=%24%5Clambda%5Ckern%20-.1667em%5Clower%20-.5ex%5Chbox%7B%24a%24%7D%5Ckern%20-.1000em%5Clower%20.2ex%5Chbox%7B%24%5Cmathcal%20M%24%7D%5Ckern%20-.1000em%5Clower%20-.5ex%5Chbox%7B%24a%24%7D%24&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=0)
 
 \lama is a programming language developed by JetBrains Research for educational purposes as an exemplary language to introduce
 the domain of programming languages, compilers and tools. Its general characteristics are:
