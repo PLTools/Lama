@@ -1,9 +1,0 @@
-fun print_list (l) {
-  case l of
-    `nil         -> skip
-  | `cons (n, t) -> write (n); print_list (t)
-  esac
-}
-
-x := `cons (4, `cons(3, `cons(2 , `cons (1, `cons (0, `cons (1, `cons (2, `cons (3, `cons (4, `cons (5, `nil))))))))));
-print_list (x)
