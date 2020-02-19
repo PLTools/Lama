@@ -46,7 +46,7 @@ Prerequisites:
 
 Installing:
 
-* `opam pin add -n ostap https://github.com/dboulytchev/ostap.git#memoCPS`
+* `opam pin add -n ostap https://github.com/dboulytchev/ostap.git#memoCPS` (remember of "#" being a comment character in bash)
 * `opam pin add -y lama https://github.com/JetBrains-Research/Lama.git`
 
 Smoke-testing:
