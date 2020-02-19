@@ -44,3 +44,7 @@ Installing:
 
 * `opam pin add -n ostap https://github.com/dboulytchev/ostap.git#memoCPS`
 * `opam pin add -y lama https://github.com/JetBrains-Research/Lama.git`
+
+Smoke-checking: `pushd tutorial && make && popd`
+
+
