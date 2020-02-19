@@ -2,7 +2,8 @@ TOPFILE = lamac
 OCAMLC = ocamlfind c
 OCAMLOPT = ocamlfind opt
 OCAMLDEP = ocamlfind dep
-SOURCES = version.ml stdpath.ml Language.ml SM.ml X86.ml Driver.ml
+PRE_SOURCES = Language.ml SM.ml X86.ml Driver.ml
+SOURCES = version.ml stdpath.ml $(PRE_SOURCES) 
 CAMLP5 = -syntax camlp5o -package ostap.syntax,GT.syntax.all
 PXFLAGS = $(CAMLP5)
 BFLAGS = -rectypes -g
@@ -14,7 +15,7 @@ metagen:
 	echo "let version = \"Version `git rev-parse --abbrev-ref HEAD`, `git rev-parse --short HEAD`, `git rev-parse --verify HEAD |git show --no-patch --no-notes --pretty='%cd'`\"" > version.ml
 	echo "let path = \"`opam var share`/Lama\"" > stdpath.ml
 
-.depend: $(SOURCES)
+.depend: $(PRE_SOURCES)
 	$(OCAMLDEP) $(PXFLAGS) *.ml > .depend
 
 $(TOPFILE): $(SOURCES:.ml=.cmx)
