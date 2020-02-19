@@ -10,4 +10,4 @@ all: $(ALL)
 	$(LAMAC) $<
 
 clean:
-	rm -Rf *.s *.o *.i *~
+	rm -Rf *.s *.o *.i *~ $(ALL)
