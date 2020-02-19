@@ -1,0 +1,12 @@
+printf ("Hi, this is Lama...\n");
+printf ("I can construct values of various shapes,\n");
+printf ("convert them into strings and print. Here you are:\n");
+
+printf ("Regular integers: %d or even %s\n", 3, 3.string);
+printf ("Lists: %s\n", {1, 2, 3}.string);
+printf ("Arrays/tuples: %s\n", [1, 2, 3].string);
+printf ("S-expressions: %s\n", Man ("Jonh", "Smith").string);
+printf ("Functions: %s\n", fun (x, y) {x+y}.string);
+printf ("These structures can be nested and heterogeneous: %s\n", {[1, "2"], Apple, fun (x) {Melon (3)}}.string);
+
+printf ("That's all for now, bye!\n")

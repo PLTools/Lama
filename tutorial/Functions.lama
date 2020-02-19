@@ -1,0 +1,7 @@
+import Fun;
+import List;
+
+printf ("Functions are first-class, higher-order.\n");
+
+printf ("Factorial: %d\n", fix (fun (f) {fun (n) {if n == 1 then 1 else n * f (n-1) fi}})(5));
+printf ("Function composition: %d\n", foldl (infix #, id, map (fun (i) {fun (x) {x+i}}, {1, 2, 3})) $ 10)

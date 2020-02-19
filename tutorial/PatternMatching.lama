@@ -1,0 +1,54 @@
+fun show (x) {
+  fun show (level, x) {
+    for local i; i := 0, i<level, i := i + 1 do
+      printf (" ")
+    od;
+  
+    case x of
+      #unboxed -> printf ("integer %d\n", x);
+                  return                
+    | #array   -> printf ("array\n")
+    | #string  -> printf ("string\n")
+    | #sexp    -> printf ("S-expression\n")
+    | #fun     -> printf ("closure 0x%x\n", x[0])
+    esac;
+
+    for local i; i := case x of #fun -> 1 | _ -> 0 esac, i < x.length, i := i + 1 do
+      show (level + 2, x[i])
+    od
+  }
+
+  show (0, x)
+}
+
+printf ("Pattern matching is a better way to deal with the structure of a value:\n");
+show (3);
+show ([3]);
+show ({1, 2});
+show (["abc", [1, fun (x) {x+1}], {3, 4}]);
+
+printf ("But the main designation of pattern matching is to deal with S-expressions.\n");
+printf ("You can discriminate the scrutinee on the tag:\n");
+
+case E of
+  A -> printf ("Nope.\n")
+| B -> printf ("Nope.\n")
+| C -> printf ("Nope.\n")
+| D -> printf ("Nope.\n")
+| E -> printf ("Yes, this is E.\n") 
+esac;
+
+printf ("You can discriminate the scrutinee on the number of arguments as well:\n");
+
+case A of
+  A (_)       -> printf ("Nope.\n")
+| A (_, _)    -> printf ("Nope.\n")
+| A           -> printf ("This is A with no subvalues.\n")
+| A (_, _, _) -> printf ("Nope.\n")
+esac;
+
+printf ("You may also use composite patterns:\n");
+
+case A (["x", "y", "z"], {1, 2, 3}) of
+  A (a@[_, _, z], _ : tl) -> printf ("a=%s, z=%s, tl=%s\n", a.string, z.string, tl.string)
+esac

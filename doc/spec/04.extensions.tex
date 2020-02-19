@@ -15,7 +15,8 @@ redefinition of builtin infix operators:
 
 \begin{itemize}
 \item redefinitions of builtin infix operators can not be exported;
-\item the assignment operator "\lstinline|:=|" can not be redefined.
+\item the assignment operator "\lstinline|:=|" can not be redefined;
+\item infix definitions can not be mutually recursive.
 \end{itemize}
 
 The syntax for infix operator definition is shown on Fig.~\ref{custom_infix_construct}; a custom infix definition must specify exactly two arguments.

@@ -1,0 +1,33 @@
+local samples = [
+  {"a", "b", "c"},
+  "string",
+  [],
+  Fruit ("apple"),
+  fun (){skip}
+];
+
+fun show () {
+  -- Note: it would be much better to use iterArray from standard unit Array;
+  -- in that case, however, we wouldn't be able to showcase
+  -- for-loops and []-expressions.
+  for local i; i := 0, i < samples.length, i := i+1 do
+    printf ("  %s has %d subvalue(s):\n", samples[i].string, samples[i].length);
+    for local j; j := 0, j < samples[i].length, j := j+1 do
+      printf ("    subvalue [%d] = %s\n", j, samples[i][j].string)
+    od
+  od
+}
+
+printf ("And now we look at accessing/modifying/analyzing the values.\n");
+printf ("Any composite value can be asked on the number of its immediate subvalues,\n");
+printf ("and these subvalues can be accessed:\n");
+
+show ();
+
+printf ("And the subvalues of a composite value can be reassigned.\n");
+
+samples [2]    := [1, 2, 3];
+samples [0][1] := {};
+
+show ()
+

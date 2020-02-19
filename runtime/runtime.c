@@ -382,11 +382,18 @@ static void printStringBuf (char *fmt, ...) {
   vprintStringBuf (fmt, args);
 }
 
+int is_valid_heap_pointer (void *p);
+
 static void printValue (void *p) {
   data *a = (data*) BOX(NULL);
   int i   = BOX(0);
   if (UNBOXED(p)) printStringBuf ("%d", UNBOX(p));
   else {
+    if (! is_valid_heap_pointer(p)) {
+      printStringBuf ("0x%x", p);
+      return;
+    }
+    
     a = TO_DATA(p);
 
     switch (TAG(a->tag)) {      
@@ -398,7 +405,7 @@ static void printValue (void *p) {
       printStringBuf ("<closure ");
       for (i = 0; i < LEN(a->tag); i++) {
 	if (i) printValue ((void*)((int*) a->contents)[i]);
-	else printStringBuf ("%x", (void*)((int*) a->contents)[i]);
+	else printStringBuf ("0x%x", (void*)((int*) a->contents)[i]);
 	
 	if (i != LEN(a->tag) - 1) printStringBuf (", ");
       }
@@ -453,7 +460,7 @@ static void printValue (void *p) {
     break;
 
     default:
-      printStringBuf ("*** invalid tag: %x ***", TAG(a->tag));
+      printStringBuf ("*** invalid tag: 0x%x ***", TAG(a->tag));
     }
   }
 }
@@ -494,7 +501,7 @@ static void stringcat (void *p) {
     break;
 
     default:
-      printStringBuf ("*** invalid tag: %x ***", TAG(a->tag));
+      printStringBuf ("*** invalid tag: 0x%x ***", TAG(a->tag));
     }
   }
 }
@@ -1436,6 +1443,10 @@ static void gc_swap_spaces (void) {
 
 # define IS_FORWARD_PTR(p)			\
   (!UNBOXED(p) && IN_PASSIVE_SPACE(p))
+
+int is_valid_heap_pointer (void *p)  {
+  return IS_VALID_HEAP_POINTER(p);
+}
 
 extern size_t * gc_copy (size_t *obj);
 
