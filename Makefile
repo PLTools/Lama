@@ -6,9 +6,9 @@ SHELL := /bin/bash
 .PHONY: all regression
 
 all:
-	pushd src && make && popd
-	pushd runtime && make && popd
-	pushd stdlib && make && popd
+	make -C src 
+	make -C runtime 
+	make -C stdlib
 
 STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.lama runtime/runtime.a runtime/Std.i)
 #$(info $(STD_FILES))
@@ -23,14 +23,14 @@ uninstall:
 	$(RM) `opam var bin`/$(EXECUTABLE)
 
 regression:
-	pushd regression && make clean check && popd
-	pushd regression/x86only && make clean check && popd
-	pushd stdlib/regression && make clean check && popd
+	make clean check -C regression
+	make clean check -C regression/x86only 
+	make clean check -C stdlib/regression
 
 clean:
-	pushd src && make clean && popd
-	pushd runtime && make clean && popd
-	pushd stdlib && make clean && popd
-	pushd regression && make clean && popd
+	make clean -C src
+	make clean -C runtime
+	make clean -C stdlib
+	make clean -C regression
 
 
