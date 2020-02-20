@@ -1,7 +1,7 @@
--- Collection package.
+-- Collections.
 -- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
 --
--- This package provides a simplistic implementation of immutable set/map/hashtable
+-- This unit provides a simplistic implementation of immutable set/map/hashtable
 -- data structures.
 
 import List;

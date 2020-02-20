@@ -1,3 +1,8 @@
+-- Fun.
+-- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
+--
+-- This unit provides some convenient function-manipulation stuff.
+
 import Ref;
 
 public fun id (x) {

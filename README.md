@@ -32,6 +32,10 @@ In addition, a source-level reference interpreter is implemented as well as a co
 stack machine. The stack machine code can in turn be either interpreted on a stack machine interpreter, or
 used as an intermediate representation by the native code compiler.
 
+## Language Specification
+
+The language specification can be found [here](lama-spec.pdf).
+
 ## Installation
 
 Prerequisites:
@@ -42,9 +46,13 @@ Prerequisites:
 
 Installing:
 
-* `opam pin add -n ostap https://github.com/dboulytchev/ostap.git#memoCPS`
+* `opam pin add -n ostap https://github.com/dboulytchev/ostap.git#memoCPS` (remember of "#" being a comment character in bash)
 * `opam pin add -y lama https://github.com/JetBrains-Research/Lama.git`
 
-Smoke-checking: `pushd tutorial && make && popd`
+Smoke-testing:
+
+* `pushd tutorial`
+* `make`
+* `popd`
 
 
