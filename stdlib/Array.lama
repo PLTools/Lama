@@ -1,8 +1,9 @@
--- Array package.
+-- Arrays.
 -- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
 --
--- This package provides a simplistic implementation of immutable set/map/hashtable
--- data structures.
+-- This unit provides a set of array-manipulation primitives. Note, some of these
+-- primitives can be applied to any boxed value in Lama, not necessarily arrays
+-- per se.
 
 import List;
 
