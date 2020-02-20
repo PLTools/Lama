@@ -1,11 +1,19 @@
+-- Emulation of first-class references.
+-- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
+--
+-- This unit provides an implementation for first-class references emulation.
+
+-- Creates a new reference cell with contents x
 public fun ref (x) {
   [x]
 }
 
+-- Returns the contents of the cell x
 public fun deref (x) {
   x[0]
 }
 
+-- Assigns a new value y into the cell x
 public infix ::= before := (x, y) {
   x[0] := y
 }

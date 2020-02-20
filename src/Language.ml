@@ -1085,6 +1085,7 @@ module Interface =
       with Sys_error _ -> None                        
 
     let find import paths =
+      (*Printf.printf "Paths to search import in: %s" (show(list) (show(string)) paths); *)
       let rec inner = function
       | [] -> None
       | p::paths ->

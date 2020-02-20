@@ -1,3 +1,8 @@
+-- Lists.
+-- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
+--
+-- This unit provides a set of list-manipulation primitives.
+
 public fun singleton (x) {
   x : {}
 }
