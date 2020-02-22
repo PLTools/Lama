@@ -1,4 +1,5 @@
 V,sysargs;
+F,stringInt;
 F,makeArray;
 F,clone;
 F,hash;

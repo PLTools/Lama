@@ -696,6 +696,12 @@ int inner_hash (int depth, unsigned acc, void *p) {
   }
 }
 
+extern void* LstringInt (char *b) {
+  int n;
+  sscanf (b, "%d", &n);
+  return BOX(n);
+}
+
 extern int Lhash (void *p) {
   return BOX(inner_hash (0, 0, p));
 }
@@ -1115,7 +1121,7 @@ extern void Bmatch_failure (void *v, char *fname, int line, int col) {
   createStringBuf ();
   printValue (v);
   failure ("match failure at %s:%d:%d, value '%s'\n",
-	   fname, line, col, stringBuf.contents);
+	   fname, UNBOX(line), UNBOX(col), stringBuf.contents);
 }
 
 extern void* /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
