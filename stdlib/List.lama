@@ -79,13 +79,13 @@ public fun flatten (l) {
 
   fun append (x) {
     local new = x : {};
-    
+
     curr [0][1] := new;
     curr [0] := new    
   }
-
+  
   iter (fun (x) {iter (append, x)}, l);
-
+  
   res [1]
 }
 

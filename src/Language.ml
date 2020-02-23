@@ -312,8 +312,8 @@ module Pattern =
       | t:UIDENT ps:(-"(" !(Util.list)[parse] -")")? {Sexp (t, match ps with None -> [] | Some ps -> ps)}
       | "[" ps:(!(Util.list0)[parse]) "]"            {Array ps}
       | "{" ps:(!(Util.list0)[parse]) "}"            {match ps with
-                                                      | [] -> UnBoxed
-                                                      | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) ps UnBoxed
+                                                      | [] -> Const 0
+                                                      | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) ps (Const 0)
                                                      }
       | l:$ x:LIDENT y:(-"@" parse)?                 {Loc.attach x l#coord; match y with None -> Named (x, Wildcard) | Some y -> Named (x, y)}
       | s:("-")? c:DECIMAL                           {Const (match s with None -> c | _ -> ~-c)}
@@ -709,10 +709,6 @@ module Expr =
             let name = infix_name s in Loc.attach name l#coord; ignore atr (Var name)
           )
       }
-      (*
-      | l:$ %"fun" "(" args:!(Util.list0)[ostap (l:$ x:LIDENT {Loc.attach x l#coord; x})] ")"
-               "{" body:scope[infix][Weak] "}"=> {notRef atr} :: (not_a_reference l) => {ignore atr (Lambda (args, body))}
-       *)
       | l:$ %"fun" "(" args:!(Util.list0)[Pattern.parse] ")"
            "{" body:scope[infix][Weak] "}"=> {notRef atr} :: (not_a_reference l) => {
           let args, body =

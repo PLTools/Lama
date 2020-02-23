@@ -13,7 +13,7 @@ fun f (l) {
 local x = read ();
 
 write (f ({}));
-write (f ({1}));
+write (f (1:{}));
 write (f ({1, 1}));
 write (f ({1, 1, 1}));
 write (f ({1, 2, 1}))

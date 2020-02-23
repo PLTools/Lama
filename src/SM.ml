@@ -101,9 +101,19 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
    Printf.eprintf "   insn=%s\n" (show_insn insn);
    Printf.eprintf "   stack=%s\n" (show(list) (show(value)) stack);
    Printf.eprintf "end\n";
-   *)
+    *)
    (match insn with
     | PUBLIC _ | EXTERN _     -> eval env conf prg'
+    | BINOP  "=="             -> let y::x::stack' = stack in
+                                 let z =
+                                   match x, y with
+                                   | Value.Int _, Value.Int _ -> Value.of_int @@ Expr.to_func "==" (Value.to_int x) (Value.to_int y)
+                                   | Value.Int _, _ | _, Value.Int _ -> Value.of_int 0
+                                   | _ -> failwith "unexpected operands in comparison: %s vs. %s\n"
+                                            (show(Value.t) (fun _ -> "<not supported>") (fun _ -> "<not supported>") x)
+                                            (show(Value.t) (fun _ -> "<not supported>") (fun _ -> "<not supported>") y)
+                                 in
+                                 eval env (cstack, z :: stack', glob, loc, i, o) prg'
     | BINOP  op               -> let y::x::stack' = stack in eval env (cstack, (Value.of_int @@ Expr.to_func op (Value.to_int x) (Value.to_int y)) :: stack', glob, loc, i, o) prg'
     | CONST n                 -> eval env (cstack, (Value.of_int n)::stack, glob, loc, i, o) prg'
     | STRING s                -> eval env (cstack, (Value.of_string @@ Bytes.of_string s)::stack, glob, loc, i, o) prg'
