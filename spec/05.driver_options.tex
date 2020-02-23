@@ -34,6 +34,7 @@ procedure for each unit will be called only once (regardless of the imports' sha
 Additionally, the following options can be given to the driver:
 
 \begin{itemize}
+\item "\texttt{-o $filename$}"~--- specifies an alternative file name for the executable. 
 \item "\texttt{-I $path$}"~--- specifies a path to look for external units. Multiples instances of this option can be given in driver's
   invocation, and the paths are looked up in that order.
 \item "\texttt{-dp}"~--- forces the driver to dump the AST of compiled unit in \textsc{html} representation. The dump is written in the file with the same

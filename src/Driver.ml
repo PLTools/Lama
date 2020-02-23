@@ -47,6 +47,7 @@ class options args =
     "When no options specified, builds the source file into executable.\n" ^
     "Options:\n" ^
     "  -c        --- compile into object file\n" ^
+    "  -o <file> --- write executable into file <file>\n" ^    
     "  -I <path> --- add <path> into unit search path list\n" ^
     "  -i        --- interpret on a source-level interpreter\n" ^
     "  -s        --- compile into stack machine code and interpret on the stack machine initerpreter\n" ^
@@ -61,6 +62,7 @@ class options args =
     val help    = ref false
     val i       = ref 1
     val infile  = ref (None : string option)
+    val outfile = ref (None : string option)
     val paths   = ref [X86.get_std_path ()]
     val mode    = ref (`Default : [`Default | `Eval | `SM | `Compile ])
     (* Workaround until Ostap starts to memoize properly *)
@@ -76,6 +78,7 @@ class options args =
             | "-w"  -> self#set_workaround
             (* end of the workaround *)
             | "-c"  -> self#set_mode `Compile
+            | "-o"  -> (match self#peek with None -> raise (Commandline_error "File name expected after '-o' specifier") | Some fname -> self#set_outfile fname)
             | "-I"  -> (match self#peek with None -> raise (Commandline_error "Path expected after '-I' specifier") | Some path -> self#add_include_path path)
             | "-s"  -> self#set_mode `SM
             | "-i"  -> self#set_mode `Eval
@@ -104,6 +107,10 @@ class options args =
       match !infile with
       | None       -> infile := Some name
       | Some name' -> raise (Commandline_error (Printf.sprintf "Input file ('%s') already specified" name'))
+    method private set_outfile name =
+      match !outfile with
+      | None       -> outfile := Some name
+      | Some name' -> raise (Commandline_error (Printf.sprintf "Output file ('%s') already specified" name'))
     method private add_include_path path =
       paths := path :: !paths
     method private set_mode s =
@@ -116,6 +123,10 @@ class options args =
       then (incr i; Some (args.(j)))
       else None
     method get_mode = !mode
+    method get_output_option =
+      match !outfile with
+      | None      -> Printf.sprintf "-o %s" self#basename
+      | Some name -> Printf.sprintf "-o %s" name
     method get_infile =
       match !infile with
       | None      -> raise (Commandline_error "Input file not specified")
@@ -150,6 +161,10 @@ class options args =
       then self#dump_file "sm" (SM.show_prg sm)
       else ()
     method greet =
+      (match !outfile with
+       | None   -> ()
+       | Some _ -> (match !mode with `Default -> () | _ -> Printf.printf "Output file option ignored in this mode.\n")
+      );           
       if !version then Printf.printf "%s\n" Version.version;
       if !help    then Printf.printf "%s" help_string
   end

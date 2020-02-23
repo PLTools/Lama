@@ -722,7 +722,7 @@ let build cmd prog =
      let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
      let buf  = Buffer.create 255 in
      List.iter (fun o -> Buffer.add_string buf o; Buffer.add_string buf " ") objs;
-     let gcc_cmdline = Printf.sprintf "gcc -g -m32 -o %s %s.s %s %s/runtime.a" cmd#basename cmd#basename (Buffer.contents buf) inc in
+     let gcc_cmdline = Printf.sprintf "gcc -g -m32 %s %s.s %s %s/runtime.a" cmd#get_output_option cmd#basename (Buffer.contents buf) inc in
      Sys.command gcc_cmdline
   | `Compile ->
      Sys.command (Printf.sprintf "gcc -g -m32 -c %s.s" cmd#basename)
