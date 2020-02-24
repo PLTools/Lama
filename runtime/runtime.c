@@ -1246,7 +1246,7 @@ extern void* LreadLine () {
   if (errno != 0)
     failure ("readLine (): %s\n", strerror (errno));
 
-  return LmakeString (0);
+  return BOX (0);
 }
 
 extern void* Lfread (char *fname) {
