@@ -1238,6 +1238,8 @@ extern void* LreadLine () {
 
   if (scanf ("%m[^\n]", &buf) == 1) {
     void * s = Bstring (buf);
+
+    getchar ();
     
     free (buf);
     return s;
