@@ -1,5 +1,7 @@
 /* Runtime library */
 
+#define _GNU_SOURCE 1
+
 # include <stdio.h>
 # include <stdio.h>
 # include <string.h>
@@ -82,7 +84,7 @@ void __post_gc_subst () {}
 #define MAX_EXTRA_ROOTS_NUMBER 16
 typedef struct {
   int current_free;
-  size_t roots[MAX_EXTRA_ROOTS_NUMBER];
+  void ** roots[MAX_EXTRA_ROOTS_NUMBER];
 } extra_roots_pool;
 
 static extra_roots_pool extra_roots;
@@ -91,7 +93,7 @@ void clear_extra_roots (void) {
   extra_roots.current_free = 0;
 }
 
-void push_extra_root (size_t * p) {
+void push_extra_root (void ** p) {
 #ifdef DEBUG_PRINT
   indent++; print_indent ();
   printf ("push_extra_root %p %p\n", p, &p); fflush (stdout);
@@ -107,7 +109,7 @@ void push_extra_root (size_t * p) {
 #endif
 }
 
-void pop_extra_root (size_t * p) {
+void pop_extra_root (void ** p) {
 #ifdef DEBUG_PRINT
   indent++; print_indent ();
   printf ("pop_extra_root %p %p\n", p, &p); fflush (stdout);
@@ -552,7 +554,7 @@ extern void* Lsubstring (void *subj, int p, int l) {
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
   struct re_pattern_buffer *b =
     (struct re_pattern_buffer*) malloc (sizeof (struct re_pattern_buffer));
-  int n = re_compile_pattern (regexp, strlen (regexp), b);
+  int n = (int) re_compile_pattern (regexp, strlen (regexp), b);
 
   if (n != 0) {
     failure ("%", strerror (n));
@@ -572,7 +574,9 @@ extern int LregexpMatch (struct re_pattern_buffer *b, char *s, int pos) {
 extern void* Bstring (void*);
 
 void *Lclone (void *p) {
-  data *res;
+  data *obj;
+  sexp *sobj;
+  void* res;
   int n;
 #ifdef DEBUG_PRINT
   register int * ebp asm ("ebp");
@@ -606,19 +610,18 @@ void *Lclone (void *p) {
       print_indent ();
       printf ("Lclone: closure or array &p=%p p=%p ebp=%p\n", &p, p, ebp); fflush (stdout);
 #endif
-      res = (data*) alloc (sizeof(int) * (l+1));
-      memcpy (res, TO_DATA(p), sizeof(int) * (l+1));
-      res = res->contents;
+      obj = (data*) alloc (sizeof(int) * (l+1));
+      memcpy (obj, TO_DATA(p), sizeof(int) * (l+1));
+      res = (void*) (obj->contents);
       break;
       
     case SEXP_TAG:
 #ifdef DEBUG_PRINT
       print_indent (); printf ("Lclone: sexp\n"); fflush (stdout);
 #endif
-      res = (sexp*) alloc (sizeof(int) * (l+2));
-      memcpy (res, TO_SEXP(p), sizeof(int) * (l+2));
-      res = res->contents;
-      res = res->contents;
+      sobj = (sexp*) alloc (sizeof(int) * (l+2));
+      memcpy (sobj, TO_SEXP(p), sizeof(int) * (l+2));
+      res = (void*) sobj->contents.contents;
       break;
        
     default:
@@ -699,7 +702,7 @@ int inner_hash (int depth, unsigned acc, void *p) {
 extern void* LstringInt (char *b) {
   int n;
   sscanf (b, "%d", &n);
-  return BOX(n);
+  return (void*) BOX(n);
 }
 
 extern int Lhash (void *p) {
@@ -833,7 +836,7 @@ extern void* Bstring (void *p) {
   print_indent ();
   printf ("\tBstring: call strncpy: %p %p %p %i\n", &p, p, s, n); fflush(stdout);
 #endif
-  strncpy (s, p, n + 1);
+  strncpy ((char*)s, p, n + 1);
 #ifdef DEBUG_PRINT
   print_indent ();
   printf ("\tBstring: ends\n"); fflush(stdout);
@@ -899,7 +902,7 @@ extern void* Bclosure (int bn, void *entry, ...) {
 #endif
   argss = (ebp + 12);
   for (i = 0; i<n; i++, argss++) {
-    push_extra_root (argss);
+    push_extra_root ((void**)argss);
   }
 
   r = (data*) alloc (sizeof(int) * (n+2));
@@ -920,7 +923,7 @@ extern void* Bclosure (int bn, void *entry, ...) {
 
   argss--;
   for (i = 0; i<n; i++, argss--) {
-    pop_extra_root (argss);
+    pop_extra_root ((void**)argss);
   }
 
 #ifdef DEBUG_PRINT
@@ -1088,13 +1091,13 @@ extern void* Bsta (void *v, int i, void *x) {
   ASSERT_UNBOXED(".sta:2", i);
   
   if (TAG(TO_DATA(x)->tag) == STRING_TAG)((char*) x)[UNBOX(i)] = (char) UNBOX(v);
-  else ((int*) x)[UNBOX(i)] = v;
+  else ((int*) x)[UNBOX(i)] = (int) v;
 
   return v;
 }
 
 static void fix_unboxed (char *s, va_list va) {
-  size_t *p = va;
+  size_t *p = (size_t*)va;
   int i = 0;
   
   while (*s) {
@@ -1173,9 +1176,9 @@ extern void* Lsprintf (char * fmt, ...) {
 
   __pre_gc ();
 
-  push_extra_root (&fmt);
+  push_extra_root ((void**)&fmt);
   s = Bstring (stringBuf.contents);
-  pop_extra_root (&fmt);
+  pop_extra_root ((void**)&fmt);
 
   __post_gc ();
   
@@ -1248,7 +1251,7 @@ extern void* LreadLine () {
   if (errno != 0)
     failure ("readLine (): %s\n", strerror (errno));
 
-  return BOX (0);
+  return (void*) BOX (0);
 }
 
 extern void* Lfread (char *fname) {
@@ -1345,25 +1348,25 @@ extern void set_args (int argc, char *argv[]) {
 #endif
 
   p = LmakeArray (BOX(n));
-  push_extra_root (&p);
+  push_extra_root ((void**)&p);
   
   for (i=0; i<n; i++) {
 #ifdef DEBUG_PRINT
     print_indent ();
     printf ("set_args: iteration %i %p %p ->\n", i, &p, p); fflush(stdout);
 #endif
-    ((int*)p) [i] = Bstring (argv[i]);
+    ((int*)p) [i] = (int) Bstring (argv[i]);
 #ifdef DEBUG_PRINT
     print_indent ();
     printf ("set_args: iteration %i <- %p %p\n", i, &p, p); fflush(stdout);
 #endif
   }
 
-  pop_extra_root (&p);
+  pop_extra_root ((void**)&p);
   __post_gc ();
 
   global_sysargs = p;
-  push_extra_root (&global_sysargs);
+  push_extra_root ((void**)&global_sysargs);
 #ifdef DEBUG_PRINT
   print_indent ();
   printf ("set_args: end\n", n, &p, p); fflush(stdout);
@@ -1434,7 +1437,7 @@ static void gc_swap_spaces (void) {
   to_space.begin   = NULL;
   to_space.current = NULL;
   to_space.end     = NULL;
-  to_space.size    = NULL;
+  to_space.size    = 0;
 #ifdef DEBUG_PRINT
   indent--;
 #endif
@@ -1442,12 +1445,12 @@ static void gc_swap_spaces (void) {
 
 # define IS_VALID_HEAP_POINTER(p)\
   (!UNBOXED(p) &&		 \
-   from_space.begin <= p &&	 \
-   from_space.end   >  p)
+   (size_t)from_space.begin <= (size_t)p &&	 \
+   (size_t)from_space.end   >  (size_t)p)
 
 # define IN_PASSIVE_SPACE(p)	\
-  (to_space.begin <= p	&&	\
-   to_space.end   >  p)
+  ((size_t)to_space.begin <= (size_t)p	&&	\
+   (size_t)to_space.end   >  (size_t)p)
 
 # define IS_FORWARD_PTR(p)			\
   (!UNBOXED(p) && IN_PASSIVE_SPACE(p))
@@ -1482,7 +1485,7 @@ static void copy_elements (size_t *where, size_t *from, int len) {
       fflush (stdout);
 #endif
       p = gc_copy ((size_t*) elem);
-      *where = p;
+      *where = (size_t) p;
       where ++;
     }
 #ifdef DEBUG_PRINT
@@ -1613,7 +1616,7 @@ extern size_t * gc_copy (size_t *obj) {
       *copy = d->tag;
       copy++;
       d->tag = (int) copy;
-      strcpy (&copy[0], (char*) obj);
+      strcpy ((char*)&copy[0], (char*) obj);
       break;
 
   case SEXP_TAG  :
@@ -1681,9 +1684,9 @@ extern void gc_test_and_copy_root (size_t ** root) {
 }
 
 extern void gc_root_scan_data (void) {
-  size_t * p = &__start_custom_data;
-  while  (p < &__stop_custom_data) {
-    gc_test_and_copy_root (p);
+  size_t * p = (size_t*)&__start_custom_data;
+  while  (p < (size_t*)&__stop_custom_data) {
+    gc_test_and_copy_root ((size_t**)p);
     p++;
   }
 }
@@ -1706,7 +1709,7 @@ extern void init_pool (void) {
   from_space.size    = SPACE_SIZE;
   to_space.current   = NULL;
   to_space.end       = NULL;
-  to_space.size      = NULL;
+  to_space.size      = 0;
   init_extra_roots ();
 }
 
@@ -1733,7 +1736,7 @@ static void* gc (size_t size) {
 	    (size_t*) extra_roots.roots[i]);
     fflush (stdout);
 #endif
-    gc_test_and_copy_root (extra_roots.roots[i]);
+    gc_test_and_copy_root ((size_t**)extra_roots.roots[i]);
   }
 #ifdef DEBUG_PRINT
   print_indent ();
