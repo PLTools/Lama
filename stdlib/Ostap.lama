@@ -64,11 +64,10 @@ public fun memo (f) {
 }
 
 public fun token (x) {
-  fun (k) {
-    fun (s) {
-      k $ matchString (s, x)
-    }
-  }   
+  case x of
+    #string -> fun (k) {fun (s) {k $ matchString (s, x)}}
+  | _       -> fun (k) {fun (s) {k $ matchRegexp (s, x)}}
+  esac
 }
 
 public fun eof (k) {
@@ -130,8 +129,8 @@ public fun bypass (f) {
 public fun opt (a) {empty @ lift (None) | a @ fun (x) {Some (x)}}
 
 public fun rep0 (a) {
-  --memo
-  (empty @ lift({}) | a |> fun (x) {rep0 (a) @ fun (as) {x : as}})
+  memo
+    (empty @ lift({}) | a |> fun (x) {rep0 (a) @ fun (as) {x : as}})
 }
 
 public fun rep (a) {

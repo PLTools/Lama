@@ -333,7 +333,8 @@ The unit describes some primitive parsers and combinators which allow to constru
 
 \descr{\lstinline|fun memo (f)|}{Takes a parser "\lstinline|a|" and returns its memoized version. Needed for some parsers (for expamle, left-recursive ones).}
 
-\descr{\lstinline|fun token (x)|}{Takes a string and returns a parser which recognizes exactly this string.}
+\descr{\lstinline|fun token (x)|}{Takes a string or a representation of regular expression, returned by "\lstinline|createRegexp|" (see unit \texttt{Matcher}),
+  and returns a parser which recognizes exactly this string/regular expression.}
 
 \descr{\lstinline|fun eof (k)|}{A parser which recognizes the end of stream.}
 

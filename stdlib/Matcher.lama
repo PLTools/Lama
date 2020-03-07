@@ -55,7 +55,7 @@ fun createMatcher (buf, pos, line, col) {
   fun matchRegexp (r) {
     local n;
     
-    if (n := regexpMatch (r[0], buf, pos)) > 0
+    if (n := regexpMatch (r[0], buf, pos)) >= 0
     then Succ (substring (buf, pos, n), shift (n))
     else Fail (sprintf ("%s expected", r[1]), line, col)
     fi
