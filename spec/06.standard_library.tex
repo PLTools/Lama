@@ -28,7 +28,7 @@ name of the executable itself).}
 \descr{\lstinline|fun stringcat (list)|}{Takes a list of strings and returns the concatenates all its elements.}
 
 \descr{\lstinline|fun matchSubString (subj, patt, pos)|}{Takes two strings "\lstinline|subj|" and "\lstinline|patt|" and integer position "\lstinline|pos|" and
-checks if a substring of "\lstinline|subj|" starting at position "\lstinline|pos|" is equal to "\lstinline|patt|"; returns integer value.}
+checks if a substring of "\lstinline|subj|" starting at position "\lstinline|pos|" is equal to "\lstinline|patt|"; returns integer value, treated as a boolean.}
 
 \descr{\lstinline|fun sprintf (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib}) and a variable number of arguments and
 returns a string, acquired via processing these arguments according to the format string. Note: indexed arguments are not supported.}
@@ -83,6 +83,11 @@ is automatically created and closed within the call.}
 
 \descr{\lstinline|fun failure (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib}, and a variable number of parameters,
   prints these parameters according to the format string on the standard error and exits. Note: indexed arguments are not supported.)}
+
+\descr{\lstinline|fun system (cmd)|}{Executes a command in a shell. The argument is a string representing a command.}
+
+\descr{\lstinline|fun getEnv (name)|}{Returns a value for an environment variable "\lstinline|name|". The argument is a string, the
+return value is either "\lstinline|0|" (if not environment variable with given name is set), or a string value.}
 
 \section{Unit \texttt{Array}}
 \label{sec:array}
@@ -301,9 +306,9 @@ diagnostic purposes.}
 
 \descr{\lstinline|fun initMatcher (buf)|}{Takes a string argument and returns a fresh matcher.}
 
-\descr{\lstinline|fun show (m)|}{Returns a printable representation for a matcher "\lstinline|m|" (for debugging purposes).}
+\descr{\lstinline|fun showMatcher (m)|}{Returns a printable representation for a matcher "\lstinline|m|" (for debugging purposes).}
 
-\descr{\lstinline|fun endOf (m)|}{Tests if the matcher "\lstinline|m|" reached the end of string. Return value represents parsing
+\descr{\lstinline|fun endOfMatcher (m)|}{Tests if the matcher "\lstinline|m|" reached the end of string. Return value represents parsing
 result as per "\lstinline|Ostap|".}
 
 \descr{\lstinline|fun matchString (m, s)|}{Tests if a matcher "\lstinline|m|" at current position matches the string "\lstinline|s|".
@@ -311,6 +316,10 @@ Return value represents parsing result as per "\lstinline|Ostap|".}
 
 \descr{\lstinline|fun matchRegexp (m, r)|}{Tests if a matcher "\lstinline|m|" at current position matches the regular expression "\lstinline|r|", which
   has to be constructed using the function "\lstinline|createRegexp|". Return value represents parsing result as per "\lstinline|Ostap|".}
+
+\descr{\lstinline|fun getLine (m)|}{Gets a line number for the current position of matcher "\lstinline|m|".}
+
+\descr{\lstinline|fun getCol (m)|}{Gets a column number for the current position of matcher "\lstinline|m|".}
 
 \section{Unit \texttt{Ostap}}
 

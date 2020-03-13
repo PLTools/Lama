@@ -1,3 +1,5 @@
+F,getEnv;
+F,system;
 V,sysargs;
 F,stringInt;
 F,makeArray;

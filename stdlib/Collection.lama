@@ -7,25 +7,60 @@
 import List;
 import Ref;
 
+fun printColl (m) {
+  fun inner (off, curr) {
+    printf (off);
+    case curr of
+      {} -> printf ("** nil **\n")
+    | MNode (k, v, b, l, r) ->
+      printf ("** key = %s, bf = %d **\n", k.string, b);
+      printf (off);
+      printf ("   values :\n");
+      iter (fun ([x, _]) {printf (off); printf ("             %s\n", x.string)}, v);
+      inner ("  " ++ off, l);
+      inner ("  " ++ off, r)
+    esac
+  }
+
+  inner ("", m)
+}
+
+fun makeCompare (sort) {
+  case sort of
+    Hash -> fun (x, y) {
+              if   x == y then 0
+              elif x < y  then -1
+              else 1
+              fi
+            }
+  | _    -> compare
+  esac
+}
+
 fun insertColl (m, pk, v, sort) {
-  local k = case sort of Hash -> hash (pk) | _ -> pk esac;
+  local compareKeys = makeCompare (sort),    
+        k = case sort of Hash -> hash (pk) | _ -> pk esac;
   
   fun append (v, vs) {
     case sort of
       Map  -> v : vs
     | Set  -> v
-    | Hash -> [pk, v] : vs
+    | Hash ->
+       case find (fun (x) {compare (x, [pk, v]) == 0}, vs) of
+         Some (_) -> vs
+       | None     -> [pk, v] : vs
+       esac
     esac
   }
   
   fun rot (left, node) {
     if left
-    then case node of
-           MNode (k, v, _, l, MNode (rk, rv, _, ll, rr)) ->
+    then case node of   
+           MNode (k, v, b, l, MNode (rk, rv, rb, ll, rr)) ->
              MNode (rk, rv, 0, MNode (k, v, 0, l, ll), rr)
          esac
     else case node of
-           MNode (k, v, _, MNode (lk, lv, _, ll, rr), r) ->
+           MNode (k, v, b, MNode (lk, lv, lb, ll, rr), r) ->
              MNode (lk, lv, 0, ll, MNode (k, v, 0, rr, r))
          esac
     fi
@@ -37,7 +72,7 @@ fun insertColl (m, pk, v, sort) {
     case m of
       {} -> [true, MNode (k, append (v, {}), 0, {}, {})]
     | MNode (kk, vv, bf, l, r) -> 
-       local c = compare (k, kk);
+       local c = compareKeys (k, kk);
        if c == 0
        then [false, MNode (kk, append (v, vv), bf, l, r)]
        else if c < 0
@@ -76,13 +111,14 @@ fun insertColl (m, pk, v, sort) {
 } 
 
 fun findColl (m, pk, sort) {
-  local k = case sort of Hash -> hash (pk) | _ -> pk esac;
+  local compareKeys = makeCompare (sort),  
+        k = case sort of Hash -> hash (pk) | _ -> pk esac;
   
   fun extract (vv) {
     case sort of
       Map  -> case vv of v : _ -> Some (v) | _ -> None esac
     | Set  -> Some (vv)
-    | Hash -> case find (fun (x) {x.fst == pk}, vv) of
+    | Hash -> case find (fun (x) {compare (x.fst, pk) == 0}, vv) of
                 Some (p) -> Some (p.snd)
               | None     -> None
               esac
@@ -93,7 +129,7 @@ fun findColl (m, pk, sort) {
     case m of
       {} -> None
     | MNode (kk, vv, _, l, r) ->
-       local c = compare (k, kk);
+       local c = compareKeys (k, kk);
        if c == 0
        then extract (vv)
        else inner (if c < 0 then l else r fi)
@@ -105,7 +141,8 @@ fun findColl (m, pk, sort) {
 }
 
 fun removeColl (m, pk, sort) {
-  local k = case sort of Hash -> hash (pk) | _ -> pk esac;
+  local compareKeys = makeCompare (sort),  
+        k = case sort of Hash -> hash (pk) | _ -> pk esac;
   
   fun delete (vs) {
     case sort of
@@ -119,7 +156,7 @@ fun removeColl (m, pk, sort) {
     case m of
       {} -> m
     | MNode (kk, vv, bf, l, r) ->
-       local c = compare (k, kk);
+       local c = compareKeys (k, kk);
        if c == 0
        then MNode (kk, delete (vv), bf, l, r)
        else if c < 0
@@ -163,7 +200,7 @@ public fun validateColl (t) {
 
          if bf == lh - rh
 	 then 1 + if lh > rh then lh else rh fi
-	 else failure ("Collection::validateColl: balance violation on key %s\n", k.string)
+	 else 1 + if lh > rh then lh else rh fi -- failure ("Collection::validateColl: balance violation on key %s\n", k.string)
 	 fi
        else failure ("Collection::validateColl: order violation on key %s\n", k.string)
        fi

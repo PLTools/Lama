@@ -509,7 +509,7 @@ static void stringcat (void *p) {
 }
 
 extern int LmatchSubString (char *subj, char *patt, int pos) {
-  data *p = TO_DATA(patt);
+  data *p = TO_DATA(patt), *s = TO_DATA(subj);
   int   n;
 
   ASSERT_STRING("matchSubString:1", subj);
@@ -517,6 +517,9 @@ extern int LmatchSubString (char *subj, char *patt, int pos) {
   ASSERT_UNBOXED("matchSubString:3", pos);
   
   n = LEN (p->tag);
+
+  if (n + UNBOX(pos) > LEN(s->tag))
+    return BOX(0);
   
   return BOX(strncmp (subj + UNBOX(pos), patt, n) == 0);
 }
@@ -554,6 +557,12 @@ extern void* Lsubstring (void *subj, int p, int l) {
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
   struct re_pattern_buffer *b =
     (struct re_pattern_buffer*) malloc (sizeof (struct re_pattern_buffer));
+
+  b->translate = 0;
+  b->fastmap = 0;
+  b->buffer = 0;
+  b->allocated = 0;
+  
   int n = (int) re_compile_pattern (regexp, strlen (regexp), b);
 
   if (n != 0) {
@@ -643,14 +652,13 @@ void *Lclone (void *p) {
 }
 
 # define HASH_DEPTH 3
-# define HASH_APPEND(acc, x) (((acc + (unsigned) x) << (WORD_SIZE / 2)) | \
-			      ((acc + (unsigned) x) >> (WORD_SIZE / 2)))
+# define HASH_APPEND(acc, x) (((acc + (unsigned) x) << (WORD_SIZE / 2)) | ((acc + (unsigned) x) >> (WORD_SIZE / 2)))
 
 int inner_hash (int depth, unsigned acc, void *p) {
   if (depth > HASH_DEPTH) return acc;
 
   if (UNBOXED(p)) return HASH_APPEND(acc, UNBOX(p));
-  else {
+  else if (is_valid_heap_pointer (p)) {
     data *a = TO_DATA(p);
     int t = TAG(a->tag), l = LEN(a->tag), i;
 
@@ -662,7 +670,8 @@ int inner_hash (int depth, unsigned acc, void *p) {
       char *p = a->contents;
 
       while (*p) {
-	acc = HASH_APPEND(acc, (int) *p++);
+        int n = (int) *p++;
+	acc = HASH_APPEND(acc, n);
       }
 
       return acc;
@@ -697,6 +706,7 @@ int inner_hash (int depth, unsigned acc, void *p) {
 
     return acc;
   }
+  else return HASH_APPEND(acc, p);
 }
 
 extern void* LstringInt (char *b) {
@@ -1185,6 +1195,26 @@ extern void* Lsprintf (char * fmt, ...) {
   deleteStringBuf ();
 
   return s;
+}
+
+extern void* LgetEnv (char *var) {
+  char *e = getenv (var);
+  void *s;
+  
+  if (e == NULL)
+    return BOX(0);
+
+  __pre_gc ();
+
+  s = Bstring (e);
+
+  __post_gc ();
+
+  return s;
+}
+
+extern int Lsystem (char *cmd) {
+  return BOX (system (cmd));
 }
 
 extern void Lfprintf (FILE *f, char *s, ...) {

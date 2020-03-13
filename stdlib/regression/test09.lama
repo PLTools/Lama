@@ -3,8 +3,6 @@ import Matcher;
 
 local a = token ("a"), acc;
 
-initOstap ();
-
 printf ("Parsing a*| against ""aa""... %s\n", parseString (rep0 (a) |> fun (x) {eof @ lift (x)}, "aa").string);
 printf ("Parsing a+| against ""aa""... %s\n", parseString (rep  (a) |> fun (x) {eof @ lift (x)}, "aa").string);
 printf ("Parsing list(a)| against ""a""... %s\n", parseString (list (a) |> bypass (eof), "a").string);

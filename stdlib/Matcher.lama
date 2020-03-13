@@ -71,14 +71,16 @@ fun createMatcher (buf, pos, line, col) {
   [show,
    eof,
    matchString,
-   matchRegexp]  
+   matchRegexp,
+   fun () {line},
+   fun () {col}]  
 }
 
-public fun show (m) {
+public fun showMatcher (m) {
   m [0] ()
 }
 
-public fun endOf (m) {
+public fun endOfMatcher (m) {
   m [1] ()
 }
 
@@ -89,6 +91,16 @@ public fun matchString (m, s) {
 -- Matches against a regexp
 public fun matchRegexp (m, r) {
   m [3] (r)
+}
+
+-- Gets a line number
+public fun getLine (m) {
+  m [4] ()
+}
+
+-- Gets a column number
+public fun getCol (m) {
+  m [5] ()
 }
 
 -- Creates a fresh matcher from a string buffer

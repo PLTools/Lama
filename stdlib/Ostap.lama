@@ -25,17 +25,21 @@ public fun initOstap () {
 public fun memo (f) {
   f := lookupMemo (hct, f);
   
-  if log then printf ("Memoizing: %x=%s\n", f, f.string) fi;
+  if log then printf ("Memoizing %x=%s\n", f, f.string) fi;
   
   case findHashTab (deref (tab), f) of
     None      -> if log then printf ("new table...\n") fi;
                  tab ::= addHashTab (deref (tab), f, ref (emptyMap ()))
+                 
   | Some (tt) -> skip
   esac;
   
   fun (k) {
     fun (s) {
-      local t = case findHashTab (deref (tab), f) of Some (t) -> t esac;
+      local t =
+         case findHashTab (deref (tab), f) of
+           Some (t) -> t
+         esac;
       if log then printf ("Applying memoized parser to %s\n", s.string) fi;
       case findMap (deref (t), s) of
         None  ->
@@ -65,14 +69,14 @@ public fun memo (f) {
 
 public fun token (x) {
   case x of
-    #string -> fun (k) {fun (s) {k $ matchString (s, x)}}
-  | _       -> fun (k) {fun (s) {k $ matchRegexp (s, x)}}
+    #string -> memo $ fun (k) {fun (s) {k $ matchString (s, x)}}
+  | _       -> memo $ fun (k) {fun (s) {k $ matchRegexp (s, x)}}
   esac
 }
 
 public fun eof (k) {
   fun (s) {
-    k (endOf (s))
+    k (endOfMatcher (s))
   }
 }
 
@@ -81,6 +85,7 @@ public fun empty (k) {
 }
 
 public fun alt (a, b) {
+  memo $ 
   fun (k) {
     fun (s) {
       if log then printf ("Running alt at %s\n", s.string) fi;
@@ -91,6 +96,7 @@ public fun alt (a, b) {
 }
 
 public fun seq (a, b) {
+  memo $ 
   fun (k) {
     fun (s) {
       if log then printf ("Running seq at %s\n", s.string) fi;
@@ -129,13 +135,11 @@ public fun bypass (f) {
 public fun opt (a) {empty @ lift (None) | a @ fun (x) {Some (x)}}
 
 public fun rep0 (a) {
-  memo
-    (empty @ lift({}) | a |> fun (x) {rep0 (a) @ fun (as) {x : as}})
+  empty @ lift({}) | a |> fun (x) {rep0 (a) @ fun (as) {x : as}}
 }
 
-public fun rep (a) {
-  --memo
-  (a |> (fun (x) {rep0 (a) @ fun (as) {x : as}}))
+public fun rep (a) {  
+  a |> (fun (x) {rep0 (a) @ fun (as) {x : as}})
 }
 
 public fun listBy (item, sep) {
