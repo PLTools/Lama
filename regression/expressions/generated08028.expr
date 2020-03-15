@@ -1,5 +1,0 @@
-
-x0 := read ();
-x1 := read ();
-y := x0+x1-x0%50;
-write (y)

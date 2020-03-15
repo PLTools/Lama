@@ -1,5 +1,0 @@
-
-x0 := read ();
-x1 := read ();
-y := 17+x0+x0+x0*x1;
-write (y)
