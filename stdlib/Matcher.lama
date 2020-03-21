@@ -8,7 +8,9 @@
 --             (e.g. "identifier", "string constant", etc.), used for error
 --             reporting
 public fun createRegexp (r, name) {
-  [regexp (r), name]
+  local l = [regexp (r), name];
+  --printf ("Created regexp %s: %x, %x\n", name, l, l[0]);
+  l
 }
 
 -- Create an immutable matcher.

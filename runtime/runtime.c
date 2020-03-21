@@ -555,13 +555,15 @@ extern void* Lsubstring (void *subj, int p, int l) {
 }
 
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
-  struct re_pattern_buffer *b =
-    (struct re_pattern_buffer*) malloc (sizeof (struct re_pattern_buffer));
-
+  regex_t *b = (regex_t*) malloc (sizeof (regex_t));
+  
   b->translate = 0;
-  b->fastmap = 0;
-  b->buffer = 0;
-  b->allocated = 0;
+  b->fastmap   = 0;
+  // A weird workaround: should be 0/0 in theory,
+  // but is does not work sometimes. The exact number is
+  // determined experimentally :((
+  b->buffer    = malloc (256);
+  b->allocated = 256;
   
   int n = (int) re_compile_pattern (regexp, strlen (regexp), b);
 
@@ -1426,7 +1428,7 @@ extern void __gc_root_scan_stack ();
 /* ======================================== */
 
 //static size_t SPACE_SIZE = 16;
-static size_t SPACE_SIZE = 16 * 1024 * 1024;
+static size_t SPACE_SIZE = 32 * 1024 * 1024;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
@@ -1728,7 +1730,7 @@ static inline void init_extra_roots (void) {
 extern void init_pool (void) {
   size_t space_size = SPACE_SIZE * sizeof(size_t);
   from_space.begin = mmap (NULL, space_size, PROT_READ | PROT_WRITE,
-			   MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
+    			   MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
   to_space.begin   = NULL;
   if (to_space.begin == MAP_FAILED) {
     perror ("EROOR: init_pool: mmap failed\n");
@@ -1922,6 +1924,7 @@ extern void * alloc (size_t size) {
 #endif
     return p;
   }
+  
   init_to_space (0);
 #ifdef DEBUG_PRINT
   print_indent ();

@@ -104,10 +104,10 @@ The following symbols are treated as delimiters:
 
 \begin{lstlisting}
     .       ,         (        )        {        }
-    ;       #         ->
+    ;       #         ->       |
 \end{lstlisting}
 
-Despite custom infix operators can coincide with delimiters "\lstinline|#|" and "\lstinline|->|" they can
-never clash as neither of these delimiters can be encountered in expressions in infix operator position.
+Note, custom infix operators can coincide with delimiters "\lstinline|#|", "\lstinline!|!", and "\lstinline|->|", which can
+sometimes be misleading. 
 
 
