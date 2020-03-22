@@ -133,54 +133,92 @@ let compile cmd env imports code =
   let rec compile' env scode =
     let on_stack = function S _ -> true | _ -> false in
     let mov x s = if on_stack x && on_stack s then [Mov (x, eax); Mov (eax, s)] else [Mov (x, s)]  in
-    let callc env n =
-      let pushr, popr =
-        List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
-      in
-      let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in
-      let env, code =
+    let callc env n tail =
+      let tail = tail && env#nargs = n in 
+      if tail
+      then (
         let rec push_args env acc = function
         | 0 -> env, acc
         | n -> let x, env = env#pop in
-               push_args env ((Push x)::acc) (n-1)
+               if x = env#loc (Value.Arg (n-1))
+               then push_args env acc (n-1)
+               else push_args env ((mov x (env#loc (Value.Arg (n-1)))) @ acc) (n-1)
         in
-        let env, pushs   = push_args env [] n in
-        let pushs        = List.rev pushs     in
-        let closure, env = env#pop            in
-        let call_closure =
-          if on_stack closure
-          then [Mov (closure, edx); Mov (edx, eax); CallI eax]
-          else [Mov (closure, edx); CallI closure]
+        let env    , pushs = push_args env [] n in
+        let closure, env   = env#pop in
+        let y      , env   = env#allocate in
+        env, pushs @ [Mov (closure, edx);
+                      Mov (I(0, edx), eax);
+                      Mov (ebp, esp);
+                      Pop (ebp)] @
+                      (if env#has_closure then [Pop ebx] else []) @
+                      [Jmp "*%eax"] (* UGLY!!! *)
+      )
+      else (
+        let pushr, popr =
+          List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
         in
-        env, pushr @ pushs @ call_closure @ [Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
-      in
-      let y, env = env#allocate in env, code @ [Mov (eax, y)]
-    in
-    let call env f n =
-      let f =
-        match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
-      in
-      let pushr, popr =
-        List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
-      in      
-      let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in
-      let env, code =
-        let rec push_args env acc = function
+        let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in
+        let env, code =
+          let rec push_args env acc = function
           | 0 -> env, acc
           | n -> let x, env = env#pop in
                  push_args env ((Push x)::acc) (n-1)
+          in
+          let env, pushs   = push_args env [] n in
+          let pushs        = List.rev pushs     in
+          let closure, env = env#pop            in
+          let call_closure =
+            if on_stack closure
+            then [Mov (closure, edx); Mov (edx, eax); CallI eax]
+            else [Mov (closure, edx); CallI closure]
+          in
+          env, pushr @ pushs @ call_closure @ [Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
+        in
+        let y, env = env#allocate in env, code @ [Mov (eax, y)]
+      )
+    in
+    let call env f n tail =
+      let tail = tail && env#nargs = n && f.[0] <> '.' in
+      let f =
+        match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
+      in
+      if tail
+      then (
+        let rec push_args env acc = function
+        | 0 -> env, acc
+        | n -> let x, env = env#pop in
+               if x = env#loc (Value.Arg (n-1))
+               then push_args env acc (n-1)
+               else push_args env ((mov x (env#loc (Value.Arg (n-1)))) @ acc) (n-1)
         in
         let env, pushs = push_args env [] n in
-        let pushs      =
-          match f with
-          | "Barray" -> List.rev @@ (Push (L (box n))) :: pushs
-          | "Bsexp"  -> List.rev @@ (Push (L (box n))) :: pushs
-          | "Bsta"   -> pushs
-          | _        -> List.rev pushs
+        let y, env = env#allocate in
+        env, pushs @ [Mov (ebp, esp); Pop (ebp); Jmp f]
+      )
+      else (
+        let pushr, popr =
+          List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
+        in      
+        let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in
+        let env, code =
+          let rec push_args env acc = function
+            | 0 -> env, acc
+            | n -> let x, env = env#pop in
+                   push_args env ((Push x)::acc) (n-1)
+          in
+          let env, pushs = push_args env [] n in
+          let pushs      =
+            match f with
+            | "Barray" -> List.rev @@ (Push (L (box n))) :: pushs
+            | "Bsexp"  -> List.rev @@ (Push (L (box n))) :: pushs
+            | "Bsta"   -> pushs
+            | _        -> List.rev pushs
+          in
+          env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
         in
-        env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
-      in
-      let y, env = env#allocate in env, code @ [Mov (eax, y)]
+        let y, env = env#allocate in env, code @ [Mov (eax, y)]
+      )
     in
     match scode with
     | [] -> env, []
@@ -217,7 +255,7 @@ let compile cmd env imports code =
           | STRING s ->
              let s, env = env#string s in
              let l, env = env#allocate in
-             let env, call = call env ".string" 1 in
+             let env, call = call env ".string" 1 false in
              (env, Mov (M ("$" ^ s), l) :: call)
 
           | LDA x ->
@@ -246,7 +284,7 @@ let compile cmd env imports code =
 	     )
 
           | STA ->
-             call env ".sta" 3
+             call env ".sta" 3 false
 
 	  | STI ->
              let v, x, env' = env#pop2 in
@@ -356,7 +394,7 @@ let compile cmd env imports code =
           | BEGIN (f, nargs, nlocals, closure) ->
              env#assert_empty_stack;
              let has_closure = closure <> [] in
-             let env  = env#enter f nlocals has_closure in
+             let env  = env#enter f nargs nlocals has_closure in
              env, (if has_closure then [Push edx] else []) @
                   (if f = cmd#topname
                    then
@@ -407,13 +445,13 @@ let compile cmd env imports code =
              let x = env#peek in
              env, [Mov (x, eax); Jmp env#epilogue]
             
-          | CALL (f, n) -> call env f n
+          | CALL (f, n, tail) -> call env f n tail
                          
-          | CALLC n -> callc env n
+          | CALLC (n, tail) -> callc env n tail
               
           | SEXP (t, n) ->
              let s, env = env#allocate in
-             let env, code = call env ".sexp" (n+1) in
+             let env, code = call env ".sexp" (n+1) false in
              env, [Mov (L env#hash t, s)] @ code
 
           | DROP ->
@@ -431,15 +469,15 @@ let compile cmd env imports code =
           | TAG (t, n) ->
              let s1, env = env#allocate in
              let s2, env = env#allocate in
-             let env, code = call env ".tag" 3 in
+             let env, code = call env ".tag" 3 false in
              env, [Mov (L (box (env#hash t)), s1); Mov (L (box n), s2)] @ code
 
           | ARRAY n ->
              let s, env    = env#allocate in
-             let env, code = call env ".array_patt" 2 in
+             let env, code = call env ".array_patt" 2 false in
              env, [Mov (L (box n), s)] @ code
 
-          | PATT StrCmp -> call env ".string_patt" 2
+          | PATT StrCmp -> call env ".string_patt" 2 false
 
           | PATT patt ->
              call env 
@@ -450,7 +488,7 @@ let compile cmd env imports code =
                 | String  -> ".string_tag_patt"
                 | Sexp    -> ".sexp_tag_patt"
                 | Closure -> ".closure_tag_patt"
-               ) 1
+               ) 1 false
 
           | FAIL ((line, col), value) ->                       
              let v, env = if value then env#peek, env else env#pop in
@@ -482,9 +520,11 @@ class env prg =
     val stringm         = M.empty (* a string map                      *)
     val scount          = 0       (* string count                      *)
     val stack_slots     = 0       (* maximal number of stack positions *)
+                        
     val static_size     = 0       (* static data size                  *)
     val stack           = []      (* symbolic stack                    *)
-    val args            = []      (* function arguments                *)
+    val nargs           = 0       (* number of function arguments      *)
+    (*    val args            = []      (* function arguments                *) *)
     val locals          = []      (* function local variables          *)
     val fname           = ""      (* function name                     *)
     val stackmap        = M.empty (* labels to stack map               *)
@@ -629,6 +669,9 @@ class env prg =
         let m = M.add x y stringm in
         y, {< scount = scount + 1; stringm = m>}
 
+    (* gets number of arguments in the current function *)
+    method nargs = nargs
+                 
     (* gets all global variables *)
     method globals = S.elements (S.diff globals externs)
 
@@ -641,8 +684,8 @@ class env prg =
     method allocated_size = Printf.sprintf "LS%s_SIZE" fname
                      
     (* enters a function *)
-    method enter f nlocals has_closure =
-      {< static_size = nlocals; stack_slots = nlocals; stack = []; fname = f; has_closure = has_closure >}
+    method enter f nargs nlocals has_closure =
+      {< nargs = nargs; static_size = nlocals; stack_slots = nlocals; stack = []; fname = f; has_closure = has_closure >}
 
     (* returns a label for the epilogue *)
     method epilogue = Printf.sprintf "L%s_epilogue" fname

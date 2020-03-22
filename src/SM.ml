@@ -23,9 +23,9 @@ open Language
 (* create a closure                          *) | CLOSURE of string * Value.designation list
 (* proto closure                             *) | PROTO   of string * string
 (* proto closure to a possible constant      *) | PPROTO  of string * string
-(* proto call                                *) | PCALLC  of int  
-(* calls a closure                           *) | CALLC   of int  
-(* calls a function/procedure                *) | CALL    of string * int 
+(* proto call                                *) | PCALLC  of int * bool
+(* calls a closure                           *) | CALLC   of int * bool
+(* calls a function/procedure                *) | CALL    of string * int * bool
 (* returns from a function                   *) | RET     
 (* drops the top element off                 *) | DROP
 (* duplicates the top element                *) | DUP
@@ -154,12 +154,12 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                  in
                                  eval env (cstack, (Value.Closure ([], name, closure)) :: stack, glob, loc, i, o) prg'
                                  
-    | CALL (f, n)             -> let args, stack' = split n stack in
+    | CALL (f, n, _)          -> let args, stack' = split n stack in
                                  if env#is_label f
                                  then eval env ((prg', loc)::cstack, stack', glob, {args = Array.of_list (List.rev args); locals = [||]; closure = [||]}, i, o) (env#labeled f)
                                  else eval env (env#builtin f args ((cstack, stack', glob, loc, i, o) : config)) prg'
 
-    | CALLC n                 -> let vs, stack' = split (n+1) stack in
+    | CALLC (n, _)            -> let vs, stack' = split (n+1) stack in
                                  let f::args    = List.rev vs   in
                                  (match f with
                                   | Value.Builtin f ->
@@ -662,7 +662,7 @@ let compile cmd ((imports, infixes), p) =
       List.fold_left
         (fun (i, env, code) p ->
            let env, _, pcode = pattern env ldrop p in
-           i+1, env, ([DUP; CONST i; CALL (".elem", 2)] @ pcode) :: code
+           i+1, env, ([DUP; CONST i; CALL (".elem", 2, false)] @ pcode) :: code
         )
         (0, env, [])
         ps
@@ -696,7 +696,7 @@ let compile cmd ((imports, infixes), p) =
            let env, dsg = env#lookup name in
            env,
            ([DUP] @
-            List.concat (List.map (fun i -> [CONST i; CALL (".elem", 2)]) path) @
+            List.concat (List.map (fun i -> [CONST i; CALL (".elem", 2, false)]) path) @
             [ST dsg; DROP]) :: acc
         )
         (env, [])
@@ -704,15 +704,15 @@ let compile cmd ((imports, infixes), p) =
     in      
     env, (List.flatten code) @ [DROP]
   and add_code (env, flag, s) l f s' = env, f, s @ (if flag then [LABEL l] else []) @ s'
-  and compile_list l env = function
+  and compile_list tail l env = function
   | []    -> env, false, []
-  | [e]   -> compile_expr l env e
+  | [e]   -> compile_expr tail l env e
   | e::es ->
      let les, env = env#get_label in
-     let env, flag1, s1 = compile_expr les env e  in
-     let env, flag2, s2 = compile_list l   env es in
+     let env, flag1, s1 = compile_expr false les env e  in
+     let env, flag2, s2 = compile_list tail  l   env es in
      add_code (env, flag1, s1) les flag2 s2
-  and compile_expr l env = function
+  and compile_expr tail l env = function
   | Expr.Lambda (args, b) ->
      let env, name = env#add_lambda args b in
      env#register_call name, false, [PROTO (name, env#current_function)] 
@@ -731,21 +731,21 @@ let compile cmd ((imports, infixes), p) =
          (List.rev ds)
      in
      let env = List.fold_left (fun env (name, args, m, b) -> env#add_fun name args m b) env funs in
-     let env, flag, code = compile_expr l env e in
+     let env, flag, code = compile_expr tail l env e in
      env#pop_scope, flag, code
  
   | Expr.Unit               -> env, false, [CONST 0]
                                
   | Expr.Ignore   s         -> let ls, env = env#get_label in
-                               add_code (compile_expr ls env s) ls false [DROP]                             
+                               add_code (compile_expr tail ls env s) ls false [DROP]                             
 
-  | Expr.ElemRef (x, i)     -> compile_list l env [x; i]                               
+  | Expr.ElemRef (x, i)     -> compile_list tail l env [x; i]
   | Expr.Var      x         -> let env, acc = env#lookup x in (match acc with Value.Fun name -> env#register_call name, false, [PROTO (name, env#current_function)] | _ -> env, false, [LD acc])
   | Expr.Ref      x         -> let env, acc = env#lookup x in env, false, [LDA acc]
   | Expr.Const    n         -> env, false, [CONST n]
   | Expr.String   s         -> env, false, [STRING s]
   | Expr.Binop (op, x, y)   -> let lop, env = env#get_label in
-                               add_code (compile_list lop env [x; y]) lop false [BINOP op]
+                               add_code (compile_list false lop env [x; y]) lop false [BINOP op]
                                
   | Expr.Call (f, args)     -> let lcall, env = env#get_label in
                                (match f with
@@ -754,60 +754,60 @@ let compile cmd ((imports, infixes), p) =
                                    (match acc with
                                     | Value.Fun name ->
                                        let env = env#register_call name in
-                                       let env, f, code = add_code (compile_list lcall env args) lcall false [PCALLC (List.length args)]  in
+                                       let env, f, code = add_code (compile_list false lcall env args) lcall false [PCALLC (List.length args, tail)]  in
                                        env, f, PPROTO (name, env#current_function) :: code
                                     | _ ->
-                                       add_code (compile_list lcall env (f :: args)) lcall false [CALLC (List.length args)]
+                                       add_code (compile_list false lcall env (f :: args)) lcall false [CALLC (List.length args, tail)]
                                    )
                                   
-                                | _ -> add_code (compile_list lcall env (f :: args)) lcall false [CALLC (List.length args)]
+                                | _ -> add_code (compile_list false lcall env (f :: args)) lcall false [CALLC (List.length args, tail)]
                                )
                                     
   | Expr.Array  xs          -> let lar, env = env#get_label in
-                               add_code (compile_list lar env xs) lar false [CALL (".array", List.length xs)]
+                               add_code (compile_list false lar env xs) lar false [CALL (".array", List.length xs, tail)]
                                
   | Expr.Sexp (t, xs)       -> let lsexp, env = env#get_label in
-                               add_code (compile_list lsexp env xs) lsexp false [SEXP (t, List.length xs)]
+                               add_code (compile_list false lsexp env xs) lsexp false [SEXP (t, List.length xs)]
                              
   | Expr.Elem (a, i)        -> let lelem, env = env#get_label in
-                               add_code (compile_list lelem env [a; i]) lelem false [CALL (".elem", 2)]
+                               add_code (compile_list false lelem env [a; i]) lelem false [CALL (".elem", 2, tail)]
                                
   | Expr.Length e           -> let llen, env = env#get_label in
-                               add_code (compile_expr llen env e) llen false [CALL (".length", 1)]
+                               add_code (compile_expr false llen env e) llen false [CALL (".length", 1, tail)]
                                
   | Expr.StringVal e        -> let lsv, env = env#get_label in
-                               add_code (compile_expr lsv env e) lsv false [CALL (".stringval", 1)]
+                               add_code (compile_expr false lsv env e) lsv false [CALL (".stringval", 1, tail)]
 
   | Expr.Assign (x, e)      -> let lassn, env = env#get_label in
-                               add_code (compile_list lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]                              
+                               add_code (compile_list false lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]                              
                              
   | Expr.Skip               -> env, false, []
 
-  | Expr.Seq    (s1, s2)    -> compile_list l env [s1; s2]
+  | Expr.Seq    (s1, s2)    -> compile_list tail l env [s1; s2]
 
   | Expr.If     (c, s1, s2) -> let le, env = env#get_label in 
                                let l2, env = env#get_label in
-                               let env, fe   , se = compile_expr le env c in
-                               let env, flag1, s1 = compile_expr l  env s1 in
-                               let env, flag2, s2 = compile_expr l  env s2 in
+                               let env, fe   , se = compile_expr false le env c in
+                               let env, flag1, s1 = compile_expr tail  l  env s1 in
+                               let env, flag2, s2 = compile_expr tail  l  env s2 in
                                env, true, se @ (if fe then [LABEL le] else []) @ [CJMP ("z", l2)] @ s1 @ (if flag1 then [] else [JMP l]) @ [LABEL l2] @ s2 @ (if flag2 then [] else [JMP l]) 
                                
   | Expr.While  (c, s)      -> let lexp, env = env#get_label in                               
                                let loop, env = env#get_label in
                                let cond, env = env#get_label in
-                               let env, fe, se = compile_expr lexp env c in
-                               let env, _ , s  = compile_expr cond env s in
+                               let env, fe, se = compile_expr false lexp env c in
+                               let env, _ , s  = compile_expr false cond env s in
                                env, false, [JMP cond; LABEL loop] @ s @ [LABEL cond] @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("nz", loop)]
                                                                                                   
   | Expr.Repeat (s, c)      -> let lexp , env = env#get_label in
                                let loop , env = env#get_label in
                                let check, env = env#get_label in
-                               let env, fe  , se   = compile_expr lexp env c in
-                               let env, flag, body = compile_expr check env s in
+                               let env, fe  , se   = compile_expr false lexp env c in
+                               let env, flag, body = compile_expr false check env s in
                                env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("z", loop)]
 
   | Expr.Return (Some e)    -> let lret, env = env#get_label in
-                               add_code (compile_expr lret env e) lret false [RET]
+                               add_code (compile_expr true lret env e) lret false [RET]
                                
   | Expr.Return None        -> env, false, [CONST 0; RET]
 
@@ -817,7 +817,7 @@ let compile cmd ((imports, infixes), p) =
      let n          = List.length brs - 1 in
      let lfail, env = env#get_label in
      let lexp , env = env#get_label in
-     let env  , fe  , se         = compile_expr lexp env e in
+     let env  , fe  , se         = compile_expr false lexp env e in
      let env  , _, _, code, fail =
        List.fold_left
          (fun ((env, lab, i, code, continue) as acc) (p, s) ->
@@ -831,7 +831,7 @@ let compile cmd ((imports, infixes), p) =
                let env, lfalse', pcode = pattern env lfalse p in
                let env                 = env#push_scope in
                let env, bindcode       = bindings env p in
-               let env, l'     , scode = compile_expr l env s in
+               let env, l'     , scode = compile_expr tail l env s in
                let env                 = env#pop_scope in
                (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l; DUP]) @ pcode @ bindcode @ scode @ jmp) :: code, lfalse')
              else acc
@@ -847,7 +847,7 @@ let compile cmd ((imports, infixes), p) =
     (*Printf.eprintf "Lookup: %s\n%!" (try show(Value.designation) @@ snd (env#lookup "inner") with _ -> "no inner..."); *)
     let env             = List.fold_left (fun env arg -> env#add_arg arg) env args in 
     let lend, env       = env#get_label in
-    let env, flag, code = compile_expr lend env stmt in
+    let env, flag, code = compile_expr true lend env stmt in
     let env, funcode    = compile_fundefs [] env in
     (*Printf.eprintf "Function: %s, closure: %s\n%!" name (show(list) (show(Value.designation)) env#closure);*)
     let env = env#register_closure name in
@@ -875,10 +875,10 @@ let compile cmd ((imports, infixes), p) =
         | []      -> inner (Some f :: state) tl
         | closure -> CLOSURE (f, closure) :: inner (None :: state) tl
        )
-    | PCALLC n :: tl ->
+    | PCALLC (n, tail) :: tl ->
        (match state with
-        | None :: state'   -> CALLC n  :: inner state' tl
-        | Some f :: state' -> CALL (f, n) :: inner state' tl
+        | None :: state'   -> CALLC (n, tail)  :: inner state' tl
+        | Some f :: state' -> CALL (f, n, tail) :: inner state' tl
        )
     | insn :: tl -> insn :: inner state tl
     in
@@ -886,10 +886,10 @@ let compile cmd ((imports, infixes), p) =
   in
   let env             = new env cmd imports in
   let lend, env       = env#get_label in
-  let env, flag, code = compile_expr lend env p in
+  let env, flag, code = compile_expr false lend env p in
   let code            = if flag then code @ [LABEL lend] else code in
   let topname         = cmd#topname in
-  let env, prg        = compile_fundefs [[LABEL topname; BEGIN (topname, 0, env#nlocals, [])] @ code @ [END]] env in
+  let env, prg        = compile_fundefs [[LABEL topname; BEGIN (topname, (if topname = "main" then 2 else 0), env#nlocals, [])] @ code @ [END]] env in
   let prg             = [PUBLIC topname] @ env#get_decls @ List.flatten prg in
   (*Printf.eprintf "Before propagating closures:\n";
   Printf.eprintf "%s\n%!" env#show_funinfo;
