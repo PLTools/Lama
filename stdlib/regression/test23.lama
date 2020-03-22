@@ -1,0 +1,15 @@
+fun hd (l) {
+  case l of
+    h : _ -> return h
+  esac
+}
+
+fun tl (l) {
+  case l of
+    _ : t -> return t
+  esac
+}
+
+printf ("%s\n", {1, 2, 3}.hd.string);
+printf ("%s\n", {1, 2, 3, 4}.tl.string);
+printf ("%s\n", {1, {2, 3, 4}, 5, 6}.tl.hd.hd.string)

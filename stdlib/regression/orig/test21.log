@@ -1,0 +1,9 @@
+1
+1
+1
+1
+1
+2
+3
+100
+Cons (3, Cons (2, Cons (1, Cons (6, Cons (5, Cons (4, Cons (3, Cons (2, Cons (1, Nil)))))))))

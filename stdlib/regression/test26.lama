@@ -1,0 +1,7 @@
+local i;
+
+printf ("Number of commands-line arguments: %d\n", sysargs.length);
+
+for i := 0, i < sysargs.length, i := i + 1 do
+  printf ("  arg [%-2d] = %s\n", i, sysargs[i].string)
+od

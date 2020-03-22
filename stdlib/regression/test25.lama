@@ -1,0 +1,14 @@
+fun f (x, y) {
+  fun () {x+y}
+}
+
+printf ("Cloning int: %d\n", clone (5));
+printf ("Cloning string: %s\n", clone ("abc"));
+printf ("Cloning array: %s\n", clone ([1, 2, 3, 4, 5]).string);
+printf ("Cloning sexp: %s\n", clone (A (1, 2, 3, 4, 5)).string);
+
+{
+  local c = f (5, 6), cc = clone (c);
+  
+  printf ("Cloning closure: address %s, %d, %d\n", if cc[0] == c[0] then "ok" else "fail" fi, c[1], c[2])
+}

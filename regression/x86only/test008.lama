@@ -1,4 +1,0 @@
-import Lib03;
-import Lib02;
-
-printf ("main dish.\n")

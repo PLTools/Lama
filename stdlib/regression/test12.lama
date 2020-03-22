@@ -16,4 +16,4 @@ local a   = token ("a"),
       exp = expr ({[Left, {add, sub}], [Left, {mul, div}]}, a) (id),
       i;
 
-printf ("%s\n", parseString (exp |> bypass (eof), gen (10)).string)
+printf ("%s\n", parseString (exp |> bypass (eof), gen (5)).string)

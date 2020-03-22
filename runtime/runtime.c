@@ -723,6 +723,10 @@ extern int Lhash (void *p) {
 
 extern int Lcompare (void *p, void *q) {
 # define COMPARE_AND_RETURN(x,y) do if (x != y) return BOX(x - y); while (0)
+  if (q == 0 || p == 0) {
+    failure ("NULL pointer in Lcompare\n");
+  }
+  
   if (p == q) return BOX(0);
   
   if (UNBOXED(p)) {

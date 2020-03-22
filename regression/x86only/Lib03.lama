@@ -1,4 +1,0 @@
-import Lib01;
-import Lib02;
-
-printf ("Init Lib03...\n")

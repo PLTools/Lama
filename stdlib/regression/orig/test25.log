@@ -1,0 +1,5 @@
+Cloning int: 5
+Cloning string: abc
+Cloning array: [1, 2, 3, 4, 5]
+Cloning sexp: A (1, 2, 3, 4, 5)
+Cloning closure: address ok, 5, 6

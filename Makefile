@@ -24,7 +24,6 @@ uninstall:
 
 regression:
 	make clean check -C regression
-	make clean check -C regression/x86only 
 	make clean check -C stdlib/regression
 
 clean:

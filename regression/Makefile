@@ -16,4 +16,3 @@ clean:
 	$(RM) test*.log *.s *~ $(TESTS) *.i
 	$(MAKE) clean -C expressions
 	$(MAKE) clean -C deep-expressions
-	$(MAKE) clean -C x86only
