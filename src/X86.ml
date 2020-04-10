@@ -179,7 +179,7 @@ let compile cmd env imports code =
       )
     in
     let call env f n tail =
-      let tail = tail && env#nargs = n && f.[0] <> '.' in
+      let tail = tail && env#nargs = n && f.[0] <> '.' in 
       let f =
         match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
       in
@@ -194,7 +194,7 @@ let compile cmd env imports code =
         in
         let env, pushs = push_args env [] n in
         let y, env = env#allocate in
-        env, pushs @ [Mov (ebp, esp); Pop (ebp); Jmp f]
+        env, pushs @ [Mov (ebp, esp); Pop (ebp)] @ (if env#has_closure then [Pop ebx] else []) @ [Jmp f]
       )
       else (
         let pushr, popr =
