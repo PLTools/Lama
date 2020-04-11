@@ -74,6 +74,12 @@ public fun token (x) {
   esac
 }
 
+public fun loc (k) {
+  fun (s) {
+    k $ Succ ([s.getLine, s.getCol], s)
+  }
+}
+
 public fun eof (k) {
   fun (s) {
     k (endOfMatcher (s))
@@ -235,18 +241,18 @@ public fun parseString (p, s) {
   acc.result
 }
 
-public fun left (f) {
+public fun left (op, f) {
   fun (c, x) {
      fun (y) {
-       f (c (x), y)
+       f (c (x), op, y)
      }
   }
 }
 
-public fun right (f) {
+public fun right (op, f) {
   fun (c, x) {
     fun (y) {
-      c (f (x, y))
+      c (f (x, op, y))
     }
   }
 }
@@ -258,7 +264,7 @@ fun altl (level) {
        local assfun = case assoc of Left -> left | Right -> right | Nona -> left esac;
        case map (fun (p) {
                    case p of
-                     [op, sema] -> op @ lift(assfun (sema))
+                     [op, sema] -> op @ fun (op) {assfun (op, sema)}
                    esac
                  }, ps) of
          p : ps -> foldl (infix |, p, ps)

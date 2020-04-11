@@ -3,11 +3,11 @@ import Fun;
 import List;
 
 local a   = token ("a"),
-      eq  = [token ("="), fun (l, r) {Eq (l, r)}],      
-      add = [token ("+"), fun (l, r) {Add (l, r)}],
-      sub = [token ("-"), fun (l, r) {Sub (l, r)}],
-      mul = [token ("*"), fun (l, r) {Mul (l, r)}],
-      div = [token ("/"), fun (l, r) {Div (l, r)}],      
+      eq  = [token ("="), fun (l, _, r) {Eq (l, r)}],      
+      add = [token ("+"), fun (l, _, r) {Add (l, r)}],
+      sub = [token ("-"), fun (l, _, r) {Sub (l, r)}],
+      mul = [token ("*"), fun (l, _, r) {Mul (l, r)}],
+      div = [token ("/"), fun (l, _, r) {Div (l, r)}],      
       exp = expr ({[Nona, singleton (eq)], [Right, {add, sub}], [Left, {mul, div}]}, a) (id);
 
 printf ("%s\n", parseString (exp |> bypass (eof), "a+a-a").string);

@@ -1,0 +1,4 @@
+Succ (Seq ("a", "b"))
+Succ (Alt ("a"))
+Succ (Alt ("b"))
+Succ (Rep ({"a", "a", "a"}))

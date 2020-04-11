@@ -775,9 +775,65 @@ module Expr =
       }
       | %"return" e:basic[infix][Val]? => {isVoid atr} => {Return e}
       | %"case" l:$ e:parse[infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[infix][atr])] %"esac"{Case (e, bs, l#coord, atr)}
-      | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {env#add_lazy; ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
-      | l:$ %"eta"  e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {let name = env#get_tmp in ignore atr (Lambda ([name], Call (e, [Var name])))}      
-      | -"(" parse[infix][atr] -")"
+      | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {env#add_import "Lazy"; ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
+      | l:$ %"eta"  e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {let name = env#get_tmp in ignore atr (Lambda ([name], Call (e, [Var name])))}
+      | l:$ %"syntax" "(" e:syntax[infix] ")" => {notRef atr} :: (not_a_reference l) => {env#add_import "Ostap"; ignore atr e}
+      | -"(" parse[infix][atr] -")";
+      syntax[infix]: ss:!(Util.listBy)[ostap ("|")][syntaxSeq infix] {
+        List.fold_right (fun s -> function
+                                  | Var "" -> s
+                                  | acc    -> Call (Var "alt", [s; acc])
+                        ) ss (Var "")
+      };
+      syntaxSeq[infix]: ss:syntaxBinding[infix]+ sema:(-"{" parse[infix][Val] -"}")? {
+        let sema, ss =
+          match sema with
+          | Some s -> s, ss
+          | None   ->
+             let arr, ss = 
+               List.fold_left (fun (arr, ss) ((loc, omit, p, s) as elem) ->
+                                 match omit with
+                                 | None   -> (match p with
+                                              | None                           -> let tmp = env#get_tmp in
+                                                                                  ((Var tmp) :: arr, (loc, omit, Some (Pattern.Named (tmp, Pattern.Wildcard)), s) :: ss)
+                                              | Some (Pattern.Named (name, _)) -> ((Var name) :: arr, elem :: ss)
+                                              | Some p                         -> let tmp = env#get_tmp in
+                                                                                  ((Var tmp) :: arr, (loc, omit, Some (Pattern.Named (tmp, p)), s) :: ss)
+                                             )
+                                 | Some _ -> (arr, elem :: ss)
+                 ) ([], []) ss
+             in
+             (match arr with [a] -> a | _ -> Array (List.rev arr)), List.rev ss
+        in
+        List.fold_right (fun (loc, _, p, s) ->
+                           let make_right =
+                             match p with
+                             | None                                          -> (fun body -> Lambda ([env#get_tmp], body))
+                             | Some (Pattern.Named (name, Pattern.Wildcard)) -> (fun body -> Lambda ([name], body))
+                             | Some p                                        -> (fun body ->
+                                                                                   let arg = env#get_tmp in
+                                                                                   Lambda ([arg], Case (Var arg, [p, body], loc#coord, Val))
+                                                                                )
+                           in
+                           function
+                           | Var "" -> Call (Var (infix_name "@"), [s; make_right sema])
+                           | acc    -> Call (Var "seq", [s; make_right acc])
+                        ) ss (Var "")
+      };
+      syntaxBinding[infix]: l:$ omit:"-"? p:(!(Pattern.parse) -"=")? s:syntaxPostfix[infix];
+      syntaxPostfix[infix]: s:syntaxPrimary[infix] p:("*" {`Rep0} | "+" {`Rep} | "?" {`Opt})? {
+        match p with
+        | None       -> s
+        | Some `Opt  -> Call (Var "opt" , [s])
+        | Some `Rep  -> Call (Var "rep" , [s])
+        | Some `Rep0 -> Call (Var "rep0", [s])
+      };
+      syntaxPrimary[infix]: l:$ p:LIDENT args:(-"(" !(Util.list0)[parse infix Val] -")")* {
+        Loc.attach p l#coord;
+        List.fold_left (fun acc args -> Call (acc, args)) (Var p) args
+      }
+      | -"(" syntax[infix] -")"
+      | -"$(" parse[infix][Val] -")" 
     ) in (fun def -> defCell := Obj.magic !def; parse),
          (fun def -> defCell := Obj.magic !def; basic),
          (fun def -> defCell := Obj.magic !def; scope)
@@ -1147,12 +1203,12 @@ ostap (
 let parse cmd =
   let env =
     object
-      val lazy_used = Pervasives.ref false
+      val imports   = Pervasives.ref ([] : string list)
       val tmp_index = Pervasives.ref 0
                     
-      method add_lazy = lazy_used := true
-      method get_tmp  = let index = !tmp_index in incr tmp_index; Printf.sprintf "__tmp%d" index
-      method is_lazy  = !lazy_used
+      method add_import imp = imports := imp :: !imports 
+      method get_tmp        = let index = !tmp_index in incr tmp_index; Printf.sprintf "__tmp%d" index
+      method get_imports    = !imports
     end
   in
 
@@ -1186,7 +1242,7 @@ let parse cmd =
         <(is, infix)> : imports[cmd]
         <(d, infix')> : definitions[infix] 
         expr:expr[infix'][Expr.Weak]? {
-            ((if env#is_lazy then "Lazy" :: is else is), Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.materialize Expr.Weak Expr.Skip | Some e -> e)
+            (env#get_imports @ is, Infix.extract_exports infix'), Expr.Scope (d, match expr with None -> Expr.materialize Expr.Weak Expr.Skip | Some e -> e)
           }
         )
   in

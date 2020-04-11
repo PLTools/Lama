@@ -3,7 +3,7 @@ open Ostap
 let parse cmd =
   let s   = Util.read cmd#get_infile in
   let kws = [
-    "skip";
+    "skip";      
     "if"; "then"; "else"; "elif"; "fi";
     "while"; "do"; "od";
     "repeat"; "until";
@@ -14,7 +14,7 @@ let parse cmd =
     "case"; "of"; "esac"; "when";
     "boxed"; "unboxed"; "string"; "sexp"; "array";
     "infix"; "infixl"; "infixr"; "at"; "before"; "after";
-    "true"; "false"; "lazy"; "eta"]
+    "true"; "false"; "lazy"; "eta"; "syntax"]
   in
   Util.parse
     (object
