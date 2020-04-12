@@ -1,6 +1,6 @@
-local sq = syntax (e1=token ("a") e2=token ("b") {Seq (e1, e2)}),
-      al = syntax (e=(token ("a") | token ("b")) {Alt (e)}),
-      rp = syntax (e=token ("a")* {Rep (e)});
+local sq = syntax (e1=token ["a"] e2=token ["b"] {Seq (e1, e2)}),
+      al = syntax (e=(token ["a"] | token ["b"]) {Alt (e)}),
+      rp = syntax (e=token ["a"]* {Rep (e)});
 
 printf ("%s\n", parseString (syntax (sq -eof), "ab").string);
 printf ("%s\n", parseString (syntax (al -eof), "a").string);

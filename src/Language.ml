@@ -828,7 +828,7 @@ module Expr =
         | Some `Rep  -> Call (Var "rep" , [s])
         | Some `Rep0 -> Call (Var "rep0", [s])
       };
-      syntaxPrimary[infix]: l:$ p:LIDENT args:(-"(" !(Util.list0)[parse infix Val] -")")* {
+      syntaxPrimary[infix]: l:$ p:LIDENT args:(-"[" !(Util.list0)[parse infix Val] -"]")* {
         Loc.attach p l#coord;
         List.fold_left (fun acc args -> Call (acc, args)) (Var p) args
       }
