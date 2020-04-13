@@ -322,6 +322,7 @@ Return value represents parsing result as per "\lstinline|Ostap|".}
 \descr{\lstinline|fun getCol (m)|}{Gets a column number for the current position of matcher "\lstinline|m|".}
 
 \section{Unit \texttt{Ostap}}
+\label{sec:ostap}
 
 Unit "\lstinline|Ostap|" implements monadic parser combinators in continuation-passing style with memoization~\cite{MonPC,MemoParsing,Meerkat}.
 A parser is a function of the shape
@@ -348,6 +349,8 @@ The unit describes some primitive parsers and combinators which allow to constru
 \descr{\lstinline|fun eof (k)|}{A parser which recognizes the end of stream.}
 
 \descr{\lstinline|fun empty (k)|}{A parser which recognizes empty string.}
+
+\descr{\lstinline|fun loc (k)|}{A parser which returns the current position (a pair "\lstinline|[line, col]|") in a stream.}
 
 \descr{\lstinline|fun alt (a, b)|}{A parser combinator which constructs a parser alternating between "\lstinline|a|" and "\lstinline|b|".}
 
@@ -393,11 +396,11 @@ parser which behaves exactly as "\lstinline|a|", but additionally applies "\lsti
 
 \begin{lrbox}{\exprbox}
 \begin{lstlisting}
-    {[Left, {[token ("+"), fun (l, r) {Add (l, r)}],
-             [token ("-"), fun (l, r) {Sub (l, r)}]
+    {[Left, {[token ("+"), fun (l, op, r) {Add (l, r)}],
+             [token ("-"), fun (l, op, r) {Sub (l, r)}]
             }],
-     [Left, {[token ("*"), fun (l, r) {Mul (l, r)}],
-             [token ("/"), fun (l, r) {Div (l, r)}]
+     [Left, {[token ("*"), fun (l, op, r) {Mul (l, r)}],
+             [token ("/"), fun (l, op, r) {Div (l, r)}]
             }]}
 \end{lstlisting}
 \end{lrbox}
@@ -405,12 +408,14 @@ parser which behaves exactly as "\lstinline|a|", but additionally applies "\lsti
 \descr{\lstinline|fun expr (ops, opnd)|}{A super-combinator to generate infix expression parsers. The argument "\lstinline|opnd|" parses primary operand, "\lstinline|ops|" is
   a list of infix operator descriptors. Each element of the list describes one \emph{precedence level} with precedence increasing from head to tail. A descriptor on
   each level is a pair, where the first element describes the associativity at the given level ("\lstinline|Left|", "\lstinline|Right|" or "\lstinline|None|") and
-  the second element is a list of pairs~--- a parser for an infix operator and the semantics action (a two-argument function). For example,
+  the second element is a list of pairs~--- a parser for an infix operator and the semantics action (a three-argument function accepting the left parser operand, that that
+  infix operator parser returns, and the right operand). For example,
 
   \usebox\exprbox
 
   specifies two levels of precedence, both left-associative, with infix operators "\lstinline|+|" and "\lstinline|-|" at the first level and
-  "\lstinline|*|" and "\lstinline|/|" at the second. The semantics for these operators constructs abstract sytax trees.
+  "\lstinline|*|" and "\lstinline|/|" at the second. The semantics for these operators constructs abstract syntax trees (in this particular example the
+  second argument of semantics functions is unused).
 }
 
 \section{Unit \texttt{Ref}}

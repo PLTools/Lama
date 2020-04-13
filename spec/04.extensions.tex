@@ -131,3 +131,79 @@ is equivalent to
 
 where $x_i$~--- fresh variables, not free in $e$.
 
+\section{Syntax Definitions}
+
+Syntax definition extension represents an alternative simplified syntax for parsers written using standard unit \lstinline|Ostap| (see Section~\ref{sec:ostap}).
+The syntax for syntax definition expressions is shown on Fig.~\ref{syntax_expressions}.
+
+\begin{figure}[h]
+  \[
+    \begin{array}{rcll}
+      \defterm{syntaxExpression}  & : & \term{syntax}\s\term{(}\s\nonterm{syntaxSeq}\s(\s\term{$\mid$}\s\nonterm{syntaxSeq}\s)^*\s\term{)}&\\
+      \defterm{syntaxSeq}         & : & \nonterm{syntaxBinding}^+\s[\s\term{\{}\s\nonterm{expression}\s\term{\}}\s]&\\
+      \defterm{syntaxBinding}     & : & [\s\term{-}\s]\s[\s\nonterm{pattern}\s\term{=}\s]\s\s\nonterm{syntaxPostfix}&\\
+      \defterm{syntaxPostfix}     & : & \nonterm{syntaxPrimary}\s[\s\term{*}\s\alt\s\term{+}\s\alt\s\term{?}\s]&\\
+      \defterm{syntaxPrimary}     & : & \token{LIDENT}\s(\s\term{[}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^*\s]\s\term{]}\s)^*&\alt\\
+                                  &   & \term{(}\s\nonterm{syntaxExpression}\s\term{)}&\alt\\
+                                  &   & \term{\$(}\s\nonterm{expression}\s\term{)}&
+    \end{array}
+  \]
+  \caption{Syntax definition expressions}
+  \label{syntax_expressions}
+\end{figure}
+
+Syntax expressions can be used wherever regular expressions are allowed. Each syntax expressions is expanded in a certain combination of \lstinline|Ostap| primitives.
+For example,
+
+\begin{lstlisting}
+    fun sum (str) {
+      parseString (
+        syntax (l=DECIMAL token["+"] r=DECIMAL eof {
+                  stringInt (l) + stringInt (r)
+               }),
+        str
+      )
+    }
+\end{lstlisting}
+
+defines a function which parses its arguments into an expression \lstinline|"l + r"|, where \lstinline|l| and \lstinline|r| are decimal literals, and evaluates its value.
+
+A syntax expression itself is a sequence of alternatives, and each alternative is a sequential composition (\nonterm{syntaxSeq}) of primitive parsers equipped with optional
+semantic action (a \emph{general} expression in curly brackets).
+
+A primitive parser is either an l-indentfier (possibly supplied with arguments), or a \emph{general} expression, surrounded by brackets \term{\$(}..\term{)},
+or a \emph{syntax} expression, surrounded by round brackets. Note, the arguments for primitive parsers in syntax expressions are surrounded by
+\term{[}..\term{]} unlike general expressions; thus
+
+\begin{lstlisting}
+   x ("a")
+\end{lstlisting}
+
+means a sequential composition of \lstinline|x| and "\lstinline|a|", not a combinator \lstinline|x| applied to "\lstinline|a|". 
+
+A primitive parser can be followed by one of postfix operators ("\term{*}", "\term{+}", or "\term{?}"), corresponding
+to "\lstinline|rep0|",  "\lstinline|rep|", or "\lstinline|opt|" combinators of \lstinline|Ostap| respectively, for example
+
+\begin{lstlisting}
+   token["a"]+
+   identifier? 
+\end{lstlisting}
+
+A value recognized by a primitive parser can be matched against a pattern, for example
+
+\begin{lstlisting}
+   value=(identifier | constant)
+   h:tl=item+
+\end{lstlisting}
+
+The bindings provided by pattern-matching can be used in semantic actions.
+
+Finally, if no semantic action is given, a sequential syntax expression returns a tuple of its components. However, if a parser
+in a sequential composition is preceded by "\term{-}" then its value is not included into the default result. Thus,
+
+\begin{lstlisting}
+   parse -eof
+\end{lstlisting}
+
+returns what "\lstinline|parse|" recognized; the input stream is parsed against "\lstinline|eof|", but the result of "\lstinline|eof|"
+is omitted.
