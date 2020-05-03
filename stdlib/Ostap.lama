@@ -173,6 +173,15 @@ public fun observe (name, f) {
   }
 }
 
+public fun showStream (name) {
+  fun (k) {
+    fun (s) {
+      printf ("%s: %s\n", name, showMatcher (s));
+      k (Succ ({}, s))
+    }
+  }
+}
+
 fun createResult () {
   local errors   = ref ({}),
         line     = ref (0),
@@ -182,8 +191,10 @@ fun createResult () {
         hasValue = ref (false);
 
   fun k (x) {
+    if log then printf ("Result: %s\n", x.string) fi;
     case x of
-      Succ (val, _)    ->
+      Succ (val, s)    ->
+        if log then printf ("Result stream: %s\n", showMatcher (s)) fi;
         if deref (hasValue)
         then failure (sprintf ("Ostap: ambiguous parsing (%s vs. %s)", deref (value).string, val.string))
         else

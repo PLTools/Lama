@@ -556,17 +556,11 @@ extern void* Lsubstring (void *subj, int p, int l) {
 
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
   regex_t *b = (regex_t*) malloc (sizeof (regex_t));
-  
-  b->translate = 0;
-  b->fastmap   = 0;
-  // A weird workaround: should be 0/0 in theory,
-  // but is does not work sometimes. The exact number is
-  // determined experimentally :((
-  b->buffer    = malloc (256);
-  b->allocated = 256;
+
+  memset (b, 0, sizeof (regex_t));
   
   int n = (int) re_compile_pattern (regexp, strlen (regexp), b);
-
+  
   if (n != 0) {
     failure ("%", strerror (n));
   };
@@ -575,11 +569,19 @@ extern struct re_pattern_buffer *Lregexp (char *regexp) {
 }
 
 extern int LregexpMatch (struct re_pattern_buffer *b, char *s, int pos) {
+  int res;
+  
   ASSERT_BOXED("regexpMatch:1", b);
   ASSERT_STRING("regexpMatch:2", s);
   ASSERT_UNBOXED("regexpMatch:3", pos);
-    
-  return BOX (re_match (b, s, LEN(TO_DATA(s)->tag), UNBOX(pos), 0));
+
+  res = re_match (b, s, LEN(TO_DATA(s)->tag), UNBOX(pos), 0);
+
+  if (res) {
+    return BOX (res);
+  }
+
+  return BOX (res);
 }
 
 extern void* Bstring (void*);
@@ -723,62 +725,66 @@ extern int Lhash (void *p) {
 
 extern int Lcompare (void *p, void *q) {
 # define COMPARE_AND_RETURN(x,y) do if (x != y) return BOX(x - y); while (0)
-  if (q == 0 || p == 0) {
-    failure ("NULL pointer in Lcompare\n");
-  }
   
   if (p == q) return BOX(0);
-  
+ 
   if (UNBOXED(p)) {
     if (UNBOXED(q)) return BOX(UNBOX(p) - UNBOX(q));    
     else return BOX(-1);
   }
   else if (UNBOXED(q)) return BOX(1);
   else {
-    data *a = TO_DATA(p), *b = TO_DATA(q);
-    int ta = TAG(a->tag), tb = TAG(b->tag);
-    int la = LEN(a->tag), lb = LEN(b->tag);
-    int i;
+    if (is_valid_heap_pointer (p)) {
+      if (is_valid_heap_pointer (q)) {
+        data *a = TO_DATA(p), *b = TO_DATA(q);
+        int ta = TAG(a->tag), tb = TAG(b->tag);
+        int la = LEN(a->tag), lb = LEN(b->tag);
+        int i;
     
-    COMPARE_AND_RETURN (ta, tb);
+        COMPARE_AND_RETURN (ta, tb);
       
-    switch (ta) {
-    case STRING_TAG:
-      return BOX(strcmp (a->contents, b->contents));
+        switch (ta) {
+        case STRING_TAG:
+          return BOX(strcmp (a->contents, b->contents));
       
-    case CLOSURE_TAG:
-      COMPARE_AND_RETURN (((void**) a->contents)[0], ((void**) b->contents)[0]);
-      COMPARE_AND_RETURN (la, lb);
-      i = 1;
-      break;
+        case CLOSURE_TAG:
+          COMPARE_AND_RETURN (((void**) a->contents)[0], ((void**) b->contents)[0]);
+          COMPARE_AND_RETURN (la, lb);
+          i = 1;
+          break;
       
-    case ARRAY_TAG:
-      COMPARE_AND_RETURN (la, lb);
-      i = 0;
-      break;
+        case ARRAY_TAG:
+          COMPARE_AND_RETURN (la, lb);
+          i = 0;
+          break;
 
-    case SEXP_TAG: {
+        case SEXP_TAG: {
 #ifndef DEBUG_PRINT
-      int ta = TO_SEXP(p)->tag, tb = TO_SEXP(q)->tag;      
+          int ta = TO_SEXP(p)->tag, tb = TO_SEXP(q)->tag;      
 #else
-      int ta = GET_SEXP_TAG(TO_SEXP(p)->tag), tb = GET_SEXP_TAG(TO_SEXP(q)->tag);
+          int ta = GET_SEXP_TAG(TO_SEXP(p)->tag), tb = GET_SEXP_TAG(TO_SEXP(q)->tag);
 #endif      
-      COMPARE_AND_RETURN (ta, tb);
-      COMPARE_AND_RETURN (la, lb);
-      i = 0;
-      break;
-    }
+          COMPARE_AND_RETURN (ta, tb);
+          COMPARE_AND_RETURN (la, lb);
+          i = 0;
+          break;
+        }
 
-    default:
-      failure ("invalid tag %d in compare *****\n", ta);
-    }
+        default:
+          failure ("invalid tag %d in compare *****\n", ta);
+        }
 
-    for (; i<la; i++) {
-      int c = Lcompare (((void**) a->contents)[i], ((void**) b->contents)[i]);
-      if (c != BOX(0)) return BOX(c);
-    }
+        for (; i<la; i++) {
+          int c = Lcompare (((void**) a->contents)[i], ((void**) b->contents)[i]);
+          if (c != BOX(0)) return BOX(c);
+        }
     
-    return BOX(0);
+        return BOX(0);
+      }
+      else return BOX(-1);
+    }
+    else if (is_valid_heap_pointer (q)) return BOX(1);
+    else return BOX (p - q);
   }
 }
 

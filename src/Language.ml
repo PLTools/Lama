@@ -785,7 +785,7 @@ module Expr =
                                   | acc    -> Call (Var "alt", [s; acc])
                         ) ss (Var "")
       };
-      syntaxSeq[infix]: ss:syntaxBinding[infix]+ sema:(-"{" parse[infix][Val] -"}")? {
+      syntaxSeq[infix]: ss:syntaxBinding[infix]+ sema:(-"{" scope[infix][Val] -"}")? {
         let sema, ss =
           match sema with
           | Some s -> s, ss

@@ -9,7 +9,7 @@
 --             reporting
 public fun createRegexp (r, name) {
   local l = [regexp (r), name];
-  --printf ("Created regexp %s: %x, %x\n", name, l, l[0]);
+--  printf ("Created regexp %s: %x, %x\n", name, l, l[0]);
   l
 }
 

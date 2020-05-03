@@ -310,9 +310,10 @@ public fun lookupMemo (m, v) {
         case v of
           #string -> m ::= addMap (deref (m), v, v); v        
         | _ ->
-          local vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;
+          local vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;          
           for skip, i < v.length, i := i + 1 do
-            vc [i] := lookupMemo (m, vc [i])
+            local vci = lookupMemo (m, vc [i]);
+            vc [i] := vci
           od;
           m ::= addMap (deref (m), vc, vc);
           vc
