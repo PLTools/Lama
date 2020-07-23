@@ -25,6 +25,28 @@ fun printColl (m) {
   inner ("", m)
 }
 
+public fun validateColl (t) {
+  fun inner (t, verify) {
+    case t of
+      {} -> 0
+    | MNode (k, _, bf, l, r) ->
+       if verify (k)
+       then
+	 local lh = validateColl (l, fun (x) {x < k}),
+	       rh = validateColl (r, fun (x) {x > k});
+
+         if bf == lh - rh
+	 then 1 + if lh > rh then lh else rh fi
+	 else failure ("Collection::validateColl: balance violation on key %s\nTree: %s\n", k.string, t.string) -- 1 + if lh > rh then lh else rh fi
+	 fi
+       else failure ("Collection::validateColl: order violation on key %s\nTree: %s\n", k.string, t.string)
+       fi
+    esac
+  }
+
+  inner (t, fun (x) {true})
+}
+
 fun makeCompare (sort) {
   case sort of
     Hash -> fun (x, y) {
@@ -56,12 +78,32 @@ fun insertColl (m, pk, v, sort) {
   fun rot (left, node) {
     if left
     then case node of   
-           MNode (k, v, b, l, MNode (rk, rv, rb, ll, rr)) ->
-             MNode (rk, rv, 0, MNode (k, v, 0, l, ll), rr)
+           MNode (k, v, x, l, MNode (rk, rv, y, ll, rr)) ->           
+             local x0 = if y  > 0 then x + 1 else x - y + 1 fi,
+                   y0 = if x0 > 0
+                        then
+                          if y > 0
+                          then x + y + 2
+                          else x + 2
+                          fi                        
+                        else y + 1
+                        fi;
+             
+             MNode (rk, rv, y0, MNode (k, v, x0, l, ll), rr)
          esac
     else case node of
-           MNode (k, v, b, MNode (lk, lv, lb, ll, rr), r) ->
-             MNode (lk, lv, 0, ll, MNode (k, v, 0, rr, r))
+           MNode (k, v, x, MNode (lk, lv, y, ll, rr), r) ->
+             local x0 = if y < 0 then x - 1 else x - y - 1 fi,
+                   y0 = if x0 > 0
+                        then y - 1
+                        else
+                          if y < 0
+                          then y + x - 2
+                          else x - 2
+                          fi
+                        fi;                   
+
+             MNode (lk, lv, y0, ll, MNode (k, v, x0, rr, r))
          esac
     fi
   }
@@ -82,8 +124,8 @@ fun insertColl (m, pk, v, sort) {
 	                       then [false, MNode (kk, vv, bf + 1, ll, r)]
 	                       elif bf == 1
 			       then if ll.factor > 0
-			            then [false, rot (false, MNode (kk, vv, bf, ll, r))]
-			            else [false, rot (false, MNode (kk, vv, bf, rot (true, ll), r))]
+			            then [false, rot (false, MNode (kk, vv, 2, ll, r))] 
+			            else [false, rot (false, MNode (kk, vv, 2, rot (true, ll), r))]
 			            fi
 			       else [true,  MNode (kk, vv, bf + 1, ll, r)] 
 			       fi
@@ -95,8 +137,8 @@ fun insertColl (m, pk, v, sort) {
 	                       then [false, MNode (kk, vv, bf - 1, l, rr)]
 			       elif bf == -1
 			       then if rr.factor < 0
-			            then [false, rot (true, MNode (kk, vv, bf, l, rr))]
-			            else [false, rot (true, MNode (kk, vv, bf, l, rot (false, rr)))]
+			            then [false, rot (true, MNode (kk, vv, -2, l, rr))]
+			            else [false, rot (true, MNode (kk, vv, -2, l, rot (false, rr)))]
 			            fi				   
 			       else [true,  MNode (kk, vv, bf - 1, l, rr)] 
 			       fi
@@ -186,28 +228,6 @@ fun contents (m, sort) {
   }
 
   inner (m, {})
-}
-
-public fun validateColl (t) {
-  fun inner (t, verify) {
-    case t of
-      {} -> 0
-    | MNode (k, _, bf, l, r) ->
-       if verify (k)
-       then
-	 local lh = validateColl (l, fun (x) {x < k}),
-	       rh = validateColl (r, fun (x) {x > k});
-
-         if bf == lh - rh
-	 then 1 + if lh > rh then lh else rh fi
-	 else 1 + if lh > rh then lh else rh fi -- failure ("Collection::validateColl: balance violation on key %s\n", k.string)
-	 fi
-       else failure ("Collection::validateColl: order violation on key %s\n", k.string)
-       fi
-    esac
-  }
-
-  inner (t, fun (x) {true})
 }
 
 -- Map structure
