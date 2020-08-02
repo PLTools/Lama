@@ -1,0 +1,51 @@
+-- Random data structures generator.
+-- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
+--
+-- This unit provides an implementation for random data structures generator
+
+import Array;
+
+-- Generates a random signed 31-bit integer
+public fun randomInt () {
+  if random (2)
+  then random (1073741823) 
+  else 0 - random (1073741823)
+  fi
+}
+
+-- Generates a printable ASCII string of given length
+public fun randomString (len) {
+  local s = makeString (len);
+
+  for local i = 0;, i < len, i := i+1
+  do
+    s [i] := 32 + random (94) -- printable ASCII set
+  od;
+
+  s
+}
+
+-- Generates a random array of (deep) size n. f is element-generation
+-- function which takes the size of the element
+public fun randomArray (f, n) {
+  mapArray (f, split (n))  
+}
+
+-- Splits a number in a random sequence of summands
+public fun split (n) {
+  local k = random (n) + 1,
+        a = makeArray (k),
+        m = n;
+
+  for local i = 0;, i < k, i := i + 1
+  do
+    if i == k - 1
+    then a[i] := m
+    else 
+      a [i] := random (m - k + i + 1) + 1;
+      m := m - a [i]
+    fi
+  od;
+
+  a
+}

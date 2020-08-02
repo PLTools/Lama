@@ -89,6 +89,11 @@ is automatically created and closed within the call.}
 \descr{\lstinline|fun getEnv (name)|}{Returns a value for an environment variable "\lstinline|name|". The argument is a string, the
 return value is either "\lstinline|0|" (if not environment variable with given name is set), or a string value.}
 
+\descr{\lstinline|fun random (n)|}{Returns a pseudo-random number in the interval $0..n-1$. The seed is auto-initialized by current time at 
+program start time.}
+
+\descr{\lstinline|fun time ()|}{Returns the elapsed time from program start in microseconds.}
+
 \section{Unit \texttt{Array}}
 \label{sec:array}
 
@@ -107,10 +112,10 @@ Array processing functions:
 \descr{\lstinline|fun listArray (l)|}{Converts a list to array (preserving the order of elements).}
 
 \descr{\lstinline|fun foldlArray (f, acc, a)|}{Folds an array "\lstinline|a|" with a function "\lstinline|f|" and initial value "\lstinline|acc|"
-  is the left-to-right manner. The function "\lstinline|f|" takes two arguments~--- an accumulator and an array element.}
+  in a left-to-right manner. The function "\lstinline|f|" takes two arguments~--- an accumulator and an array element.}
 
 \descr{\lstinline|fun foldrArray (f, acc, a)|}{Folds an array "\lstinline|a|" with a function "\lstinline|f|" and initial value "\lstinline|acc|"
-  is the right-to-left manner. The function "\lstinline|f|" takes two arguments~--- an accumulator and an array element.}
+  in a right-to-left manner. The function "\lstinline|f|" takes two arguments~--- an accumulator and an array element.}
 
 \descr{\lstinline|fun iterArray (f, a)|}{Applies a function "\lstinline|f|" to each element of an array "\lstinline|a|"; does not return a value.}
 

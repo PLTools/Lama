@@ -18,7 +18,7 @@ public fun initArray (n, f) {
 }
 
 public fun mapArray (f, a) {
-  initArray (a.length, fun (i) {a[i]})
+  initArray (a.length, fun (i) {f (a[i])})
 }
 
 public fun arrayList (a) {

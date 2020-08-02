@@ -43,4 +43,8 @@ F,s__Infix_42;
 F,s__Infix_47;
 F,s__Infix_37;
 L,"++",T,"+";
- 
+F,enableGC;
+F,disableGC;
+F,random;
+F,time;
+F,rawTag;

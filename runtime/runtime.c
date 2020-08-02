@@ -11,6 +11,7 @@
 # include <assert.h>
 # include <errno.h>
 # include <regex.h>
+# include <time.h>
 # include <limits.h>
 
 # define __ENABLE_GC__
@@ -171,6 +172,13 @@ extern void* alloc (size_t);
 extern void* Bsexp (int n, ...);
 
 void *global_sysargs;
+
+// Gets a raw tag
+extern int LrawTag (void *p) {
+  ASSERT_UNBOXED ("rawTag, 0", p);
+  
+  return TAG(TO_DATA(p)->tag);
+}
 
 // Functional synonym for built-in operator ":";
 void* Ls__Infix_58 (void *p, void *q) {
@@ -1374,6 +1382,24 @@ extern int Lwrite (int n) {
   return 0;
 }
 
+extern int Lrandom (int n) {
+  ASSERT_UNBOXED("Lrandom, 0", n);
+
+  if (UNBOX(n) <= 0) {
+    failure ("invalid range in random: %d\n", UNBOX(n));
+  }
+  
+  return BOX (random () % UNBOX(n));
+}
+
+extern int Ltime () {
+  struct timespec t;
+  
+  clock_gettime (CLOCK_MONOTONIC_RAW, &t);
+  
+  return BOX(t.tv_sec * 1000000 + t.tv_nsec / 1000);
+}
+
 extern void set_args (int argc, char *argv[]) {
   data *a;
   int n = argc, *p = NULL;
@@ -1418,15 +1444,25 @@ extern void set_args (int argc, char *argv[]) {
 
 /* GC starts here */
 
+static int enable_GC = 1;
+
+extern void LenableGC () {
+  enable_GC = 1;
+}
+
+extern void LdisableGC () {
+  enable_GC = 0;
+}
+
 extern const size_t __start_custom_data, __stop_custom_data;
 
 # ifdef __ENABLE_GC__
 
-extern void L__gc_init ();
+extern void __gc_init ();
 
 # else
 
-# define L__gc_init __gc_init_subst
+# define __gc_init __gc_init_subst
 void __gc_init_subst () {}
 
 # endif
@@ -1737,8 +1773,11 @@ static inline void init_extra_roots (void) {
   extra_roots.current_free = 0;
 }
 
-extern void init_pool (void) {
+extern void __init (void) {
   size_t space_size = SPACE_SIZE * sizeof(size_t);
+
+  srandom (time (NULL));
+  
   from_space.begin = mmap (NULL, space_size, PROT_READ | PROT_WRITE,
     			   MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
   to_space.begin   = NULL;
@@ -1756,6 +1795,10 @@ extern void init_pool (void) {
 }
 
 static void* gc (size_t size) {
+  if (! enable_GC) {
+    Lfailure ("GC disabled");
+  }
+  
   current = to_space.begin;
 #ifdef DEBUG_PRINT
   print_indent ();

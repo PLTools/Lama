@@ -48,13 +48,16 @@ public fun validateColl (t) {
 }
 
 fun makeCompare (sort) {
+  fun c (x, y) {
+    if   x == y then 0
+    elif x < y  then -1
+    else 1
+    fi  
+  }
+  
   case sort of
-    Hash -> fun (x, y) {
-              if   x == y then 0
-              elif x < y  then -1
-              else 1
-              fi
-            }
+    Hash -> c
+  | Ptr  -> c
   | _    -> compare
   esac
 }
@@ -66,6 +69,7 @@ fun insertColl (m, pk, v, sort) {
   fun append (v, vs) {
     case sort of
       Map  -> v : vs
+    | Ptr  -> v : vs
     | Set  -> v
     | Hash ->
        case find (fun (x) {compare (x, [pk, v]) == 0}, vs) of
@@ -159,6 +163,7 @@ fun findColl (m, pk, sort) {
   fun extract (vv) {
     case sort of
       Map  -> case vv of v : _ -> Some (v) | _ -> None esac
+    | Ptr  -> case vv of v : _ -> Some (v) | _ -> None esac
     | Set  -> Some (vv)
     | Hash -> case find (fun (x) {compare (x.fst, pk) == 0}, vv) of
                 Some (p) -> Some (p.snd)
@@ -189,6 +194,7 @@ fun removeColl (m, pk, sort) {
   fun delete (vs) {
     case sort of
       Map  -> case vs of {} -> {} | _ : vv -> vv esac
+    | Ptr  -> case vs of {} -> {} | _ : vv -> vv esac
     | Set  -> false
     | Hash -> remove (fun (x) {x.fst == pk}, vs)
     esac
@@ -216,6 +222,7 @@ fun contents (m, sort) {
   fun append (k, vs, acc) {
     case sort of
       Map -> case vs of {} -> acc | v : _ -> [k, v] : acc esac
+    | Ptr -> case vs of {} -> acc | v : _ -> [k, v] : acc esac
     | Set -> if vs then k : acc else acc fi
     esac
   }
@@ -228,6 +235,19 @@ fun contents (m, sort) {
   }
 
   inner (m, {})
+}
+
+-- Map on raw pointers (experimental)
+public fun emptyPtrMap () {
+  {}
+}
+
+public fun addPtrMap (m, k, v) {
+  insertColl (m, k, v, Ptr)
+}
+
+public fun findPtrMap (m, k) {
+  findColl (m, k, Ptr)
 }
 
 -- Map structure

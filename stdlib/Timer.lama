@@ -1,0 +1,14 @@
+-- Timer.
+-- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
+--
+-- This unit provides an implementation for simple timer. A timer is a function which
+-- measures an elapsed time (in microseconds) since its creation.
+
+-- Creates a new timer
+public fun timer () {
+  local t = time ();
+
+  fun () {
+    time () - t
+  }
+}

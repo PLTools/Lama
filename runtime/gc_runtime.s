@@ -9,7 +9,7 @@ __gc_stack_top:	        .long	0
 
 			.globl	__pre_gc
 			.globl	__post_gc
-			.globl	L__gc_init
+			.globl	__gc_init
 			.globl	__gc_root_scan_stack
 			.globl	__gc_stack_top
 			.globl	__gc_stack_bottom
@@ -17,9 +17,9 @@ __gc_stack_top:	        .long	0
 			.extern	gc_test_and_copy_root
 			.text
 
-L__gc_init:		movl	%ebp, __gc_stack_bottom
+__gc_init:		movl	%ebp, __gc_stack_bottom
 			addl	$4, __gc_stack_bottom
-			call	init_pool
+			call	__init
 			ret
 
 	// if __gc_stack_top is equal to 0

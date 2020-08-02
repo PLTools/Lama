@@ -416,7 +416,7 @@ let compile cmd env imports code =
 	           Repmovsl
                   ] @
                   (if f = "main"
-                   then [Call "L__gc_init"; Push (I (12, ebp)); Push (I (8, ebp)); Call "set_args"; Binop ("+", L 8, esp)]
+                   then [Call "__gc_init"; Push (I (12, ebp)); Push (I (8, ebp)); Call "set_args"; Binop ("+", L 8, esp)]
                    else []
                   ) @
                   (if f = cmd#topname

@@ -1,0 +1,147 @@
+import Collection;
+import Ref;
+import Random;
+import Array;
+import Fun;
+
+local m = emptyPtrMap ();
+
+fun eq (x, y) {
+  local m = ref (emptyPtrMap ());
+
+  fun alreadyEq (x, y) {
+    fun find (x) {
+      fun walk (r) {
+        case r of
+          [#unboxed] -> r
+        | [x]        -> walk (x)
+        esac
+      }
+      
+      case findPtrMap (deref (m), x) of
+        Some (r) -> Some (walk (r))
+      | x        -> x
+      esac
+    }
+
+    case [find (x), find (y)] of
+      [None, None] ->
+        local v = [1];
+        m ::= addPtrMap (addPtrMap (deref (m), x, v), y, v);
+        false
+         
+    | [None, Some (ry)] ->
+        m ::= addPtrMap (deref (m), x, ry);
+        false
+         
+    | [Some (rx), None] ->
+        m ::= addPtrMap (deref (m), y, rx);
+        false
+        
+    | [Some (rx), Some (ry)] ->
+        if rx == ry
+        then true
+        else
+          rx [0] := ry;
+          false
+        fi
+    esac    
+  }
+  
+  fun eqrec (x, y) {
+    if alreadyEq (x, y)
+    then true
+    else
+      case [x, y] of
+        [#array, #array] ->
+          if x.length == y.length
+          then
+            local continue = true;
+            
+            for local i = 0;, i<x.length && continue, i := i + 1 do
+              continue := eqrec (x[i], y[i]) 
+            od;            
+            continue
+          else false
+          fi
+      | [#unboxed, #unboxed] -> x == y
+      | [#string, #string]   -> compare (x, y) == 0
+      | [#unboxed, #array] -> false
+      | [#array, #unboxed] -> false
+      | _ -> failure ("eq not supported: %s, %s", x.string, y.string)
+      esac
+    fi
+  }
+
+  eqrec (x, y)  
+}
+
+fun genCyclicArrays (n) {
+  fun genrec (n, stacka, stackb, depth) {
+    fun peek (k, stack) {
+      case stack of
+        [x, prev] -> if k == 0 then x else peek (k-1, prev) fi
+      esac
+    }
+    
+    if n == 1
+    then
+      case if random (2)
+           then randomString (16)
+           else randomInt ()
+           fi of
+        x -> [x, clone (x)]
+      esac           
+    else
+      local a     = split (n),
+            b     = mapArray (id, a),
+            index = initArray (random (a.length + 1), fun (_) {random (a.length)});
+      
+      fun shared (i)  {
+        local found = false;
+        
+        for local j=0;, j < index.length && 1 - found, j := j + 1
+        do
+          found := i == index[j]
+        od;
+
+        found
+      }
+      
+      for local i=0;, i < a.length, i := i + 1
+      do
+        if shared (i)
+        then
+          if depth == 0
+          then
+            a[i] := a;
+            b[i] := b
+          else
+            case random (depth) of
+              r -> a [i] := peek (r, stacka);
+                   b [i] := peek (r, stackb)
+            esac
+          fi
+        else
+          case genrec (a[i], [a, stacka], [b, stackb], depth + 1) of
+            [ai, bi] -> a [i] := ai;
+                        b [i] := bi
+          esac
+        fi
+      od;
+
+      [a, b]
+    fi
+  }
+
+  genrec (n, [], [], 0)
+}
+
+disableGC ();
+
+for local i=0;, i<100, i:=i+1
+do
+  case genCyclicArrays (1000) of
+    [a, b] -> printf ("%d\n", eq (a, b))
+  esac
+od
