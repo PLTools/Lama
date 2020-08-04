@@ -76,7 +76,9 @@ fun eq (x, y) {
   eqrec (x, y)  
 }
 
-fun genCyclicArrays (n) {
+fun genCyclicArrays (n, eq, cross) {
+  local f = ref (true);
+  
   fun genrec (n, stacka, stackb, depth) {
     fun peek (k, stack) {
       case stack of
@@ -115,17 +117,27 @@ fun genCyclicArrays (n) {
           if depth == 0
           then
             a[i] := a;
-            b[i] := b
+            b[i] := if cross then a else b fi
           else
             case random (depth) of
               r -> a [i] := peek (r, stacka);
-                   b [i] := peek (r, stackb)
+                   b [i] := if cross then a[i] else peek (r, stackb) fi
             esac
-          fi
+          fi;
+          
+          if 1 - eq && deref (f) then b[i] := 0; f ::= true fi
         else
           case genrec (a[i], [a, stacka], [b, stackb], depth + 1) of
             [ai, bi] -> a [i] := ai;
-                        b [i] := bi
+                        b [i] := bi;
+                        
+                        if 1 - eq && deref (f) then
+                          case b[i] of
+                            #unboxed -> b[i] := b[i] + 1
+                          | _        -> b[i] := 0
+                          esac;
+                          f ::= true
+                        fi
           esac
         fi
       od;
@@ -139,9 +151,32 @@ fun genCyclicArrays (n) {
 
 disableGC ();
 
-for local i=0;, i<100, i:=i+1
+for local i=0;, i<25, i:=i+1
 do
-  case genCyclicArrays (1000) of
-    [a, b] -> printf ("%d\n", eq (a, b))
+  case genCyclicArrays (1000, true, false) of
+    [a, _] -> printf ("%d\n", eq (a, a) == true)
+  | [a, b] -> printf ("%d\n", eq (a, b) == true)
+  esac
+od;
+
+for local i=0;, i<25, i:=i+1
+do
+  case genCyclicArrays (1000, true, true) of
+    [a, _] -> printf ("%d\n", eq (a, a) == true)
+  | [a, b] -> printf ("%d\n", eq (a, b) == true)
+  esac
+od;
+
+for local i=0;, i<25, i:=i+1
+do
+  case genCyclicArrays (1000, false, false) of
+   [a, b] -> printf ("%d\n", eq (a, b) == false)
+  esac
+od;
+
+for local i=0;, i<25, i:=i+1
+do
+  case genCyclicArrays (1000, false, true) of
+   [a, b] -> printf ("%d\n", eq (a, b) == false)
   esac
 od
