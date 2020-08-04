@@ -47,29 +47,34 @@ fun eq (x, y) {
         fi
     esac    
   }
+
+  fun eqargs (x, y, from) {
+    local continue = true;
+
+    if x.length != y.length
+    then false
+    else 
+      for local i = from;, i<x.length && continue, i := i + 1 do
+        continue := eqrec (x[i], y[i]) 
+      od;
+    
+      continue
+    fi       
+  }
   
   fun eqrec (x, y) {
     if alreadyEq (x, y)
     then true
-    else
-      case [x, y] of
-        [#array, #array] ->
-          if x.length == y.length
-          then
-            local continue = true;
-            
-            for local i = 0;, i<x.length && continue, i := i + 1 do
-              continue := eqrec (x[i], y[i]) 
-            od;            
-            continue
-          else false
-          fi
-      | [#unboxed, #unboxed] -> x == y
-      | [#string, #string]   -> compare (x, y) == 0
-      | [#unboxed, #array] -> false
-      | [#array, #unboxed] -> false
-      | _ -> failure ("eq not supported: %s, %s", x.string, y.string)
-      esac
+    else      
+      if rawTag (x) != rawTag (y) then false      
+      else
+        case x of
+          #array -> eqargs (x, y, 0)
+        | #fun   -> if x[0] == y[0] then eqargs (x, y, 1) else false fi
+        | #sexp  -> if compareTags (x, y) == 0 then eqargs (x, y, 0) else false fi
+        | _      -> compare (x, y) == 0
+        esac
+      fi
     fi
   }
 

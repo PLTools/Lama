@@ -48,3 +48,4 @@ F,disableGC;
 F,random;
 F,time;
 F,rawTag;
+F,compareTags;

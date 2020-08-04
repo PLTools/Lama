@@ -67,6 +67,7 @@ void __post_gc_subst () {}
 # define ARRAY_TAG   0x00000003
 # define SEXP_TAG    0x00000005
 # define CLOSURE_TAG 0x00000007 
+# define UNBOXED_TAG 0x00000009 // Not actually a tag; used to return from LrawTag
 
 # define LEN(x) ((x & 0xFFFFFFF8) >> 3)
 # define TAG(x)  (x & 0x00000007)
@@ -175,9 +176,32 @@ void *global_sysargs;
 
 // Gets a raw tag
 extern int LrawTag (void *p) {
-  ASSERT_UNBOXED ("rawTag, 0", p);
+  if (UNBOXED(p)) return UNBOXED_TAG;
   
   return TAG(TO_DATA(p)->tag);
+}
+
+// Compare sexprs tags
+extern int LcompareTags (void *p, void *q) {
+  data *pd, *qd;
+  
+  ASSERT_BOXED ("compareTags, 0", p);
+  ASSERT_BOXED ("compareTags, 1", q);
+
+  pd = TO_DATA(p);
+  qd = TO_DATA(q);
+
+  if (TAG(pd->tag) == SEXP_TAG && TAG(qd->tag) == SEXP_TAG) {
+    return
+    #ifndef DEBUG_PRINT
+      (TO_SEXP(p)->tag) - (TO_SEXP(q)->tag);
+    #else
+      (GET_SEXP_TAG(TO_SEXP(p)->tag)) - (GET_SEXP_TAG(TO_SEXP(p)->tag));
+    #endif      
+  }
+  else failure ("not a sexpr in compareTags: %d, %d\n", TAG(pd->tag), TAG(qd->tag));    
+          
+  return 0; // never happens
 }
 
 // Functional synonym for built-in operator ":";
