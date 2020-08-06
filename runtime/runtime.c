@@ -239,10 +239,7 @@ int Ls__Infix_3838 (void *p, void *q) {
 
 // Functional synonym for built-in operator "==";
 int Ls__Infix_6161 (void *p, void *q) {
-  ASSERT_UNBOXED("captured ==:1", p);
-  ASSERT_UNBOXED("captured ==:2", q);
-
-  return BOX(UNBOX(p) == UNBOX(q));
+  return BOX(p == q);
 }
 
 // Functional synonym for built-in operator "!=";
@@ -295,10 +292,13 @@ int Ls__Infix_43 (void *p, void *q) {
 
 // Functional synonym for built-in operator "-";
 int Ls__Infix_45 (void *p, void *q) {
-  ASSERT_UNBOXED("captured -:1", p);
-  ASSERT_UNBOXED("captured -:2", q);
+  if (UNBOXED(p)) {
+    ASSERT_UNBOXED("captured -:2", q);
+    return BOX(UNBOX(p) - UNBOX(q));
+  }
 
-  return BOX(UNBOX(p) - UNBOX(q));
+  ASSERT_BOXED("captured -:1", q);
+  return BOX(p - q);
 }
 
 // Functional synonym for built-in operator "*";
@@ -752,7 +752,21 @@ extern void* LstringInt (char *b) {
 }
 
 extern int Lhash (void *p) {
-  return BOX(inner_hash (0, 0, p));
+  return BOX(0x3fffff & inner_hash (0, 0, p));
+}
+
+extern int LflatCompare (void *p, void *q) {
+  if (UNBOXED(p)) {
+    if (UNBOXED(q)) {
+      return BOX (UNBOX(p) - UNBOX(q));
+    }
+    
+    return -1;
+  }
+  else if (~UNBOXED(q)) {
+    return BOX(p - q);
+  }
+  else BOX(1);
 }
 
 extern int Lcompare (void *p, void *q) {
@@ -1498,7 +1512,7 @@ extern void __gc_root_scan_stack ();
 /* ======================================== */
 
 //static size_t SPACE_SIZE = 16;
-static size_t SPACE_SIZE = 32 * 1024 * 1024;
+static size_t SPACE_SIZE = 64 * 1024 * 1024;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 

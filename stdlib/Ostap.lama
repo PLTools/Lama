@@ -17,7 +17,7 @@ public fun logOn () {
 }
 
 public fun initOstap () {
-  tab    := ref (emptyHashTab ());
+  tab    := ref (emptyHashTab (1024, hash, compare));
   restab := emptyMemo ();
   hct    := emptyMemo ()
 }
@@ -29,7 +29,7 @@ public fun memo (f) {
   
   case findHashTab (deref (tab), f) of
     None      -> if log then printf ("new table...\n") fi;
-                 tab ::= addHashTab (deref (tab), f, ref (emptyMap ()))
+                 tab ::= addHashTab (deref (tab), f, ref (emptyMap (compare)))
                  
   | Some (tt) -> skip
   esac;
@@ -43,7 +43,7 @@ public fun memo (f) {
       if log then printf ("Applying memoized parser to %s\n", s.string) fi;
       case findMap (deref (t), s) of
         None  ->
-          t ::= addMap (deref (t), s, [addSet (emptySet (), k), emptySet ()]);
+          t ::= addMap (deref (t), s, [addSet (emptySet (compare), k), emptySet (compare)]);
           f (fun (r) {
                r := lookupMemo (restab, r);
                if log then printf ("Running continuation with result %s\n", r.string) fi;

@@ -6,8 +6,9 @@
 
 import List;
 import Ref;
+import Array;
 
-fun printColl (m) {
+fun printColl ([m, _]) {
   fun inner (off, curr) {
     printf (off);
     case curr of
@@ -25,21 +26,21 @@ fun printColl (m) {
   inner ("", m)
 }
 
-public fun validateColl (t) {
+public fun validateColl ([t, compare]) {
   fun inner (t, verify) {
     case t of
       {} -> 0
     | MNode (k, _, bf, l, r) ->
        if verify (k)
        then
-	 local lh = validateColl (l, fun (x) {x < k}),
-	       rh = validateColl (r, fun (x) {x > k});
+	 local lh = inner (l, fun (x) {compare (x, k) < 0}),
+	       rh = inner (r, fun (x) {compare (x, k) > 0});
 
          if bf == lh - rh
 	 then 1 + if lh > rh then lh else rh fi
-	 else failure ("Collection::validateColl: balance violation on key %s\nTree: %s\n", k.string, t.string) -- 1 + if lh > rh then lh else rh fi
+	 else failure ("Collection.validateColl: balance violation on key %s\nTree: %s\n", k.string, t.string)
 	 fi
-       else failure ("Collection::validateColl: order violation on key %s\nTree: %s\n", k.string, t.string)
+       else failure ("Collection.validateColl: order violation on key %s\nTree: %s\n", k.string, t.string)
        fi
     esac
   }
@@ -47,35 +48,11 @@ public fun validateColl (t) {
   inner (t, fun (x) {true})
 }
 
-fun makeCompare (sort) {
-  fun c (x, y) {
-    if   x == y then 0
-    elif x < y  then -1
-    else 1
-    fi  
-  }
-  
-  case sort of
-    Hash -> c
-  | Ptr  -> c
-  | _    -> compare
-  esac
-}
-
-fun insertColl (m, pk, v, sort) {
-  local compareKeys = makeCompare (sort),    
-        k = case sort of Hash -> hash (pk) | _ -> pk esac;
-  
+fun insertColl ([m, compare], pk, v, sort) {
   fun append (v, vs) {
     case sort of
       Map  -> v : vs
-    | Ptr  -> v : vs
     | Set  -> v
-    | Hash ->
-       case find (fun (x) {compare (x, [pk, v]) == 0}, vs) of
-         Some (_) -> vs
-       | None     -> [pk, v] : vs
-       esac
     esac
   }
   
@@ -116,9 +93,9 @@ fun insertColl (m, pk, v, sort) {
   
   fun inner (m) {
     case m of
-      {} -> [true, MNode (k, append (v, {}), 0, {}, {})]
+      {} -> [true, MNode (pk, append (v, {}), 0, {}, {})]
     | MNode (kk, vv, bf, l, r) -> 
-       local c = compareKeys (k, kk);
+       local c = compare (pk, kk);
        if c == 0
        then [false, MNode (kk, append (v, vv), bf, l, r)]
        else if c < 0
@@ -153,22 +130,14 @@ fun insertColl (m, pk, v, sort) {
     esac
   }
 
-  inner (m).snd
+  [inner (m).snd, compare]
 } 
 
-fun findColl (m, pk, sort) {
-  local compareKeys = makeCompare (sort),  
-        k = case sort of Hash -> hash (pk) | _ -> pk esac;
-  
+fun findColl ([m, compare], pk, sort) {
   fun extract (vv) {
     case sort of
       Map  -> case vv of v : _ -> Some (v) | _ -> None esac
-    | Ptr  -> case vv of v : _ -> Some (v) | _ -> None esac
     | Set  -> Some (vv)
-    | Hash -> case find (fun (x) {compare (x.fst, pk) == 0}, vv) of
-                Some (p) -> Some (p.snd)
-              | None     -> None
-              esac
     esac
   }
   
@@ -176,7 +145,7 @@ fun findColl (m, pk, sort) {
     case m of
       {} -> None
     | MNode (kk, vv, _, l, r) ->
-       local c = compareKeys (k, kk);
+       local c = compare (pk, kk);
        if c == 0
        then extract (vv)
        else inner (if c < 0 then l else r fi)
@@ -187,16 +156,11 @@ fun findColl (m, pk, sort) {
   inner (m)
 }
 
-fun removeColl (m, pk, sort) {
-  local compareKeys = makeCompare (sort),  
-        k = case sort of Hash -> hash (pk) | _ -> pk esac;
-  
+fun removeColl ([m, compare], pk, sort) {
   fun delete (vs) {
     case sort of
       Map  -> case vs of {} -> {} | _ : vv -> vv esac
-    | Ptr  -> case vs of {} -> {} | _ : vv -> vv esac
     | Set  -> false
-    | Hash -> remove (fun (x) {x.fst == pk}, vs)
     esac
   }
   
@@ -204,7 +168,7 @@ fun removeColl (m, pk, sort) {
     case m of
       {} -> m
     | MNode (kk, vv, bf, l, r) ->
-       local c = compareKeys (k, kk);
+       local c = compare (pk, kk);
        if c == 0
        then MNode (kk, delete (vv), bf, l, r)
        else if c < 0
@@ -215,21 +179,20 @@ fun removeColl (m, pk, sort) {
     esac
   }
 
-  inner (m)
+  [inner (m), compare]
 }
 
-fun contents (m, sort) {
+fun contents ([m, _], sort) {
   fun append (k, vs, acc) {
     case sort of
       Map -> case vs of {} -> acc | v : _ -> [k, v] : acc esac
-    | Ptr -> case vs of {} -> acc | v : _ -> [k, v] : acc esac
     | Set -> if vs then k : acc else acc fi
     esac
   }
   
   fun inner (m, acc) {
     case m of
-      {} -> acc
+      {}                     -> acc
     | MNode (k, vv, _, l, r) -> inner (l, append (k, vv, inner (r, acc))) 
     esac
   }
@@ -237,22 +200,18 @@ fun contents (m, sort) {
   inner (m, {})
 }
 
--- Map on raw pointers (experimental)
-public fun emptyPtrMap () {
-  {}
+-- Accessors
+public fun internalOf (m) {
+  m [0]
 }
 
-public fun addPtrMap (m, k, v) {
-  insertColl (m, k, v, Ptr)
-}
-
-public fun findPtrMap (m, k) {
-  findColl (m, k, Ptr)
+public fun compareOf (m) {
+  m [1]
 }
 
 -- Map structure
-public fun emptyMap () {
-  {}
+public fun emptyMap (compare) {
+  [{}, compare]
 }
 
 public fun addMap (m, k, v) {
@@ -271,8 +230,8 @@ public fun bindings (m) {
   contents (m, Map)
 }
 
-public fun listMap (l) {
-  foldl (fun (m, p) {addMap (m, p.fst, p.snd)}, emptyMap (), l)
+public fun listMap (l, compare) {
+  foldl (fun (m, p) {addMap (m, p.fst, p.snd)}, emptyMap (compare), l)
 }
 
 public fun iterMap (f, m) {
@@ -280,7 +239,7 @@ public fun iterMap (f, m) {
 }
 
 public fun mapMap (f, m) {
-  listMap (map (fun (p) {[p.fst, f (p.snd)]}, bindings (m)))
+  listMap (map (fun (p) {[p.fst, f (p.snd)]}, bindings (m)), m[1])
 }
 
 public fun foldMap (f, acc, m) {
@@ -288,8 +247,8 @@ public fun foldMap (f, acc, m) {
 }
 
 -- Set structure
-public fun emptySet () {
-  {}
+public fun emptySet (compare) {
+  [{}, compare]
 }
 
 public fun addSet (s, v) {
@@ -319,8 +278,8 @@ public fun diff (a, b) {
   foldl (removeSet, a, elements (b))
 }
 
-public fun listSet (l) {
-  foldl (addSet, emptySet (), l)
+public fun listSet (l, compare) {
+  foldl (addSet, emptySet (compare), l)
 }
 
 public fun iterSet (f, s) {
@@ -328,7 +287,7 @@ public fun iterSet (f, s) {
 }
 
 public fun mapSet (f, s) {
-  listSet (map (f, elements (s)))
+  listSet (map (f, elements (s)),s[1])
 }
 
 public fun foldSet (f, acc, s) {
@@ -337,7 +296,7 @@ public fun foldSet (f, acc, s) {
 
 -- Hash consing
 public fun emptyMemo () {
-  ref ({})
+  ref (emptyMap (compare))
 }
 
 public fun lookupMemo (m, v) {
@@ -363,18 +322,29 @@ public fun lookupMemo (m, v) {
 }
 
 -- Maps of hashed pointers
-public fun emptyHashTab () {
- {}
+public fun emptyHashTab (n, hash, compare) {
+  [initArray (n, fun (_) {{}}), fun (x) {hash (x) % n}, compare]
 }
 
-public fun addHashTab (t, k, v) {
-  insertColl (t, k, v, Hash)
+public fun addHashTab (ht@[a, hash, compare], k, v) {
+  local h = hash (k);
+  
+  a [h] := [k, v] : a [h];
+
+  ht
 }
 
-public fun findHashTab (t, k) {
-  findColl (t, k, Hash)
+public fun findHashTab ([a, hash, compare], k) {
+  case find (fun ([k0, _]) {compare (k, k0) == 0}, a[hash(k)]) of
+    Some ([_, v]) -> Some (v)
+  | _ -> None
+  esac
 }
 
-public fun removeHashTab (t, k) {
-  removeColl (t, k, Hash)
-}
+public fun removeHashTab (ht@[a, hash, compare], k) {
+  local h = hash (k);
+  
+  a [h] := remove (fun ([k0, _]) {compare (k, k0) == 0}, a [h]);
+
+  ht
+} 

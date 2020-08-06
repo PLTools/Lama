@@ -1,6 +1,6 @@
 import Collection;
 
-local s = emptySet (), i;
+local s = emptySet (compare), i;
 
 for i := 0, i < 100, i := i+1
 do
@@ -8,7 +8,7 @@ do
   validateColl (s)
 od;
 
-printf ("Set internal structure: %s\n", s.string);
+printf ("Set internal structure: %s\n", internalOf (s).string);
 printf ("Set elements: %s\n", elements (s).string);
 
 for i := 0, i < 100, i := i+1
@@ -23,7 +23,7 @@ do
   validateColl (s)
 od;
 
-printf ("Set internal structure: %s\n", s.string);
+printf ("Set internal structure: %s\n", internalOf (s).string);
 printf ("Set elements: %s\n", elements (s).string);
 
 for i := 0, i < 100, i := i+1
@@ -31,20 +31,20 @@ do
   printf ("Testing %-3d => %d\n", i, memSet (s, i))
 od;
 
-printf ("List set: %s\n", listSet ({1, 2, 3, 4, 5}).string);
+printf ("List set: %s\n", internalOf (listSet ({1, 2, 3, 4, 5}, compare)).string);
 
 {
- local u = union (listSet ({1, 2, 3, 4, 5}), listSet ({11, 22, 33, 44, 55})), u1;
+ local u = union (listSet ({1, 2, 3, 4, 5}, compare), listSet ({11, 22, 33, 44, 55}, compare)), u1;
  
  validateColl (u);
  
- printf ("Set union: %s\n", u.string);
+ printf ("Set union: %s\n", internalOf (u).string);
  printf ("Elements: %s\n", elements (u).string);
 
- u1 := diff (u, listSet ({1, 22, 3, 44, 5}));
+ u1 := diff (u, listSet ({1, 22, 3, 44, 5}, compare));
  validateColl (u1);
 
- printf ("Set difference: %s\n", u1.string);
+ printf ("Set difference: %s\n", internalOf (u1).string);
  printf ("Elements: %s\n", elements (u1).string) 
 }
 

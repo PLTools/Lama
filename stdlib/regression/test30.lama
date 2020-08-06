@@ -3,83 +3,7 @@ import Ref;
 import Random;
 import Array;
 import Fun;
-
-local m = emptyPtrMap ();
-
-fun eq (x, y) {
-  local m = ref (emptyPtrMap ());
-
-  fun alreadyEq (x, y) {
-    fun find (x) {
-      fun walk (r) {
-        case r of
-          [#unboxed] -> r
-        | [x]        -> walk (x)
-        esac
-      }
-      
-      case findPtrMap (deref (m), x) of
-        Some (r) -> Some (walk (r))
-      | x        -> x
-      esac
-    }
-
-    case [find (x), find (y)] of
-      [None, None] ->
-        local v = [1];
-        m ::= addPtrMap (addPtrMap (deref (m), x, v), y, v);
-        false
-         
-    | [None, Some (ry)] ->
-        m ::= addPtrMap (deref (m), x, ry);
-        false
-         
-    | [Some (rx), None] ->
-        m ::= addPtrMap (deref (m), y, rx);
-        false
-        
-    | [Some (rx), Some (ry)] ->
-        if rx == ry
-        then true
-        else
-          rx [0] := ry;
-          false
-        fi
-    esac    
-  }
-
-  fun eqargs (x, y, from) {
-    local continue = true;
-
-    if x.length != y.length
-    then false
-    else 
-      for local i = from;, i<x.length && continue, i := i + 1 do
-        continue := eqrec (x[i], y[i]) 
-      od;
-    
-      continue
-    fi       
-  }
-  
-  fun eqrec (x, y) {
-    if alreadyEq (x, y)
-    then true
-    else      
-      if rawTag (x) != rawTag (y) then false      
-      else
-        case x of
-          #array -> eqargs (x, y, 0)
-        | #fun   -> if x[0] == y[0] then eqargs (x, y, 1) else false fi
-        | #sexp  -> if compareTags (x, y) == 0 then eqargs (x, y, 0) else false fi
-        | _      -> compare (x, y) == 0
-        esac
-      fi
-    fi
-  }
-
-  eqrec (x, y)  
-}
+import Data;
 
 fun genCyclicArrays (n, eq, cross) {
   local f = ref (true);
@@ -154,34 +78,49 @@ fun genCyclicArrays (n, eq, cross) {
   genrec (n, [], [], 0)
 }
 
+fun normalize (x) {
+    if x < 0 then -1
+  elif x > 0 then 1
+  else 0
+    fi
+}
+
+fun not (x) {0 - x}
+
 disableGC ();
 
 for local i=0;, i<25, i:=i+1
 do
   case genCyclicArrays (1000, true, false) of
-    [a, _] -> printf ("%d\n", eq (a, a) == true)
-  | [a, b] -> printf ("%d\n", eq (a, b) == true)
+    [a, b] ->
+      printf ("%d\n", (a =?= a) == 0);
+      printf ("%d\n", (a =?= b) == 0)
   esac
 od;
 
 for local i=0;, i<25, i:=i+1
 do
   case genCyclicArrays (1000, true, true) of
-    [a, _] -> printf ("%d\n", eq (a, a) == true)
-  | [a, b] -> printf ("%d\n", eq (a, b) == true)
+    [a, b] ->
+      printf ("%d\n", (a =?= a) == 0);
+      printf ("%d\n", (a =?= b) == 0)
   esac
 od;
 
 for local i=0;, i<25, i:=i+1
 do
   case genCyclicArrays (1000, false, false) of
-   [a, b] -> printf ("%d\n", eq (a, b) == false)
+   [a, b] -> local x = normalize (a =?= b);
+             printf ("%d\n", x != 0);
+             printf ("%d\n", not (x) == normalize (b =?= a))
   esac
 od;
 
 for local i=0;, i<25, i:=i+1
 do
   case genCyclicArrays (1000, false, true) of
-   [a, b] -> printf ("%d\n", eq (a, b) == false)
+   [a, b] -> local x = normalize (a =?= b);
+             printf ("%d\n", x != 0);
+             printf ("%d\n", not (x) == normalize (b =?= a))
   esac
 od

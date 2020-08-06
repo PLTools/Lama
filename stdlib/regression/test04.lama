@@ -1,6 +1,6 @@
 import Collection;
 
-local s = emptyMap (), i;
+local s = emptyMap (compare), i;
 
 for i := 0, i < 100, i := i+1
 do
@@ -8,7 +8,7 @@ do
   validateColl (s)
 od;
 
-printf ("Map internal structure: %s\n", s.string);
+printf ("Map internal structure: %s\n", internalOf (s).string);
 printf ("Map elements: %s\n", bindings (s).string);
 
 for i := 0, i < 100, i := i+1
@@ -23,7 +23,7 @@ do
   validateColl (s)
 od;
 
-printf ("Map internal structure: %s\n", s.string);
+printf ("Map internal structure: %s\n", internalOf (s).string);
 printf ("Map elements: %s\n", bindings (s).string);
 
 for i := 0, i < 100, i := i+1
@@ -31,4 +31,4 @@ do
   printf ("Testing %-3d => %s\n", i, findMap (s, i).string)
 od;
 
-printf ("List map: %s\n", listMap ({[1, 10], [2, 20], [3, 30], [4, 40], [5, 50]}).string)
+printf ("List map: %s\n", internalOf (listMap ({[1, 10], [2, 20], [3, 30], [4, 40], [5, 50]}, compare)).string)

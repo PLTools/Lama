@@ -1,0 +1,92 @@
+-- Data.
+-- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
+--
+-- This unit provides a set of generic operations on data structures.
+
+import Collection;
+import Ref;
+
+-- Generic comparison for shared/cyclic data structures
+public infix =?= at < (x, y) {
+  local m = ref (emptyMap (flatCompare));
+
+  fun alreadyEq (x, y) {
+    fun find (x) {
+      fun walk (r) {
+        case r of
+          [#unboxed] -> r
+        | [x]        -> walk (x)
+        esac
+      }
+      
+      case findMap (deref (m), x) of
+        Some (r) -> Some (walk (r))
+      | x        -> x
+      esac
+    }
+
+    case [find (x), find (y)] of
+      [None, None] ->
+        local v = [1];
+        m ::= addMap (addMap (deref (m), x, v), y, v);
+        false
+         
+    | [None, Some (ry)] ->
+        m ::= addMap (deref (m), x, ry);
+        false
+         
+    | [Some (rx), None] ->
+        m ::= addMap (deref (m), y, rx);
+        false
+        
+    | [Some (rx), Some (ry)] ->
+        if rx == ry
+        then true
+        else
+          rx [0] := ry;
+          false
+        fi
+    esac    
+  }
+
+  fun cmpargs (x, y, from) {
+    local diff = x.length - y.length;
+
+    for local i = from;, i < x.length && diff == 0, i := i + 1 do
+      diff := cmprec (x[i], y[i]) 
+    od;
+    
+    diff
+  }
+  
+  fun cmprec (x, y) {
+    if alreadyEq (x, y)
+    then 0
+    else
+      local diff = x.rawTag - y.rawTag;
+      
+      if diff != 0 then diff
+      else
+        case x of
+          #array -> cmpargs (x, y, 0)
+        | #fun   -> if (diff := x[0] - y[0]) == 0
+                    then cmpargs (x, y, 1)
+                    else diff
+                    fi
+        | #sexp  -> if (diff := compareTags (x, y)) == 0
+                    then cmpargs (x, y, 0)
+                    else diff
+                    fi
+        | _      -> compare (x, y)
+        esac
+      fi
+    fi
+  }
+
+  cmprec (x, y)  
+}
+
+-- Generic equaliry for shared/cyclic data structures
+public infix === at == (x, y) {
+  (x =?= y) == 0
+}

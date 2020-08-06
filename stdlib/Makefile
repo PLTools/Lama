@@ -8,6 +8,8 @@ all: $(ALL)
 
 Fun.o: Ref.o
 
+Data.o: Ref.o Collection.o
+
 Collection.o: List.o Ref.o
 
 Array.o: List.o

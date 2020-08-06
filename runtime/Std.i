@@ -49,3 +49,4 @@ F,random;
 F,time;
 F,rawTag;
 F,compareTags;
+F,flatCompare;
