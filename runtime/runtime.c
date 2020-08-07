@@ -194,9 +194,9 @@ extern int LcompareTags (void *p, void *q) {
   if (TAG(pd->tag) == SEXP_TAG && TAG(qd->tag) == SEXP_TAG) {
     return
     #ifndef DEBUG_PRINT
-      (TO_SEXP(p)->tag) - (TO_SEXP(q)->tag);
+      BOX((TO_SEXP(p)->tag) - (TO_SEXP(q)->tag));
     #else
-      (GET_SEXP_TAG(TO_SEXP(p)->tag)) - (GET_SEXP_TAG(TO_SEXP(p)->tag));
+      BOX((GET_SEXP_TAG(TO_SEXP(p)->tag)) - (GET_SEXP_TAG(TO_SEXP(p)->tag)));
     #endif      
   }
   else failure ("not a sexpr in compareTags: %d, %d\n", TAG(pd->tag), TAG(qd->tag));    
