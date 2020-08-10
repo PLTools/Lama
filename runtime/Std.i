@@ -47,6 +47,6 @@ F,enableGC;
 F,disableGC;
 F,random;
 F,time;
-F,rawTag;
+F,kindOf;
 F,compareTags;
 F,flatCompare;

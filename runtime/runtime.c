@@ -67,7 +67,7 @@ void __post_gc_subst () {}
 # define ARRAY_TAG   0x00000003
 # define SEXP_TAG    0x00000005
 # define CLOSURE_TAG 0x00000007 
-# define UNBOXED_TAG 0x00000009 // Not actually a tag; used to return from LrawTag
+# define UNBOXED_TAG 0x00000009 // Not actually a tag; used to return from LkindOf
 
 # define LEN(x) ((x & 0xFFFFFFF8) >> 3)
 # define TAG(x)  (x & 0x00000007)
@@ -175,7 +175,7 @@ extern void* Bsexp (int n, ...);
 void *global_sysargs;
 
 // Gets a raw tag
-extern int LrawTag (void *p) {
+extern int LkindOf (void *p) {
   if (UNBOXED(p)) return UNBOXED_TAG;
   
   return TAG(TO_DATA(p)->tag);

@@ -134,7 +134,10 @@ is used.
 
 Maps are immutable structures with the following interface:
 
-\descr{\lstinline|fun emptyMap ()|}{Creates an empty map.}
+\descr{\lstinline|fun emptyMap (f)|}{Creates an empty map. An argument is a comparison function, which returns zero, positive or negative integer values depending on
+the order of its arguments.}
+
+\descr{\lstinline|fun compareOf (m)|}{Returns a comparison function, associated with the map given as an argument.}
 
 \descr{\lstinline|fun addMap (m, k, v)|}{Adds a binding of a key "\lstinline|k|" to a value "\lstinline|v|" into a map "\lstinline|m|". As a result, a new map is
 returned.}
@@ -161,7 +164,10 @@ The function takes an accumulator and a pair key-value. The bindings are enumera
 
 Sets are immutable structures with the following interface:
 
-\descr{\lstinline|fun emptySet ()|}{Creates an empty set.}
+\descr{\lstinline|fun emptySet (f)|}{Creates an empty set. An argument is a comparison function, which returns zero, positive or negative integer values depending on
+the order of its arguments.}
+
+\descr{\lstinline|fun compareOf (m)|}{Returns a comparison function, associated with the set given as an argument.}
 
 \descr{\lstinline|fun addSet (s, v)|}{Adds an element "\lstinline|v|" into a set "\lstinline|s|" and returns a new set.}
 
@@ -204,7 +210,11 @@ Hash table is an immutable map which uses hashes as keys and lists of key-value 
 hash function is used, the search within the same hash class is linear with physical equality "\lstinline|==|" used for
 comparison. 
 
-\descr{\lstinline|fun emptyHashTab ()|}{Creates an empty hash table.}
+\descr{\lstinline|fun emptyHashTab (n, h, c)|}{Creates an empty hash table. Argument are: a number of classes, hash and comparison functions.}
+
+\descr{\lstinline|fun compareOf (m)|}{Returns a comparison function, associated with the hash table given as an argument.}
+
+\descr{\lstinline|fun hashOf (m)|}{Returns a hash function, associated with the hash table given as an argument.}
 
 \descr{\lstinline|fun addHashTab (t, k, v)|}{Adds a binding of "\lstinline|k|" to "\lstinline|v|" to the hash table "\lstinline|t|" and returns a
 new hash table.}

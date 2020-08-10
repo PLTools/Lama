@@ -13,10 +13,19 @@ public infix =?= at < (x, y) {
   fun alreadyEq (x, y) {
     fun find (x) {
       fun walk (r) {
-        case r of
-          [#unboxed] -> r
-        | [x]        -> walk (x)
-        esac
+        fun walkrec (p1, p2, r) {
+          case p2 of
+            [_] -> p2 [0] := r
+          |  _  -> skip
+          esac;
+          
+          case r of
+            [#unboxed] -> r
+          | [x]        -> walkrec (r, p1, x)
+          esac
+        }
+
+        walkrec ({}, {}, r)
       }
       
       case findMap (deref (m), x) of
@@ -43,7 +52,14 @@ public infix =?= at < (x, y) {
         if rx == ry
         then true
         else
-          rx [0] := ry;
+          if rx[0] < ry[0]
+          then
+            ry [0] := ry [0] + rx [0];
+            rx [0] := ry
+          else
+            rx [0] := rx [0] + ry [0];
+            ry [0] := rx
+          fi;
           false
         fi
     esac    
@@ -63,7 +79,7 @@ public infix =?= at < (x, y) {
     if alreadyEq (x, y)
     then 0
     else
-      local diff = x.rawTag - y.rawTag;
+      local diff = x.kindOf - y.kindOf;
       
       if diff != 0 then diff
       else

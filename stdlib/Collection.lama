@@ -323,10 +323,10 @@ public fun lookupMemo (m, v) {
 
 -- Maps of hashed pointers
 public fun emptyHashTab (n, hash, compare) {
-  [initArray (n, fun (_) {{}}), fun (x) {hash (x) % n}, compare]
+  [initArray (n, fun (_) {{}}), compare, fun (x) {hash (x) % n}]
 }
 
-public fun addHashTab (ht@[a, hash, compare], k, v) {
+public fun addHashTab (ht@[a, compare, hash], k, v) {
   local h = hash (k);
   
   a [h] := [k, v] : a [h];
@@ -334,17 +334,21 @@ public fun addHashTab (ht@[a, hash, compare], k, v) {
   ht
 }
 
-public fun findHashTab ([a, hash, compare], k) {
+public fun findHashTab ([a, compare, hash], k) {
   case find (fun ([k0, _]) {compare (k, k0) == 0}, a[hash(k)]) of
     Some ([_, v]) -> Some (v)
   | _ -> None
   esac
 }
 
-public fun removeHashTab (ht@[a, hash, compare], k) {
+public fun removeHashTab (ht@[a, compare, hash], k) {
   local h = hash (k);
   
   a [h] := remove (fun ([k0, _]) {compare (k, k0) == 0}, a [h]);
 
   ht
-} 
+}
+
+public fun hashOf (ht) {
+  ht [2]
+}
