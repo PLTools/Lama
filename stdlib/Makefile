@@ -16,6 +16,8 @@ Array.o: List.o
 
 Ostap.o: List.o Collection.o Ref.o Fun.o Matcher.o
 
+Buffer.o: List.o
+
 Expr.o: Ostap.o
 
 %.o: %.lama

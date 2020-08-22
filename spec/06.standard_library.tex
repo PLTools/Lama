@@ -94,6 +94,45 @@ program start time.}
 
 \descr{\lstinline|fun time ()|}{Returns the elapsed time from program start in microseconds.}
 
+\section{Unit \texttt{Data}}
+\label{sec:data}
+
+Generic data manupulation.
+
+\descr{\lstinline|infix =?= at < (x, y)|}{A generic comparison operator similar to \lstinline|compare|, but capable of handling cyclic/shared data structures.}
+\descr{\lstinline|infix === at == (x, y)|}{A generic equality operator capable of handling cyclic/shared data structures.}
+
+\section{Unit \texttt{Random}}
+\label{sec:random}
+
+Random data structures generation functions.
+
+\descr{\lstinline|fun randomInt ()|}{Generates a random representable integer value.}
+
+\descr{\lstinline|fun randomString (len)|}{Generates a random string of printable ASCII characters of given length.}
+
+\descr{\lstinline|fun randomArray (f, n)|}{Generates a random array of \emph{deep} size \lstinline|n|. The length of the array is chosen randomly, and \lstinline|f| is intended to be an element-generating function which takes the size of the element as an argument.}
+
+\descr{\lstinline|fun split (n, k)|}{Splits a non-negative integer \lstinline|n| in \lstinline|k| random summands. Returns an array if length \lstinline|k|. \lstinline|k| has to be non-negative.}
+
+\newsavebox\strubox
+
+\begin{lrbox}{\strubox}
+\begin{lstlisting}
+    structure (100,
+               [[2, fun ([x, y]) {Add (x, y)}],
+                [2, fun ([x, y]) {Sub (x, y)}]],
+               fun () {Const (randomInt ())}
+              )    
+\end{lstlisting}  
+\end{lrbox}
+
+\descr{\lstinline|fun structure (n, nodeSpec, leaf)|}{Generates a random tree-shaped data structure of size \lstinline|n|. \lstinline|nodeSpec| is an array of pairs \lstinline|[$k$, $f_k$]|, where $k$ is a non-negative integer and $f_k$ is a function which takes an array of length $k$ as its argument. Each pair describes a generator of a certain kind of interior node with degree $k$. \lstinline|leaf| is a zero-argument function which generates the leaves of the tree. For example, the following code
+
+\usebox\strubox
+
+can be used to generate a random arithmetic expression of size 100.}
+
 \section{Unit \texttt{Array}}
 \label{sec:array}
 
@@ -307,6 +346,27 @@ fresh list if images in the same order.}
 
 \descr{\lstinline|fun filter (f, l)|}{Removes all values, not satisfying the predicate "\lstinline|f|", from the list "\lstinline|l|". The function
 "\lstinline|f|" should return integers, treated as booleans.}
+
+\section{Unit \texttt{Buffer}}
+\label{sec:std:buffer}
+
+Mutable buffers.
+
+\descr{\lstinline|fun emptyBuffer ()|}{Creates an empty buffer.}
+
+\descr{\lstinline|fun singletonBuffer (x)|}{Creates a buffer from a single element.}
+
+\descr{\lstinline|fun listBuffer (x)|}{Creates a buffer from a list.}
+
+\descr{\lstinline|fun getBuffer (buf)|}{Gets the contents of a buffer as a list.}
+
+\descr{\lstinline|fun addBuffer (buf, x)|}{Adds an element \lstinline|x| to the end of buffer \lstinline|buf| and returns the updated buffer. The buffer \lstinline|buf| can be updated in-place.}
+
+\descr{\lstinline|fun concatBuffer (buf, x)|}{Adds buffer \lstinline|x| to the end of buffer \lstinline|buf| and returns the updated buffer. The buffer \lstinline|buf| can be updated in-place.}
+
+\descr{\lstinline|infixl <+> before + (b1, b2)|}{Infix synonym for \lstinline|concatBuffer|.}
+
+\descr{\lstinline|infix <+ at <+> (b, x)|}{Infix synonym for \lstinline|addBuffer|.}
 
 \section{Unit \texttt{Matcher}}
 

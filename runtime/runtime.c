@@ -1512,7 +1512,7 @@ extern void __gc_root_scan_stack ();
 /* ======================================== */
 
 //static size_t SPACE_SIZE = 16;
-static size_t SPACE_SIZE = 64 * 1024 * 1024;
+static size_t SPACE_SIZE = 256 * 1024 * 1024;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 

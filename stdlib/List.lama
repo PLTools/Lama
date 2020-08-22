@@ -79,12 +79,20 @@ public fun flatten (l) {
 
   fun append (x) {
     local new = x : {};
-
+    
     curr [0][1] := new;
     curr [0] := new    
   }
+
+  fun traverse (l) {
+    case l of
+      _ : _ -> iter (traverse, l)
+    | {}    -> skip
+    | _     -> append (l)
+    esac
+  }
   
-  iter (fun (x) {iter (append, x)}, l);
+  traverse (l);
   
   res [1]
 }

@@ -28,13 +28,12 @@ public fun randomString (len) {
 -- Generates a random array of (deep) size n. f is element-generation
 -- function which takes the size of the element
 public fun randomArray (f, n) {
-  mapArray (f, split (n))  
+  mapArray (f, split (n, random (n + 1)))  
 }
 
--- Splits a number in a random sequence of summands
-public fun split (n) {
-  local k = random (n) + 1,
-        a = makeArray (k),
+-- Splits a number n in a random sequence of k summands
+public fun split (n, k) {
+  local a = makeArray (k),
         m = n;
 
   for local i = 0;, i < k, i := i + 1
@@ -48,4 +47,23 @@ public fun split (n) {
   od;
 
   a
+}
+
+-- Generates a (recursive) data structure of size n. nodeSpec is an array of pairs [n, fn] where
+-- fn gets an array of values of length n and generates some node; leaf is a fucntion without
+-- arguments which create a leaf.
+public fun structure (n, nodeSpec, leaf) {
+  local k = nodeSpec.length;
+
+  fun rec (n) {
+    if n <= 1
+    then leaf ()
+    else
+      local ns = nodeSpec [random (k)];
+      
+      ns [1] (mapArray (rec, split (n, ns [0])))
+    fi
+  }
+
+  rec (n)
 }

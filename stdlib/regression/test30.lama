@@ -24,7 +24,7 @@ fun genCyclicArrays (n, eq, cross) {
         x -> [x, clone (x)]
       esac           
     else
-      local a     = split (n),
+      local a     = split (n, random (n+1)),
             b     = mapArray (id, a),
             index = initArray (random (a.length + 1), fun (_) {random (a.length)});
       

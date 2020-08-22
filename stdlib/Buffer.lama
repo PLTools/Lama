@@ -1,0 +1,66 @@
+-- Buffer.
+-- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
+--
+-- This unit provides a simple add-to-the-end buffer implemetation.
+
+import List;
+
+-- Creates an empty buffer
+public fun emptyBuffer () {
+  {}
+}
+
+-- Creates a buffer with one element x
+public fun singletonBuffer (x) {
+  local y = singleton (x);
+
+  [y, y]
+}  
+
+-- Creates a buffer from a list x
+public fun listBuffer (x) {
+  foldl (addBuffer, emptyBuffer (), x)
+}
+
+-- Adds x to the end of buffer buf
+public fun addBuffer (buf, x) {
+  case buf of
+    {} -> local y = singleton (x);
+          [y, y]          
+  | [head, last] ->
+          last[1] := singleton (x);
+          [head, last[1]]
+  esac
+}
+
+-- Adds the contents of buffer x to the end of buffer buf
+public fun concatBuffer (buf, x) {
+  case buf of
+    {}           -> x
+  | [head, last] ->
+       case x of
+         {}     -> buf
+       | [h, l] ->
+           last[1] := h;
+           [head, l]
+       esac
+  esac
+}
+
+-- Infix synonym for concatBuffer
+public infixl <+> before + (b1, b2) {
+  concatBuffer (b1, b2)
+}
+
+-- Infix synonym for addBuffer
+public infix <+ at <+> (b, x) {
+  addBuffer (b, x)
+}
+
+-- Gets the contents of the buffer buf (as a list)
+public fun getBuffer (buf) {
+  case buf of
+    {}        -> {}
+  | [head, _] -> head
+  esac
+}
