@@ -12,3 +12,14 @@ public fun timer () {
     time () - t
   }
 }
+
+-- Formats a given time as a floating-point number
+public fun toSeconds (t) {
+  local s = sprintf ("%d", t);
+  
+  if s.length >= 7
+  then
+    sprintf ("%s.%s", substring (s, 0, s.length - 7 + 1), substring (s, s.length - 7 + 1, 6))
+  else sprintf ("0.%s", s)
+  fi
+}

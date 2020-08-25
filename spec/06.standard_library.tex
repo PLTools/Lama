@@ -102,6 +102,14 @@ Generic data manupulation.
 \descr{\lstinline|infix =?= at < (x, y)|}{A generic comparison operator similar to \lstinline|compare|, but capable of handling cyclic/shared data structures.}
 \descr{\lstinline|infix === at == (x, y)|}{A generic equality operator capable of handling cyclic/shared data structures.}
 
+\section{Unit \texttt{Timer}}
+\label{sec:timer}
+
+A simple timer.
+
+\descr{\lstinline|fun timer ()|}{Creates a timer. Creates a zero-argument function which, being called, returns the elapsed time in microseconds since its creation.}
+\descr{\lstinline|fun toSeconds (n)|}{Converts an integer value, interpreted as microseconds, into a floating-point string.}
+
 \section{Unit \texttt{Random}}
 \label{sec:random}
 
