@@ -34,8 +34,8 @@ fun createMatcher (buf, pos, line, col) {
   -- Moves the position pointer on given number of characters.
   fun shift (n) {
     local i, l = line, c = col;
-
-    for i := pos, i < n, i := i+1 do
+    
+    for i := pos, i < pos+n, i := i+1 do
       case buf [i] of
         '\n' -> l := l + 1; c := 1
       | '\t' -> c := c + 8
