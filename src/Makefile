@@ -3,9 +3,9 @@ OCAMLC = ocamlfind c
 OCAMLOPT = ocamlfind opt
 OCAMLDEP = ocamlfind dep
 SOURCES = version.ml stdpath.ml Language.ml Pprinter.ml SM.ml X86.ml Driver.ml
-CAMLP5 = -syntax camlp5o -package ostap.syntax,GT.syntax.all
+CAMLP5 = -syntax camlp5o -package ostap.syntax,GT-p5,GT.syntax.all
 PXFLAGS = $(CAMLP5)
-BFLAGS = -rectypes -g -w -13-58 -package ostap,unix
+BFLAGS = -rectypes -g -w -13-58 -package GT,ostap,unix
 OFLAGS = $(BFLAGS)
 
 all: depend metagen  $(TOPFILE)
@@ -45,4 +45,3 @@ clean:
 
 %.cmx: %.ml
 	$(OCAMLOPT) -c $(OFLAGS) $(STATIC) $(PXFLAGS) $<
-
