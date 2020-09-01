@@ -157,7 +157,7 @@ static void failure (char *s, ...) {
   do if (!UNBOXED(x)) failure ("unboxed value expected in %s\n", memo); while (0)
 # define ASSERT_STRING(memo, x)              \
   do if (!UNBOXED(x) && TAG(TO_DATA(x)->tag) \
-	 != STRING_TAG) failure ("sting value expected in %s\n", memo); while (0)
+	 != STRING_TAG) failure ("string value expected in %s\n", memo); while (0)
 
 typedef struct {
   int tag; 
@@ -334,11 +334,33 @@ extern int Blength (void *p) {
   return BOX(LEN(a->tag));
 }
 
+static char* chars = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'";
+
+extern int LtagHash (char *s) {
+  char *p;
+  int  h = 0, limit = 0, pos = 0;
+  
+  ASSERT_STRING("tagHash: 1", s);
+               
+  p = s;
+
+  while (*p && limit++ < 4) {
+    char *q = chars;  
+    for (; *q && *q != *p; q++, pos++);
+
+    if (*q) h = (h << 6) | pos;    
+    else failure ("tagHash: character not found: %c\n", *p);
+
+    p++;
+  }
+
+  return BOX(h);
+}
+
 char* de_hash (int n) {
-  static char *chars = (char*) BOX (NULL);
+  //  static char *chars = (char*) BOX (NULL);
   static char buf[6] = {0,0,0,0,0,0};
   char *p = (char *) BOX (NULL);
-  chars =   "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'";
   p = &buf[5];
 
 #ifdef DEBUG_PRINT

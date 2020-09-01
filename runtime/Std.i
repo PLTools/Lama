@@ -50,3 +50,4 @@ F,time;
 F,kindOf;
 F,compareTags;
 F,flatCompare;
+F,tagHash;

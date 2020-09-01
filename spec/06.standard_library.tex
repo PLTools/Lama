@@ -42,9 +42,13 @@ returns a string, acquired via processing these arguments according to the forma
 
 \descr{\lstinline|fun hash (value)|}{Returns integer hash for the argument value; also works for cyclic data structures.}
 
+\descr{\lstinline|fun tagHash (s)|}{Returns an integer value for a hash of tag, represented by string \lstinline|s|.}
+
 \descr{\lstinline|fun compare (value1, value2)|}{Performs a structural deep comparison of two values. Determines a
   linear order relation for every pairs of values. Returns \lstinline|0| if the values are structurally equal, negative or
   positive integers otherwise. May not work for cyclic data structures.}
+
+\descr{\lstinline|fun flatCompare (x, y)|}{Performs a shallow comparison of two values. The result is similar to that for \lstinline|compare|.}
 
 \descr{\lstinline|fun fst (value)|}{Returns the first subvalue for a given boxed value.}
 
