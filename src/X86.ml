@@ -452,7 +452,7 @@ let compile cmd env imports code =
           | SEXP (t, n) ->
              let s, env = env#allocate in
              let env, code = call env ".sexp" (n+1) false in
-             env, [Mov (L env#hash t, s)] @ code
+             env, [Mov (L (box (env#hash t)), s)] @ code
 
           | DROP ->
              snd env#pop, []

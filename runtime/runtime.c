@@ -169,8 +169,9 @@ typedef struct {
   data contents; 
 } sexp;
 
-extern void* alloc (size_t);
-extern void* Bsexp (int n, ...);
+extern void* alloc    (size_t);
+extern void* Bsexp    (int n, ...);
+extern int   LtagHash (char*);
 
 void *global_sysargs;
 
@@ -212,7 +213,7 @@ void* Ls__Infix_58 (void *p, void *q) {
 
   push_extra_root(&p);
   push_extra_root(&q);
-  res = Bsexp (BOX(3), p, q, 848787);
+  res = Bsexp (BOX(3), p, q, LtagHash ("cons")); //BOX(848787));
   pop_extra_root(&q);
   pop_extra_root(&p);
 
@@ -336,16 +337,18 @@ extern int Blength (void *p) {
 
 static char* chars = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'";
 
+extern char* de_hash (int);
+
 extern int LtagHash (char *s) {
   char *p;
-  int  h = 0, limit = 0, pos = 0;
-  
-  ASSERT_STRING("tagHash: 1", s);
+  int  h = 0, limit = 0;
                
   p = s;
 
   while (*p && limit++ < 4) {
-    char *q = chars;  
+    char *q = chars;
+    int pos = 0;
+    
     for (; *q && *q != *p; q++, pos++);
 
     if (*q) h = (h << 6) | pos;    
@@ -354,6 +357,10 @@ extern int LtagHash (char *s) {
     p++;
   }
 
+  if (strcmp (s, de_hash (h)) != 0) {
+    failure ("%s <-> %s\n", s, de_hash(h));
+  }
+  
   return BOX(h);
 }
 
@@ -1041,7 +1048,7 @@ extern void* Barray (int bn, ...) {
 
   r->tag = ARRAY_TAG | (n << 3);
   
-  va_start(args, n);
+  va_start(args, bn);
   
   for (i = 0; i<n; i++) {
     ai = va_arg(args, int);
@@ -1064,7 +1071,7 @@ extern void* Bsexp (int bn, ...) {
   size_t *p;  
   sexp   *r;  
   data   *d;  
-  int n = UNBOX(bn);
+  int n = UNBOX(bn); 
 
   __pre_gc () ;
   
@@ -1078,7 +1085,7 @@ extern void* Bsexp (int bn, ...) {
     
   d->tag = SEXP_TAG | ((n-1) << 3);
   
-  va_start(args, n);
+  va_start(args, bn);
   
   for (i=0; i<n-1; i++) {
     ai = va_arg(args, int);
@@ -1087,7 +1094,7 @@ extern void* Bsexp (int bn, ...) {
     ((int*)d->contents)[i] = ai;
   }
 
-  r->tag = va_arg(args, int);
+  r->tag = UNBOX(va_arg(args, int));
 
 #ifdef DEBUG_PRINT
   r->tag = SEXP_TAG | ((r->tag) << 3);
