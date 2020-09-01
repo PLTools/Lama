@@ -1,1 +1,1 @@
-let version = "Version 1.00, f81a63865, Wed Aug 26 00:27:42 2020 +0300"
+let version = "Version 1.00, 6f72275cf, Thu Aug 27 07:24:46 2020 +0300"
