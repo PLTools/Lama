@@ -7,6 +7,7 @@ CAMLP5 = -syntax camlp5o -package ostap.syntax,GT.syntax.all
 PXFLAGS = $(CAMLP5)
 BFLAGS = -rectypes -g
 OFLAGS = $(BFLAGS)
+LIBS = unix.cma
 
 all: metagen .depend $(TOPFILE)
 

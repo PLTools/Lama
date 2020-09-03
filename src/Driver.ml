@@ -65,6 +65,7 @@ class options args =
     val outfile = ref (None : string option)
     val paths   = ref [X86.get_std_path ()]
     val mode    = ref (`Default : [`Default | `Eval | `SM | `Compile ])
+    val curdir  = Unix.getcwd ()
     (* Workaround until Ostap starts to memoize properly *)
     val const  = ref false
     (* end of the workaround *)
@@ -127,6 +128,9 @@ class options args =
       match !outfile with
       | None      -> Printf.sprintf "-o %s" self#basename
       | Some name -> Printf.sprintf "-o %s" name
+    method get_absolute_infile =
+      let f = self#get_infile in
+      if Filename.is_relative f then Filename.concat curdir f else f
     method get_infile =
       match !infile with
       | None      -> raise (Commandline_error "Input file not specified")

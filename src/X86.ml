@@ -395,7 +395,8 @@ let compile cmd env imports code =
              env#assert_empty_stack;
              let has_closure = closure <> [] in
              let env  = env#enter f nargs nlocals has_closure in
-             env, (if has_closure then [Push edx] else []) @
+             env, [Meta "\t.cfi_startproc\n"] @
+                  (if has_closure then [Push edx] else []) @
                   (if f = cmd#topname
                    then
                      [Mov   (M "_init", eax);
@@ -437,6 +438,7 @@ let compile cmd env imports code =
                env#rest_closure @
                (if name = "main" then [Binop ("^", eax, eax)] else []) @
                [Ret;
+                Meta "\t.cfi_endproc\n";
                 Meta (Printf.sprintf "\t.set\t%s,\t%d" env#lsize (env#allocated * word_size));
                 Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated)
                ]
@@ -489,7 +491,9 @@ let compile cmd env imports code =
                 | Sexp    -> ".sexp_tag_patt"
                 | Closure -> ".closure_tag_patt"
                ) 1 false
-
+          | LINE (line) ->
+             env, [Meta (Printf.sprintf "\t.loc\t1 %d" line)]
+             
           | FAIL ((line, col), value) ->                       
              let v, env = if value then env#peek, env else env#pop in
              let s, env = env#string cmd#get_infile in
@@ -719,17 +723,11 @@ let genasm cmd prog =
               Meta "\t.section custom_data,\"aw\",@progbits";
               Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size)] @
               (List.map (fun s -> Meta (Printf.sprintf "%s:\t.int\t1" s)) env#globals)
-  (* let data = [Meta "\t.data";
-   *             Meta "_init:\t.int 0";
-   *             Meta "\t.section custom_data,\"aw\",@progbits";
-   *             Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size)] @
-   *             (List.map (fun s -> Meta (Printf.sprintf "%s:\t.int\t1" s)) env#globals) @
-   *             (List.map (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s)) env#strings) *)
   in
   let asm = Buffer.create 1024 in
   List.iter
     (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show i))
-    (globals @ data @ [Meta "\t.text"] @ code);
+    ([Meta (Printf.sprintf "\t.file\t1 \"%s\"" cmd#get_absolute_infile)] @ globals @ data @ [Meta "\t.text"] @ code);
   Buffer.contents asm
 
 let get_std_path () =

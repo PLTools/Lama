@@ -36,6 +36,7 @@ open Language
 (* match failure (location, leave a value    *) | FAIL    of Loc.t * bool
 (* external definition                       *) | EXTERN  of string
 (* public   definition                       *) | PUBLIC  of string
+(* line info                                 *) | LINE    of int
 with show
                                                    
 (* The type for the stack machine program *)
@@ -102,8 +103,9 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
    Printf.eprintf "   stack=%s\n" (show(list) (show(value)) stack);
    Printf.eprintf "end\n";
     *)
-   (match insn with
-    | PUBLIC _ | EXTERN _     -> eval env conf prg'
+   (match insn with   
+    | PUBLIC _ | EXTERN _ | LINE _ -> eval env conf prg'
+                                    
     | BINOP  "=="             -> let y::x::stack' = stack in
                                  let z =
                                    match x, y with
@@ -426,6 +428,7 @@ object (self : 'self)
   val fundefs      = Top []
   val decls        = []
   val funinfo      = new funinfo
+  val line         = None
 
   method show_funinfo = funinfo#show_funinfo
 
@@ -630,7 +633,15 @@ object (self : 'self)
     | fds, Some fd -> Some ({< fundefs = fds >}, from_fundef fd)
 
   method closure = List.rev scope.closure 
-                 
+
+  method gen_line name =
+    match Loc.get name with
+    | None           -> self, []
+    | Some (l, _) ->
+       match line with
+       | None                 -> {< line = Some l >}, [LINE l] 
+       | Some l' when l' <> l -> {< line = Some l >}, [LINE l]
+       | _                    -> self, []    
 end
   
 let compile cmd ((imports, infixes), p) =
@@ -740,8 +751,11 @@ let compile cmd ((imports, infixes), p) =
                                add_code (compile_expr tail ls env s) ls false [DROP]                             
 
   | Expr.ElemRef (x, i)     -> compile_list tail l env [x; i]
-  | Expr.Var      x         -> let env, acc = env#lookup x in (match acc with Value.Fun name -> env#register_call name, false, [PROTO (name, env#current_function)] | _ -> env, false, [LD acc])
-  | Expr.Ref      x         -> let env, acc = env#lookup x in env, false, [LDA acc]
+  | Expr.Var      x         -> let env, line = env#gen_line x in
+                               let env, acc  = env#lookup x in
+                               (match acc with Value.Fun name -> env#register_call name, false, line @ [PROTO (name, env#current_function)] | _ -> env, false, line @ [LD acc])
+  | Expr.Ref      x         -> let env, line = env#gen_line x in
+                               let env, acc  = env#lookup x in env, false, line @ [LDA acc]
   | Expr.Const    n         -> env, false, [CONST n]
   | Expr.String   s         -> env, false, [STRING s]
   | Expr.Binop (op, x, y)   -> let lop, env = env#get_label in
