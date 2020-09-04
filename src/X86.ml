@@ -395,8 +395,8 @@ let compile cmd env imports code =
              env#assert_empty_stack;
              let has_closure = closure <> [] in
              let env  = env#enter f nargs nlocals has_closure in
-             env, [Meta "\t.cfi_startproc\n"] @
-                  (if has_closure then [Push edx] else []) @
+             env, [Meta "\t.cfi_startproc"] @
+                  (if has_closure then [Push edx; Meta "\t.cfi_adjust_cfa_offset\t8"] else []) @
                   (if f = cmd#topname
                    then
                      [Mov   (M "_init", eax);
@@ -409,7 +409,9 @@ let compile cmd env imports code =
                    else []
                   ) @                  
                   [Push ebp;
+                   Meta "\t.cfi_adjust_cfa_offset\t8";   
                    Mov (esp, ebp);
+                   Meta "\t.cfi_def_cfa_register\t5";
                    Binop ("-", M ("$" ^ env#lsize), esp);
                    Mov (esp, edi);
 	           Mov (M "$filler", esi);
@@ -433,12 +435,14 @@ let compile cmd env imports code =
                  Mov (x, eax); (*!!*)
                  Label env#epilogue;
                  Mov (ebp, esp);
-                 Pop ebp
+                 Pop ebp;
                ] @
                env#rest_closure @
                (if name = "main" then [Binop ("^", eax, eax)] else []) @
-               [Ret;
-                Meta "\t.cfi_endproc\n";
+               [Meta "\t.cfi_restore\t5";
+	        Meta "\t.cfi_def_cfa\t4, 4";
+                Ret;
+                Meta "\t.cfi_endproc";
                 Meta (Printf.sprintf "\t.set\t%s,\t%d" env#lsize (env#allocated * word_size));
                 Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated)
                ]
