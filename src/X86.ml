@@ -391,11 +391,22 @@ let compile cmd env imports code =
               let x, env = env#pop in
               env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, l)]
 
-          | BEGIN (f, nargs, nlocals, closure) ->
+          | BEGIN (f, args, nargs, nlocals, closure) ->
+             let name =
+               if f.[0] = 'L' then String.sub f 1 (String.length f - 1) else f
+             in
              env#assert_empty_stack;
              let has_closure = closure <> [] in
-             let env  = env#enter f nargs nlocals has_closure in
-             env, [Meta "\t.cfi_startproc"] @
+             let env         = env#enter f nargs nlocals has_closure in
+             env, [Meta (Printf.sprintf "\t.type %s, @function" name)] @
+                  (if f = "main"
+                   then []
+                   else 
+                     [Meta (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f)] @
+                     (List.mapi (fun i a -> Meta (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a ((i*4) + match closure with [] -> 8 | _ -> 12))) args)
+                  )
+                  @
+                  [Meta "\t.cfi_startproc"] @
                   (if has_closure then [Push edx; Meta "\t.cfi_adjust_cfa_offset\t8"] else []) @
                   (if f = cmd#topname
                    then
@@ -444,7 +455,8 @@ let compile cmd env imports code =
                 Ret;
                 Meta "\t.cfi_endproc";
                 Meta (Printf.sprintf "\t.set\t%s,\t%d" env#lsize (env#allocated * word_size));
-                Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated)
+                Meta (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size env#allocated);
+                Meta (Printf.sprintf "\t.size %s, .-%s" name name);
                ]
 
           | RET ->
@@ -496,7 +508,7 @@ let compile cmd env imports code =
                 | Closure -> ".closure_tag_patt"
                ) 1 false
           | LINE (line) ->
-             env, [Meta (Printf.sprintf "\t.loc\t1 %d" line)]
+             env#gen_line line
              
           | FAIL ((line, col), value) ->                       
              let v, env = if value then env#peek, env else env#pop in
@@ -532,7 +544,6 @@ class env prg =
     val static_size     = 0       (* static data size                  *)
     val stack           = []      (* symbolic stack                    *)
     val nargs           = 0       (* number of function arguments      *)
-    (*    val args            = []      (* function arguments                *) *)
     val locals          = []      (* function local variables          *)
     val fname           = ""      (* function name                     *)
     val stackmap        = M.empty (* labels to stack map               *)
@@ -541,7 +552,9 @@ class env prg =
     val has_closure     = false
     val publics         = S.empty
     val externs         = S.empty
-
+    val nlabels         = 0
+    val first_line      = true
+                        
     method publics = S.elements publics
                    
     method register_public name = {< publics = S.add name publics >}
@@ -693,7 +706,7 @@ class env prg =
                      
     (* enters a function *)
     method enter f nargs nlocals has_closure =
-      {< nargs = nargs; static_size = nlocals; stack_slots = nlocals; stack = []; fname = f; has_closure = has_closure >}
+      {< nargs = nargs; static_size = nlocals; stack_slots = nlocals; stack = []; fname = f; has_closure = has_closure; first_line = true >}
 
     (* returns a label for the epilogue *)
     method epilogue = Printf.sprintf "L%s_epilogue" fname
@@ -710,6 +723,17 @@ class env prg =
       in
       inner 0 [] stack
 
+    (* generate a line number information for current function *)
+    method gen_line line =
+      let lab = Printf.sprintf ".L%d" nlabels in
+      {< nlabels = nlabels + 1; first_line = false >},
+      if fname = "main"
+      then
+         [Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab); Label lab]
+      else
+        (if first_line then [Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line)] else []) @  
+        [Meta (Printf.sprintf "\t.stabn 68,0,%d,%s-%s" line lab fname); Label lab]
+      
   end
 
 (* Generates an assembler text for a program: first compiles the program into
@@ -726,12 +750,22 @@ let genasm cmd prog =
              [Meta "_init:\t.int 0";
               Meta "\t.section custom_data,\"aw\",@progbits";
               Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size)] @
-              (List.map (fun s -> Meta (Printf.sprintf "%s:\t.int\t1" s)) env#globals)
+              (List.concat @@
+                 List.map
+                   (fun s -> [Meta (Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s" (String.sub s (String.length "global_") (String.length s - String.length "global_")) s);
+                              Meta (Printf.sprintf "%s:\t.int\t1" s)])
+                   env#globals
+              )
   in
   let asm = Buffer.create 1024 in
   List.iter
     (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show i))
-    ([Meta (Printf.sprintf "\t.file\t1 \"%s\"" cmd#get_absolute_infile)] @ globals @ data @ [Meta "\t.text"] @ code);
+    ([Meta (Printf.sprintf "\t.file \"%s\"" cmd#get_absolute_infile);
+      Meta (Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext" cmd#get_absolute_infile)] @
+      globals @
+      data @
+      [Meta "\t.text"; Label ".Ltext"; Meta "\t.stabs \"data:t1=r1;0;4294967295;\",128,0,0,0"] @          
+      code);
   Buffer.contents asm
 
 let get_std_path () =
@@ -767,8 +801,8 @@ let build cmd prog =
      let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
      let buf  = Buffer.create 255 in
      List.iter (fun o -> Buffer.add_string buf o; Buffer.add_string buf " ") objs;
-     let gcc_cmdline = Printf.sprintf "gcc -g -m32 %s %s.s %s %s/runtime.a" cmd#get_output_option cmd#basename (Buffer.contents buf) inc in
+     let gcc_cmdline = Printf.sprintf "gcc -m32 %s %s.s %s %s/runtime.a" cmd#get_output_option cmd#basename (Buffer.contents buf) inc in
      Sys.command gcc_cmdline
   | `Compile ->
-     Sys.command (Printf.sprintf "gcc -g -m32 -c %s.s" cmd#basename)
+     Sys.command (Printf.sprintf "gcc -m32 -c %s.s" cmd#basename)
   | _ -> invalid_arg "must not happen"

@@ -18,7 +18,7 @@ open Language
 (* a label                                   *) | LABEL   of string
 (* unconditional jump                        *) | JMP     of string
 (* conditional jump                          *) | CJMP    of string * string
-(* begins procedure definition               *) | BEGIN   of string * int * int * Value.designation list
+(* begins procedure definition               *) | BEGIN   of string * string list * int * int * Value.designation list
 (* end procedure definition                  *) | END
 (* create a closure                          *) | CLOSURE of string * Value.designation list
 (* proto closure                             *) | PROTO   of string * string
@@ -171,7 +171,7 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                   | _ -> invalid_arg "not a closure (or a builtin) in CALL: %s\n" @@ show(value) f
                                  )
                                
-    | BEGIN (_, _, locals, _)  -> eval env (cstack, stack, glob, {loc with locals  = Array.init locals (fun _ -> Value.Empty)}, i, o) prg'
+    | BEGIN (_, _, _, locals, _)  -> eval env (cstack, stack, glob, {loc with locals  = Array.init locals (fun _ -> Value.Empty)}, i, o) prg'
                                  
     | END                     -> (match cstack with
                                   | (prg', loc')::cstack' -> eval env (cstack', (*Value.Empty ::*) stack, glob, loc', i, o) prg'
@@ -765,12 +765,13 @@ let compile cmd ((imports, infixes), p) =
   | Expr.Call (f, args)     -> let lcall, env = env#get_label in
                                (match f with
                                 | Expr.Var name ->
-                                   let env, acc = env#lookup name in
+                                   let env, line = env#gen_line name in
+                                   let env, acc  = env#lookup name in
                                    (match acc with
                                     | Value.Fun name ->
                                        let env = env#register_call name in
                                        let env, f, code = add_code (compile_list false lcall env args) lcall false [PCALLC (List.length args, tail)]  in
-                                       env, f, PPROTO (name, env#current_function) :: code
+                                       env, f, line @ (PPROTO (name, env#current_function) :: code)
                                     | _ ->
                                        add_code (compile_list false lcall env (f :: args)) lcall false [CALLC (List.length args, tail)]
                                    )
@@ -867,7 +868,7 @@ let compile cmd ((imports, infixes), p) =
     (*Printf.eprintf "Function: %s, closure: %s\n%!" name (show(list) (show(Value.designation)) env#closure);*)
     let env = env#register_closure name in
     let code =
-      ([LABEL name; BEGIN (name, env#nargs, env#nlocals, env#closure)] @
+      ([LABEL name; BEGIN (name, args, env#nargs, env#nlocals, env#closure)] @ 
        code @
        (if flag then [LABEL lend] else []) @
        [END]) :: funcode
@@ -883,8 +884,8 @@ let compile cmd ((imports, infixes), p) =
   let fix_closures env prg =
     let rec inner state = function
     | []                       -> []
-    | BEGIN (f, a, l, c) :: tl -> BEGIN (f, a, l, try env#get_fun_closure f with Not_found -> c) :: inner state tl
-    | PROTO (f, c) :: tl       -> CLOSURE (f, env#get_closure (f, c)) :: inner state tl                             
+    | BEGIN  (f, a, na, l, c) :: tl -> BEGIN (f, a, na, l, try env#get_fun_closure f with Not_found -> c) :: inner state tl
+    | PROTO  (f, c) :: tl      -> CLOSURE (f, env#get_closure (f, c)) :: inner state tl                             
     | PPROTO (f, c) :: tl      ->
        (match env#get_closure (f, c) with
         | []      -> inner (Some f :: state) tl
@@ -904,7 +905,7 @@ let compile cmd ((imports, infixes), p) =
   let env, flag, code = compile_expr false lend env p in
   let code            = if flag then code @ [LABEL lend] else code in
   let topname         = cmd#topname in
-  let env, prg        = compile_fundefs [[LABEL topname; BEGIN (topname, (if topname = "main" then 2 else 0), env#nlocals, [])] @ code @ [END]] env in
+  let env, prg        = compile_fundefs [[LABEL topname; BEGIN (topname, [], (if topname = "main" then 2 else 0), env#nlocals, [])] @ code @ [END]] env in
   let prg             = [PUBLIC topname] @ env#get_decls @ List.flatten prg in
   (*Printf.eprintf "Before propagating closures:\n";
   Printf.eprintf "%s\n%!" env#show_funinfo;
