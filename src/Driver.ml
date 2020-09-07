@@ -66,6 +66,7 @@ class options args =
     val paths   = ref [X86.get_std_path ()]
     val mode    = ref (`Default : [`Default | `Eval | `SM | `Compile ])
     val curdir  = Unix.getcwd ()
+    val debug   = ref false
     (* Workaround until Ostap starts to memoize properly *)
     val const  = ref false
     (* end of the workaround *)
@@ -87,6 +88,7 @@ class options args =
             | "-dp" -> self#set_dump dump_ast
             | "-h"  -> self#set_help
             | "-v"  -> self#set_version
+            | "-g"  -> self#set_debug
             | _ ->
                if opt.[0] = '-'
                then raise (Commandline_error (Printf.sprintf "Invalid command line specifier ('%s')" opt))
@@ -171,6 +173,10 @@ class options args =
       );           
       if !version then Printf.printf "%s\n" Version.version;
       if !help    then Printf.printf "%s" help_string
+    method get_debug =
+      if !debug then "" else "-g"
+    method set_debug =
+      debug := true     
   end
   
 let main =

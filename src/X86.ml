@@ -403,11 +403,11 @@ let compile cmd env imports code =
                    then []
                    else 
                      [Meta (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f)] @
-                     (List.mapi (fun i a -> Meta (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a ((i*4) + match closure with [] -> 8 | _ -> 12))) args)
+                     (List.mapi (fun i a -> Meta (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a ((i*4) + 8))) args)
                   )
                   @
-                  [Meta "\t.cfi_startproc"] @
-                  (if has_closure then [Push edx; Meta "\t.cfi_adjust_cfa_offset\t8"] else []) @
+                  [Meta "\t.cfi_startproc"; Meta "\t.cfi_adjust_cfa_offset\t4"] @
+                  (if has_closure then [Push edx; Meta "\t.cfi_adjust_cfa_offset\t4"] else []) @
                   (if f = cmd#topname
                    then
                      [Mov   (M "_init", eax);
@@ -420,7 +420,7 @@ let compile cmd env imports code =
                    else []
                   ) @                  
                   [Push ebp;
-                   Meta "\t.cfi_adjust_cfa_offset\t8";   
+                   Meta "\t.cfi_adjust_cfa_offset\t4";   
                    Mov (esp, ebp);
                    Meta "\t.cfi_def_cfa_register\t5";
                    Binop ("-", M ("$" ^ env#lsize), esp);
@@ -801,8 +801,8 @@ let build cmd prog =
      let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
      let buf  = Buffer.create 255 in
      List.iter (fun o -> Buffer.add_string buf o; Buffer.add_string buf " ") objs;
-     let gcc_cmdline = Printf.sprintf "gcc -m32 %s %s.s %s %s/runtime.a" cmd#get_output_option cmd#basename (Buffer.contents buf) inc in
+     let gcc_cmdline = Printf.sprintf "gcc %s -m32 %s %s.s %s %s/runtime.a" cmd#get_debug cmd#get_output_option cmd#basename (Buffer.contents buf) inc in
      Sys.command gcc_cmdline
   | `Compile ->
-     Sys.command (Printf.sprintf "gcc -m32 -c %s.s" cmd#basename)
+     Sys.command (Printf.sprintf "gcc %s -m32 -c %s.s" cmd#get_debug cmd#basename)
   | _ -> invalid_arg "must not happen"
