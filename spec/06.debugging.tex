@@ -1,0 +1,36 @@
+\chapter{Debugging Support}
+\label{sec:debugging}
+
+Current implementation supports a minimalistic debugging with \textsc{GDB}~\cite{gdb}. In order to include the debug information into object files/executable these files
+have to be compiled with the command-line option "\texttt{-g}" (see Section~\ref{sec:driver}).
+
+The following debugging features are supported:
+
+\begin{itemize}
+\item setting breakpoints on lines; note, the line number information is generated only for identifiers, so, if a line does not contain even a single identifier, it
+  will not be visible for the debugger;
+\item setting breakpoints on functions:
+  \begin{itemize}
+    \item by source name for top-level function;
+    \item by internal name for nested functions or lambdas; an internal name can be found in stack machine program dump (option "\texttt{-ds}", see Section~\ref{sec:driver});
+  \end{itemize}
+\item stepping over/into;
+\item inspecting the values of global variables by their source names;
+\item inspecting the values of function arguments and local variables (include those in nested scopes) by their source names;
+\item inspecting the values in closures by their indices; the indices for closure elements can be found in stack machine
+  program dump (option "\texttt{-ds}", see Section~\ref{sec:driver}).
+\end{itemize}
+
+In addition a number of customized debugging command definitions is provided to make the debugging easier. These definitions reside in the "\texttt{gdb/.gdbinit}"
+file of the distribution; to make effect either the whole file has to be put in a proper place (usually the root of the home directory), or its content has to be
+imported into an existing \textsc{GDB} profile; consult \textsc{GDB} documentation for details.
+
+The following customized commands are available:
+
+\begin{itemize}
+\item "\texttt{pp }$e$", where "$e$" is a \textsc{GDB} expression. The commands prints in a human-readable form the value of the expression. For example,
+  "\texttt{pp x}" prints a value of a variable/parameter "\texttt{x}".
+\item "\texttt{pc }$i$", where "$i$" is an integer number. The commands prints a value of $i$-component of current closure.
+\end{itemize}
+
+
