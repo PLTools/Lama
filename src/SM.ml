@@ -4,6 +4,16 @@ open Language
 (* The type for patters *)
 @type patt = StrCmp | String | Array | Sexp | Boxed | UnBoxed | Closure with show
 
+(* The type for local scopes tree *)                                                                           
+@type scope = {
+    blab  : string;
+    elab  : string;
+    names : (string * int) list;
+    subs  : scope list;
+} with show
+
+let show_scope = show(scope);;
+
 (* The type for the stack machine instructions *)
 @type insn =
 (* binary operator                           *) | BINOP   of string
@@ -16,9 +26,10 @@ open Language
 (* store a value into a reference            *) | STI
 (* store a value into array/sexp/string      *) | STA                                  
 (* a label                                   *) | LABEL   of string
+(* a scope label                             *) | SLABEL  of string
 (* unconditional jump                        *) | JMP     of string
 (* conditional jump                          *) | CJMP    of string * string
-(* begins procedure definition               *) | BEGIN   of string * string list * int * int * Value.designation list
+(* begins procedure definition               *) | BEGIN   of string * int * int * Value.designation list * string list * scope list
 (* end procedure definition                  *) | END
 (* create a closure                          *) | CLOSURE of string * Value.designation list
 (* proto closure                             *) | PROTO   of string * string
@@ -139,7 +150,7 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                  Value.update_elem x (Value.to_int j) v;
                                  eval env (cstack, v::stack', glob, loc, i, o) prg'
                                  
-    | LABEL  _                -> eval env conf prg'
+    | SLABEL _ | LABEL  _     -> eval env conf prg'
     | JMP    l                -> eval env conf (env#labeled l)
     | CJMP  (c, l)            -> let x::stack' = stack in
                                  eval env (cstack, stack', glob, loc, i, o) (if (c = "z" && Value.to_int x = 0) || (c = "nz" && Value.to_int x <> 0) then env#labeled l else prg')
@@ -171,7 +182,7 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                   | _ -> invalid_arg "not a closure (or a builtin) in CALL: %s\n" @@ show(value) f
                                  )
                                
-    | BEGIN (_, _, _, locals, _)  -> eval env (cstack, stack, glob, {loc with locals  = Array.init locals (fun _ -> Value.Empty)}, i, o) prg'
+    | BEGIN (_, _, locals, _, _, _)  -> eval env (cstack, stack, glob, {loc with locals  = Array.init locals (fun _ -> Value.Empty)}, i, o) prg'
                                  
     | END                     -> (match cstack with
                                   | (prg', loc')::cstack' -> eval env (cstack', (*Value.Empty ::*) stack, glob, loc', i, o) prg'
@@ -269,7 +280,8 @@ let check_name_and_add names name mut =
     local_index  : int;
     acc_index    : int;
     nlocals      : int;
-    closure      : Value.designation list 
+    closure      : Value.designation list;
+    scopes       : scope list;
 } with show
        
 @type fundef  = {
@@ -290,7 +302,8 @@ let init_scope st = {
     acc_index   = 0;
     local_index = 0;
     nlocals     = 0;
-    closure     = []
+    closure     = [];
+    scopes      = [];
   }
                   
 let to_fundef name args body st = {
@@ -485,7 +498,7 @@ object (self : 'self)
       ) @@
     List.filter (function (_, `Local, _) -> false | _ -> true) decls
     
-  method push_scope =
+  method push_scope (blab : string) (elab : string) =
     match scope.st with
     | State.I ->
        {<
@@ -500,7 +513,8 @@ object (self : 'self)
        {< scope_index = scope_index + 1;
           scope       = {
               scope with
-              st = State.L ([], State.undefined, scope.st)
+              st     = State.L ([], State.undefined, scope.st);
+              scopes = {blab = blab; elab = elab; names = []; subs = []} :: scope.scopes
             }
        >}
 
@@ -513,11 +527,14 @@ object (self : 'self)
          scope = {
            scope with
            st          = x;
-           local_index = scope.local_index - List.length xs
+           local_index = scope.local_index - List.length xs;
+           scopes      = match scope.scopes with
+                           [_]            -> scope.scopes
+                         | hs :: ps :: tl -> {ps with subs = hs :: ps.subs} :: tl
          }
        >}
 
-  method open_fun_scope (name, args, body, st') =
+  method open_fun_scope blab elab (name, args, body, st') =
     {<
        fundefs      = open_scope fundefs {
                           name        = name;
@@ -533,13 +550,15 @@ object (self : 'self)
                         in
                         readdress_to_closure st'
                       );
-    >} # push_scope
+    >} # push_scope blab elab
 
   method close_fun_scope =
+    (*Printf.printf "Scopes: %s\n" @@ show(GT.list) show_scope scope.scopes;*)
+    let scopes = scope.scopes in
     let fundefs' = close_scope fundefs in
     match top fundefs' with
-    | Some fd -> {< fundefs = fundefs'; scope = fd.scope >} # pop_scope
-    | None    -> {< fundefs = fundefs' >} # pop_scope 
+    | Some fd -> {< fundefs = fundefs'; scope = fd.scope >} # pop_scope, scopes
+    | None    -> {< fundefs = fundefs' >} # pop_scope, scopes
                          
   method add_arg (name : string) = {<
       scope = {
@@ -574,7 +593,10 @@ object (self : 'self)
                           State.L (check_name_and_add names name mut, State.bind name (Value.Local scope.local_index) s, p)
                       );
         local_index = (match scope.st with State.L _ -> scope.local_index + 1 | _ -> scope.local_index);
-        nlocals     = (match scope.st with State.L _ -> max (scope.local_index + 1) scope.nlocals | _ -> scope.nlocals)
+        nlocals     = (match scope.st with State.L _ -> max (scope.local_index + 1) scope.nlocals | _ -> scope.nlocals);
+        scopes      = match scope.scopes with
+                        ts :: tl -> {ts with names = (name, scope.local_index) :: ts.names} :: tl
+                      | _        -> scope.scopes
       }
   >}
 
@@ -730,7 +752,9 @@ let compile cmd ((imports, infixes), p) =
      env#register_call name, false, lines @ [PROTO (name, env#current_function)] 
        
   | Expr.Scope (ds, e)  ->
-     let env = env#push_scope in
+     let blab, env = env#get_label in
+     let elab, env = env#get_label in
+     let env = env#push_scope blab elab in
      let env, e, funs =
        List.fold_left
          (fun (env, e, funs) ->
@@ -744,7 +768,7 @@ let compile cmd ((imports, infixes), p) =
      in
      let env = List.fold_left (fun env (name, args, m, b) -> env#add_fun name args m b) env funs in
      let env, flag, code = compile_expr tail l env e in
-     env#pop_scope, flag, code
+     env#pop_scope, flag, [SLABEL blab] @ code @ [SLABEL elab]
  
   | Expr.Unit               -> env, false, [CONST 0]
                                
@@ -845,11 +869,13 @@ let compile cmd ((imports, infixes), p) =
                  else env#get_label, [JMP l]
                in
                let env, lfalse', pcode = pattern env lfalse p in
-               let env                 = env#push_scope in
+               let blab, env           = env#get_label in
+               let elab, env           = env#get_label in               
+               let env                 = env#push_scope blab elab in
                let env, bindcode       = bindings env p in
                let env, l'     , scode = compile_expr tail l env s in
                let env                 = env#pop_scope in
-               (env, Some lfalse, i+1, ((match lab with None -> [] | Some l -> [LABEL l; DUP]) @ pcode @ bindcode @ scode @ jmp) :: code, lfalse')
+               (env, Some lfalse, i+1, ((match lab with None -> [SLABEL blab] | Some l -> [SLABEL blab; LABEL l; DUP]) @ pcode @ bindcode @ scode @ jmp @ [SLABEL elab]) :: code, lfalse')
              else acc
          )
          (env, None, 0, [], true) brs
@@ -859,7 +885,9 @@ let compile cmd ((imports, infixes), p) =
   let rec compile_fundef env ((name, args, stmt, st) as fd) =
     (* Printf.eprintf "Compile fundef: %s, state=%s\n" name (show(State.t) (show(Value.designation)) st);                *)
     (* Printf.eprintf "st (inner) = %s\n" (try show(Value.designation) @@ State.eval st "inner" with _ -> " not found"); *)
-    let env             = env#open_fun_scope fd in    
+    let blab, env       = env#get_label in
+    let elab, env       = env#get_label in
+    let env             = env#open_fun_scope blab elab fd in    
     (*Printf.eprintf "Lookup: %s\n%!" (try show(Value.designation) @@ snd (env#lookup "inner") with _ -> "no inner..."); *)
     let env             = List.fold_left (fun env arg -> env#add_arg arg) env args in 
     let lend, env       = env#get_label in
@@ -867,13 +895,15 @@ let compile cmd ((imports, infixes), p) =
     let env, funcode    = compile_fundefs [] env in
     (*Printf.eprintf "Function: %s, closure: %s\n%!" name (show(list) (show(Value.designation)) env#closure);*)
     let env = env#register_closure name in
+    let nargs, nlocals, closure = env#nargs, env#nlocals, env#closure in
+    let env, scopes = env#close_fun_scope in
     let code =
-      ([LABEL name; BEGIN (name, args, env#nargs, env#nlocals, env#closure)] @ 
+      ([LABEL name; BEGIN (name, nargs, nlocals, closure, args, scopes); SLABEL blab] @ 
        code @
        (if flag then [LABEL lend] else []) @
-       [END]) :: funcode
+       [SLABEL elab; END]) :: funcode
     in
-    env#close_fun_scope, code
+    env, code
   and compile_fundefs acc env =
     match env#next_definition with
     | None            -> env, acc
@@ -884,7 +914,7 @@ let compile cmd ((imports, infixes), p) =
   let fix_closures env prg =
     let rec inner state = function
     | []                       -> []
-    | BEGIN  (f, a, na, l, c) :: tl -> BEGIN (f, a, na, l, try env#get_fun_closure f with Not_found -> c) :: inner state tl
+    | BEGIN  (f, na, l, c, a, s) :: tl -> BEGIN (f, na, l, (try env#get_fun_closure f with Not_found -> c), a, s) :: inner state tl
     | PROTO  (f, c) :: tl      -> CLOSURE (f, env#get_closure (f, c)) :: inner state tl                             
     | PPROTO (f, c) :: tl      ->
        (match env#get_closure (f, c) with
@@ -905,7 +935,7 @@ let compile cmd ((imports, infixes), p) =
   let env, flag, code = compile_expr false lend env p in
   let code            = if flag then code @ [LABEL lend] else code in
   let topname         = cmd#topname in
-  let env, prg        = compile_fundefs [[LABEL topname; BEGIN (topname, [], (if topname = "main" then 2 else 0), env#nlocals, [])] @ code @ [END]] env in
+  let env, prg        = compile_fundefs [[LABEL topname; BEGIN (topname, (if topname = "main" then 2 else 0), env#nlocals, [], [], [])] @ code @ [END]] env in
   let prg             = [PUBLIC topname] @ env#get_decls @ List.flatten prg in
   (*Printf.eprintf "Before propagating closures:\n";
   Printf.eprintf "%s\n%!" env#show_funinfo;

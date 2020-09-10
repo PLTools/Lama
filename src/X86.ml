@@ -62,7 +62,23 @@ type instr =
 (* arithmetic correction: shr 1                          *) | Sar1  of opnd
                                                             | Repmovsl
 (* Instruction printer *)
+let stack_offset i =
+  if i >= 0
+  then (i+1) * word_size
+  else 8 + (-i-1) * word_size
+  
 let show instr =
+  let rec opnd = function
+  | R i      -> regs.(i)
+  | C        -> "4(%ebp)"              
+  | S i      -> if i >= 0
+                then Printf.sprintf "-%d(%%ebp)" (stack_offset i)
+                else Printf.sprintf "%d(%%ebp)"  (stack_offset i)
+  | M x      -> x
+  | L i      -> Printf.sprintf "$%d" i
+  | I (0, x) -> Printf.sprintf "(%s)" (opnd x)
+  | I (n, x) -> Printf.sprintf "%d(%s)" n (opnd x)
+  in
   let binop = function
   | "+"    -> "addl"
   | "-"    -> "subl"
@@ -73,17 +89,6 @@ let show instr =
   | "cmp"  -> "cmpl"
   | "test" -> "test"
   | _      -> failwith "unknown binary operator"
-  in
-  let rec opnd = function
-  | R i      -> regs.(i)
-  | C        -> "4(%ebp)"              
-  | S i      -> if i >= 0
-                then Printf.sprintf "-%d(%%ebp)" ((i+1) * word_size)
-                else Printf.sprintf "%d(%%ebp)"  (8+(-i-1) * word_size)
-  | M x      -> x
-  | L i      -> Printf.sprintf "$%d" i
-  | I (0, x) -> Printf.sprintf "(%s)" (opnd x)
-  | I (n, x) -> Printf.sprintf "%d(%s)" n (opnd x)
   in
   match instr with
   | Cltd               -> "\tcltd"
@@ -383,7 +388,10 @@ let compile cmd env imports code =
                  then [Mov   (x, eax); Binop (op, eax, y); Or1 y]
                  else [Binop (op, x, y); Or1 y]
              )
+             
           | LABEL s     -> (if env#is_barrier then (env#drop_barrier)#retrieve_stack s else env), [Label s]
+
+          | SLABEL s    -> env, [Label s]
 
 	  | JMP   l     -> (env#set_stack l)#set_barrier, [Jmp l]
 
@@ -391,7 +399,20 @@ let compile cmd env imports code =
               let x, env = env#pop in
               env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, l)]
 
-          | BEGIN (f, args, nargs, nlocals, closure) ->
+          | BEGIN (f, nargs, nlocals, closure, args, scopes) ->             
+             let rec stabs_scope scope =
+               let names =
+                 List.map
+                   (fun (name, index) ->
+                     Meta (Printf.sprintf "\t.stabs \"%s:1\",128,0,0,-%d" name (stack_offset index))
+                   )
+                   scope.names
+               in
+               names @
+               (if names = [] then [] else [Meta (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f)]) @
+               (List.flatten @@ List.map stabs_scope scope.subs) @
+               (if names = [] then [] else [Meta (Printf.sprintf "\t.stabn 224,0,0,%s-%s" scope.elab f)])
+             in    
              let name =
                if f.[0] = 'L' then String.sub f 1 (String.length f - 1) else f
              in
@@ -403,7 +424,8 @@ let compile cmd env imports code =
                    then []
                    else 
                      [Meta (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f)] @
-                     (List.mapi (fun i a -> Meta (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a ((i*4) + 8))) args)
+                     (List.mapi (fun i a -> Meta (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a ((i*4) + 8))) args)  @
+                     (List.flatten @@ List.map stabs_scope scopes)                         
                   )
                   @
                   [Meta "\t.cfi_startproc"; Meta "\t.cfi_adjust_cfa_offset\t4"] @
