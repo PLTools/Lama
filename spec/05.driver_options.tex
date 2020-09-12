@@ -39,13 +39,13 @@ Additionally, the following options can be given to the driver:
   invocation, and the paths are looked up in that order.
 \item "\texttt{-dp}"~--- forces the driver to dump the AST of compiled unit in \textsc{html} representation. The dump is written in the file with the same
   basename as the source one, with the extension replaced with "\texttt{.html}".
-\item "\texttt{-ds}"~--- forces the driver to sump stack machine code. The option is only in effect in stack interpreter on
+\item "\texttt{-ds}"~--- forces the driver to sump stack machine code. The option is only in effect in stack interpreter or
   native mode. The dump is written in the file "\texttt{.sm}".
 \item "\texttt{-g}"~--- compile with debug information (see Section~\ref{sec:debugging}).
 \item "\texttt{-v}"~--- makes the driver to print the version of the compiler.
 \item "\texttt{-h}"~--- makes the driver to print the help on the options.
 \end{itemize}
 
-Apart from the paths specified by the "\texttt{-I}" option the driver uses the environment variable "\texttt{LAMA}"
+Apart from the paths specified by the "\texttt{-I}" option the driver uses environment variable "\texttt{LAMA}"
 to locate the runtime and standard libraries (see Section~\ref{sec:stdlib}). Thus, the units from standard libraries are accessible
 without any "\texttt{-I}" option given.
