@@ -587,12 +587,15 @@ module Expr =
   let sem s = (fun x atr y -> ignore atr (Call (Var s, [x; y]))), (fun _ -> Val, Val)
 
   let sem_init s = fun x atr y ->
-    ignore atr (
-       match s with
-       | ":"  -> Sexp   ("cons", [x; y])
-       | ":=" -> Assign (x, y)
-       | _    -> Binop  (s, x, y)
-    )
+    let p x y =
+      match s with
+      | ":"  -> Sexp   ("cons", [x; y])
+      | ":=" -> Assign (x, y)
+      | _    -> Binop  (s, x, y)
+    in
+    match x with
+      Ignore x -> Ignore (p x y)
+    | _        -> ignore atr (p x y)
 
     (* ======= *)
 
@@ -624,7 +627,7 @@ module Expr =
           )]
       )
       in
-      ostap (inner[0][id][atr])
+      ostap (inner[0][id][atr]) 
       
     let atr' = atr
     let not_a_reference s = new Reason.t (Msg.make "not a reference" [||] (Msg.Locator.Point s#coord))
