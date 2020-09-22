@@ -1,0 +1,5 @@
+import List;
+import Array;
+
+printf ("Flattening: %s\n", deepFlatten ({}).string);
+printf ("Flattening: %s\n", deepFlatten ({{A}, {B, {C}, D}}).string)

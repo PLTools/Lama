@@ -84,6 +84,21 @@ public fun flatten (l) {
     curr [0] := new    
   }
 
+  iter (fun (x) {iter (append, x)}, l);
+  
+  res [1]
+}
+
+public fun deepFlatten (l) {
+  local res = [0, {}], curr = [res];
+
+  fun append (x) {
+    local new = x : {};
+    
+    curr [0][1] := new;
+    curr [0] := new    
+  }
+
   fun traverse (l) {
     case l of
       _ : _ -> iter (traverse, l)
