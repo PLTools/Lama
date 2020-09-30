@@ -205,7 +205,7 @@ let main =
 	   in
 	   List.iter (fun i -> Printf.printf "%d\n" i) output 
        )
-    | `Fail er -> Printf.eprintf "Error: %s\n" er
+    | `Fail er -> Printf.eprintf "Error: %s\n" er; exit 255
   with
-  | Language.Semantic_error msg -> Printf.printf "Error: %s\n" msg 
-  | Commandline_error msg -> Printf.printf "%s\n" msg
+  | Language.Semantic_error msg -> Printf.printf "Error: %s\n" msg; exit 255 
+  | Commandline_error msg -> Printf.printf "%s\n" msg; exit 255
