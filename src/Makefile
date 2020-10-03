@@ -9,13 +9,13 @@ BFLAGS = -rectypes -g
 OFLAGS = $(BFLAGS)
 LIBS = unix.cma
 
-all: metagen .depend $(TOPFILE)
+all: depend metagen  $(TOPFILE)
 
 metagen:
 	echo "let version = \"Version `git rev-parse --abbrev-ref HEAD`, `git rev-parse --short HEAD`, `git rev-parse --verify HEAD |git show --no-patch --no-notes --pretty='%cd'`\"" > version.ml
 	echo "let path = \"`opam var share`/Lama\"" > stdpath.ml
 
-.depend: $(SOURCES)
+depend: $(SOURCES)
 	$(OCAMLDEP) $(PXFLAGS) *.ml > .depend
 
 $(TOPFILE): $(SOURCES:.ml=.cmx)
