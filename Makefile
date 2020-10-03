@@ -31,5 +31,5 @@ clean:
 	make clean -C runtime
 	make clean -C stdlib
 	make clean -C regression
-
+	$(MAKE) clean -C bench
 

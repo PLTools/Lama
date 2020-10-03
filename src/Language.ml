@@ -294,7 +294,7 @@ module Pattern =
     (* any sexp value   *) | SexpTag
     (* any array value  *) | ArrayTag
     (* any closure      *) | ClosureTag
-    with show, foldl, html
+    with show, foldl, html, fmt
 
     (* Pattern parser *)
     ostap (
@@ -349,6 +349,10 @@ module Expr =
     (* The type for expressions. Note, in regular OCaml there is no "@type..."
        notation, it came from GT.
     *)
+
+    @type qualifier = [ `Local | `Public | `Extern | `PublicExtern ]
+        with show, html
+
     @type t =
     (* integer constant           *) | Const     of int
     (* array                      *) | Array     of t list
@@ -377,7 +381,7 @@ module Expr =
     (* leave a scope              *) | Leave
     (* intrinsic (for evaluation) *) | Intrinsic of (t config, t config) arrow
     (* control (for control flow) *) | Control   of (t config, t * t config) arrow
-    and decl = [`Local | `Public | `Extern | `PublicExtern ] * [`Fun of string list * t | `Variable of t option]
+    and decl = qualifier * [`Fun of string list * t | `Variable of t option]
     with show, html
                            
     let notRef = function Reff -> false | _ -> true
@@ -1250,3 +1254,39 @@ let parse cmd =
         )
   in
   parse cmd
+
+
+let run_parser cmd =
+  let s   = Util.read cmd#get_infile in
+  let kws = [
+    "skip";
+    "if"; "then"; "else"; "elif"; "fi";
+    "while"; "do"; "od";
+    "repeat"; "until";
+    "for";
+    "fun"; "local"; "public"; "external"; "return"; "import";
+    "length";
+    "string";
+    "case"; "of"; "esac"; "when";
+    "boxed"; "unboxed"; "string"; "sexp"; "array";
+    "infix"; "infixl"; "infixr"; "at"; "before"; "after";
+    "true"; "false"; "lazy"; "eta"; "syntax"]
+  in
+  Util.parse
+    (object
+       inherit Matcher.t s
+       inherit Util.Lexers.decimal s
+       inherit Util.Lexers.string s
+       inherit Util.Lexers.char   s
+       inherit Util.Lexers.infix  s
+       inherit Util.Lexers.lident kws s
+       inherit Util.Lexers.uident kws s
+       inherit Util.Lexers.skip [
+        Matcher.Skip.whitespaces " \t\n\r";
+        Matcher.Skip.lineComment "--";
+        Matcher.Skip.nestedComment "(*" "*)"
+       ] s
+     end
+    )
+    (if cmd#is_workaround then ostap (p:!(constparse cmd) -EOF)  else ostap (p:!(parse cmd) -EOF))
+
