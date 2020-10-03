@@ -79,22 +79,21 @@ object
     Format.fprintf ppf ")@]@]"
 
 
-  method c_Assign ppf _ _x__526_ _x__527_ =
-    Format.fprintf ppf "@[%a@ :=@ %a@]" fself _x__526_ fself _x__527_
+  method c_Assign ppf _ l r =
+    Format.fprintf ppf "@[%a@ :=@ %a@]" fself l fself r
   method c_Seq ppf _ l r =
     Format.fprintf ppf "@[<v>%a;@ %a@]" fself l fself r
   method c_Skip ppf _ = Format.fprintf ppf "skip"
-  method c_If ppf _ _x__533_ _x__534_ _x__535_ =
+  method c_If ppf _ c th el =
     Format.fprintf ppf "@[if %a then @[<v 2>{@,%a@]@ @[<v 2>} else {@,%a@]@ } fi@]"
-      fself _x__533_ fself _x__534_ fself _x__535_
+      fself c fself th fself el
   method c_While ppf _ cond body =
     Format.fprintf ppf "@[<v 2>";
     Format.fprintf ppf "while %a do@," fself cond;
     fself ppf body;
     Format.fprintf ppf "@]@ ";
-    Format.fprintf ppf "od";
-    (*Format.fprintf inh___536_ "While @[(@,%a,@,@ %a@,)@]" fself
-      cond fself body*)
+    Format.fprintf ppf "od"
+
   method c_Repeat ppf _ cond body =
     Format.fprintf ppf "@[<v 2>";
     Format.fprintf ppf "repeat@,%a" fself body;
