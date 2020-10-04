@@ -316,7 +316,7 @@ public fun expr (ops, opnd) {
     esac  
   }
 
-  inner (ops)
+  inner (ops) (id)
 }
 
 initOstap ()

@@ -8,7 +8,7 @@ local a   = token ("a") @ lift(fun (a) {if a then "a" else "b" fi}),
       sub = [token ("-"), fun (l, _, r) {fun (a) {Sub (l (a), r (a))}}],
       mul = [token ("*"), fun (l, _, r) {fun (a) {Mul (l (a), r (a))}}],
       div = [token ("/"), fun (l, _, r) {fun (a) {Div (l (a), r (a))}}],      
-      exp = expr ({[Nona, singleton (eq)], [Right, {add, sub}], [Left, {mul, div}]}, a) (id);
+      exp = expr ({[Nona, singleton (eq)], [Right, {add, sub}], [Left, {mul, div}]}, a);
 
 fun unpack (x, y) {
   case x of

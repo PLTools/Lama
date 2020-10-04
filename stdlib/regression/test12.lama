@@ -13,7 +13,7 @@ local a   = token ("a"),
       sub = [token ("-"), fun (l, _, r) {Sub (l, r)}],
       mul = [token ("*"), fun (l, _, r) {Mul (l, r)}],
       div = [token ("/"), fun (l, _, r) {Div (l, r)}],      
-      exp = expr ({[Left, {add, sub}], [Left, {mul, div}]}, a) (id),
+      exp = expr ({[Left, {add, sub}], [Left, {mul, div}]}, a),
       i;
 
 printf ("%s\n", parseString (exp |> bypass (eof), gen (5)).string)
