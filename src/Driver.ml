@@ -38,7 +38,6 @@ exception Commandline_error of string
   
 class options args =
   let n = Array.length args in
-  let rec fix f = f (fix f) in
   let dump_ast  = 1 in
   let dump_sm   = 2 in
   let help_string =
