@@ -1,3 +1,4 @@
+(*
 open Language
 
 class pp_pattern fself = object
@@ -192,3 +193,6 @@ let pp ppf ast =
   Format.set_margin margin;
   Format.set_max_indent 15;
   Format.printf "%a\n%!" pp ast
+*)
+
+let pp: Format.formatter -> _ -> unit = fun _ _ -> failwith "Pretty printer is not implemented"
