@@ -1,17 +1,21 @@
 .PHONY: clean
 
 OUT = bench.exe
+OUT2 = demo_infix.exe
 LAMA_CMXES = ../src/Language.cmx
 OCAMLC = ocamlfind c
 OCAMLOPT = ocamlfind opt
 BFLAGS += -package GT,ostap,re,benchmark,str -I ../src -rectypes -g
 GENERATED = Pprint_gt.ml Pprint_default.ml
 
-all: $(OUT)
+all: $(OUT) $(OUT2)
 
-bench_main.cmx: Pprint_gt.cmx Pprint_default.cmx
+demo_infix.cmx bench_main.cmx: Pprint_gt.cmx Pprint_default.cmx
 
 $(OUT): Pprint_gt.cmx Pprint_default.cmx bench_main.cmx
+	$(OCAMLOPT) $(BFLAGS) $(LAMA_CMXES) -linkpkg $^ -o $@
+
+$(OUT2): Pprint_gt.cmx Pprint_default.cmx demo_infix.cmx
 	$(OCAMLOPT) $(BFLAGS) $(LAMA_CMXES) -linkpkg $^ -o $@
 
 clean:

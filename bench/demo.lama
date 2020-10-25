@@ -1,0 +1,6 @@
+public infix +++ at + (x, y) {
+  case x of
+    {}     -> y
+  | x : xs -> x : xs +++ y
+  esac
+}
