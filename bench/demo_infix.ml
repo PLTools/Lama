@@ -32,7 +32,6 @@ let rewrite_infix s =
       else
         let num c = Char.code c - Char.code '0' in
         let c = Char.chr (num s.[i] * 10 + num s.[i+1]) in
-        (* Printf.printf "Got char '%c'\n" c; *)
         Buffer.add_char b c;
         loop (i+2)
     in
@@ -44,7 +43,11 @@ class my_pp_e pp_decl fself = object
   method! c_Call ppf e f args =
     match f,args with
     | (Var s, [l; r]) when looks_like_infix s ->
-        super#c_Call ppf e (Var (rewrite_infix s)) args                (* CHANGE 1 *)
+        Format.fprintf ppf "@[<h>%a@ %s@ %a@]"
+          fself l
+          (rewrite_infix s)
+          fself r                                                     (* CHANGE 1 *)
+
     | _ -> super#c_Call ppf e f args
 end
 
