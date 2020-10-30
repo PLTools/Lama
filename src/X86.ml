@@ -229,7 +229,15 @@ let compile cmd env imports code =
     | [] -> env, []
     | instr :: scode' ->
         let stack = "" (* env#show_stack*) in
+        (* Printf.printf "insn=%s, stack=%s\n%!" (GT.show(insn) instr) (env#show_stack);  *)
         let env', code' =
+          if env#is_barrier
+          then match instr with
+               | LABEL  s -> if env#has_stack s then (env#drop_barrier)#retrieve_stack s, [Label s] else env, []
+               | FLABEL s -> env#drop_barrier, [Label s]
+               | SLABEL s -> env, [Label s]
+               | _        -> env, []
+          else
           match instr with
           | PUBLIC name -> env#register_public name, []
           | EXTERN name -> env#register_extern name, []
@@ -389,8 +397,8 @@ let compile cmd env imports code =
                  else [Binop (op, x, y); Or1 y]
              )
              
-          | LABEL s     -> (if env#is_barrier then (env#drop_barrier)#retrieve_stack s else env), [Label s]
-
+          | LABEL  s 
+          | FLABEL s
           | SLABEL s    -> env, [Label s]
 
 	  | JMP   l     -> (env#set_stack l)#set_barrier, [Jmp l]
@@ -622,17 +630,22 @@ class env prg =
     method is_barrier = barrier
 
     (* set barrier *)
-    method set_barrier = {< barrier = true >}
+    method set_barrier = {< stack = []; barrier = true >}
 
     (* drop barrier *)
     method drop_barrier = {< barrier = false >}
 
     (* associates a stack to a label *)
-    method set_stack l = (*Printf.printf "Setting stack for %s\n" l;*) {< stackmap = M.add l stack stackmap >}
+    method set_stack l = (*Printf.printf "Setting stack for %s\n" l;*)
+      {< stackmap = M.add l stack stackmap >}
 
     (* retrieves a stack for a label *)
     method retrieve_stack l = (*Printf.printf "Retrieving stack for %s\n" l;*)
       try {< stack = M.find l stackmap >} with Not_found -> self
+
+    (* checks if there is a stack for a label *)
+    method has_stack l = (*Printf.printf "Retrieving stack for %s\n" l;*)
+      M.mem l stackmap
 
     (* gets a name for a global variable *)
     method loc x =

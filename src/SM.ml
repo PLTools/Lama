@@ -26,6 +26,7 @@ let show_scope = show(scope);;
 (* store a value into a reference            *) | STI
 (* store a value into array/sexp/string      *) | STA                                  
 (* a label                                   *) | LABEL   of string
+(* a forwarded label                         *) | FLABEL  of string
 (* a scope label                             *) | SLABEL  of string
 (* unconditional jump                        *) | JMP     of string
 (* conditional jump                          *) | CJMP    of string * string
@@ -150,7 +151,8 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
                                  Value.update_elem x (Value.to_int j) v;
                                  eval env (cstack, v::stack', glob, loc, i, o) prg'
                                  
-    | SLABEL _ | LABEL  _     -> eval env conf prg'
+    | SLABEL _ | LABEL  _ | FLABEL _ -> eval env conf prg'
+                                      
     | JMP    l                -> eval env conf (env#labeled l)
     | CJMP  (c, l)            -> let x::stack' = stack in
                                  eval env (cstack, stack', glob, loc, i, o) (if (c = "z" && Value.to_int x = 0) || (c = "nz" && Value.to_int x <> 0) then env#labeled l else prg')
@@ -231,10 +233,11 @@ module M = Map.Make (String)
 
 class indexer prg =
   let rec make_env m = function
-  | []              -> m
-  | (LABEL l) :: tl -> make_env (M.add l tl m) tl
-  | _ :: tl         -> make_env m tl
-  in
+  | []               -> m
+  | (LABEL l)  :: tl
+  | (FLABEL l) :: tl -> make_env (M.add l tl m) tl
+  | _ :: tl          -> make_env m tl
+  in 
   let m = make_env M.empty prg in
   object
     method is_label l = M.mem l m
@@ -442,6 +445,7 @@ object (self : 'self)
   val decls        = []
   val funinfo      = new funinfo
   val line         = None
+  val end_label    = ""
 
   method show_funinfo = funinfo#show_funinfo
 
@@ -481,8 +485,13 @@ object (self : 'self)
 
   method global_scope = scope_index = 0
                       
-  method get_label = (label @@ string_of_int label_index), {< label_index = label_index + 1 >}
-
+  method get_label     = (label @@ string_of_int label_index), {< label_index = label_index + 1 >}
+  method get_end_label =    
+    let lab = label @@ string_of_int label_index in
+    lab, {< end_label = lab; label_index = label_index + 1 >}
+    
+  method end_label = end_label
+    
   method nargs   = scope.arg_index
   method nlocals = scope.nlocals
 
@@ -837,7 +846,7 @@ let compile cmd ((imports, infixes), p) =
                                let cond, env = env#get_label in
                                let env, fe, se = compile_expr false lexp env c in
                                let env, _ , s  = compile_expr false cond env s in
-                               env, false, [JMP cond; LABEL loop] @ s @ [LABEL cond] @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("nz", loop)]
+                               env, false, [JMP cond; FLABEL loop] @ s @ [LABEL cond] @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("nz", loop)]
                                                                                                   
   | Expr.Repeat (s, c)      -> let lexp , env = env#get_label in
                                let loop , env = env#get_label in
@@ -847,9 +856,9 @@ let compile cmd ((imports, infixes), p) =
                                env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("z", loop)]
 
   | Expr.Return (Some e)    -> let lret, env = env#get_label in
-                               add_code (compile_expr true lret env e) lret false [RET]
+                               add_code (compile_expr true lret env e) lret false [JMP env#end_label] (* [RET] *)
                                
-  | Expr.Return None        -> env, false, [CONST 0; RET]
+  | Expr.Return None        -> env, false, [CONST 0; (*RET*) JMP env#end_label]
 
   | Expr.Leave              -> env, false, []
                                  
@@ -890,7 +899,7 @@ let compile cmd ((imports, infixes), p) =
     let env             = env#open_fun_scope blab elab fd in    
     (*Printf.eprintf "Lookup: %s\n%!" (try show(Value.designation) @@ snd (env#lookup "inner") with _ -> "no inner..."); *)
     let env             = List.fold_left (fun env arg -> env#add_arg arg) env args in 
-    let lend, env       = env#get_label in
+    let lend, env       = env#get_end_label in
     let env, flag, code = compile_expr true lend env stmt in
     let env, funcode    = compile_fundefs [] env in
     (*Printf.eprintf "Function: %s, closure: %s\n%!" name (show(list) (show(Value.designation)) env#closure);*)
@@ -900,8 +909,7 @@ let compile cmd ((imports, infixes), p) =
     let code =
       ([LABEL name; BEGIN (name, nargs, nlocals, closure, args, scopes); SLABEL blab] @ 
        code @
-       (if flag then [LABEL lend] else []) @
-       [SLABEL elab; END]) :: funcode
+       [LABEL lend; SLABEL elab; END]) :: funcode
     in
     env, code
   and compile_fundefs acc env =
