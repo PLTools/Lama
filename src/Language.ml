@@ -643,7 +643,7 @@ module Expr =
       let def s   = let Some def = Obj.magic !defCell in def s in
       let ostap (
       parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)} | basic[infix][atr];
-      scope[infix][atr]: <(d, infix')> : def[infix] expr:parse[infix'][atr] {Scope (d, expr)} | <(d, infix')> : def[infix] => {d <> []} => {Scope (d, materialize atr Skip)}; 
+      scope[infix][atr]: <(d, infix')> : def[infix] expr:parse[infix'][atr] {Scope (d, expr)} | {isVoid atr} => <(d, infix')> : def[infix] => {d <> []} => {Scope (d, materialize atr Skip)}; 
       basic[infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary infix) atr);
       primary[infix][atr]:
           s:(s:"-"? {match s with None -> fun x -> x | _ -> fun x -> Binop ("-", Const 0, x)})  
