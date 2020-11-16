@@ -436,8 +436,8 @@ let compile cmd env imports code =
                      (List.flatten @@ List.map stabs_scope scopes)                         
                   )
                   @
-                  [Meta "\t.cfi_startproc"; Meta "\t.cfi_adjust_cfa_offset\t4"] @
-                  (if has_closure then [Push edx; Meta "\t.cfi_adjust_cfa_offset\t4"] else []) @
+                  [Meta "\t.cfi_startproc"] @
+                  (if has_closure then [Push edx] else []) @
                   (if f = cmd#topname
                    then
                      [Mov   (M "_init", eax);
@@ -450,7 +450,8 @@ let compile cmd env imports code =
                    else []
                   ) @                  
                   [Push ebp;
-                   Meta "\t.cfi_adjust_cfa_offset\t4";   
+                   Meta ("\t.cfi_def_cfa_offset\t" ^ if has_closure then "12" else "8");
+                   Meta ("\t.cfi_offset 5, -" ^ if has_closure then "12" else "8");
                    Mov (esp, ebp);
                    Meta "\t.cfi_def_cfa_register\t5";
                    Binop ("-", M ("$" ^ env#lsize), esp);
