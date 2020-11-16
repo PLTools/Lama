@@ -250,7 +250,10 @@ elements are enumerated in an ascending order.}
 Memoization tables can be used for \emph{hash-consing}~\cite{hashConsing}~--- a data transformation which converts structurally equal
 data structures into physically equal. Memoization tables are mutable; they do not work for cyclic data structures.
 
-\descr{\lstinline|fun emptyMemo ()|}{Creates an empty memo table.}
+\descr{\lstinline|fun emptyCustomMemo (p, c)|}{Creates an empty customized memo table; \lstinline|p| is a predicate to filter out certain data structures (returns true on
+data structures which \emph{should not be} hash-consed; ``\lstinline|\{\}|'' can be specified for always false predicate); \lstinline|c| is a custom comparison function.}
+
+\descr{\lstinline|fun emptyMemo ()|}{Creates an empty memo table. Equivalent to \lstinline|emptyCustomMemo (\{\}, compare)|.}
 
 \descr{\lstinline|fun lookupMemo (m, v)|}{Lookups a value "\lstinline|v|" in a memo table "\lstinline|m|", performing hash-consing and
   returning a hash-consed value.} 
