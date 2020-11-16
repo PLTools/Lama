@@ -18,7 +18,7 @@ public fun logOn () {
 
 public fun initOstap () {
   tab    := ref (emptyHashTab (1024, hash, compare));
-  restab := emptyMemo ();
+  restab := emptyCustomMemo (fun (x) {case x of #string -> true | _ -> false esac}, compare);
   hct    := emptyMemo ()
 }
 

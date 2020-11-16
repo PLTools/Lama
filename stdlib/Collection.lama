@@ -295,26 +295,36 @@ public fun foldSet (f, acc, s) {
 }
 
 -- Hash consing
-public fun emptyMemo () {
-  ref (emptyMap (compare))
+public fun emptyCustomMemo (pred, compare) {
+  [pred, emptyMap (compare)]
 }
 
-public fun lookupMemo (m, v) {
+public fun emptyMemo () {
+--  ref (emptyMap (compare))
+  emptyCustomMemo ({}, compare)
+}
+
+public fun lookupMemo (mm@[p, m], v) {
+  case p of
+    #fun -> if p (v) then return v fi
+  | _    -> skip
+  esac;
+  
   case v of
     #unboxed -> v
   | _ ->
-     case findMap (deref (m), v) of
+     case findMap (m, v) of
        Some (w) -> w
      | None ->
         case v of
-          #string -> m ::= addMap (deref (m), v, v); v        
+          #string -> mm[1] := addMap (m, v, v); v        
         | _ ->
           local vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;          
           for skip, i < v.length, i := i + 1 do
-            local vci = lookupMemo (m, vc [i]);
+            local vci = lookupMemo (mm, vc [i]);
             vc [i] := vci
           od;
-          m ::= addMap (deref (m), vc, vc);
+          mm [1] := addMap (m, vc, vc);
           vc
         esac
      esac
