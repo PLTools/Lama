@@ -746,7 +746,7 @@ module Expr =
 
       | %"if" e:parse[infix][Val] %"then" the:scope[infix][atr]
         elif:(%"elif" parse[infix][Val] %"then" scope[infix][atr])*
-        els:(%"else" scope[infix][atr])? %"fi"
+        els:("else" s:scope[infix][atr] {Some s} | {isVoid atr} => empty {None}) %"fi"
           {If (e, the, List.fold_right (fun (e, t) elif -> If (e, t, elif)) elif (match els with Some e -> e | _ -> materialize atr Skip))}
       | %"while" e:parse[infix][Val] %"do" s:scope[infix][Void]
                                             => {isVoid atr} => %"od" {materialize atr (While (e, s))}
