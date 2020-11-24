@@ -81,6 +81,8 @@ module Value =
     | Builtin of string
     with show, html
 
+    let is_int = function Int _ -> true | _ -> false
+                                             
     let to_int = function
     | Int n -> n
     | x -> failwith (Printf.sprintf "int value expected (%s)\n" (show(t) (fun _ -> "<not supported>") (fun _ -> "<not supported>") x))

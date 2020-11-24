@@ -1184,11 +1184,17 @@ extern int Bsexp_tag_patt (void *x) {
 }
 
 extern void* Bsta (void *v, int i, void *x) {
-  ASSERT_BOXED(".sta:3", x);
-  ASSERT_UNBOXED(".sta:2", i);
+  if (UNBOXED(i)) {
+    ASSERT_BOXED(".sta:3", x);
+    //    ASSERT_UNBOXED(".sta:2", i);
   
-  if (TAG(TO_DATA(x)->tag) == STRING_TAG)((char*) x)[UNBOX(i)] = (char) UNBOX(v);
-  else ((int*) x)[UNBOX(i)] = (int) v;
+    if (TAG(TO_DATA(x)->tag) == STRING_TAG)((char*) x)[UNBOX(i)] = (char) UNBOX(v);
+    else ((int*) x)[UNBOX(i)] = (int) v;
+
+    return v;
+  }
+
+  * (void**) x = v;
 
   return v;
 }

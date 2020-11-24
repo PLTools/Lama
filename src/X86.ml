@@ -272,12 +272,10 @@ let compile cmd env imports code =
              (env, Mov (M ("$" ^ s), l) :: call)
 
           | LDA x ->
-             let s, env' = (env#variable x)#allocate in
-             env',
-             (match s with
-	      | S _ | M _ -> [Lea (env'#loc x, eax); Mov (eax, s)]
-	      | _         -> [Lea (env'#loc x, s)]
-             )
+             let s,  env' = (env #variable x)#allocate in
+             let s', env''= env'#allocate in
+             env'',
+             [Lea (env'#loc x, eax); Mov (eax, s); Mov (eax, s')]	     
 
 	  | LD x ->
              let s, env' = (env#variable x)#allocate in

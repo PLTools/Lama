@@ -147,9 +147,14 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
     | STI                     -> let z::(Value.Var r)::stack' = stack in 
                                  eval env (cstack, z::stack', update glob loc z r, loc, i, o) prg'
 
-    | STA                     -> let v::j::x::stack' = stack in
-                                 Value.update_elem x (Value.to_int j) v;
-                                 eval env (cstack, v::stack', glob, loc, i, o) prg'
+    | STA                     -> let z::j::stack' = stack in
+                                 (match j with
+                                  | Value.Var r -> eval env (cstack, z::stack', update glob loc z r, loc, i, o) prg'
+                                  | Value.Int _ ->
+                                     let x :: stack' = stack' in                                   
+                                     Value.update_elem x (Value.to_int j) z;
+                                     eval env (cstack, z::stack', glob, loc, i, o) prg'
+                                 )
                                  
     | SLABEL _ | LABEL  _ | FLABEL _ -> eval env conf prg'
                                       
@@ -826,9 +831,14 @@ let compile cmd ((imports, infixes), p) =
                                
   | Expr.StringVal e        -> let lsv, env = env#get_label in
                                add_code (compile_expr false lsv env e) lsv false [CALL (".stringval", 1, tail)]
+                               
+  | Expr.Assign (Expr.Ref x, e) ->  let lassn, env = env#get_label in
+                                    let env  , line = env#gen_line x in
+                                    let env  , acc  = env#lookup x in
+                                    add_code (compile_expr false lassn env e) lassn false (line @ [ST acc])     
 
   | Expr.Assign (x, e)      -> let lassn, env = env#get_label in
-                               add_code (compile_list false lassn env [x; e]) lassn false [match x with Expr.ElemRef _ -> STA | _ -> STI]                              
+                               add_code (compile_list false lassn env [x; e]) lassn false [match x with Expr.Ref _ -> STI | _ -> STA] (*Expr.ElemRef _ -> STA | _ -> STI]*)
                              
   | Expr.Skip               -> env, false, []
 
