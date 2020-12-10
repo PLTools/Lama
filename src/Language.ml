@@ -53,8 +53,10 @@ module Loc =
   end
 
 let report_error ?(loc=None) str =
-  raise (Semantic_error (str ^ match loc with None -> "" | Some (l, c) -> Printf.sprintf " at (%d, %d)" l c))
+  raise (Semantic_error (str ^ match loc with None -> "" | Some (l, c) -> Printf.sprintf " at (%d, %d)" l c));;
   
+@type k = Unmut | Mut | FVal with show, html
+
 (* Values *)
 module Value =
   struct
@@ -148,7 +150,7 @@ module Builtin =
 
     let list        = ["read"; "write"; ".elem"; ".length"; ".array"; ".stringval"]
     let bindings () = List.map (fun name -> name, Value.Builtin name) list
-    let names       = List.map (fun name -> name, false) list
+    let names       = List.map (fun name -> name, FVal) list
                  
     let eval (st, i, o, vs) args = function
     | "read"     -> (match i with z::i' -> (st, i', o, (Value.of_int z)::vs) | _ -> failwith "Unexpected end of input")
@@ -170,12 +172,12 @@ module Builtin =
 (* States *)
 module State =
   struct
-
+                                 
     (* State: global state, local state, scope variables *)
     @type 'a t =
     | I
-    | G of (string * bool) list * (string, 'a) arrow
-    | L of (string * bool) list * (string, 'a) arrow * 'a t
+    | G of (string * k) list * (string, 'a) arrow
+    | L of (string * k) list * (string, 'a) arrow * 'a t
     with show, html
 
     (* Get the depth level of a state *)
@@ -213,7 +215,7 @@ module State =
     let in_scope x s = List.exists (fun (y, _) -> y = x) s
 
     (* Scope operation: checks if a name designates variable *)
-    let is_var x s = try List.assoc x s with Not_found -> false
+    let is_var x s = try Mut = List.assoc x s with Not_found -> false
                     
     (* Update: non-destructively "modifies" the state s by binding the variable x
        to value v and returns the new state w.r.t. a scope
@@ -455,8 +457,8 @@ module Expr =
          let vars, body, bnds =
            List.fold_left
              (fun (vs, bd, bnd) -> function
-              | (name, (_, `Variable value)) -> (name, true) :: vs, (match value with None -> bd | Some v -> Seq (Ignore (Assign (Ref name, v)), bd)), bnd
-              | (name, (_, `Fun (args, b)))  -> (name, false) :: vs, bd, (name, Value.FunRef (name, args, b, 1 + State.level st)) :: bnd
+              | (name, (_, `Variable value)) -> (name, Mut) :: vs, (match value with None -> bd | Some v -> Seq (Ignore (Assign (Ref name, v)), bd)), bnd
+              | (name, (_, `Fun (args, b)))  -> (name, FVal) :: vs, bd, (name, Value.FunRef (name, args, b, 1 + State.level st)) :: bnd
              )
              ([], body, [])
              (List.rev @@
@@ -512,7 +514,7 @@ module Expr =
              | Value.Builtin name ->
                 Builtin.eval (st, i, o, vs') es name
              | Value.Closure (args, body, closure) ->
-                let st' = State.push (State.leave st closure.(0)) (State.from_list @@ List.combine args es) (List.map (fun x -> x, true) args) in
+                let st' = State.push (State.leave st closure.(0)) (State.from_list @@ List.combine args es) (List.map (fun x -> x, Mut) args) in
                 let st'', i', o', vs'' = eval (st', i, o, []) Skip body in
                 closure.(0) <- st'';
                 (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')                      
@@ -566,7 +568,7 @@ module Expr =
              in
              match match_patt patt v (Some State.undefined) with
              | None     -> branch conf tl
-             | Some st' -> eval (State.push st st' (List.map (fun x -> x, false) @@ Pattern.vars patt), i, o, vs) k (Seq (body, Leave))
+             | Some st' -> eval (State.push st st' (List.map (fun x -> x, Unmut) @@ Pattern.vars patt), i, o, vs) k (Seq (body, Leave))
          in
          eval conf Skip (schedule_list [e; Intrinsic (fun conf -> branch conf bs)])
 

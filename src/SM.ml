@@ -476,7 +476,7 @@ object (self : 'self)
                    let _, intfs = Interface.find import paths in
                    List.fold_left
                      (fun env -> function
-                      | `Variable name -> env#add_name     name `Extern true
+                      | `Variable name -> env#add_name     name `Extern Mut
                       | `Fun name      -> env#add_fun_name name `Extern 
                       | _              -> env
                      )
@@ -513,6 +513,7 @@ object (self : 'self)
     List.filter (function (_, `Local, _) -> false | _ -> true) decls
     
   method push_scope (blab : string) (elab : string) =
+    (*Printf.printf "push: Scope local index = %d\n" scope.local_index;*)
     match scope.st with
     | State.I ->
        {<
@@ -541,7 +542,7 @@ object (self : 'self)
          scope = {
            scope with
            st          = x;
-           local_index = scope.local_index - List.length xs;
+           local_index = ((*Printf.printf "pop: Scope local index = %d\n" (scope.local_index - List.length xs);*) scope.local_index - List.length (List.filter (fun (_, x) -> x <> FVal) xs) (*xs*));
            scopes      = match scope.scopes with
                            [_]            -> scope.scopes
                          | hs :: ps :: tl -> {ps with subs = hs :: ps.subs} :: tl
@@ -581,7 +582,7 @@ object (self : 'self)
                      | State.I | State.G _ ->
                         invalid_arg "wrong scope in add_arg"
                      | State.L (names, s, p) ->
-                        State.L (check_name_and_add names name true, State.bind name (Value.Arg scope.arg_index) s, p)
+                        State.L (check_name_and_add names name Mut, State.bind name (Value.Arg scope.arg_index) s, p)
                     );
         arg_index = scope.arg_index + 1
       }
@@ -593,7 +594,7 @@ object (self : 'self)
     |  _  ->
        report_error (Printf.sprintf "external/public definitions (\"%s\") not allowed in local scopes" (Subst.subst name))
     
-  method add_name (name : string) (m : [`Local | `Extern | `Public | `PublicExtern]) (mut : bool) = {<
+  method add_name (name : string) (m : [`Local | `Extern | `Public | `PublicExtern]) (mut : Language.k) = {<
       decls = (name, m, false) :: decls;
       scope = {
         scope with
@@ -604,7 +605,7 @@ object (self : 'self)
                           State.G ((match m with `Extern | `PublicExtern -> names | _ -> check_name_and_add names name mut), State.bind name (Value.Global name) s)
                        | State.L (names, s, p) ->
                           self#check_scope m name;
-                          State.L (check_name_and_add names name mut, State.bind name (Value.Local scope.local_index) s, p)
+                          State.L (check_name_and_add names name mut, State.bind name (Value.Local ((*Printf.printf "Var: %s -> %d\n" name scope.local_index;*) scope.local_index)) s, p) (* !! *)
                       );
         local_index = (match scope.st with State.L _ -> scope.local_index + 1 | _ -> scope.local_index);
         nlocals     = (match scope.st with State.L _ -> max (scope.local_index + 1) scope.nlocals | _ -> scope.nlocals);
@@ -624,10 +625,10 @@ object (self : 'self)
       | State.I ->
          invalid_arg "uninitialized scope"
       | State.G (names, s) ->
-         State.G ((match m with `Extern | `PublicExtern -> names | _ -> check_name_and_add names name false), State.bind name (Value.Fun name') s)
+         State.G ((match m with `Extern | `PublicExtern -> names | _ -> check_name_and_add names name FVal), State.bind name (Value.Fun name') s)
       | State.L (names, s, p) ->
          self#check_scope m name;
-         State.L (check_name_and_add names name false, State.bind name (Value.Fun name') s, p)        
+         State.L (check_name_and_add names name FVal, State.bind name (Value.Fun name') s, p)        
     in
     {<
       decls = (name, m, true) :: decls;
@@ -739,8 +740,10 @@ let compile cmd ((imports, infixes), p) =
     let env, code =
       List.fold_left
         (fun (env, acc) (name, path) ->
-           let env = env#add_name name `Local true in
+          (*Printf.printf "Bindings..\n";*)
+           let env = env#add_name name `Local Mut in
            let env, dsg = env#lookup name in
+          (*Printf.printf "End Bindings..\n";*)
            env,
            ([DUP] @
             List.concat (List.map (fun i -> [CONST i; CALL (".elem", 2, false)]) path) @
@@ -774,8 +777,8 @@ let compile cmd ((imports, infixes), p) =
          (fun (env, e, funs) ->
            function
            | name, (m, `Fun (args, b))     -> env#add_fun_name name m, e, (name, args, m, b) :: funs
-           | name, (m, `Variable None)     -> env#add_name name m true, e, funs
-           | name, (m, `Variable (Some v)) -> env#add_name name m true, Expr.Seq (Expr.Ignore (Expr.Assign (Expr.Ref name, v)), e), funs
+           | name, (m, `Variable None)     -> env#add_name name m Mut, e, funs
+           | name, (m, `Variable (Some v)) -> env#add_name name m Mut, Expr.Seq (Expr.Ignore (Expr.Assign (Expr.Ref name, v)), e), funs
          )
          (env, e, [])
          (List.rev ds)
@@ -792,6 +795,7 @@ let compile cmd ((imports, infixes), p) =
   | Expr.ElemRef (x, i)     -> compile_list tail l env [x; i]
   | Expr.Var      x         -> let env, line = env#gen_line x in
                                let env, acc  = env#lookup x in
+                               (*Printf.printf "Looking up %s -> %s\n" x (show(Value.designation) acc);*)
                                (match acc with Value.Fun name -> env#register_call name, false, line @ [PROTO (name, env#current_function)] | _ -> env, false, line @ [LD acc])
   | Expr.Ref      x         -> let env, line = env#gen_line x in
                                let env, acc  = env#lookup x in env, false, line @ [LDA acc]
