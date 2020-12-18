@@ -1,4 +1,12 @@
 open Language
+
+(* Test using:
+    mkae -C tools && LAMA=./runtime tools/gtd.exe stdlib/List.lama -pos 20,22 -use
+  should give:
+    found definition for `f` at (17,19)
+    Total 2 usages found
+    (20,25) (20,22)
+*)
 type mode = GoToDef | Usages
 type config =
   { mutable filename : string
@@ -22,8 +30,12 @@ let () =
     "Help"
 
 
-module Introduced = Map.Make(String)
-
+module Introduced = struct
+  include Map.Make(String)
+  let extend k v map =
+    (* Format.printf "extending '%s' -> (%d,%d)\n%!" k (fst v) (snd v); *)
+    add k (k,v) map
+end
 exception DefinitionFound of (string * Loc.t)
 
 let do_find e =
@@ -31,8 +43,8 @@ let do_find e =
     match Loc.get name with
     | Some (l,c) when l=config.line && c = config.col ->
         (* we found what we want *)
-        let (l,c) = Introduced.find name map in
-        raise (DefinitionFound (name,(l,c)))
+        let (key,(l,c)) = Introduced.find name map in
+        raise (DefinitionFound (key,(l,c)))
     | _ -> map
   in
 
@@ -41,13 +53,15 @@ let do_find e =
     inherit [_,_] Language.Expr.foldl_t_t_stub (foldl_decl, fself) as super
     method! c_Var _inh _ name = on_name name _inh
     method! c_Ref _inh _ name = on_name name _inh
-    method c_Scope inh e names r =
-      let map = ListLabels.fold_left ~init:inh names ~f:(fun acc (fname,(_,info)) ->
-        let acc = Introduced.add fname (Loc.get_exn fname) acc in
+    method c_Scope init e names r =
+      let map = ListLabels.fold_left ~init names ~f:(fun acc (fname,(_,info)) ->
+        let acc = Introduced.extend fname (Loc.get_exn fname) acc in
         match info with
         | `Variable _ ->  acc
-        | `Fun (args, _body) ->
-            List.fold_left (fun acc name -> Introduced.add name (Loc.get_exn name) acc) acc args
+        | `Fun (args, body) ->
+            let acc2 = List.fold_left (fun acc arg_name -> Introduced.extend arg_name (Loc.get_exn arg_name) acc) acc args in
+            let _ = fself acc2 body in
+            acc
         )
       in
       super#c_Scope map e names r
@@ -69,19 +83,36 @@ let find_usages root (def_name,(_,_)) =
     else acc
   in
 
-  let ooo (foldl_decl, fself) = object
+  let ooo (foldl_decl, fself) = object(self)
     inherit [_,_] Language.Expr.foldl_t_t_stub (foldl_decl, fself) as super
-    method! c_Var _inh _ name = on_name name _inh
-    method! c_Ref _inh _ name = on_name name _inh
-    method c_Scope inh e names r =
-      (* if we hide interesting name, then we stop the search *)
-      if List.exists (fun (n,_) -> String.equal n def_name) (names : (string * _) list)
-      then inh
-      else super#c_Scope inh e names r
+    method! c_Var (acc,in_scope) _ name =
+      if in_scope then (on_name name acc, in_scope) else (acc, in_scope)
+    method! c_Ref (acc,in_scope) _ name =
+      self#c_Var (acc,in_scope) (Var name) name
+    method c_Scope init e names r =
+      ListLabels.fold_left ~init names ~f:(fun ((acc, in_scope) as inh) (name,info) ->
+        match (in_scope, String.equal def_name name) with
+        | (true, true) -> (acc, false)
+        | (true, _) -> begin
+            match snd info with
+            | `Fun (args, body) when List.mem def_name args ->  inh
+            | `Fun (args, body) -> fself inh body
+            | `Variable (Some rhs) -> fself inh rhs
+            | `Variable None -> inh
+        end
+        | (false, true) -> super#c_Scope (acc,true) e names r
+        | false,false -> begin
+            match snd info with
+            | `Fun (args, body) when List.memq def_name args -> fself (acc,true) body
+            | `Fun (args, body) -> fself inh body
+            | `Variable (Some rhs) -> fself inh rhs
+            | `Variable None -> inh
+        end
+      ) |> (fun acc -> fself acc r)
   end in
 
   let (_,fold_t) = Expr.fix_decl Expr.foldl_decl_0 ooo in
-  fold_t [] root
+  fold_t ([],false) root
 
 
 let () =
@@ -98,7 +129,8 @@ let () =
           match config.mode with
           | GoToDef -> Format.printf "found definition for `%s` at (%d,%d)\n%!" name l c;
           | Usages ->
-              let locs = find_usages e (name,(l,c)) in
+              Format.printf "found definition for `%s` at (%d,%d)\n%!" name l c;
+              let (locs,_) = find_usages e (name,(l,c)) in
               Format.printf "Total %d usages found\n%!" (List.length locs);
               List.iter (fun (l,c) -> Format.printf "(%d,%d) %!" l c) locs;
               Format.printf "\n%!"
