@@ -1,0 +1,45 @@
+-- State Monad.
+-- (C) Dmitry Boulytchev, JetBrains Research, St. Petersburg State University, 2020
+--
+-- This unit provides a state
+
+import List;
+import Fun;
+
+public infixl => before $ (x, f) {
+  fun (state) {
+    case x (state) of
+      [state, x] -> [state, f (x)]
+    esac
+  }
+}
+
+public infix =>> at => (x, f) {
+  fun (state) {
+    case x (state) of
+      [state, x] -> f (x) (state)
+    esac
+  }
+}
+
+public fun returnST (x) {
+  fun (state) {[state, x]}
+}
+
+public fun chainST (xs) {
+  fun (state) {
+    case
+      foldl (fun (f, x) {
+               fun (state) {
+                 case f (state) of
+                   [state, xs] -> case x (state) of
+                                  [state, x] -> [state, x : xs]
+                                esac
+                 esac
+               }
+             }, returnST $ {}, xs) (state) of    
+      [state, xs] -> [state, reverse (xs)]
+    esac
+  }
+}
+ 

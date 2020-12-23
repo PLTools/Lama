@@ -18,7 +18,7 @@ Ostap.o: List.o Collection.o Ref.o Fun.o Matcher.o
 
 Buffer.o: List.o
 
-Expr.o: Ostap.o
+STM.o: List.o Fun.o
 
 %.o: %.lama
 	LAMA=../runtime $(LAMAC) -I . -c $<
