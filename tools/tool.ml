@@ -1,11 +1,11 @@
 open Language
 
 (* Test using:
-    mkae -C tools && LAMA=./runtime tools/gtd.exe stdlib/List.lama -pos 20,22 -use
+    mkae -C tools && LAMA=./runtime tools/gtd.exe tools/demo1.lama -pos 20,22 -use
   should give:
     found definition for `f` at (17,19)
     Total 2 usages found
-    (20,25) (20,22)
+    (5,25) (5,22)
 *)
 type mode = GoToDef | Usages
 type config =
@@ -122,7 +122,7 @@ let () =
   match Language.run_parser cfg with
   | `Fail s -> failwith s
   | `Ok ((_,_), e) ->
-      Format.printf "%s\n%!" (GT.show Expr.t e);
+      (* Format.printf "%s\n%!" (GT.show Expr.t e); *)
       match do_find e with
       | None -> Format.printf "Definition not found\n%!"
       | Some (name,(l,c)) ->

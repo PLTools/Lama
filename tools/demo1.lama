@@ -1,0 +1,15 @@
+public fun foldl (f, acc, l) {
+              --  ^-- (1,19)
+  case l of
+    {}     -> acc
+  | x : xs -> foldl (f, f (acc, x), xs)
+          -- (5,22)--^  ^-- (5,25)
+  esac
+}
+
+public fun filter (f, l) {
+  case l of
+    {}    -> {}
+  | h : t -> if f (h) then h : filter (f, t) else filter (f, t) fi
+  esac
+}
