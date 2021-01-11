@@ -4,10 +4,10 @@ import Fun;
 
 fun many (a) {
   memo (
-   fun (k) {
+   eta (
       empty @ lift({})
-    | many (a) |> fun (as) {a @ fun (x) {as +++ singleton (x)}} $ k
-   }
+    | many (a) |> fun (as) {a @ fun (x) {as +++ singleton (x)}}
+   )   
   )
 }
 

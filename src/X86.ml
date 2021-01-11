@@ -542,7 +542,7 @@ let compile cmd env imports code =
           | FAIL ((line, col), value) ->                       
              let v, env = if value then env#peek, env else env#pop in
              let s, env = env#string cmd#get_infile in
-             env, [Push (L (box col)); Push (L (box line)); Push (M ("$" ^ s)); Push v; Call "Bmatch_failure"; Binop  ("+", L (3 * word_size), esp)]
+             env, [Push (L (box col)); Push (L (box line)); Push (M ("$" ^ s)); Push v; Call "Bmatch_failure"; Binop  ("+", L (4 * word_size), esp)]
              
           | i ->
              invalid_arg (Printf.sprintf "invalid SM insn: %s\n" (GT.show(insn) i))

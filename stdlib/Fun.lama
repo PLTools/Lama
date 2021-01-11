@@ -9,7 +9,7 @@ public fun id (x) {
   x
 }
 
-public infixl $ after := (f, x) {
+public infixr $ after := (f, x) {
   f (x)
 }
 
