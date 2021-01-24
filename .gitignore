@@ -1,5 +1,7 @@
 *~
 *.cmi
 *.cmx
+*.cmo
 *.o
+.merlin
 
