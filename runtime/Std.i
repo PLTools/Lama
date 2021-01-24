@@ -1,3 +1,4 @@
+F,assert;
 F,getEnv;
 F,system;
 V,sysargs;

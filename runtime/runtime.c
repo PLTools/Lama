@@ -151,6 +151,15 @@ static void failure (char *s, ...) {
   vfailure (s, args);
 }
 
+void Lassert (void *f, char *s, ...) {
+  if (!UNBOX(f)) {
+    va_list args;
+
+    va_start (args, s);
+    vfailure (s, args);    
+  }
+}
+
 # define ASSERT_BOXED(memo, x)               \
   do if (UNBOXED(x)) failure ("boxed value expected in %s\n", memo); while (0)
 # define ASSERT_UNBOXED(memo, x)             \
