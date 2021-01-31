@@ -6,6 +6,6 @@ fun f (x) {
    inner (x)
 }
 
-local n = read ();
+var n = read ();
 
 write (f (5))

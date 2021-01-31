@@ -1,7 +1,7 @@
-local n, y, y2, t;
+var n, y, y2, t;
 
 fun test (n, m) {
-  local i, s;
+  var i, s;
   s := 0;
   for i := 0, i <= n, i := i + 1 do
     s := s + i;

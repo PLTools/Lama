@@ -1,7 +1,7 @@
-local n, x, i;
+var n, x, i;
 
 fun sort (x) {
-  local i, j, y, n;
+  var i, j, y, n;
   n := x.length;
   
   if n == 0 then  x fi;

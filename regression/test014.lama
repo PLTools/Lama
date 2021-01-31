@@ -1,4 +1,4 @@
-local n;
+var n;
 
 n := read ();
 

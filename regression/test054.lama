@@ -1,4 +1,4 @@
-local x, y, z, s, i, n;
+var x, y, z, s, i, n;
 
 x := y := z := 105;
 

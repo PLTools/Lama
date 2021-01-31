@@ -1,8 +1,8 @@
 import Matcher;
 
-local m = initMatcher ("   -- asdasdakm ,m.,msd .,m.,asd\n    \n\n abc");
+var m = initMatcher ("   -- asdasdakm ,m.,msd .,m.,asd\n    \n\n abc");
 
-local
+var
   lident  = createRegexp ("[a-z][a-zA-Z_]*", "lowercase identifier"),
   uident  = createRegexp ("[A-Z][a-zA-Z_]*", "uppercase identifier"),
   ws      = createRegexp ("\\([ \t\n]\\|--[^\n]*\n\\)*", "whitespace"),
@@ -53,7 +53,7 @@ infixr || after |> (l, r) {
   }
 }
 
-local expr = lid @ fun (s) {Lid (s)} || const @ fun (s) {Dec (s)},
+var expr = lid @ fun (s) {Lid (s)} || const @ fun (s) {Dec (s)},
       assn = lid |> fun (id) {token (":=") |> fun (s) {expr @ fun (e) {Assn (id, e)}}};
 
 printf ("%s\n", case assn (initMatcher ("x:=3")) of Fail (err) -> err | Succ (s, _) -> s.string esac)

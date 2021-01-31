@@ -1,4 +1,4 @@
-local x, m, n;
+var x, m, n;
 
 fun ack (m, n) {
   if m == 0 then  (n+1)

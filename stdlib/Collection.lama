@@ -33,7 +33,7 @@ public fun validateColl ([t, compare]) {
     | MNode (k, _, bf, l, r) ->
        if verify (k)
        then
-	 local lh = inner (l, fun (x) {compare (x, k) < 0}),
+	 var lh = inner (l, fun (x) {compare (x, k) < 0}),
 	       rh = inner (r, fun (x) {compare (x, k) > 0});
 
          if bf == lh - rh
@@ -60,7 +60,7 @@ fun insertColl ([m, compare], pk, v, sort) {
     if left
     then case node of   
            MNode (k, v, x, l, MNode (rk, rv, y, ll, rr)) ->           
-             local x0 = if y  > 0 then x + 1 else x - y + 1 fi,
+             var x0 = if y  > 0 then x + 1 else x - y + 1 fi,
                    y0 = if x0 > 0
                         then
                           if y > 0
@@ -74,7 +74,7 @@ fun insertColl ([m, compare], pk, v, sort) {
          esac
     else case node of
            MNode (k, v, x, MNode (lk, lv, y, ll, rr), r) ->
-             local x0 = if y < 0 then x - 1 else x - y - 1 fi,
+             var x0 = if y < 0 then x - 1 else x - y - 1 fi,
                    y0 = if x0 > 0
                         then y - 1
                         else
@@ -95,7 +95,7 @@ fun insertColl ([m, compare], pk, v, sort) {
     case m of
       {} -> [true, MNode (pk, append (v, {}), 0, {}, {})]
     | MNode (kk, vv, bf, l, r) -> 
-       local c = compare (pk, kk);
+       var c = compare (pk, kk);
        if c == 0
        then [false, MNode (kk, append (v, vv), bf, l, r)]
        else if c < 0
@@ -145,7 +145,7 @@ fun findColl ([m, compare], pk, sort) {
     case m of
       {} -> None
     | MNode (kk, vv, _, l, r) ->
-       local c = compare (pk, kk);
+       var c = compare (pk, kk);
        if c == 0
        then extract (vv)
        else inner (if c < 0 then l else r fi)
@@ -168,7 +168,7 @@ fun removeColl ([m, compare], pk, sort) {
     case m of
       {} -> m
     | MNode (kk, vv, bf, l, r) ->
-       local c = compare (pk, kk);
+       var c = compare (pk, kk);
        if c == 0
        then MNode (kk, delete (vv), bf, l, r)
        else if c < 0
@@ -319,9 +319,9 @@ public fun lookupMemo (mm@[p, m], v) {
          case v of
            #string -> mm[1] := addMap (m, v, v); v        
          | _ ->
-           local vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;          
+           var vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;          
            for skip, i < v.length, i := i + 1 do
-             local vci = lookupMemo (mm, vc [i]);
+             var vci = lookupMemo (mm, vc [i]);
              vc [i] := vci
            od;
            mm [1] := addMap (m, vc, vc);
@@ -337,7 +337,7 @@ public fun emptyHashTab (n, hash, compare) {
 }
 
 public fun addHashTab (ht@[a, compare, hash], k, v) {
-  local h = hash (k);
+  var h = hash (k);
   
   a [h] := [k, v] : a [h];
 
@@ -352,7 +352,7 @@ public fun findHashTab ([a, compare, hash], k) {
 }
 
 public fun removeHashTab (ht@[a, compare, hash], k) {
-  local h = hash (k);
+  var h = hash (k);
   
   a [h] := remove (fun ([k0, _]) {compare (k, k0) == 0}, a [h]);
 

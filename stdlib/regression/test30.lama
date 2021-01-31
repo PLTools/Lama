@@ -6,7 +6,7 @@ import Fun;
 import Data;
 
 fun genCyclicArrays (n, eq, cross) {
-  local f = ref (true);
+  var f = ref (true);
   
   fun genrec (n, stacka, stackb, depth) {
     fun peek (k, stack) {
@@ -24,14 +24,14 @@ fun genCyclicArrays (n, eq, cross) {
         x -> [x, clone (x)]
       esac           
     else
-      local a     = split (n, random (n+1)),
+      var a     = split (n, random (n+1)),
             b     = mapArray (id, a),
             index = initArray (random (a.length + 1), fun (_) {random (a.length)});
       
       fun shared (i)  {
-        local found = false;
+        var found = false;
         
-        for local j=0;, j < index.length && 1 - found, j := j + 1
+        for var j=0;, j < index.length && 1 - found, j := j + 1
         do
           found := i == index[j]
         od;
@@ -39,7 +39,7 @@ fun genCyclicArrays (n, eq, cross) {
         found
       }
       
-      for local i=0;, i < a.length, i := i + 1
+      for var i=0;, i < a.length, i := i + 1
       do
         if shared (i)
         then
@@ -89,7 +89,7 @@ fun not (x) {0 - x}
 
 disableGC ();
 
-for local i=0;, i<25, i:=i+1
+for var i=0;, i<25, i:=i+1
 do
   case genCyclicArrays (1000, true, false) of
     [a, b] ->
@@ -98,7 +98,7 @@ do
   esac
 od;
 
-for local i=0;, i<25, i:=i+1
+for var i=0;, i<25, i:=i+1
 do
   case genCyclicArrays (1000, true, true) of
     [a, b] ->
@@ -107,19 +107,19 @@ do
   esac
 od;
 
-for local i=0;, i<25, i:=i+1
+for var i=0;, i<25, i:=i+1
 do
   case genCyclicArrays (1000, false, false) of
-   [a, b] -> local x = normalize (a =?= b);
+   [a, b] -> var x = normalize (a =?= b);
              printf ("%d\n", x != 0);
              printf ("%d\n", not (x) == normalize (b =?= a))
   esac
 od;
 
-for local i=0;, i<25, i:=i+1
+for var i=0;, i<25, i:=i+1
 do
   case genCyclicArrays (1000, false, true) of
-   [a, b] -> local x = normalize (a =?= b);
+   [a, b] -> var x = normalize (a =?= b);
              printf ("%d\n", x != 0);
              printf ("%d\n", not (x) == normalize (b =?= a))
   esac

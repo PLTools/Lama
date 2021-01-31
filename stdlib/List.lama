@@ -3,10 +3,6 @@
 --
 -- This unit provides a set of list-manipulation primitives.
 
-public fun singleton (x) {
-  x : {}
-}
-
 public fun size (l) {
   case l of
     {}    -> 0
@@ -75,10 +71,10 @@ public fun find (f, l) {
 }
 
 public fun flatten (l) {
-  local res = [0, {}], curr = [res];
+  var res = [0, {}], curr = [res];
 
   fun append (x) {
-    local new = x : {};
+    var new = x : {};
     
     curr [0][1] := new;
     curr [0] := new    
@@ -90,10 +86,10 @@ public fun flatten (l) {
 }
 
 public fun deepFlatten (l) {
-  local res = [0, {}], curr = [res];
+  var res = [0, {}], curr = [res];
 
   fun append (x) {
-    local new = x : {};
+    var new = x : {};
     
     curr [0][1] := new;
     curr [0] := new    

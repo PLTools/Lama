@@ -2,13 +2,13 @@ import Ostap;
 import Fun;
 import List;
 
-local a   = token ("a"),
+var a   = token ("a"),
       eq  = [token ("="), fun (l, _, r) {Eq (l, r)}],      
       add = [token ("+"), fun (l, _, r) {Add (l, r)}],
       sub = [token ("-"), fun (l, _, r) {Sub (l, r)}],
       mul = [token ("*"), fun (l, _, r) {Mul (l, r)}],
       div = [token ("/"), fun (l, _, r) {Div (l, r)}],      
-      exp = expr ({[Nona, singleton (eq)], [Right, {add, sub}], [Left, {mul, div}]}, a);
+      exp = expr ({[Nona, {eq}], [Right, {add, sub}], [Left, {mul, div}]}, a);
 
 printf ("%s\n", parseString (exp |> bypass (eof), "a+a-a").string);
 printf ("%s\n", parseString (exp |> bypass (eof), "a*a/a*a").string);

@@ -1,11 +1,11 @@
-local s, n, p;
+var s, n, p;
 
 s := 0;
 n := read ();
 p := 2;
 
-while n > 0 do {
-    local c = 2, f = 1;
+while n > 0 do (
+    var c = 2, f = 1;
 
     while c*c <= p && f do
       f := (p % c) != 0;
@@ -18,5 +18,5 @@ while n > 0 do {
     else skip fi;
 
     p := p + 1
-}    
+)
 od

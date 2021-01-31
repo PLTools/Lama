@@ -1,4 +1,4 @@
-local x, a, b, c;
+var x, a, b, c;
 
 fun test1 (a) {
   write (a);

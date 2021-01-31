@@ -1,4 +1,4 @@
-local n, t;
+var n, t;
 
 fun insert (t, x) {
   case t of

@@ -8,6 +8,6 @@ fun f (a) {
    g (a)
 }
 
-local x = read ();
+var x = read ();
 
 write (f(10)(5))

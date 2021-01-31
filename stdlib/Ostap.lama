@@ -10,7 +10,7 @@ import Ref;
 import Fun;
 import Matcher;
 
-local tab, hct, restab, log = false;
+var tab, hct, restab, log = false;
 
 public fun logOn () {
   log := true
@@ -36,7 +36,7 @@ public fun memo (f) {
   
   fun (k) {
     fun (s) {
-      local t =
+      var t =
          case findHashTab (deref (tab), f) of
            Some (t) -> t
          esac;
@@ -188,7 +188,7 @@ public fun showStream (name) {
 }
 
 fun createResult () {
-  local errors   = ref ({}),
+  var errors   = ref ({}),
         line     = ref (0),
         col      = ref (0),
         value    = ref ({}),
@@ -209,14 +209,14 @@ fun createResult () {
     | Fail (err, l, c) ->
         if deref (hasError)
         then
-          local c = compare ([line, col], [l, c]);
+          var c = compare ([line, col], [l, c]);
 
           if   c == 0 then errors ::= err : deref (errors)
-          elif c <  0 then errors ::= singleton (err); line ::= l; col ::= c
+          elif c <  0 then errors ::= {err}; line ::= l; col ::= c
           fi
         else
           hasError ::= true;
-          errors   ::= singleton (err);
+          errors   ::= {err};
           line     ::= l;
           col      ::= c
         fi
@@ -242,7 +242,7 @@ fun result (acc) {
 }
 
 public fun parse (p, m) {
-  local acc = createResult ();
+  var acc = createResult ();
 
   p (acc.k) (m);
 
@@ -250,7 +250,7 @@ public fun parse (p, m) {
 }
 
 public fun parseString (p, s) {
-  local acc = createResult ();
+  var acc = createResult ();
 
   p (acc.k) (initMatcher (s));
 
@@ -277,7 +277,7 @@ public fun right (op, f) {
 fun altl (level) {
   case level of
     [assoc, ps] ->
-       local assfun = case assoc of Left -> left | Right -> right | Nona -> left esac;
+       var assfun = case assoc of Left -> left | Right -> right | Nona -> left esac;
        case map (fun (p) {
                    case p of
                      [op, sema] -> op @ fun (op) {assfun (op, sema)}
@@ -293,7 +293,7 @@ public fun expr (ops, opnd) {
     case ops of
       {}         -> fun (c) {opnd @ c}
     | level : tl ->
-        local lops = altl (level),
+        var lops = altl (level),
               next = inner (tl);
 
         case level.fst of

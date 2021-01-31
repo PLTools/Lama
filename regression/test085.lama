@@ -1,4 +1,4 @@
-local n;
+var n;
 
 fun sum (l) {
   case l of
@@ -15,7 +15,7 @@ fun print_list (l) {
 }
 
 fun array_to_list (a) {
-  local l, i;
+  var l, i;
   l := {};
   for i := a.length, i > 0, i := i-1 do
     l := a[i-1] : l

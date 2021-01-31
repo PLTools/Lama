@@ -1,7 +1,7 @@
-local x;
+var x;
 
 do
-  local n = read ();
+  var n = read ();
   x := n
 while n <= 0 od;
 

@@ -739,7 +739,6 @@ module Expr =
       }
 
       | l:$ "[" es:!(Util.list0)[parse infix Val] "]" => {notRef atr} :: (not_a_reference l) => {ignore atr (Array es)}
-      | -"{" scope[infix][atr] -"}"
       | l:$ "{" es:!(Util.list0)[parse infix Val] "}" => {notRef atr} :: (not_a_reference l) => {ignore atr (match es with
                                                                                       | [] -> Const 0
                                                                                       | _  -> List.fold_right (fun x acc -> Sexp ("cons", [x; acc])) es (Const 0))
@@ -788,7 +787,7 @@ module Expr =
       | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {env#add_import "Lazy"; ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
       | l:$ %"eta"  e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {let name = env#get_tmp in ignore atr (Lambda ([name], Call (e, [Var name])))}
       | l:$ %"syntax" "(" e:syntax[infix] ")" => {notRef atr} :: (not_a_reference l) => {env#add_import "Ostap"; ignore atr e}
-      | -"(" parse[infix][atr] -")";
+      | -"(" scope[infix][atr] (*parse[infix][atr]*) -")";
       syntax[infix]: ss:!(Util.listBy)[ostap ("|")][syntaxSeq infix] {
         List.fold_right (fun s -> function
                                   | Var "" -> s
@@ -1054,7 +1053,7 @@ module Definition =
       };
 
       parse[infix]:
-        m:(%"local" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
+        m:(%"var" {`Local} | %"public" e:(%"external")? {match e with None -> `Public | Some _ -> `PublicExtern} | %"external" {`Extern})
           locs:!(Util.list (local_var m infix)) next:";" {locs, infix}
     | - <(m, orig_name, name, infix', flag)> : head[infix] -"(" -args:!(Util.list0)[Pattern.parse] -")"
           (l:$ "{" body:exprScope[infix'][Expr.Weak] "}" {
@@ -1266,7 +1265,7 @@ let run_parser cmd =
     "if"; "then"; "else"; "elif"; "fi";
     "while"; "do"; "od";
     "for";
-    "fun"; "local"; "public"; "external"; "import";
+    "fun"; "var"; "public"; "external"; "import";
     "length";
     "string";
     "case"; "of"; "esac"; "when";

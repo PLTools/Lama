@@ -2,6 +2,6 @@ infixr ** before * (f, g) {
    fun (x) { f (g (x))}
 }
 
-local x = read ();
+var x = read ();
 
 write ((fun (x) { x+2} ** fun (x) { x+3})(7))

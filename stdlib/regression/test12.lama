@@ -8,7 +8,7 @@ fun gen (depth) {
   fi    
 }
 
-local a   = token ("a"),
+var a   = token ("a"),
       add = [token ("+"), fun (l, _, r) {Add (l, r)}],
       sub = [token ("-"), fun (l, _, r) {Sub (l, r)}],
       mul = [token ("*"), fun (l, _, r) {Mul (l, r)}],

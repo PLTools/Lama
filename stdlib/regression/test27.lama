@@ -4,7 +4,7 @@ fun pure(v) {
   empty @ lift(v)
 }
 
-local parse = 
+var parse = 
   token(".") |> fun(e1) { 
   token(".") |> fun(e2) {
   pure(Dot(e1, e2)) }};

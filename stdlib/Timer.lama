@@ -6,7 +6,7 @@
 
 -- Creates a new timer
 public fun timer () {
-  local t = time ();
+  var t = time ();
 
   fun () {
     time () - t
@@ -15,7 +15,7 @@ public fun timer () {
 
 -- Formats a given time as a floating-point number
 public fun toSeconds (t) {
-  local s = sprintf ("%d", t);
+  var s = sprintf ("%d", t);
   
   if s.length >= 7
   then

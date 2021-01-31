@@ -8,7 +8,7 @@ import Ref;
 
 -- Generic comparison for shared/cyclic data structures
 public infix =?= at < (x, y) {
-  local m = ref (emptyMap (flatCompare));
+  var m = ref (emptyMap (flatCompare));
 
   fun alreadyEq (x, y) {
     fun find (x) {
@@ -36,7 +36,7 @@ public infix =?= at < (x, y) {
 
     case [find (x), find (y)] of
       [None, None] ->
-        local v = [1];
+        var v = [1];
         m ::= addMap (addMap (deref (m), x, v), y, v);
         false
          
@@ -66,9 +66,9 @@ public infix =?= at < (x, y) {
   }
 
   fun cmpargs (x, y, from) {
-    local diff = x.length - y.length;
+    var diff = x.length - y.length;
 
-    for local i = from;, i < x.length && diff == 0, i := i + 1 do
+    for var i = from;, i < x.length && diff == 0, i := i + 1 do
       diff := cmprec (x[i], y[i]) 
     od;
     
@@ -79,7 +79,7 @@ public infix =?= at < (x, y) {
     if alreadyEq (x, y)
     then 0
     else
-      local diff = x.kindOf - y.kindOf;
+      var diff = x.kindOf - y.kindOf;
       
       if diff != 0 then diff
       else

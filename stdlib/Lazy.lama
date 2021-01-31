@@ -4,13 +4,13 @@
 -- Deferred computations.
 
 public fun makeLazy (f) {
-  local value, set = false;
+  var value, set = false;
   
   fun () {
     if set
     then value
     else
-      local c; -- need this temporary since in value := f () value would
+      var c; -- need this temporary since in value := f () value would
                -- create an intermediate managed pointer
       set   := true;
       c     := f ();

@@ -4,7 +4,7 @@ fun f (x, y) {
   fun () {x+y}
 }
 
-local t = emptyMemo (),
+var t = emptyMemo (),
       a = lookupMemo (t, "abc"),
       b = lookupMemo (t, [1, 2, 3, 4, "abc"]),
       c = lookupMemo (t, f (5, 6));

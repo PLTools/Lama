@@ -10,7 +10,7 @@ fun f (l) {
   esac
 }
 
-local x = read ();
+var x = read ();
 
 write (f ({}));
 write (f (1:{}));

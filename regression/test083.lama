@@ -1,7 +1,7 @@
-local n, y;
+var n, y;
 
 fun test (n, m) {
-  local i, s;
+  var i, s;
   write (n);
   write (m);
    n

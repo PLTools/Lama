@@ -1,7 +1,7 @@
-local i, n, result;
+var i, n, result;
 
 fun fib (n) {
-  local r;
+  var r;
   if n <= 1
   then result := 1
   else

@@ -1,4 +1,4 @@
-local i;
+var i;
 
 printf ("Number of commands-line arguments: %d\n", sysargs.length);
 

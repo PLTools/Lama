@@ -1,7 +1,7 @@
-local n;
+var n;
 
 fun collect_ints_acc (v, tail) {
-  local i;
+  var i;
   case v of
     a@#val  ->  Cons (a, tail)
   | #string ->  tail

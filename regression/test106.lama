@@ -3,7 +3,7 @@ fun g (h : tl) {
   write (h)
 }
 
-local n = read ();
+var n = read ();
 
 f (1);
 g ({2, 3})

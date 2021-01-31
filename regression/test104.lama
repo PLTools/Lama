@@ -1,5 +1,5 @@
-local n = read ();
+var n = read ();
 
-for local i; i := 0, i<10, i := i + 1 do
+for var i; i := 0, i<10, i := i + 1 do
   write (i)
 od   

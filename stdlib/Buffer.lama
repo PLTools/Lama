@@ -12,7 +12,7 @@ public fun emptyBuffer () {
 
 -- Creates a buffer with one element x
 public fun singletonBuffer (x) {
-  local y = singleton (x);
+  var y = {x};
 
   [y, y]
 }  
@@ -25,10 +25,10 @@ public fun listBuffer (x) {
 -- Adds x to the end of buffer buf
 public fun addBuffer (buf, x) {
   case buf of
-    {} -> local y = singleton (x);
+    {} -> var y = {x};
           [y, y]          
   | [head, last] ->
-          last[1] := singleton (x);
+          last[1] := {x};
           [head, last[1]]
   esac
 }

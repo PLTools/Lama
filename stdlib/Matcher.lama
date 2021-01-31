@@ -8,7 +8,7 @@
 --             (e.g. "identifier", "string constant", etc.), used for error
 --             reporting
 public fun createRegexp (r, name) {
-  local l = [regexp (r), name];
+  var l = [regexp (r), name];
   l
 }
 
@@ -32,7 +32,7 @@ fun createMatcher (buf, pos, line, col) {
 
   -- Moves the position pointer on given number of characters.
   fun shift (n) {
-    local i, l = line, c = col;
+    var i, l = line, c = col;
     
     for i := pos, i < pos+n, i := i+1 do
       case buf [i] of
@@ -54,7 +54,7 @@ fun createMatcher (buf, pos, line, col) {
   }
 
   fun matchRegexp (r) {
-    local n;
+    var n;
     
     if (n := regexpMatch (r[0], buf, pos)) >= 0
     then Succ (substring (buf, pos, n), shift (n))

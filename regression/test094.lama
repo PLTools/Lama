@@ -1,7 +1,7 @@
 fun a (x, y) {
-  local a = x + y, b = x - y;
-  {
-   local f = fun () {
+  var a = x + y, b = x - y;
+  (
+   var f = fun () {
      write (x);
      write (y);
      write (a);
@@ -14,9 +14,9 @@ fun a (x, y) {
    y := 1000;
    
     f
-  }
+  )
 }
 
-local x = read ();
+var x = read ();
 
 a (5, 7) ()

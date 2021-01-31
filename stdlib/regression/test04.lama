@@ -1,6 +1,6 @@
 import Collection;
 
-local s = emptyMap (compare), i;
+var s = emptyMap (compare), i;
 
 for i := 0, i < 100, i := i+1
 do

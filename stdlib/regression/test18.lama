@@ -12,7 +12,7 @@ fun not (x) {
 }
 
 fun test (a, b) {
-  local f = normalize (a =?= b);
+  var f = normalize (a =?= b);
 
   printf ("%s =?= %s = %d\n", a.string, b.string, f);
   printf ("symmetricity: %s\n", if normalize (b =?= a) == not (f) then "ok" else "fail" fi)
@@ -37,8 +37,8 @@ test ([1, 2, 3], S (1, 2, 3));
 test ("abc", [1, 2, 3]);
 test (1, [1, 2, 3]);
 
-{
- local a = [1], b = [1];
+(
+ var a = [1], b = [1];
 
  a [0] := a;
  b [0] := b;
@@ -62,4 +62,4 @@ test (1, [1, 2, 3]);
  b[0] := a;
 
  printf ("%d\n", a =?= b)
-}
+)

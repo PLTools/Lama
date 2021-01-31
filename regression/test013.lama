@@ -1,4 +1,4 @@
-local n = read ();
+var n = read ();
 
 do
   

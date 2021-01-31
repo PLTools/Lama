@@ -17,6 +17,6 @@ fun c () {
   write (2)
 }
 
-local x = read ();
+var x = read ();
 
 f ({a, b, c})

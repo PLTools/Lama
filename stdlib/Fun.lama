@@ -20,7 +20,7 @@ public infix # after * (f, g) {
 }
 
 public fun fix (f) {
-  local knot = ref ({});
+  var knot = ref ({});
   
   knot ::= fun (x) {f (deref (knot)) (x)};  
 

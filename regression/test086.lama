@@ -1,4 +1,4 @@
-local n;
+var n;
 
 fun hd (l) {
   case l of

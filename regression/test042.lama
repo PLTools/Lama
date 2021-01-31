@@ -1,4 +1,4 @@
-local x, y, i;
+var x, y, i;
 
 fun f (x) {
   case x of

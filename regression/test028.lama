@@ -1,4 +1,4 @@
-local n, i, result;
+var n, i, result;
 
 fun fact (n) {
   if n <= 1

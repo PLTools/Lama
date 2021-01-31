@@ -1,6 +1,6 @@
 import Collection;
 
-local a = {1, 2, 3}, b = {1, 2, 3}, t = emptyHashTab (16, hash, compare);
+var a = {1, 2, 3}, b = {1, 2, 3}, t = emptyHashTab (16, hash, compare);
 
 t := addHashTab (t, a, 100);
 printf ("HashTab internal structure: %s\n", internalOf (t).string);

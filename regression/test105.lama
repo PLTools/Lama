@@ -1,6 +1,6 @@
 fun f (x) {write (x)}
 
-local g = eta f, n = read ();
+var g = eta f, n = read ();
 
 
 g (3)

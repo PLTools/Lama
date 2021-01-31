@@ -1,5 +1,5 @@
 fun makeLazy (f) {
-  local flag = 0, value = 0;
+  var flag = 0, value = 0;
 
    fun () {
     if flag
@@ -12,8 +12,8 @@ fun makeLazy (f) {
   }
 }
 
-local l = makeLazy (fun () {write (1);  800});
-local x = read ();
+var l = makeLazy (fun () {write (1);  800});
+var x = read ();
 
 write (l ());
 write (l ())

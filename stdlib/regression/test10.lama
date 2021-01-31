@@ -6,13 +6,13 @@ fun many (a) {
   memo (
    eta (
       empty @ lift({})
-    | many (a) |> fun (as) {a @ fun (x) {as +++ singleton (x)}}
+    | many (a) |> fun (as) {a @ fun (x) {as +++ {x}}}
    )   
   )
 }
 
-local a = token ("a"), b = token ("b");
-local bad_alter = a | a |> fun (x) {b @ fun (y) {x ++ y}}; 
+var a = token ("a"), b = token ("b");
+var bad_alter = a | a |> fun (x) {b @ fun (y) {x ++ y}}; 
 
 --logOn ();
 printf ("Parsing ""aaa"" with many ... %s\n", parseString (many (a) |> bypass (eof), "aaa").string);

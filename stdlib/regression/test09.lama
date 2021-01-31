@@ -1,7 +1,7 @@
 import Ostap;
 import Matcher;
 
-local a = token ("a"), acc;
+var a = token ("a"), acc;
 
 printf ("Parsing a*| against ""aa""... %s\n", parseString (rep0 (a) |> fun (x) {eof @ lift (x)}, "aa").string);
 printf ("Parsing a+| against ""aa""... %s\n", parseString (rep  (a) |> fun (x) {eof @ lift (x)}, "aa").string);

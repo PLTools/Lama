@@ -1,4 +1,4 @@
-local n = read ();
+var n = read ();
 
 case 0 of
  0 -> 0 + 0 + 0

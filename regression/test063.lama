@@ -6,6 +6,6 @@ fun traverse (l) {
   esac
 }
 
-local x = read ();
+var x = read ();
 
 traverse ({1, fun () {write(100)}, 2, 3, 4, 5, fun () {write (200)}, 6, 7})

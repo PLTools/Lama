@@ -1,6 +1,6 @@
 import Fun;
 
-local fact = fix (fun (self) {fun (n) {if n <= 1 then 1 else n * self (n-1) fi}});
+var fact = fix (fun (self) {fun (n) {if n <= 1 then 1 else n * self (n-1) fi}});
 
 printf ("%d\n", fact (3));
 printf ("%d\n", fact (5));

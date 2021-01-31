@@ -1,4 +1,4 @@
-local n, c, p, q, i, m, d;
+var n, c, p, q, i, m, d;
 
 n := read ();
 
@@ -7,7 +7,7 @@ p := 2;
 
 while c do
 
-  local cc = 1;
+  var cc = 1;
 
   while cc do
     q := 2;

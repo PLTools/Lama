@@ -4,6 +4,6 @@ fun f (x) {
    g
 }
 
-local n = read ();
+var n = read ();
 
 write (f(5)())

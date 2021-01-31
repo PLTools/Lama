@@ -1,4 +1,4 @@
-local x = lazy (for local i; i := 0, i<10, i := i + 1 do printf ("Lazy body: %d\n", i) od; 100); 
+var x = lazy (for var i; i := 0, i<10, i := i + 1 do printf ("Lazy body: %d\n", i) od; 100); 
 
 printf ("First force: %d\n", force (x));
 printf ("Second force: %d\n", force (x))

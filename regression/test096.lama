@@ -1,5 +1,5 @@
 fun f () {
-  local x, l = {};
+  var x, l = {};
   fun g () { x}
   
   x := 1;
@@ -18,6 +18,6 @@ fun p (l) {
   esac
 }
 
-local x = read ();
+var x = read ();
 
 p (f ())

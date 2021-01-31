@@ -15,7 +15,7 @@ fun print_list (x) {
   esac
 }
 
-local x = read ();
+var x = read ();
 
 print_list ({1, 2, 3});
 print_list (map (a, {1, 2, 3}));

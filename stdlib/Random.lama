@@ -15,9 +15,9 @@ public fun randomInt () {
 
 -- Generates a printable ASCII string of given length
 public fun randomString (len) {
-  local s = makeString (len);
+  var s = makeString (len);
 
-  for local i = 0;, i < len, i := i+1
+  for var i = 0;, i < len, i := i+1
   do
     s [i] := 32 + random (94) -- printable ASCII set
   od;
@@ -33,10 +33,10 @@ public fun randomArray (f, n) {
 
 -- Splits a number n in a random sequence of k summands
 public fun split (n, k) {
-  local a = makeArray (k),
+  var a = makeArray (k),
         m = n;
 
-  for local i = 0;, i < k, i := i + 1
+  for var i = 0;, i < k, i := i + 1
   do
     if i == k - 1
     then a[i] := m
@@ -53,13 +53,13 @@ public fun split (n, k) {
 -- fn gets an array of values of length n and generates some node; leaf is a fucntion without
 -- arguments which create a leaf.
 public fun structure (n, nodeSpec, leaf) {
-  local k = nodeSpec.length;
+  var k = nodeSpec.length;
 
   fun rec (n) {
     if n <= 1
     then leaf ()
     else
-      local ns = nodeSpec [random (k)];
+      var ns = nodeSpec [random (k)];
       
       ns [1] (mapArray (rec, split (n, ns [0])))
     fi
