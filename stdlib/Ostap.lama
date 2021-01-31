@@ -198,13 +198,13 @@ fun createResult () {
   fun k (x) {
     if log then printf ("Result: %s\n", x.string) fi;
     case x of
-      Succ (val, s)    ->
+      Succ (v, s)    ->
         if log then printf ("Result stream: %s\n", showMatcher (s)) fi;
         if deref (hasValue)
-        then failure (sprintf ("Ostap: ambiguous parsing (%s vs. %s)", deref (value).string, val.string))
+        then failure (sprintf ("Ostap: ambiguous parsing (%s vs. %s)", deref (value).string, v.string))
         else
           hasValue ::= true;
-          value    ::= val
+          value    ::= v
         fi
     | Fail (err, l, c) ->
         if deref (hasError)

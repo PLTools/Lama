@@ -311,7 +311,7 @@ public fun lookupMemo (mm@[p, m], v) {
     | _    -> x ()
     esac}   
   (fun () {case v of
-     #unboxed -> v
+     #val -> v
    | _ ->
       case findMap (m, v) of
         Some (w) -> w

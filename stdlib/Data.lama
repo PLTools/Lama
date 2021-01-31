@@ -20,8 +20,8 @@ public infix =?= at < (x, y) {
           esac;
           
           case r of
-            [#unboxed] -> r
-          | [x]        -> walkrec (r, p1, x)
+            [#val] -> r
+          | [x]    -> walkrec (r, p1, x)
           esac
         }
 

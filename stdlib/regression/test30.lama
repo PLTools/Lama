@@ -62,8 +62,8 @@ fun genCyclicArrays (n, eq, cross) {
                         
                         if 1 - eq && deref (f) then
                           case b[i] of
-                            #unboxed -> b[i] := b[i] + 1
-                          | _        -> b[i] := 0
+                            #val -> b[i] := b[i] + 1
+                          | _    -> b[i] := 0
                           esac;
                           f ::= true
                         fi

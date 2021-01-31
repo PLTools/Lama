@@ -326,8 +326,8 @@ module Pattern =
       | c:CHAR                                       {Const  (Char.code c)}
       | %"true"                                      {Const 1}
       | %"false"                                     {Const 0}
-      | "#" %"boxed"                                 {Boxed}
-      | "#" %"unboxed"                               {UnBoxed}
+      | "#" %"box"                                   {Boxed}
+      | "#" %"val"                                   {UnBoxed}
       | "#" %"string"                                {StringTag}
       | "#" %"sexp"                                  {SexpTag}
       | "#" %"array"                                 {ArrayTag}
@@ -1270,7 +1270,7 @@ let run_parser cmd =
     "length";
     "string";
     "case"; "of"; "esac"; "when";
-    "boxed"; "unboxed"; "string"; "sexp"; "array";
+    "box"; "val"; "string"; "sexp"; "array";
     "infix"; "infixl"; "infixr"; "at"; "before"; "after";
     "true"; "false"; "lazy"; "eta"; "syntax"]
   in
