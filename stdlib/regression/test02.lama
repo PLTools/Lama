@@ -6,7 +6,7 @@ var
   lident  = createRegexp ("[a-z][a-zA-Z_]*", "lowercase identifier"),
   uident  = createRegexp ("[A-Z][a-zA-Z_]*", "uppercase identifier"),
   ws      = createRegexp ("\\([ \t\n]\\|--[^\n]*\n\\)*", "whitespace"),
-  str     = createRegexp ("""\([^""]\|""""\)*""", "string literal"),
+  strlit  = createRegexp ("""\([^""]\|""""\)*""", "string literal"),
   decimal = createRegexp ("[0-9]+", "decimal literal"),
   chr     = createRegexp ("'[^']'", "character literal");
 

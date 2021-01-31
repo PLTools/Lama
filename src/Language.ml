@@ -149,11 +149,11 @@ module Value =
 module Builtin =
   struct
 
-    let list        = ["read"; "write"; ".elem"; ".length"; ".array"; ".stringval"]
+    let list        = ["read"; "write"; ".elem"; "length"; ".array"; "string"]
     let bindings () = List.map (fun name -> name, Value.Builtin name) list
     let names       = List.map (fun name -> name, FVal) list
 
-let eval (st, i, o, vs) args = function
+    let eval (st, i, o, vs) args = function
     | "read"     -> (match i with z::i' -> (st, i', o, (Value.of_int z)::vs) | _ -> failwith "Unexpected end of input")
     | "write"    -> (st, i, o @ [Value.to_int @@ List.hd args], Value.Empty :: vs)
     | ".elem"    -> let [b; j] = args in
@@ -164,9 +164,9 @@ let eval (st, i, o, vs) args = function
                                 | Value.Sexp (_, a) -> a.(i)
                                ) :: vs
                     )
-    | ".length"     -> (st, i, o, (Value.of_int (match List.hd args with Value.Sexp (_, a) | Value.Array a -> Array.length a | Value.String s -> Bytes.length s))::vs)
-    | ".array"      -> (st, i, o, (Value.of_array @@ Array.of_list args)::vs)
-    | ".stringval"  -> let [a] = args in (st, i, o, (Value.of_string @@ Value.string_val a)::vs)
+    | "length"     -> (st, i, o, (Value.of_int (match List.hd args with Value.Sexp (_, a) | Value.Array a -> Array.length a | Value.String s -> Bytes.length s))::vs)
+    | ".array"     -> (st, i, o, (Value.of_array @@ Array.of_list args)::vs)
+    | "string"     -> let [a] = args in (st, i, o, (Value.of_string @@ Value.string_val a)::vs)
 
   end
 
@@ -328,7 +328,7 @@ module Pattern =
       | %"false"                                     {Const 0}
       | "#" %"box"                                   {Boxed}
       | "#" %"val"                                   {UnBoxed}
-      | "#" %"string"                                {StringTag}
+      | "#" %"str"                                   {StringTag}
       | "#" %"sexp"                                  {SexpTag}
       | "#" %"array"                                 {ArrayTag}
       | "#" %"fun"                                   {ClosureTag}
@@ -369,8 +369,6 @@ module Expr =
     (* binary operator            *) | Binop     of string * t * t
     (* element extraction         *) | Elem      of t * t
     (* reference to an element    *) | ElemRef   of t * t
-    (* length                     *) | Length    of t
-    (* string conversion          *) | StringVal of t
     (* function call              *) | Call      of t * t list
     (* assignment                 *) | Assign    of t * t
     (* composition                *) | Seq       of t * t
@@ -487,8 +485,6 @@ module Expr =
          eval (st, i, o, (Value.of_int n) :: vs) Skip k
       | String s ->
          eval (st, i, o, (Value.of_string @@ Bytes.of_string s) :: vs) Skip k
-      | StringVal s ->
-         eval conf k (schedule_list [s; Intrinsic (fun (st, i, o, s::vs) -> (st, i, o, (Value.of_string @@ Value.string_val s)::vs))])
       | Var x ->
          let v =
            match State.eval st x with
@@ -509,8 +505,6 @@ module Expr =
          eval conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> Builtin.eval (st, i, o, vs) [b; j] ".elem")])
       | ElemRef (b, i) ->
          eval conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> (st, i, o, (Value.Elem (b, Value.to_int j))::vs))])
-      | Length e ->
-         eval conf k (schedule_list [e; Intrinsic (fun (st, i, o, v::vs) -> Builtin.eval (st, i, o, vs) [v] ".length")])
       | Call (f, args) ->
          eval conf k (schedule_list (f :: args @ [Intrinsic (fun (st, i, o, vs) ->
             let es, vs' = take (List.length args + 1) vs in
@@ -656,8 +650,6 @@ module Expr =
       primary[infix][atr]:
           s:(s:"-"? {match s with None -> fun x -> x | _ -> fun x -> Binop ("-", Const 0, x)})
           b:base[infix][Val] is:(  "." f:LIDENT args:(-"(" !(Util.list)[parse infix Val] -")")? {`Post (f, args)}
-                                      | "." %"length"                                           {`Len}
-                                      | "." %"string"                                           {`Str}
                                       | "[" i:parse[infix][Val] "]"                             {`Elem i}
                                       | "(" args:!(Util.list0)[parse infix Val] ")"             {`Call args}
           )+
@@ -682,8 +674,6 @@ module Expr =
               (fun b ->
                 function
                 | `Elem i         -> Elem (b, i)
-                | `Len            -> Length b
-                | `Str            -> StringVal b
                 | `Post (f, args) -> Call (Var f, b :: match args with None -> [] | Some args -> args)
                 | `Call args      -> (match b with Sexp _ -> invalid_arg "retry!" | _ -> Call (b, args))
               )
@@ -693,8 +683,6 @@ module Expr =
           let res = match lastElem, atr with
                     | `Elem i        , Reff -> ElemRef (b, i)
                     | `Elem i        , _    -> Elem (b, i)
-                    | `Len           , _    -> Length b
-                    | `Str           , _    -> StringVal b
                     | `Post (f, args), _    -> Call (Var f, b :: match args with None -> [] | Some args -> args)
                     | `Call args     , _    -> (match b with Sexp _ -> invalid_arg "retry!"  | _ -> Call (b, args))
           in
@@ -1266,10 +1254,8 @@ let run_parser cmd =
     "while"; "do"; "od";
     "for";
     "fun"; "var"; "public"; "external"; "import";
-    "length";
-    "string";
     "case"; "of"; "esac"; "when";
-    "box"; "val"; "string"; "sexp"; "array";
+    "box"; "val"; "str"; "sexp"; "array";
     "infix"; "infixl"; "infixr"; "at"; "before"; "after";
     "true"; "false"; "lazy"; "eta"; "syntax"]
   in

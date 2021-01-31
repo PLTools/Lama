@@ -317,7 +317,7 @@ public fun lookupMemo (mm@[p, m], v) {
         Some (w) -> w
       | None ->
          case v of
-           #string -> mm[1] := addMap (m, v, v); v        
+           #str -> mm[1] := addMap (m, v, v); v        
          | _ ->
            var vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;          
            for skip, i < v.length, i := i + 1 do

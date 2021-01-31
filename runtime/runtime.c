@@ -335,7 +335,7 @@ int Ls__Infix_37 (void *p, void *q) {
   return BOX(UNBOX(p) % UNBOX(q));
 }
 
-extern int Blength (void *p) {
+extern int Llength (void *p) {
   data *a = (data*) BOX (NULL);
   
   ASSERT_BOXED(".length", p);
@@ -974,7 +974,7 @@ extern void* Lstringcat (void *p) {
   return s;  
 }
 
-extern void* Bstringval (void *p) {
+extern void* Lstring (void *p) {
   void *s = (void *) BOX (NULL);
 
   __pre_gc () ;

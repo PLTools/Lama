@@ -2,8 +2,8 @@ fun collect_ints_acc (v, tail) {
   var i;
   
   case v of
-    a@#val  -> Cons (a, tail)
-  | #string -> tail
+    a@#val -> Cons (a, tail)
+  | #str   -> tail
   | _       ->
      for i := 0, i < v.length, i := i + 1 do
        tail := collect_ints_acc (v[i], tail)

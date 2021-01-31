@@ -830,12 +830,6 @@ let compile cmd ((imports, infixes), p) =
   | Expr.Elem (a, i)        -> let lelem, env = env#get_label in
                                add_code (compile_list false lelem env [a; i]) lelem false [CALL (".elem", 2, tail)]
                                
-  | Expr.Length e           -> let llen, env = env#get_label in
-                               add_code (compile_expr false llen env e) llen false [CALL (".length", 1, tail)]
-                               
-  | Expr.StringVal e        -> let lsv, env = env#get_label in
-                               add_code (compile_expr false lsv env e) lsv false [CALL (".stringval", 1, tail)]
-                               
   | Expr.Assign (Expr.Ref x, e) ->  let lassn, env = env#get_label in
                                     let env  , line = env#gen_line x in
                                     let env  , acc  = env#lookup x in

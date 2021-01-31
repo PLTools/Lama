@@ -4,6 +4,8 @@ F,system;
 V,sysargs;
 F,stringInt;
 F,makeArray;
+F,string;
+F,length;
 F,clone;
 F,hash;
 F,fst;

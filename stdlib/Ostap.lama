@@ -18,7 +18,7 @@ public fun logOn () {
 
 public fun initOstap () {
   tab    := ref (emptyHashTab (1024, hash, compare));
-  restab := emptyCustomMemo (fun (x) {case x of #string -> true | _ -> false esac}, compare);
+  restab := emptyCustomMemo (fun (x) {case x of #str -> true | _ -> false esac}, compare);
   hct    := emptyMemo ()
 }
 
@@ -74,8 +74,8 @@ public fun memo (f) {
 
 public fun token (x) {
   case x of
-    #string -> memo $ fun (k) {fun (s) {k $ matchString (s, x)}}
-  | _       -> memo $ fun (k) {fun (s) {k $ matchRegexp (s, x)}}
+    #str -> memo $ fun (k) {fun (s) {k $ matchString (s, x)}}
+  | _    -> memo $ fun (k) {fun (s) {k $ matchRegexp (s, x)}}
   esac
 }
 
