@@ -1,8 +1,8 @@
 local x;
 
-repeat
+do
   local n = read ();
   x := n
-until n > 0;
+while n <= 0 od;
 
 write (x)

@@ -862,12 +862,12 @@ let compile cmd ((imports, infixes), p) =
                                let env, _ , s  = compile_expr false cond env s in
                                env, false, [JMP cond; FLABEL loop] @ s @ [LABEL cond] @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("nz", loop)]
                                                                                                   
-  | Expr.Repeat (s, c)      -> let lexp , env = env#get_label in
+  | Expr.DoWhile (s, c)     -> let lexp , env = env#get_label in
                                let loop , env = env#get_label in
                                let check, env = env#get_label in
                                let env, fe  , se   = compile_expr false lexp env c in
                                let env, flag, body = compile_expr false check env s in
-                               env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("z", loop)]
+                               env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("nz", loop)]
 
   | Expr.Leave              -> env, false, []
                                  

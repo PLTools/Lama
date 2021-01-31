@@ -2,9 +2,9 @@ local s, n;
 
 s := 0;
 
-repeat
+do
   n := read ();
   s := s + n
-until (n == 0);
+while n != 0 od;
 
 write (s)  

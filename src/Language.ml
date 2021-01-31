@@ -377,7 +377,7 @@ module Expr =
     (* empty statement            *) | Skip
     (* conditional                *) | If        of t * t * t
     (* loop with a pre-condition  *) | While     of t * t
-    (* loop with a post-condition *) | Repeat    of t * t
+    (* loop with a post-condition *) | DoWhile   of t * t
     (* pattern-matching           *) | Case      of t * (Pattern.t * t) list * Loc.t * atr
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
@@ -537,8 +537,8 @@ module Expr =
          eval conf k (schedule_list [e; Control (fun (st, i, o, e::vs) -> (if Value.to_int e <> 0 then s1 else s2), (st, i, o, vs))])
       | While (e, s) ->
          eval conf k (schedule_list [e; Control (fun (st, i, o, e::vs) -> (if Value.to_int e <> 0 then seq s expr else Skip), (st, i, o, vs))])
-      | Repeat (s, e) ->
-         eval conf (seq (While (Binop ("==", e, Const 0), s)) k) s
+      | DoWhile (s, e) ->
+         eval conf (seq (While (e, s)) k) s
       | Case (e, bs, _, _)->
          let rec branch ((st, i, o, v::vs) as conf) = function
          | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v))
@@ -768,7 +768,7 @@ module Expr =
                   | _               -> Seq (i, While (c, Seq (b, s))))
                }
 
-      | %"repeat" s:scope[infix][Void] %"until" e:basic[infix][Val] => {isVoid atr} => {
+      | %"do" s:scope[infix][Void] %"while" e:parse[infix][Val] => {isVoid atr} =>  %"od" {
           materialize atr @@
             match s with
             | Scope (defs, s) ->
@@ -781,8 +781,8 @@ module Expr =
                    defs
                    ([], s)
                in
-               Scope (defs, Repeat (s, e))
-            | _  -> Repeat (s, e)
+               Scope (defs, DoWhile (s, e))
+            | _  -> DoWhile (s, e)
       }
       | %"case" l:$ e:parse[infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[infix][atr])] %"esac"{Case (e, bs, l#coord, atr)}
       | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {env#add_import "Lazy"; ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
@@ -1265,7 +1265,6 @@ let run_parser cmd =
     "skip";
     "if"; "then"; "else"; "elif"; "fi";
     "while"; "do"; "od";
-    "repeat"; "until";
     "for";
     "fun"; "local"; "public"; "external"; "import";
     "length";

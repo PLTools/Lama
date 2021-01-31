@@ -4,11 +4,11 @@ n := read ();
 
 s := 1;
 
-repeat
+do
 
   s := s * n;
   n := n - 1
   
-until (n == 0);
+while n != 0 od;
 
 write (s)
