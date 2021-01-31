@@ -379,7 +379,6 @@ module Expr =
     (* loop with a pre-condition  *) | While     of t * t
     (* loop with a post-condition *) | Repeat    of t * t
     (* pattern-matching           *) | Case      of t * (Pattern.t * t) list * Loc.t * atr
-    (* return statement           *) | Return    of t option
     (* ignore a value             *) | Ignore    of t
     (* unit value                 *) | Unit
     (* entering the scope         *) | Scope     of (string * decl) list * t
@@ -540,7 +539,6 @@ module Expr =
          eval conf k (schedule_list [e; Control (fun (st, i, o, e::vs) -> (if Value.to_int e <> 0 then seq s expr else Skip), (st, i, o, vs))])
       | Repeat (s, e) ->
          eval conf (seq (While (Binop ("==", e, Const 0), s)) k) s
-      | Return e -> (match e with None -> (st, i, o, []) | Some e -> eval (st, i, o, []) Skip e)
       | Case (e, bs, _, _)->
          let rec branch ((st, i, o, v::vs) as conf) = function
          | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v))
@@ -786,7 +784,6 @@ module Expr =
                Scope (defs, Repeat (s, e))
             | _  -> Repeat (s, e)
       }
-      | %"return" e:basic[infix][Val]? => {isVoid atr} => {Return e}
       | %"case" l:$ e:parse[infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[infix][atr])] %"esac"{Case (e, bs, l#coord, atr)}
       | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {env#add_import "Lazy"; ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
       | l:$ %"eta"  e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {let name = env#get_tmp in ignore atr (Lambda ([name], Call (e, [Var name])))}
@@ -1270,7 +1267,7 @@ let run_parser cmd =
     "while"; "do"; "od";
     "repeat"; "until";
     "for";
-    "fun"; "local"; "public"; "external"; "return"; "import";
+    "fun"; "local"; "public"; "external"; "import";
     "length";
     "string";
     "case"; "of"; "esac"; "when";

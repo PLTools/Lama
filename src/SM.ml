@@ -869,11 +869,6 @@ let compile cmd ((imports, infixes), p) =
                                let env, flag, body = compile_expr false check env s in
                                env, false, [LABEL loop] @ body @ (if flag then [LABEL check] else []) @ se @ (if fe then [LABEL lexp] else []) @ [CJMP ("z", loop)]
 
-  | Expr.Return (Some e)    -> let lret, env = env#get_label in
-                               add_code (compile_expr true lret env e) lret false [JMP env#end_label] (* [RET] *)
-                               
-  | Expr.Return None        -> env, false, [CONST 0; (*RET*) JMP env#end_label]
-
   | Expr.Leave              -> env, false, []
                                  
   | Expr.Case (e, brs, loc, atr) ->

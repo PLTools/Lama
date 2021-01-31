@@ -1,12 +1,12 @@
 fun hd (l) {
   case l of
-    h : _ -> return h
+    h : _ -> h
   esac
 }
 
 fun tl (l) {
   case l of
-    _ : t -> return t
+    _ : t -> t
   esac
 }
 

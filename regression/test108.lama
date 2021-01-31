@@ -1,8 +1,0 @@
-fun foo (x) {
-    return x;
-    0
-}
-
-local n = read ();
-
-write (foo (n))

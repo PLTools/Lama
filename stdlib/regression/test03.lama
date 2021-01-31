@@ -1,5 +1,5 @@
 fun f (x) {
-  return fun (y) {return x + y}
+  fun (y) {x + y}
 }
 
 write (compare (1, 2));

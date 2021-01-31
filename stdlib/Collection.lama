@@ -305,30 +305,30 @@ public fun emptyMemo () {
 }
 
 public fun lookupMemo (mm@[p, m], v) {
-  case p of
-    #fun -> if p (v) then return v fi
-  | _    -> skip
-  esac;
-  
-  case v of
-    #unboxed -> v
-  | _ ->
-     case findMap (m, v) of
-       Some (w) -> w
-     | None ->
-        case v of
-          #string -> mm[1] := addMap (m, v, v); v        
-        | _ ->
-          local vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;          
-          for skip, i < v.length, i := i + 1 do
-            local vci = lookupMemo (mm, vc [i]);
-            vc [i] := vci
-          od;
-          mm [1] := addMap (m, vc, vc);
-          vc
-        esac
-     esac
-  esac
+  fun (x) {
+    case p of
+      #fun -> if p (v) then v else x () fi
+    | _    -> x ()
+    esac}   
+  (fun () {case v of
+     #unboxed -> v
+   | _ ->
+      case findMap (m, v) of
+        Some (w) -> w
+      | None ->
+         case v of
+           #string -> mm[1] := addMap (m, v, v); v        
+         | _ ->
+           local vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;          
+           for skip, i < v.length, i := i + 1 do
+             local vci = lookupMemo (mm, vc [i]);
+             vc [i] := vci
+           od;
+           mm [1] := addMap (m, vc, vc);
+           vc
+         esac
+      esac
+   esac})
 }
 
 -- Maps of hashed pointers

@@ -1,9 +1,0 @@
-fun f (x) {
-  fun g () {return x}
-  fun h () {return g}
-  return g
-}
-
-local n = read ();
-
-write (f(5)())
