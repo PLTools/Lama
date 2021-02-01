@@ -18,7 +18,7 @@ Compilation unit is a minimal structure recognized by the parser. An application
 In order to use other units they have to be imported. In particular, the standard library is comprised of a number of precompiled units,
 which can be imported by an end-user application.
 
-The concrete syntax for compilation unit is shown on Fig.~\ref{compilation_unit}. Besides optional imports a unit must contain
+The concrete syntax for compilation unit is shown in Fig.~\ref{compilation_unit}. Besides optional imports a unit must contain
 a \nonterm{scopeExpression}, which may contain some definitions and computations. Note, a unit can not be empty. The computations described in
-a unit are performed at unit initialization time (see Chapter~\ref{sec:driver}).
+a unit are performed at the unit initialization time (see Chapter~\ref{sec:driver}).
 

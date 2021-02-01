@@ -1254,7 +1254,7 @@ let run_parser cmd =
     "while"; "do"; "od";
     "for";
     "fun"; "var"; "public"; "external"; "import";
-    "case"; "of"; "esac"; "when";
+    "case"; "of"; "esac"; 
     "box"; "val"; "str"; "sexp"; "array";
     "infix"; "infixl"; "infixr"; "at"; "before"; "after";
     "true"; "false"; "lazy"; "eta"; "syntax"]

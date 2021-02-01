@@ -86,8 +86,8 @@
 \newcommand{\descr}[2]{\smallskip{#1}\begin{itemize}[noitemsep,topsep=0pt]\item[]{#2}\end{itemize}}
 
 \lstdefinelanguage{lama}{
-keywords={skip,if,then,else,elif,fi,while,do,od,repeat,until,for,fun,local,public,import,length,
-string,case,of,esac,when,boxed,unboxed,string,sexp,array,infix,infixl,infixr,at,before,after,true,false,eta,lazy,syntax},
+keywords={skip,if,then,else,elif,fi,while,do,od,for,fun,public,import,
+box,val, var,case,of,esac,when,box,str,sexp,array,infix,infixl,infixr,at,before,after,true,false,eta,lazy,syntax},
 sensitive=true,
 basicstyle=\small,
 %commentstyle=\scriptsize\rmfamily,
@@ -144,7 +144,9 @@ language=lama
 	\HRule\\[0.4cm]
 	
 	{\huge\bfseries \lama Language Specification}\\[0.4cm] % Title of your document
-	
+
+        {\textsc{Version 1.10}}
+        
 	\HRule\\[1.5cm]
 	
 	%------------------------------------------------

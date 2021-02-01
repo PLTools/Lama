@@ -15,6 +15,11 @@ The following declarations are accessible:
 \descr{\lstinline|fun assert (n, s, ...)|}{Asserts that \lstinline|n| is non-zero; otherwise raises \lstinline|failure| with
   a corresponding error message.}
 
+\descr{\lstinline|fun string (x)|}{Converts \lstinline|x| into its string representation.}
+
+\descr{\lstinline|fun length (x)|}{Returns the number of immediate subvalues for a reference value \lstinline|x|; in particular, for
+  strings and arrays returns their lengths.}
+
 \descr{\lstinline|fun stringInt (s)|}{Converts a string representation of a signed decimal number into integer.}
 
 \descr{\lstinline|fun read ()|}{Reads an integer value from the standard input, printing a prompt "\lstinline|>|".}
@@ -124,7 +129,7 @@ Random data structures generation functions.
 
 \descr{\lstinline|fun randomInt ()|}{Generates a random representable integer value.}
 
-\descr{\lstinline|fun randomString (len)|}{Generates a random string of printable ASCII characters of given length.}
+\descr{\lstinline|fun randomString (len)|}{Generates a random string of printable \textsc{ASCII} characters of given length.}
 
 \descr{\lstinline|fun randomArray (f, n)|}{Generates a random array of \emph{deep} size \lstinline|n|. The length of the array is chosen randomly, and \lstinline|f| is intended to be an element-generating function which takes the size of the element as an argument.}
 
@@ -322,9 +327,7 @@ The unit provides primitives for lazy evaluation.
 \section{Unit \texttt{List}}
 \label{sec:std:list}
 
-The unit provides some list-manipulation functions. None of the functions mutate their arguments.
-
-\descr{\lstinline|fun singleton (x)|}{Returns a one-element list with the value "\lstinline|x|" as its head.}
+The unit provides some list-manipulation functions.
 
 \descr{\lstinline|fun size (l)|}{Returns the length of the list.}
 

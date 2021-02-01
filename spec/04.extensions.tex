@@ -16,10 +16,11 @@ redefinition of builtin infix operators:
 \begin{itemize}
 \item redefinitions of builtin infix operators can not be exported;
 \item the assignment operator "\lstinline|:=|" can not be redefined;
-\item infix definitions can not be mutually recursive.
+\item infix definitions can not be mutually recursive (but this can be worked around by
+  definining infix synonyms for mutually-recursive functions).
 \end{itemize}
 
-The syntax for infix operator definition is shown on Fig.~\ref{custom_infix_construct}; a custom infix definition must specify exactly two arguments.
+The syntax for infix operator definition is shown in Fig.~\ref{custom_infix_construct}; a custom infix definition must specify exactly two arguments.
 An associativity and precedence level has to be assigned to each custom infix operator. A precedence level is assigned by specifying at which
 position, relative to other known infix operators, the operator being defined is inserted. Three kinds of specifications are allowed: at given level,
 immediately before or immediately after. For example, "\lstinline|at +|" means that the operator is assigned exactly the same
@@ -27,7 +28,7 @@ level of precedence as "\lstinline|+|"; "\lstinline|after +|" creates a new prec
 "\lstinline|+|" (but \emph{before} that for "\lstinline|*|"), and "\lstinline|before *|" has exactly the same effect (provided
 there were no insertions of precedence levels between those for "\lstinline|+|" and "\lstinline|*|").
 
-When begin inserted at existing precedence level, an infix operator inherits the associativity from that level; hence, only "\lstinline|infix|"
+When being inserted at an existing precedence level, an infix operator inherits the associativity from that level; hence, only "\lstinline|infix|"
 keyword can be used for such definitions. When a new level is created, an associativity for this level has to be additionally specified
 by using corresponding keyword ("\lstinline|infix|" for non-associative levels, "\lstinline|infixr|"~--- for levels with right
 associativity, and "\lstinline|infixl|"~--- for levels with left associativity).
@@ -94,6 +95,7 @@ where $e$~--- a $\nonterm{basicExpression}$~--- is converted into
 where "$x$"~--- a fresh variable which does not occur free in "$e$".
 
 \section{Dot Notation}
+\label{sec:dot-notation}
 
 A function call
 
@@ -134,7 +136,7 @@ where $x_i$~--- fresh variables, not free in $e$.
 \section{Syntax Definitions}
 
 Syntax definition extension represents an alternative simplified syntax for parsers written using standard unit \lstinline|Ostap| (see Section~\ref{sec:ostap}).
-The syntax for syntax definition expressions is shown on Fig.~\ref{syntax_expressions}.
+The syntax for syntax definition expressions is shown in Fig.~\ref{syntax_expressions}.
 
 \begin{figure}[h]
   \[

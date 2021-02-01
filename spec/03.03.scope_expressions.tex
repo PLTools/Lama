@@ -5,7 +5,7 @@
       \defterm{definition}                     & : & \nonterm{variableDefinition}&\alt\\
                                                &   & \nonterm{functionDefinition}&\alt\\
                                                &   & \nonterm{infixDefinition}&\\
-      \defterm{variableDefinition}             & : & (\s\term{local}\alt\term{public}\s)\s\nonterm{variableDefinitionSequence}\s\term{;}&\\
+      \defterm{variableDefinition}             & : & (\s\term{var}\alt\term{public}\s)\s\nonterm{variableDefinitionSequence}\s\term{;}&\\
       \defterm{variableDefinitionSequence}     & : & \nonterm{variableDefinitionItem}\s(\s\term{,}\s\nonterm{variableDefinitionItem}\s)^\star&\\
       \defterm{variableDefinitionItem}         & : & \token{LIDENT}\s[\s\term{=}\s\nonterm{basicExpression}\s]&\\
       \defterm{functionDefinition}             & : & [\s\term{public}\s]\s\term{fun}\s\token{LIDENT}\s\term{(}\s\nonterm{functionArguments}\s\term{)}&\\
@@ -25,7 +25,7 @@ Scope expressions provide a mean to put expressions is a scoped context. The def
 variable definitions (see Fig.~\ref{scope_expression}). For example:
 
 \begin{lstlisting}
-    local x, y, z; -- variable definitions
+    var x, y, z; -- variable definitions
 
     fun id (x) {x} -- function definition
 \end{lstlisting}
@@ -33,50 +33,50 @@ variable definitions (see Fig.~\ref{scope_expression}). For example:
 As scope expressions are expressions, they can be nested:
 
 \begin{lstlisting}
-    local x;
+    var x;
 
-    { -- nested scope begins here
-      local y;
+    ( -- nested scope begins here
+      var y;
       skip
-    } -- nested scope ends here
+    ) -- nested scope ends here
 \end{lstlisting}
 
 The definitions on the top-level of compilation unit can be tagged as ``\lstinline|public|'', in which case they are exported and become visible by
-other units which import the given one. Nested scopes can not contain public definitions.
+other units which import a given one. Nested scopes can not contain public definitions.
 
 The nesting relation has the shape of a tree, and in a concrete node of the tree all definitions in all enclosing scopes are visible:
 
 \begin{lstlisting}
-    local x;
+    var x;
 
-    {local y; 
-      {local z;
+    (var y; 
+      (var z;
         skip -- x, y, and z are visible here
-      };
-      {local t;
+      );
+      (var t;
         skip -- x, y, and t are visible here
-      };
+      );
       skip -- x and y are visible here
-    };
+    );
     skip -- only x is visible here
 \end{lstlisting}
 
 Multiple definitions of the same name in the same scope are prohibited:
 
 \begin{lstlisting}
-    local x;
+    var x;
     fun x () {0} -- error
 \end{lstlisting}
 
 However, a definition is a nested scope can override a definition in an enclosing one:
 
 \begin{lstlisting}
-    local x;
+    var x;
 
-    {
+    (
       fun x () {0} -- ok
       skip         -- here x is associated with the function
-    };
+    );
 
     skip -- here x is associated with the variable
 \end{lstlisting}
@@ -85,15 +85,15 @@ A function can freely use all visible definitions; in particular, functions defi
 same scope can be mutually recursive:
 
 \begin{lstlisting}
-    local x;
+    var x;
     fun f () {0}
 
-    { 
+    ( 
       fun g () {f () + h () + y} -- ok
       fun h () {g () + x}        -- ok
-      local y;
+      var y;
       skip
-    };
+    );
     skip
 \end{lstlisting}
 
@@ -103,7 +103,7 @@ technically it is possible to have forward references in the initialization expr
 behavior is undefined. For example:
 
 \begin{lstlisting}
-    local x = y + 2; -- undefined, as y is not yet initialized at this point
-    local y = x + 2;
+    var x = y + 2; -- undefined, as y is not yet initialized at this point
+    var y = x + 2;
     skip
 \end{lstlisting}

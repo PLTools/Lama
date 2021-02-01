@@ -1,11 +1,11 @@
 \section{Expressions}
 \label{sec:expressions}
 
-The syntax definition for expressions is shown on Fig.~\ref{expressions}. The top-level construct is \emph{sequential composition}, expressed
+The syntax definition for expressions is shown in Fig.~\ref{expressions}. The top-level construct is \emph{sequential composition}, expressed
 using right-associative connective "\term{;}". The basic blocks of sequential composition have the form of \nonterm{binaryExpression}, which is
 a composition of infix operators and operands. The description above is given in a highly ambiguous form as it does not specify explicitly the
 precedence and associativity of infix operators. The precedences and associativity of predefined built-in infix operators are shown
-on Fig.~\ref{builtin_infixes} with the precedence level increasing top-to-bottom.
+in Fig.~\ref{builtin_infixes} with the precedence level increasing top-to-bottom.
 
 \begin{figure}[h]
   \begin{tabular}{c|l|l}
@@ -27,7 +27,7 @@ Apart from assignment and list constructor all other built-in infix operators op
 any non-zero value is treated as truth and zero as falsity, and the result respects this convention.
 
 The assignment operator is unique among all others in the sense that it requires its left operand to designate a \emph{reference}. This
-property is syntactically ensured using an inference system shown on Fig.~\ref{reference_inference}; here $\mathcal{R}\,(e)$ designates the
+property is syntactically ensured using an inference system shown in Fig.~\ref{reference_inference}; here $\mathcal{R}\,(e)$ designates the
 property ``$e$ is a reference''. The result of assignment operator coincides with its right operand, thus
 
 \begin{lstlisting}
@@ -52,14 +52,14 @@ assigns 3 to both "\lstinline|x|" and "\lstinline|y|".
 
 \subsection{Postfix Expressions}
 
-There are four postfix forms of expressions:
+There are two postfix forms of expressions:
 
 \begin{itemize}
 \item function call, designated as postfix form "\lstinline|($arg_1, \dots, arg_k$)|";
-\item array element selection, designated as "\lstinline|[$index$]|";
-\item built-in primitive "\lstinline|.string|", returning the string representation of a value;
-\item built-in primitive "\lstinline|.length|", returning the length of a boxed value.
+\item array element selection, designated as "\lstinline|[$index$]|".
 \end{itemize}
+
+Also, see postfix ``dot'' notation (Section~\ref{sec:dot-notation}).
 
 Multiple postfixes are allowed, for example
 
@@ -71,10 +71,10 @@ Multiple postfixes are allowed, for example
 \end{lstlisting}
 
 The basic form of expression is \nonterm{primary}. The simplest form of primary is an identifier or constant. Keywords \lstinline|true| and \lstinline|false|
-designate integer constants 1 and 0 respectively, character constant is implicitly converted into its ASCII code.  String constants designate arrays
+designate integer constants 1 and 0 respectively, character constant is implicitly converted into its \textsc{ASCII} code.  String constants designate arrays
 of one-byte characters. Infix constants allow to reference a functional value associated with corresponding infix operator (however, a value associated with
 builtin assignment operator "\lstinline|:=|" can not be taken), and functional constant (\emph{lambda-expression})
-designates an anonymous functional value in the form of closure. 
+designates an anonymous functional value in the form of a closure. 
 
 \begin{figure}[h]
   \[
@@ -88,8 +88,6 @@ designates an anonymous functional value in the form of closure.
       \defterm{postfixExpression} & : & \nonterm{primary}&\alt\\
                                   &   & \nonterm{postfixExpression}\s\term{(}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^\star\s]\s\term{)}&\alt\\
                                   &   & \nonterm{postfixExpression}\s\term{[}\s\nonterm{expression}\s\term{]}&\alt\\
-                                  &   & \nonterm{postfixExpression}\s\term{.}\s\term{length}&\alt\\
-                                  &   & \nonterm{postfixExpression}\s\term{.}\s\term{string}&\\      
       \defterm{primary}           & : & \token{DECIMAL}&\alt\\
                                   &   & \token{STRING}&\alt\\
                                   &   & \token{CHAR}&\alt\\
@@ -99,17 +97,15 @@ designates an anonymous functional value in the form of closure.
                                   &   & \term{infix}\s\token{INFIX}&\alt\\
                                   &   & \term{fun}\s\term{(}\s\nonterm{functionArguments}\s\term{)}\s\nonterm{functionBody}&\alt\\
                                   &   & \term{skip}&\alt\\
-                                  &   & \term{return}\s[\s\nonterm{basicExpression}\s]&\alt\\                                 
-                                  &   & \term{\{}\s\nonterm{scopeExpression}\s\term{\}}&\alt\\
+                                  &   & \term{(}\s\nonterm{scopeExpression}\s\term{)}&\alt\\
                                   &   & \nonterm{listExpression}&\alt\\
                                   &   & \nonterm{arrayExpression}&\alt\\
                                   &   & \nonterm{S-expression}&\alt\\
                                   &   & \nonterm{ifExpression}&\alt\\
-                                  &   & \nonterm{whileExpression}&\alt\\
-                                  &   & \nonterm{repeatExpression}&\alt\\
+                                  &   & \nonterm{whileDoExpression}&\alt\\
+                                  &   & \nonterm{doWhileExpression}&\alt\\
                                   &   & \nonterm{forExpression}&\alt\\
-                                  &   & \nonterm{caseExpression}&\alt\\
-                                  &   & \term{(}\s\nonterm{expression}\s\term{)}&
+                                  &   & \nonterm{caseExpression}&
     \end{array}
   \]
   \caption{Expression concrete syntax}
@@ -117,10 +113,9 @@ designates an anonymous functional value in the form of closure.
 \end{figure}
 
 \FloatBarrier
-\subsection{\texttt{skip} and \texttt{return} Expressions}
+\subsection{\texttt{skip} Expression}
 
 Expression \lstinline|skip| can be used to designate a no-value when no action is needed (for example, in the body of unit which contains only declarations).
-\lstinline|return| expression can be used to immediately complete the execution of current function call; optional return value can be specified.
 
 \subsection{Arrays, Lists, and S-expressions}
 
@@ -136,9 +131,7 @@ Expression \lstinline|skip| can be used to designate a no-value when no action i
   \label{composite_expressions}
 \end{figure}
 
-There are three forms of expressions to specify composite values: arrays, lists and S-expressions (see Fig.~\ref{composite_expressions}). Note, it is impossible
-to specify one-element list as "\lstinline|{$e$}|" since it is treated as scope expression. Instead, the form "\lstinline|$e$:{}|" can be used; alternatively, a standard
-unit "\lstinline|List|" (see~Section~\ref{sec:std:list}) defines function "\lstinline|singleton|" which serves for the same purpose.
+There are three forms of expressions to specify composite values: arrays, lists and S-expressions (see Fig.~\ref{composite_expressions}). 
 
 \subsection{Conditional Expressions}
 
@@ -182,9 +175,9 @@ is equivalent to a nested form
 \begin{figure}[t]
   \[
     \begin{array}{rcl}
-      \defterm{whileExpression}  & : & \term{while}\s\nonterm{expression}\s\term{do}\s\nonterm{scopeExpression}\s\term{od}\\
-      \defterm{repeatExpression} & : & \term{repeat}\s\nonterm{scopeExpression}\s\term{until}\s\nonterm{basicExpression}\\
-      \defterm{forExpression}    & : & \term{for}\s\nonterm{expression}\s\term{,}\s\nonterm{expression}\s\term{,}\s\nonterm{expression}\\
+      \defterm{whileDoExpression}  & : & \term{while}\s\nonterm{expression}\s\term{do}\s\nonterm{scopeExpression}\s\term{od}\\
+      \defterm{doWhileExpression} & : & \term{do}\s\nonterm{scopeExpression}\s\term{while}\s\nonterm{expression}\s\term{od}\\
+      \defterm{forExpression}    & : & \term{for}\s\nonterm{scopeExpression}\s\term{,}\s\nonterm{expression}\s\term{,}\s\nonterm{expression}\\
                                  &   & \term{do}\nonterm{scopeExpresssion}\s\term{od}
     \end{array}
   \]
@@ -192,21 +185,21 @@ is equivalent to a nested form
   \label{loop_expression}
 \end{figure}
 
-There are three forms of loop expressions~--- "\lstinline|while|", "\lstinline|repeat|", and "\lstinline|for|", among which "\lstinline|while|" is the
-basic one (see Fig.~\ref{loop_expression}). In "\lstinline|while|" expression the evaluation of the body is repeated as long as the evaluation of condition provides
-a non-zero value. The condition is evaluated before the body on each iteration of the loop, and the body is evaluated in the context of
-condition evaluation results.
+There are three forms of loop expressions~--- "\lstinline|while$\dots$do$\dots$od|", "\lstinline|do$\dots$while$\dots$od|", and "\lstinline|for$\dots$|", among
+which "\lstinline|while$\dots$do$\dots$od|" is the basic one (see Fig.~\ref{loop_expression}). In "\lstinline|while$\dots$do$\dots$od|" expression the evaluation
+of the body is repeated as long as the evaluation of condition provides a non-zero value. The condition is evaluated before the body on each iteration of the loop,
+and the body is evaluated in the context of condition evaluation results.
 
-The construct "\lstinline|repeat $\;e\;$ until $\;c$|" is derived and operationally equivalent to
+The construct "\lstinline|do $\;e\;$ while $\;c\;$ od|" is derived and operationally equivalent to
 
 \begin{lstlisting}
-    $e\;$; while $\;c\;$ == 0 do $\;e\;$ od
+    $e\;$; while $\;c\;$ do $\;e\;$ od
 \end{lstlisting}
 
-However, the top-level local declarations in the body of "\lstinline|repeat|"-loop are visible in the condition expression:
+However, the top-level local declarations in the body of "\lstinline|do$\dots$while$\dots$od|"-loop are visible in the condition expression:
 
 \begin{lstlisting}
-    repeat local x = read () until x 
+    do var x = read () while x od
 \end{lstlisting}
 
 
@@ -219,7 +212,7 @@ The construct "\lstinline|for $\;i\;$, $\;c\;$, $\;s\;$ do $\;e\;$ od|" is also 
 However, the top-level local definitions of the the first expression ("$i$") are visible in the rest of the construct:
 
 \begin{lstlisting}
-    for local i; i := 0, i < 10, i := i + 1 do write (i) od
+    for var i; i := 0, i < 10, i := i + 1 do write (i) od
 \end{lstlisting}
 
 \subsection{Pattern Matching}
@@ -239,9 +232,9 @@ However, the top-level local definitions of the the first expression ("$i$") are
                                 &   & \token{CHAR} & \alt \\
                                 &   & \term{true} & \alt \\
                                 &   & \term{false} & \alt \\
-                                &   & \term{\#}\s\term{boxed} & \alt \\
-                                &   & \term{\#}\s\term{unboxed} & \alt \\
-                                &   & \term{\#}\s\term{string} & \alt \\
+                                &   & \term{\#}\s\term{box} & \alt \\
+                                &   & \term{\#}\s\term{val} & \alt \\
+                                &   & \term{\#}\s\term{str} & \alt \\
                                 &   & \term{\#}\s\term{array} & \alt \\
                                 &   & \term{\#}\s\term{sexp} & \alt \\
                                 &   & \term{\#}\s\term{fun} & \alt \\
@@ -277,8 +270,8 @@ The semantics of patterns is as follows:
 \item a "\lstinline|$x$@$p$|"-pattern matches what pattern $p$ matches, and additionally binds the
   matched value to the identifier $x$;
 \item constant patterns match corresponding constants;
-\item six "\lstinline|#|"-patterns match values of corresponding shapes (boxed, unboxed, string, array, S-expression or
-  closure) regardless their content;
+\item six "\lstinline|#|"-patterns match values of corresponding shapes (reference values (\lstinline|box|), primitive values (\lstinline|val|),
+  strings (\lstinline|str|), arrays, S-expressions or closures (\lstinline|fun|)) regardless their content;
   \item round brackets can be used for grouping.
 \end{itemize}
 

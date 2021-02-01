@@ -21,8 +21,8 @@ The following characters are treated as whitespaces:
 Additionally, two kinds of comments are recognized:
 
 \begin{itemize}
-\item end-of-line comment "\texttt{--}" escapes the rest of the line, including itself;
-\item block comment "\texttt{(*} ... \texttt{*)}" escapes all the text between
+\item the end-of-line comment "\texttt{--}" escapes the rest of the line, including itself;
+\item the block comment "\texttt{(*} ... \texttt{*)}" escapes all the text between
   "\texttt{(*}" and "\texttt{*)}".
 \end{itemize}
 
@@ -76,11 +76,10 @@ two-character abbreviations "\textbackslash t" and "\textbackslash n" are recogn
 The following identifiers are reserved for keywords:
 
 \begin{lstlisting}
-    after   array   at      before  boxed   case    do      elif    else
-    esac    eta     false   fi      for     fun     if      import  infix
-    infixl  infixr  lazy    length  local   od      of      public  repeat
-    return  sexp    skip    string  string  syntax  then    true    unboxed
-    until   when    while
+    after    array    at      before   box   case     do     elif     else
+    esac     eta      false   fi       for   fun      if     import   infix
+    infixl   infixr   lazy    od       of    public   sexp   skip     str
+    syntax   then     true    val      var   while
 \end{lstlisting}
 
 \subsection{Infix Operators}
