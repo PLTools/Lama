@@ -229,11 +229,11 @@ let compile cmd env imports code =
     | [] -> env, []
     | instr :: scode' ->
         let stack = "" (* env#show_stack*) in
-        (* Printf.printf "insn=%s, stack=%s\n%!" (GT.show(insn) instr) (env#show_stack);  *)
+        (* Printf.printf "insn=%s, stack=%s\n%!" (GT.show(insn) instr) (env#show_stack);   *)
         let env', code' =
           if env#is_barrier
           then match instr with
-               | LABEL  s -> if env#has_stack s then (env#drop_barrier)#retrieve_stack s, [Label s] else env, []
+               | LABEL  s -> if env#has_stack s then (env#drop_barrier)#retrieve_stack s, [Label s] else env#drop_stack, []
                | FLABEL s -> env#drop_barrier, [Label s]
                | SLABEL s -> env, [Label s]
                | _        -> env, []
@@ -629,10 +629,13 @@ class env prg =
     method is_barrier = barrier
 
     (* set barrier *)
-    method set_barrier = {< stack = []; barrier = true >}
+    method set_barrier = {< barrier = true >}
 
     (* drop barrier *)
     method drop_barrier = {< barrier = false >}
+
+    (* drop stack *)
+    method drop_stack = {< stack = [] >}
 
     (* associates a stack to a label *)
     method set_stack l = (*Printf.printf "Setting stack for %s\n" l;*)

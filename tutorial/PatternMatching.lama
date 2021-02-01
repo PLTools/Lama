@@ -1,21 +1,23 @@
 fun show (x) {
   fun show (level, x) {
-    for local i; i := 0, i<level, i := i + 1 do
+    for var i; i := 0, i<level, i := i + 1 do
       printf (" ")
     od;
   
     case x of
-      #unboxed -> printf ("integer %d\n", x);
-                  return                
-    | #array   -> printf ("array\n")
-    | #string  -> printf ("string\n")
-    | #sexp    -> printf ("S-expression\n")
-    | #fun     -> printf ("closure 0x%x\n", x[0])
+      #val   -> printf ("integer %d\n", x)
+    | #array -> printf ("array\n")
+    | #str   -> printf ("string\n")
+    | #sexp  -> printf ("S-expression\n")
+    | #fun   -> printf ("closure 0x%x\n", x[0])
     esac;
 
-    for local i; i := case x of #fun -> 1 | _ -> 0 esac, i < x.length, i := i + 1 do
-      show (level + 2, x[i])
-    od
+    case x of
+      #val -> skip
+    | _    -> for var i; i := case x of #fun -> 1 | _ -> 0 esac, i < x.length, i := i + 1 do
+                show (level + 2, x[i])
+              od
+    esac
   }
 
   show (0, x)

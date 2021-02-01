@@ -1,0 +1,20 @@
+LaMa 1.10
+---------
+
+Version 1.10 clears some inconsistnces in 1.00. The language is *not* top-down compatible
+with 1.00, but the conversion is simple.
+
+# Language features:
+
+- Removed keywords: local, repeat, until, boxed, unboxed, length, string;
+- Added keywords: var, val, box;
+- local variable declarations syntax changed: local x... -> var x...;
+- repeat ... until syntax changed: now do .. while .. od. Note the inversion in
+  the condition while converting from repeat... to do..while...;
+- .length and .string are now regular functions; hence a conventional synax string (x) and
+  length (x) is possible;
+- pattern syntax changed: #boxed -> #box, #unboxed -> #val, #string -> #str;
+- scope expressions are integrated with ( ... ) primaries; thus,
+  nested scopes are introduced with *round* brackets;
+- no more List.singleton is needed since there is no more confilict between one-element lists
+  and scoped expressions.
