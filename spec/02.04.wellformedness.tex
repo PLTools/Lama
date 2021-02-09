@@ -1,0 +1,46 @@
+\section{Well-formed Expressions}
+\label{sec:wellformedness}
+
+{
+\newcommand{\Ref}{\primi{Ref}{}}
+\newcommand{\Val}{\primi{Val}{}}
+\newcommand{\Void}{\primi{Void}{}}
+\newcommand{\Weak}{\primi{Weak}{}}
+\renewcommand{\withenv}[2]{{#2}\,:\,{#1}}
+
+\begin{comment}
+    \withenv{\Ref}{\llang{ref $\;x$}} & \withenv{\Val}{x}& \withenv{\Void}{\llang{ignore $\;x$}} & x \in \mathscr X\\
+                                      & \withenv{\Val}{z}& \withenv{\Void}{\llang{ignore $\;z$}} & z \in \mathbb N \\
+                                      & \trule{\withenv{\Val}{l},\quad\withenv{\Val}{r}} 
+                                              {\withenv{\Val}{l\oplus r}} &
+                                        \trule{\withenv{\Val}{l},\quad\withenv{\Val}{r}}
+                                              {\withenv{\Void}{\llang{ignore $\;l\oplus r$}}}    & \\
+                                      &                  & \withenv{\Void}{\llang{skip}}         & \\
+                                      & \trule{\withenv{\Ref}{l},\quad\withenv{\Val}{r}}
+                                              {\withenv{\Val}{\llang{$l\;$ := $\; r$}}} &
+                                        \trule{\withenv{\Ref}{l},\quad\withenv{\Val}{r}}
+                                              {\withenv{\Void}{\llang{ignore ($l\;$ := $\; r$})}} & \\
+                                      &                  & \withenv{\Void}{\llang{read ($x$)}} & \\
+                                      &                  & \trule{\withenv{\Val}{e}}{\withenv{\Void}{\llang{write ($e$)}}} & \\[2mm]
+      \trule{\withenv{\Void}{s_1},\quad\withenv{a}{s_2}}{\withenv{a}{\llang{$s_1\;$;$\;s_2$}}}&
+      \trule{\withenv{\Val}{e},\quad\withenv{a}{s_1},\quad\withenv{a}{s_2}}{\withenv{a}{\llang{if $\;e\;$ then $\;s_1\;$ else $\;s_2$}}}&
+      \trule{\withenv{\Val}{e},\quad\withenv{\Void}{s}}{\withenv{\Void}{\llang{while $\;e\;$ do $\;s$}}}&       \\[2mm]
+       & \trule{\withenv{\Val}{e},\quad\withenv{\Void}{s}}{\withenv{\Void}{\llang{repeat $\;s\;$ until $\;e$}}} & &
+\end{comment}
+
+\renewcommand{\arraystretch}{3}
+\[
+  \begin{array}{cc}
+    \trule{x \in \mathscr X}{\withenv{\Weak}{x}}  & \trule{z \in \mathbb N }{\withenv{\Weak}{z}}\\
+    
+  \trule{\withenv{\Val}{l},\quad\withenv{\Val}{r}} 
+        {\withenv{\Weak}{l\oplus r}}               & \withenv{\Weak}{\llang{skip; $\;\bot$}} \\
+  \trule{\withenv{\Ref}{l},\quad\withenv{\Val}{r}}
+        {\withenv{\Weak}{\llang{$l\;$ := $\; r$}}} & \withenv{\Weak}{\llang{read ($x$); $\;\bot$}} \\
+  \trule{\withenv{\Val}{e}}{\withenv{\Weak}{\llang{write ($e$); $\;\bot$}}} & \trule{\withenv{\Val}{e},\quad\withenv{\Void}{s}}{\withenv{\Weak}{\llang{while $\;e\;$ do $\;s\;$ od; $\;\bot$}}} \\
+  \trule{\withenv{\Val}{e},\quad\withenv{\Void}{s}}{\withenv{\Weak}{\llang{(repeat $\;s\;$ until $\;e$); $\;\bot$ }}} & 
+  \end{array}
+  \]
+
+}
+

@@ -1,5 +1,8 @@
 \documentclass{book}
 
+\newcommand\hmmax{0}
+\newcommand\bmmax{0}
+
 \usepackage{amssymb, amsmath}
 \usepackage{alltt}
 \usepackage{pslatex}
@@ -42,12 +45,12 @@
 \def\subarrow{}
 \newcommand{\setsubarrow}[1]{\def\subarrow{#1}}
 
-\newcommand{\trule}[2]{\frac{#1}{#2}}
+\newcommand{\trule}[2]{\dfrac{#1}{#2}}
 \newcommand{\crule}[3]{\frac{#1}{#2},\;{#3}}
 \newcommand{\withenv}[2]{{#1}\vdash{#2}}
-\newcommand{\trans}[3]{{#1}\transarrow{\padding{\textstyle #2}\padding}\subarrow{#3}}
+\newcommand{\trans}[3]{{#1}\transarrow{\padding{\textstyle #2}\padding}{\subarrow}{#3}}
 \newcommand{\ctrans}[4]{{#1}\transarrow{\padding#2\padding}\subarrow{#3},\;{#4}}
-\newcommand{\llang}[1]{\mbox{\lstinline[mathescape]|#1|}}
+\newcommand{\llang}[1]{\mbox{\lstinline[language=abslama,mathescape]|#1|}}
 \newcommand{\pair}[2]{\inbr{{#1}\mid{#2}}}
 \newcommand{\inbr}[1]{\left<{#1}\right>}
 \newcommand{\highlight}[1]{\color{red}{#1}}
@@ -71,6 +74,7 @@
 \renewcommand{\emptyset}{\varnothing}
 \newcommand{\dom}[1]{\mathtt{dom}\;{#1}}
 \newcommand{\primi}[2]{\mathbf{#1}\;{#2}}
+\newcommand{\con}[1]{\mathbf{#1}}
 \newcommand{\lama}{$\lambda\kern -.1667em\lower -.5ex\hbox{$a$}\kern -.1000em\lower .2ex\hbox{$\mathcal M$}\kern -.1000em\lower -.5ex\hbox{$a$}$\xspace}
 %\newcommand{\sial}{S\textit{\lower -.5ex\hbox{I}\kern -.1667em\lower .5ex\hbox {A}}\kern -.125emL\@\xspace}
 \definecolor{light-gray}{gray}{0.90}
@@ -84,6 +88,22 @@
 \newcommand{\s}{\:\:}
 
 \newcommand{\descr}[2]{\smallskip{#1}\begin{itemize}[noitemsep,topsep=0pt]\item[]{#2}\end{itemize}}
+
+\lstdefinelanguage{abslama}{
+keywords={skip,if,then,else,elif,fi,while,do,od,for,fun,public,import,
+box,val,var,case,of,esac,when,box,str,sexp,array,infix,infixl,infixr,at,before,after,true,false,eta,lazy,syntax,ref,ignore,elemRef},
+sensitive=true,
+basicstyle=\small,
+%commentstyle=\scriptsize\rmfamily,
+keywordstyle=\ttfamily\bfseries,
+identifierstyle=\ttfamily,
+basewidth={0.5em,0.5em},
+columns=fixed,
+fontadjust=true,
+literate={->}{{$\to$}}3,
+morecomment=[s][\ttfamily]{(*}{*)},
+morecomment=[l][\ttfamily]{--}
+}
 
 \lstdefinelanguage{lama}{
 keywords={skip,if,then,else,elif,fi,while,do,od,for,fun,public,import,

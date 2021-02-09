@@ -1,0 +1,37 @@
+\begin{table}[t]
+  \begin{tabular}{cccl}
+    notation           & instances                       & definition                                              & comments \\[1mm]
+    \hline\\
+    $\inbr{\bullet,\,\bullet,\,\dots}$ & & & pairs and tuples\\[1mm]
+    $X^\bot$                            & & & $X\cup\{\bot\}$\\[1mm]
+    $X^*$                              & & & lists of elements of $X$\\[1mm]    
+    $\mathscr X$       & $x,\,y,\,z,\,\dots$             &                                                         & variables \\[1mm]
+    $\mathscr E$       &                                 &                                                         & expressions \\[1mm]
+    $\mathscr T$       & $\con{C},\,\con{D},\,\dots$     &                                                         & tags (constructors) \\[1mm]
+    $\Sigma$           & $\sigma$                        & $\mathscr X\to\mathscr V$                               & bindings (a partial map from\\
+                       &                                 &                                                         & variables to values) \\[1mm]
+    $\Sigma_{\mathscr X}$ & $\inbr{S,\,\sigma}$             & $2^{\mathscr X}\times\Sigma$                              & local scopes (sets of variables\\
+                       &                                 &                                                         & and their bindings) \\[1mm]
+    $St$               & $\inbr{\sigma_g,\,ss}$          & $\Sigma\times\Sigma^*_{\mathscr X}$                        & states (global bindings and stacks\\        
+                       &                                 &                                                         & of local scopes) \\[1mm]
+    $\mathcal W$       & $w$                             &                                                         & worlds\\[1mm]
+    $\mathcal L$       & $l$                             &                                                         & locations \\[1mm]
+    $\mathcal M$       & $\mu$                           & $\mathcal L\to\mathcal C$                               & abstract memory (a partial map from\\
+                       &                                 &                                                         & locations to composite values) \\[1mm]
+    $\mathcal C$       & $c$                             & $St\times\mathcal{M}\times\mathcal{W}$                  & configurations (state, memory and world)\\[2mm]
+    $\mathcal P$       &                                 & $\mathbb Z^\bot\uplus$                                   & primitive values (integer or default\\
+                       &                                 & $\primi{ref}{\mathscr{X}}\uplus$                        & value, references to variables or\\
+                       &                                 & $\primi{elemRef}{\mathcal L\;\mathbb N}$                & array elements)\\[2mm]
+    $\mathcal F$       &                                 & $\mathscr X^*\times\mathscr E \times \mathbb N$         & function values (argument names, body,\\
+                       &                                 &                                                         & nesting level)\\[1mm]
+    $\mathcal V$       & $v$                             & $\mathcal P\uplus \mathcal L$                           & values (primitive values or locations) \\[1mm]
+    $\mathcal C$       &                                 & $Arr\uplus Sexp \uplus Clo$                             & composite values (arrays, S-expressions, \\
+                       &                                 &                                                         & or closures) \\[1mm]
+    $Arr$              &                                 & $\mathbb N\times (\mathbb N\to\mathcal V)$              & arrays (length and element function) \\[1mm]
+    $Sexp$             &                                 & $\mathscr T \times Arr$                                 & S-expressions (tag and array of subvalues) \\[1mm]
+    $Clo$              &                                 & $\mathscr X^* \times\mathscr E\times\Sigma^*_{\mathscr X}$ & closures (argument names, function body\\
+                       &                                 &                                                         & and a stack of local scopes) 
+  \end{tabular}
+  \caption{Basic Categories}
+  \label{categories}
+\end{table}

@@ -1,0 +1,224 @@
+\section{Operational Semantics}
+
+The semantics for the language is given in the form of a \emph{big-step} operational semantics with the
+main transition relation being
+
+\[
+\setarrow{\xRightarrow}
+\trans{c}{e}{\inbr{c^\prime,\,v}}
+\]
+
+for some \emph{configurations} $c, c^\prime$, some expression $e$ and some value $v$. Besides this main relation a few supplementary are
+used to handle the semantics of other syntactic categories.
+
+\subsection{States, Worlds and Configurations}
+
+A configuration is a triple of a \emph{state}, a \emph{memory}, and a \emph{world}. A world is an abstract entity to accomodate side-effects
+potentially performed as the execution of a program proceeds, and a memory is a patrial function which maps \emph{locations} to
+\emph{composite values} (arrays, S-expressions, and closures).
+
+A state is a pair
+
+\[
+\inbr{\sigma_g,\,ss}
+\]
+
+of a \emph{global} binding and a stack (list) of local scopes, each of which is a pair
+
+\[
+\inbr{S,\,\sigma}
+\]
+
+where $S$ is a set of variable names and $\sigma$ is local bindings. For states we define two primitives to read a variable
+value in a state 
+
+
+\[
+\begin{array}{rcl}
+  \inbr{\sigma_g,\,\epsilon}\,x & = &\sigma_g\,x\\[2mm]
+  \inbr{\sigma_g,\,\inbr{S,\,\sigma}\circ ss}\,x  & = & \left\{\begin{array}{rcl}
+                                                                  \sigma\,x &,& x\in S\\
+                                                                  \inbr{\sigma_g,\,ss}\,x &,&x\not\in S
+                                                               \end{array}
+                                                        \right.
+\end{array}
+\]
+
+and to reassign a variable to another value:
+
+\[
+\begin{array}{rcl}
+  \inbr{\sigma_g,\,\epsilon}\,[x\gets v] & = &\inbr{\sigma_g\,[x\gets v],\,\epsilon}\\[2mm]
+  \inbr{\sigma_g,\,\inbr{S,\,\sigma}\circ ss}\,[x\gets v]  & = & \left\{\begin{array}{rcl}
+                                                                          \inbr{\sigma_g,\,\inbr{S,\,\sigma\,[x\gets v]}\circ ss} &,& x\in S\\[1mm]
+                                                                          \inbr{\sigma^\prime_g,\,\inbr{S,\,\sigma}\circ ss^\prime}\,x &,&x\not\in S\\
+                                                                                                                                    & &\inbr{\sigma^\prime_g,\,ss^\prime}=\inbr{\sigma_g,\,ss}\,[x\gets v]
+                                                                        \end{array}
+                                                                 \right.
+\end{array}
+\]
+
+\subsection{Expressions}
+
+To give the semantics for the expressions we introduce a supplementary transition ``$\xRightarrow{}^*$'', which described a left-to-right computation
+of the \emph{list} of expressions and results, correspondingly, in a final configuration and a \emph{list} of values:
+
+\setarrow{\xRightarrow}
+\setsubarrow{\hskip-0,3em^*\hskip0.3em}
+\[ 
+\trans{c}{\epsilon}{\inbr{c,\,\epsilon}}\ruleno{Expr$^*_\epsilon$} 
+\]
+\[ 
+\trule{{\setsubarrow{}\trans{c}{e}{\inbr{c^\prime,\,v}}}\qquad\trans{c^\prime}{\omega}{\inbr{c^{\prime\prime},\,\psi}}}
+      {\trans{c}{e\circ\omega}{\inbr{c^{\prime\prime},\,v\circ\psi}}}\ruleno{Expr$^*$} 
+\]
+
+Operational semantics for core expressions is given in Fig.~\ref{semantics:core}. Note, the semantics of binary expressions is
+given in terms of a primitive ``$\oplus$'', which is left undefined. The concrete semantics of binary operators is
+given in Section~\ref{sec:expressions}.
+
+\begin{figure}[t]
+\setsubarrow{}
+\[
+\trans{c}{z}{\inbr{c,\,z}}\ruleno{Const}
+\]
+\[
+\trans{\inbr{s,\,m,\,w}}{x}{\inbr{\inbr{s,\,m,\,w},\,s\,x}}\ruleno{Var}
+\]
+\[
+\trans{c}{\llang{ref $\;x$}}{\inbr{c,\,\primi{ref}{x}}}\ruleno{Ref}
+\]
+\[
+\trule{\setsubarrow{\hskip-0,3em^*\hskip0.3em}\trans{c}{l\circ r}{\inbr{c^\prime,\,w\circ v}}}
+      {\trans{c}{l\oplus r}{\inbr{c^\prime,\,w\otimes v}}}\ruleno{Binop}
+\]\vskip1mm
+\[
+\trans{c}{\llang{skip}}{\inbr{c,\,\bot}}\ruleno{Skip}
+\]
+\[
+\trule{\setsubarrow{\hskip-0,3em^*\hskip0.3em}\trans{c}{l\circ r}{\inbr{\inbr{s,\,m,\,w},\,[\primi{ref}{x}]\circ[v]}}}
+      {\trans{c}{\llang{$l\;$ := $\;r$}}{\inbr{\inbr{s\,[x\gets v],\,m,\,w},\,v}}}\ruleno{Assign}
+\]\vskip1mm
+\[
+\trule{\trans{c_1}{S_1}{\inbr{c^\prime,\,v}}\qquad \trans{c^\prime}{S_2}{c_2}}
+      {\trans{c_1}{S_1\llang{;}\;S_2}{c_2}}\ruleno{Seq}
+\]\vskip1mm
+\[
+\trule{\trans{c}{e}{\inbr{c^\prime,\,n}}\qquad n\ne 0\qquad \trans{c^\prime}{S_1}{c^{\prime\prime}}}
+      {\trans{c}{\llang{if $\ \ e\ \ $ then $\ \ S_1\ \ $ else $\ \ S_2\ \ $}}{c^{\prime\prime}}}
+      \ruleno{If-True}
+\]\vskip1mm
+\[
+\trule{\trans{c}{e}{\inbr{c^\prime,\,0}}\qquad \trans{c^\prime}{S_2}{c^{\prime\prime}}}
+      {\trans{c}{\llang{if $\ \ e\ \ $ then $\ \ S_1\ \ $ else $\ \ S_2\ \ $}}{c^{\prime\prime}}}
+      \ruleno{If-False}
+\]\vskip1mm
+\[
+\trule{\trans{c}{e}{\inbr{c^\prime,\,n}}\quad n\ne 0\quad\trans{c^\prime}{S}{\inbr{c^{\prime\prime},\,v}}\quad\trans{c^{\prime\prime}}{\llang{while $\ \ e\ \ $ do $\ \ S\ \ $}}{c^{\prime\prime\prime}}}     
+      {\trans{c}{\llang{while $\ \ e\ \ $ do $\ \ S\ \ $}}{c^{\prime\prime\prime}}}
+      \ruleno{While-True}
+\]\vskip1mm
+\[
+\trule{\trans{c}{e}{\inbr{c^\prime,\,0}}}
+      {\trans{c}{\llang{while $\ \ e\ \ $ do $\ \ S\ \ $}}{\inbr{c^\prime,\,\bot}}}
+      \ruleno{While-False}
+\]
+\caption{Big-step Operational Semantics for Core Expressions}
+\label{semantics:core}
+\end{figure}
+
+\subsubsection{Arrays and S-expressions}
+
+Arrays and S-expressions allow to manipulate \emph{composite valuues} which are kept in \emph{memory}. A memory is a partial function $m$
+which maps \emph{locations} into composite values. Locations are abstractions of real-world memory addresses; the set of locations
+is considered to be linearly ordered. We define the following primitive
+
+\[
+\primi{new}\,m\,v=\inbr{l,\,m\,[l\gets v]}\mbox{ where }l=min\{l\in\mathcal{L}\mid m\,(l)\mbox{ undefined}\}
+\]
+
+which takes a memory $m$ and a composite value $v$ and returns a \emph{new} location $l$ (previously unoccupied) and a new \emph{memory} which
+associates $l$ with $v$ and preserves other associations intact.
+
+Arrays are represented as pairs
+
+\[
+\inbr{n,\,f}
+\]
+
+where $n\in\mathbb N$ is a lengths and $f : \mathbb{N}\to\mathcal{V}$~--- element function which maps indices into values. It is assumed, that
+$\primi{dom}{f}=[0\dots n-1]$.
+
+S-expressions are represented as pairs
+
+\[
+\inbr{t,\,s}
+\]
+
+where $t$ is a \emph{tag} and $s$ is an array of subexpressions. The semantics of arrays and subexpressions is given in Fig.~\ref{semantics:arrays}.
+
+\begin{figure}
+  \setsubarrow{}
+  \[
+  \trule{\setsubarrow{\hskip-0,3em^*\hskip0.3em}
+         \begin{array}{c}
+           \trans{c}{e_1\circ\dots\circ e_k}{\inbr{\inbr{s,\,m,\,w}, v_1\circ\dots\circ v_k}}\\[2mm]
+           \inbr{l,\,m^\prime}=\primi{new}{m\,\inbr{k-1,\,i\mapsto v_{i+1}}}
+         \end{array}
+        }
+        {\trans{c}{\llang{[$e_1,\dots,e_k$]}}{\inbr{\inbr{s,\,m^\prime,\,w},\,l}}}\ruleno{Array}
+  \]\\[2mm]
+  \[
+  \trule{\setsubarrow{\hskip-0,3em^*\hskip0.3em}
+         \begin{array}{c}
+           \trans{c}{e_1\circ\dots\circ e_k}{\inbr{\inbr{s,\,m,\,w}, v_1\circ\dots\circ v_k}}\\[2mm]
+           \inbr{l,\,m^\prime}=\primi{new}{m\,\inbr{t,\,\inbr{k-1,\,i\mapsto v_{i+1}}}}
+         \end{array}
+        }
+        {\trans{c}{\llang{$t\,$($e_1,\dots,e_k$)}}{\inbr{\inbr{s,\,m^\prime,\,w},\,l}}}\ruleno{Sexp}  
+  \]\\[2mm]
+  \[
+  \trule{\setsubarrow{\hskip-0,3em^*\hskip0.3em}
+         \begin{array}{c}
+           \trans{c}{e_1\circ e_2}{\inbr{\inbr{s,\,m,\,w},\,l\circ i}}\\[2mm]
+           l\in\mathcal{L}\\
+           m\,(l)=\inbr{k,\,f}\mbox{ or }m\,(l)=\inbr{t,\,\inbr{k, f}}\\
+           i\in[0\dots k-1]
+         \end{array}
+        }
+        {\trans{c}{\llang{$e_1\,$[$e_2$]}}{\inbr{\inbr{s,\,m,\,w},\,f\,(i)}}}\ruleno{Elem}
+  \]\\[2mm]
+  \[
+  \trule{\setsubarrow{\hskip-0,3em^*\hskip0.3em}
+         \begin{array}{c}
+           \trans{c}{e_1\circ e_2}{\inbr{\inbr{s,\,m,\,w},\,l\circ i}}\\[2mm]
+           l\in\mathcal{L}\\
+           m\,(l)=\inbr{k,\,f}\mbox{ or }m\,(l)=\inbr{t,\,\inbr{k, f}}\\
+           i\in[0\dots k-1]
+         \end{array}
+        }
+        {\trans{c}{\llang{elemRef ($e_1$,$\ \ e_2$)}}{\inbr{\inbr{s,\,m,\,w},\,\primi{elemRef}{l\;i}}}}\ruleno{ElemRef}
+  \]\\[2mm]
+  \[
+  \trule{\setsubarrow{\hskip-0,3em^*\hskip0.3em}
+         \begin{array}{c}
+           \trans{c}{l\circ r}{\inbr{\inbr{s,\,m,\,w},\,[\primi{elemRef}{l\;i}]\circ[v]}}\\[2mm]
+           m^\prime=\left\{\begin{array}{rcl}
+                            m\,[l\gets\inbr{k,\,f\,[i\gets v]}] &,&m\,(l)=\inbr{k,\,f}\\
+                            m\,[l\gets\inbr{t,\,\inbr{k,\,f\,[i\gets v]}}] &,&m\,(l)=\inbr{t,\,\inbr{k,\,f}}
+                          \end{array}
+                   \right. 
+         \end{array}
+        }
+        {\trans{c}{\llang{$l\;$ := $\;r$}}{\inbr{\inbr{s,\,m,\,w},\,v}}}\ruleno{AssignElem}
+  \]    
+\caption{Big-step Operational Semantics for Arrays and S-expressions}  
+\label{semantics:arrays}
+\end{figure}
+
+\subsubsection{Pattern Matching}
+
+\subsubsection{Declarations}
+
+\subsubsection{Functions and Closures}
+

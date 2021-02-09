@@ -1,0 +1,78 @@
+\section{Abstract Syntax}
+
+Abstract syntax defines the shapes of \emph{abstract syntax trees} (AST). We give the formation rules in a \emph{mixfix} form to
+reflect the concrete syntax (presented in Section~\ref{sec:concrete_syntax}); however, the intended meaning is \emph{prefix},
+thus the formation rule for, for example, conditional expression
+
+\[
+\mbox{\llang{if $\;\mathscr E\;$ then $\;\mathscr E\;$ else $\;\mathscr E$}}
+\]
+
+defines the following AST fragment:
+
+\[
+\mbox{\llang{if$\,(\mathscr E,\,\mathscr E,\,\mathscr E)$}}
+\]
+
+The root syntactic category for the language is \emph{compilation unit} $\mathscr U$, which is an expression in a contexts of
+a group of top-level \emph{definitions} $\mathscr D$:
+
+\[
+\begin{array}{rcll}
+  \mathscr S & :: & \mathscr D^*\quad \mathscr E & \mbox{--- scope expression}\\
+  \mathscr D & :: & \mbox{\lstinline|var $\;\mathscr X$|} & \mbox{--- local variable definition} \\
+             &    & \mbox{\lstinline|fun $\;\mathscr X\;$ ($\mathscr X^*$) \{$\;\mathscr S\;$\}|} & \mbox{--- function definition}\\
+  \mathscr U & :: & \mathscr S & \mbox{--- compilation unit}
+\end{array}
+\]
+
+The core syntactic category for the language is \emph{expressions} $\mathscr E$. The following kinds of
+expressions are distinguished:
+
+\[
+\begin{array}{rcll}
+   \mathscr E & :: & \mathscr X                                                            & \mbox{--- variable}  \\
+              &    & \mathbb N                                                             & \mbox{--- constant}  \\
+              &    & \lstinline|{ $\mathscr S\;$ }|                                        & \mbox{--- nested scope} \\   
+              &    & \mathscr E \otimes \mathscr E                                         & \mbox{--- binary expression} \\
+              &    & \mathscr E\;\lstinline|($\mathscr E^*$)|                              & \mbox{--- call} \\
+              &    & \llang{fun ($\mathscr X^*$) \{$\mathscr S$\}}                         & \mbox{--- lambda expression} \\
+              &    & \llang{[$\mathscr E^*$]}                                              & \mbox{--- array} \\
+              &    & \llang{$\mathscr E\;$ [$\mathscr E$]}                                 & \mbox{--- array element} \\
+              &    & \llang{$\mathscr T\;$ ($\mathscr E^*$)}                               & \mbox{--- S-expression}  \\
+              &    & \mathscr E \;\mbox{\lstinline|:=|} \;\mathscr E                       & \mbox{--- assignment} \\
+              &    & \mathscr E \mbox{\lstinline|;|}\; \mathscr E                          & \mbox{--- sequential expression} \\
+              &    & \llang{if $\;\mathscr E\;$ then $\;\mathscr E\;$ else $\;\mathscr E$} & \mbox{--- conditional expression} \\
+              &    & \llang{while $\;\mathscr E\;$ do $\;\mathscr E$}                      & \mbox{--- loop expression} \\
+              &    & \llang{case $\;\mathscr E\;$ ($\mathscr P$ -> $\mathscr E$)$^+$}      & \mbox{--- pattern matching} \\
+              &    & \mbox{\lstinline|skip|}                                               & \mbox{--- empty expression} \\
+              &    & \bot                                                                  & \mbox{--- default value} \\
+              &    & \llang{ref ($\mathscr X$)}                                            & \mbox{--- reference to variable} \\
+              &    & \llang{elemRef ($\mathscr E$,$\;\mathscr E$)}                         & \mbox{--- reference to array element}  \\
+              &    & \llang{ignore ($\mathscr E$)}                                         & \mbox{--- ignore expression}
+\end{array}
+\]
+
+Note, in the formation rule for binary expressions the symbol ``$\otimes$'' is left undefined. The actual assortment of
+binary operators is given in Section~\ref{sec:expressions}.
+
+The last four kinds of expressions (``$\bot$'', \llang{ref}, \llang{elemRef} and \llang{ignore}) are \emph{internal} in the sense that
+they are not represented  explicitly in the concrete syntax; instead, they are \emph{inferred} using the attribute system described
+in Section~\ref{sec:wellformedness}. 
+
+The last category is \emph{patterns} $\mathscr P$. Patterns are used in \lstinline|case|-expressions to match the values against:
+
+\[
+\begin{array}{rcll}
+  \mathscr P & :: & \_                                     & \mbox{--- wildcard} \\
+             &    & \mathbb N                              & \mbox{--- constant} \\
+             &    & \llang{[$\mathcal P^*$]}               & \mbox{--- array}\\
+             &    & \llang{$\mathcal T\;$($\mathcal P^*$)} & \mbox{--- S-expression}\\
+             &    & \llang{array}                          & \mbox{--- array type}\\
+             &    & \llang{sexp}                           & \mbox{--- S-expression type}\\
+             &    & \llang{fun}                            & \mbox{--- closure type}\\  
+             &    & \llang{val}                            & \mbox{--- value type}\\             
+             &    & \llang{box}                            & \mbox{--- reference type}
+\end{array}
+\]
+

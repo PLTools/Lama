@@ -1,1 +1,48 @@
 \chapter{Abstract Syntax and Semantics}
+
+In this section we present abstract syntax and semantics of \lama. The syntax is given in the form of \emph{abstract syntax tree} (AST) format,
+and the semantics~--- in the form of a \emph{big-step operational semantics}. In addition we present a part of static semantics of the language
+in the form of \emph{attribute system}, which can be considered as a form of simplictic type system. Only the core constructs of the languge
+are considered here.
+
+Basic syntactic and semantic categories and their brief descriptions are given in Tab.~\ref{categories}. Apart from those, we will use the
+following notations: for a mapping $f : X\to Y$ we use the following definition:
+
+\[
+f [x\gets y] = \lambda\,z\,.\,
+\left\{
+\begin{array}{rcl}
+  y    &,& x = z \\
+  f\;x &,& x\neq z
+\end{array}
+\right.
+\]
+
+Empty mapping (undefined everywhere) is denoted $\Lambda$, the domain of a mapping $f$~--- $\primi{dom}{f}$, and we abbreviate
+
+\[
+  \Lambda[x_1\gets y_1][x_2\gets y_2]\dots[x_k\gets y_k]
+\]
+
+as
+
+\[
+  [x_1\gets y_1,\,x_2\gets y_2,\,\dots,\,x_k\gets y_k]
+\]
+
+For lists, we use notation $h\circ t$ for decomposition lists into heads and tails, $\epsilon$~--- for empty lists,
+$|l|$~--- for list length and
+
+\[
+l[i:j]\qquad l[:n]\qquad l[n:]
+\]
+
+for taking sublists from $i$-th to $j$-th elements, $n$-last and $n$-first elements respectively; the numbering
+of elements is left-to-right, starting from $0$. We also will enclose elements of lists which have a
+composite structure in square brackets ``$[\dots]$'' to separate them properly.
+
+\input{02.01.categories}
+\FloatBarrier
+\input{02.02.abstract_syntax}
+\input{02.03.operational_semantics}
+%\input{02.04.wellformedness}
