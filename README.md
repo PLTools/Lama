@@ -41,7 +41,7 @@ The language specification can be found [here](lama-spec.pdf).
 Prerequisites:
 
 * gcc-multilib
-* ocaml (>= 4.07.1) [http://ocaml.org]
+* ocaml (4.07.1 <= . <= 4.10) [http://ocaml.org]
 * opam (>= 2.0.4) [http://opam.ocaml.org]
 
 Installing:
