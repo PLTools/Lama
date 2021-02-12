@@ -1,3 +1,12 @@
+| Branch 1.10                     |
+| ------------------------------- |
+| [![Lama 1.10][1]][2] |
+
+[1]:  https://github.com/JetBrains-Research/Lama-devel/workflows/Build/badge.svg?branch=1.10
+[2]:  https://github.com/JetBrains-Research/Lama-devel/actions
+
+
+
 # Lama
 
 ![lama](lama.png) is a programming language developed by JetBrains Research for educational purposes as an exemplary language to introduce
