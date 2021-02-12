@@ -48,7 +48,7 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
 
 * Check that `opam` is installed (using commands `which opam` or `opam --version`)
 
-* Install right switch for OCaml compiler
+* Install right [switch](https://opam.ocaml.org/doc/Manual.html#Switches) for OCaml compiler
 
   `opam switch create lama ocaml-variants.4.10.1+fp+flambda`
 
@@ -72,7 +72,7 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
   Standard library directory: /home/user/.opam/lama/lib/ocaml
   ```
 
-* Pin Lama package using `opam` and right URL (remember of "#" being a comment character in bash)
+* Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
 
   `opam pin add Lama https://github.com/JetBrains-Research/Lama-devel.git\#1.10+ocaml4.10 -y`
 
