@@ -1,4 +1,4 @@
-# Lama  
+# Lama
 
 ![lama](lama.png) is a programming language developed by JetBrains Research for educational purposes as an exemplary language to introduce
 the domain of programming languages, compilers and tools. Its general characteristics are:
@@ -38,21 +38,52 @@ The language specification can be found [here](lama-spec.pdf).
 
 ## Installation
 
-Prerequisites:
+Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or cygwin. Ubuntu-based variant of WSL is recommended.
 
-* gcc-multilib
-* ocaml (4.07.1 <= . < 4.10) [http://ocaml.org]
-* opam (>= 2.0.4) [http://opam.ocaml.org]
+* System-wide prerequisites:
 
-Installing:
+  - `sudo apt install gcc-multilib` (in Debian-based GNU/Linux)
+  - [opam](http://opam.ocaml.org) (>= 2.0.4)
+  - [OCaml](http://ocaml.org) (>= 4.10.1). *Optional* because it can be easily installed through opam. Compiler variant with `flambda` switch is recommended
 
-* `opam pin add -n ostap https://github.com/dboulytchev/ostap.git#memoCPS` (remember of "#" being a comment character in bash)
-* `opam pin add -y lama https://github.com/JetBrains-Research/Lama.git`
+* Check that `opam` is installed (using commands `which opam` or `opam --version`)
 
-Smoke-testing:
+* Install right [switch](https://opam.ocaml.org/doc/Manual.html#Switches) for OCaml compiler
 
-* `pushd tutorial`
-* `make`
-* `popd`
+  `opam switch create lama ocaml-variants.4.10.1+fp+flambda`
 
+  In above command:
 
+  - `opam switch create` is a subcommand to create a new switch
+  - `ocaml-variants.4.10.1+fp+flambda` is name of a standart template for the switch
+  - `lama` is an alias for the switch being created; on success a directory `$(HOME)/.opam/lama` should be created
+
+* Update PATH variable for the fresh switch. (You can add these commands to your `~/.bashrc` for convenience but they should be added by `opam`)
+
+  ```
+  export OPAMSWITCH=lama
+  eval $(opam env)
+  ```
+
+  Check that OCaml compiler is now available in PATH: running `which ocamlc` should give `/home/user/.opam/lama/bin/ocamlc` (or similar) and `ocamlc -v` should give
+
+  ```
+  The OCaml compiler, version 4.10.1
+  Standard library directory: /home/user/.opam/lama/lib/ocaml
+  ```
+
+* Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
+
+  `opam pin add Lama https://github.com/JetBrains-Research/Lama-devel.git\#1.10+ocaml4.10 -y`
+
+  The `-y` switch meands "reply always 'yes'".
+
+* Check that `lamac` exectuable was installed: `which lamac` should give
+
+  ```
+  /home/user/.opam/lama/bin/lamac
+  ```
+
+### Smoke-testing:
+
+Install `lama` system-wide, clone the repository and run `make -C tutorial`
