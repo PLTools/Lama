@@ -21,6 +21,10 @@ build: [
 ]
 install: [make "install"]
 
+depexts: [
+  ["gcc-multilib"] {os-family = "debian"}
+]
+
 dev-repo: "git+https://github.com/JetBrains-Research/Lama.git"
 url {
   src: "git+https://github.com/JetBrains-Research/Lama.git#1.10+ocaml4.10"
