@@ -23,7 +23,7 @@ the domain of programming languages, compilers and tools. Its general characteri
 * with automatic memory management (garbage collection).
 
 The name ![lama](lama.png) is an acronym for *Lambda-Algol* since the language has borrowed the syntactic shape of
-operators from **Algol-68**; [**Haskell**](www.haskell.org) and [**OCaml**](www.ocaml.org) can be
+operators from **Algol-68**; [**Haskell**](http://www.haskell.org) and [**OCaml**](http://ocaml.org) can be
 mentioned as other languages of inspiration.
 
 The main purpose of ![lama](lama.png) is to present a repertoire of constructs with certain runtime behavior and
