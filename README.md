@@ -98,6 +98,6 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
   /home/user/.opam/lama/bin/lamac
   ```
 
-### Smoke-testing:
+### Smoke-testing (optional)
 
-Clone the repository and run `make -C tutorial LAMAC=../src/lamac`. Without extra `LAMAC` switch it will try to use `lamac` installed system-wide to build tutorial.
+Clone the repository and run `make -C tutorial`. It should build local compiler `src/lamac` and a few tutorial executables in `tutorial/`.

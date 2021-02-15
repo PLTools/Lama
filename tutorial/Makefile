@@ -1,13 +1,19 @@
-SHELL := /bin/bash
-
 FILES=$(wildcard *.lama)
 ALL=$(sort $(FILES:.lama=))
-LAMAC=lamac
+EXTRA_TARGETS =
 
-all: $(ALL)
+ifeq ($(LAMAC),)
+	LAMAC := ../src/lamac
+	EXTRA_TARGETS += $(LAMAC)
+endif
+
+all: $(EXTRA_TARGETS) $(ALL)
+
+../src/lamac:
+	$(MAKE) -C ../src
 
 %: %.lama
 	$(LAMAC) $<
 
 clean:
-	rm -Rf *.s *.o *.i *~ $(ALL)
+	$(RM) -R *.s *.o *.i *~ $(ALL)
