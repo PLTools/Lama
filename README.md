@@ -52,6 +52,12 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
 * System-wide prerequisites:
 
   - `sudo apt install gcc-multilib` (in Debian-based GNU/Linux)
+   
+     On some versions you need to install additional package `lib32gcc-9-dev` in case of errors like 
+       ```       
+      /usr/bin/ld: cannot find -lgcc
+      /usr/bin/ld: skipping incompatible /usr/lib/gcc/x86_64-linux-gnu/9/libgcc.a when searching for -lgcc              
+       ```
   - [opam](http://opam.ocaml.org) (>= 2.0.4)
   - [OCaml](http://ocaml.org) (>= 4.10.1). *Optional* because it can be easily installed through opam. Compiler variant with `flambda` switch is recommended
 
