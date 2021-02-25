@@ -83,9 +83,14 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
 
 * Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
 
-  `opam pin add Lama https://github.com/JetBrains-Research/Lama-devel.git\#1.10+ocaml4.10 -y`
+  `opam pin add Lama https://github.com/JetBrains-Research/Lama-devel.git\#1.10+ocaml4.10 --no-action`
 
-  The `-y` switch meands "reply always 'yes'".
+* Install *dep*endencies on system-wide *ext*ernal packages and `lama` itself after that.
+
+  ```
+  opam depext Lama --yes
+  opam install Lama --yes
+  ```
 
 * Check that `lamac` exectuable was installed: `which lamac` should give
 
@@ -95,4 +100,4 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
 
 ### Smoke-testing:
 
-Install `lama` system-wide, clone the repository and run `make -C tutorial`
+Clone the repository and run `make -C tutorial LAMAC=../src/lamac`. Without extra `LAMAC` switch it will try to use `lamac` installed system-wide to build tutorial.
