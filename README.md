@@ -23,7 +23,7 @@ the domain of programming languages, compilers and tools. Its general characteri
 * with automatic memory management (garbage collection).
 
 The name ![lama](lama.png) is an acronym for *Lambda-Algol* since the language has borrowed the syntactic shape of
-operators from **Algol-68**; [**Haskell**](www.haskell.org) and [**OCaml**](www.ocaml.org) can be
+operators from **Algol-68**; [**Haskell**](http://www.haskell.org) and [**OCaml**](http://ocaml.org) can be
 mentioned as other languages of inspiration.
 
 The main purpose of ![lama](lama.png) is to present a repertoire of constructs with certain runtime behavior and
@@ -52,6 +52,12 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
 * System-wide prerequisites:
 
   - `sudo apt install gcc-multilib` (in Debian-based GNU/Linux)
+   
+     On some versions you need to install additional package `lib32gcc-9-dev` in case of errors like 
+       ```       
+      /usr/bin/ld: cannot find -lgcc
+      /usr/bin/ld: skipping incompatible /usr/lib/gcc/x86_64-linux-gnu/9/libgcc.a when searching for -lgcc              
+       ```
   - [opam](http://opam.ocaml.org) (>= 2.0.4)
   - [OCaml](http://ocaml.org) (>= 4.10.1). *Optional* because it can be easily installed through opam. Compiler variant with `flambda` switch is recommended
 
@@ -98,6 +104,6 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
   /home/user/.opam/lama/bin/lamac
   ```
 
-### Smoke-testing:
+### Smoke-testing (optional)
 
-Clone the repository and run `make -C tutorial LAMAC=../src/lamac`. Without extra `LAMAC` switch it will try to use `lamac` installed system-wide to build tutorial.
+Clone the repository and run `make -C tutorial`. It should build local compiler `src/lamac` and a few tutorial executables in `tutorial/`.

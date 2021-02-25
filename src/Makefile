@@ -24,7 +24,7 @@ $(TOPFILE).byte: $(SOURCES:.ml=.cmo)
 	$(OCAMLC) -o $(TOPFILE).byte $(BFLAGS) -linkpkg $(SOURCES:.ml=.cmo)
 
 clean:
-	rm -Rf *.cmi *.cmo *.cmx *.annot *.o *.opt *.byte *~ .depend
+	$(RM) $(TOPFILE) *.cm[ioxa] *.annot *.o *.opt *.byte *~ .depend
 
 -include .depend
 # generic rules

@@ -1,17 +1,15 @@
 EXECUTABLE = src/lamac
 INSTALL ?= install -v
 MKDIR ?= mkdir
-SHELL := /bin/bash
 
 .PHONY: all regression
 
 all:
-	make -C src 
-	make -C runtime 
-	make -C stdlib
+	$(MAKE) -C src
+	$(MAKE) -C runtime
+	$(MAKE) -C stdlib
 
 STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.lama runtime/runtime.a runtime/Std.i)
-#$(info $(STD_FILES))
 
 install: all
 	$(INSTALL) $(EXECUTABLE) `opam var bin`
@@ -23,13 +21,12 @@ uninstall:
 	$(RM) `opam var bin`/$(EXECUTABLE)
 
 regression:
-	make clean check -C regression
-	make clean check -C stdlib/regression
+	$(MAKE) clean check -C regression
+	$(MAKE) clean check -C stdlib/regression
 
 clean:
-	make clean -C src
-	make clean -C runtime
-	make clean -C stdlib
-	make clean -C regression
+	$(MAKE) clean -C src
+	$(MAKE) clean -C runtime
+	$(MAKE) clean -C stdlib
+	$(MAKE) clean -C regression
 	$(MAKE) clean -C bench
-
