@@ -47,7 +47,7 @@ However, as  "\lstinline|**|" is not exported its precedence level will be forgo
 
 Respectively, multiple imports of units with custom infix operators will modify the precedence level in the order of their import. For example,
 if there are two units  "\lstinline|A|" and  "\lstinline|B|" with declarations "\lstinline|infixl ++ before +|" and "\lstinline|infixl +++ before +|"
-correspondingly, then importing  "\lstinline|B|" after  "\lstinline|B|" will result in "\lstinline|++|" having a \emph{lower} precedence, then
+correspondingly, then importing  "\lstinline|A|" after  "\lstinline|B|" will result in "\lstinline|++|" having a \emph{lower} precedence, then
 "\lstinline|+++|".
 
 \begin{figure}[t]
