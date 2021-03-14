@@ -83,7 +83,7 @@ void __post_gc_subst () {}
 # define BOX(x)      ((((int) (x)) << 1) | 0x0001)
 
 /* GC extra roots */
-#define MAX_EXTRA_ROOTS_NUMBER 16
+#define MAX_EXTRA_ROOTS_NUMBER 17
 typedef struct {
   int current_free;
   void ** roots[MAX_EXTRA_ROOTS_NUMBER];
