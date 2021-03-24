@@ -196,6 +196,8 @@ Maps are immutable structures with the following interface:
 \descr{\lstinline|fun emptyMap (f)|}{Creates an empty map. An argument is a comparison function, which returns zero, positive or negative integer values depending on
 the order of its arguments.}
 
+\descr{\lstinline|fun isEmptyMap (m)|}{Returns true if an argument map is empty.}
+
 \descr{\lstinline|fun compareOf (m)|}{Returns a comparison function, associated with the map given as an argument.}
 
 \descr{\lstinline|fun addMap (m, k, v)|}{Adds a binding of a key "\lstinline|k|" to a value "\lstinline|v|" into a map "\lstinline|m|". As a result, a new map is
@@ -225,6 +227,8 @@ Sets are immutable structures with the following interface:
 
 \descr{\lstinline|fun emptySet (f)|}{Creates an empty set. An argument is a comparison function, which returns zero, positive or negative integer values depending on
 the order of its arguments.}
+
+\descr{\lstinline|fun isEmptySet (m)|}{Returns true if an argument set is empty.}
 
 \descr{\lstinline|fun compareOf (m)|}{Returns a comparison function, associated with the set given as an argument.}
 
