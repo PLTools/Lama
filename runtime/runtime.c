@@ -956,7 +956,7 @@ extern void* Bstring (void *p) {
 extern void* Lstringcat (void *p) {
   void *s;
 
-  ASSERT_BOXED("stringcat", p);
+  /* ASSERT_BOXED("stringcat", p); */
   
   __pre_gc ();
   
