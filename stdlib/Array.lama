@@ -78,3 +78,14 @@ public fun iteriArray (f, a) {
     f (i, a [i])
   od
 }
+
+public fun findArray (f, a) {
+  var i = 0, found = false, value;
+
+  while i < a.length && found == false
+  do
+    found := f (value := a[i])
+  od;
+
+  if found then Some (value) else None fi
+}

@@ -181,6 +181,10 @@ Array processing functions:
 \descr{\lstinline|fun iteriArray (f, a)|}{Applies a function "\lstinline|f|" to each element of an array "\lstinline|a|" and its index (index first);
   does not return a value.}
 
+\descr{\lstinline|fun findArray (f, a)|}{Finds a value in an array "\lstinline|a|" which satisfies the predicate "\lstinline|f|". The
+  predicate must return integer value, treated as boolean. Returns "\lstinline|None|" if no element satisfies "\lstinline|f|" and
+  "\lstinline|Some (v)|" otherwise, where "\lstinline|v|"~--- the first value to satisfy "\lstinline|f|".}
+
 \section{Unit \texttt{Collection}}
 \label{sec:collection}
 
