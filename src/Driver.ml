@@ -20,6 +20,7 @@ class options args =
     "  -dsrc     --- dump pretty-printed source code\n" ^
     "  -ds       --- dump stack machine code (the output will be written into .sm file; has no\n" ^
     "                effect if -i option is specfied)\n" ^
+    "  -b        --- compile to a stack machine bytecode\n" ^    
     "  -v        --- show version\n" ^
     "  -h        --- show this help\n"
   in
@@ -30,7 +31,7 @@ class options args =
     val infile  = ref (None : string option)
     val outfile = ref (None : string option)
     val paths   = ref [X86.get_std_path ()]
-    val mode    = ref (`Default : [`Default | `Eval | `SM | `Compile ])
+    val mode    = ref (`Default : [`Default | `Eval | `SM | `Compile | `BC])
     val curdir  = Unix.getcwd ()
     val debug   = ref false
     (* Workaround until Ostap starts to memoize properly *)
@@ -49,6 +50,7 @@ class options args =
             | "-o"  -> (match self#peek with None -> raise (Commandline_error "File name expected after '-o' specifier") | Some fname -> self#set_outfile fname)
             | "-I"  -> (match self#peek with None -> raise (Commandline_error "Path expected after '-I' specifier") | Some path -> self#add_include_path path)
             | "-s"  -> self#set_mode `SM
+            | "-b"  -> self#set_mode `BC
             | "-i"  -> self#set_mode `Eval
             | "-ds" -> self#set_dump dump_sm
             | "-dsrc" -> self#set_dump dump_source
@@ -131,8 +133,6 @@ class options args =
     method dump_source (ast: Language.Expr.t) =
       if (!dump land dump_source) > 0
       then Pprinter.pp Format.std_formatter ast;
-
-
     method dump_SM sm  =
       if (!dump land dump_sm) > 0
       then self#dump_file "sm" (SM.show_prg sm)
@@ -160,7 +160,9 @@ let main =
        cmd#dump_source (snd prog);
        (match cmd#get_mode with
         | `Default | `Compile ->
-            ignore @@ X86.build cmd prog
+           ignore @@ X86.build cmd prog
+        | `BC ->
+           SM.ByteCode.compile cmd (SM.compile cmd prog)
         | _ ->
   	   let rec read acc =
 	     try

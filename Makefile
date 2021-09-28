@@ -7,6 +7,7 @@ MKDIR ?= mkdir
 all:
 	$(MAKE) -C src
 	$(MAKE) -C runtime
+	$(MAKE) -C byterun
 	$(MAKE) -C stdlib
 
 STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.lama runtime/runtime.a runtime/Std.i)

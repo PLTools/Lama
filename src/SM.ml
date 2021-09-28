@@ -2,7 +2,7 @@ open GT
 open Language
 
 (* The type for patters *)
-@type patt = StrCmp | String | Array | Sexp | Boxed | UnBoxed | Closure with show
+@type patt = StrCmp | String | Array | Sexp | Boxed | UnBoxed | Closure with show, enum
 
 (* The type for local scopes tree *)                                                                           
 @type scope = {
@@ -54,6 +54,178 @@ with show
 (* The type for the stack machine program *)
 @type prg = insn list with show
 
+module ByteCode =
+  struct
+        
+    module M = Map.Make (String)
+    module S = Set.Make (String)
+
+    module StringTab =
+      struct
+       
+        type t = {mutable smap : int M.t; buffer: Buffer.t; mutable index : int}
+
+        let create () = {smap = M.empty; buffer = Buffer.create 255; index = 0}
+
+        let add st s =
+          try let i = M.find s st.smap in i 
+          with Not_found ->
+            let i = st.index in
+            Buffer.add_string st.buffer s;
+            Buffer.add_char   st.buffer (Char.chr 0);
+            st.smap  <- M.add s i st.smap;
+            st.index <- st.index + String.length s + 1;
+            i
+            
+      end
+
+    exception Found of int                     
+                     
+    let opnum =
+      let optab = ["+"; "-"; "*"; "/"; "%"; "<"; "<="; ">"; ">="; "=="; "!="; "&&"; "!!"] in
+      fun s ->
+      try
+        ignore @@ List.fold_left (fun i op -> if s = op then raise (Found i) else i+1) 1 optab;
+        failwith (Printf.sprintf "ERROR: undefined binary operator '%s'" s)
+      with
+        Found i -> i
+
+(* Below are the the numbers of occurrencies of SM instructions for the stdlib+lama compiler itself
+
+   7328 SLABEL
+   5351 CALL
+   5321 DROP
+   4437 LABEL
+   4331 LD
+   4213 DUP
+   3979 EXTERN
+   3525 CONST
+   2503 LINE
+   2281 JMP
+   1400 ST
+   1122 CJMP
+    922 END
+    922 BEGIN
+    790 SEXP
+    770 CLOSURE
+    519 TAG
+    493 STRING
+    354 FAIL
+    349 CALLC
+    339 BINOP
+    289 ARRAY
+    270 PUBLIC
+     87 PATT
+     39 STA
+     16 FLABEL
+ *)
+
+    let compile cmd insns =
+      let word_size          = 4                                                                                   in
+      let code               = Buffer.create 256                                                                   in
+      let st                 = StringTab.create ()                                                                 in
+      let lmap               = Stdlib.ref M.empty                                                                  in
+      let pubs               = Stdlib.ref S.empty                                                                  in
+      let globals            = Stdlib.ref M.empty                                                                  in
+      let glob_count         = Stdlib.ref 0                                                                        in
+      let fixups             = Stdlib.ref []                                                                       in
+      let add_lab   l        = lmap := M.add l (Buffer.length code) !lmap                                          in
+      let add_public l       = pubs := S.add l !pubs                                                               in
+      let add_fixup l        = fixups := (Buffer.length code, l) :: !fixups                                        in      
+      let add_bytes          = List.iter (fun x -> Buffer.add_char     code @@ Char .chr                        x) in
+      let add_ints           = List.iter (fun x -> Buffer.add_int32_ne code @@ Int32.of_int                     x) in
+      let add_strings        = List.iter (fun x -> Buffer.add_int32_ne code @@ Int32.of_int @@ StringTab.add st x) in
+      let add_designations n =
+        let b x =
+          match n with
+            None   -> x
+          | Some b -> b * 16 + x
+        in
+        List.iter (function
+                   | Value.Global s ->
+                      let i =
+                        try M.find s !globals
+                        with Not_found ->
+                          let i = !glob_count in
+                          incr glob_count;
+                          globals := M.add s i !globals;
+                          i
+                      in
+                      add_bytes [b 0]; add_ints [i]
+                   | Value.Local  n -> add_bytes [b 1]; add_ints    [n]
+                   | Value.Arg    n -> add_bytes [b 2]; add_ints    [n]
+                   | Value.Access n -> add_bytes [b 3]; add_ints    [n]
+          )
+      in
+      let insn_code = function
+      (* 0x0s                 *) | BINOP   s                   -> add_bytes [opnum s]
+      (* 0x10 n:32            *) | CONST   n                   -> add_bytes [1*16 + 0]; add_ints [n]
+      (* 0x11 s:32            *) | STRING  s                   -> add_bytes [1*16 + 1]; add_strings [s]
+      (* 0x12 s:32 n:32       *) | SEXP   (s, n)               -> add_bytes [1*16 + 2]; add_strings [s]; add_ints [n]
+      (* 0x13                 *) | STI                         -> add_bytes [1*16 + 3]
+      (* 0x14                 *) | STA                         -> add_bytes [1*16 + 4]
+                                                               
+                                 | LABEL   s                 
+                                 | FLABEL  s                 
+                                 | SLABEL  s                   -> add_lab s
+                                                               
+      (* 0x15 l:32            *) | JMP     s                   -> add_bytes [1*16 + 5]; add_fixup s; add_ints [0]
+      (* 0x16                 *) | END                         -> add_bytes [1*16 + 6]
+      (* 0x17                 *) | RET                         -> add_bytes [1*16 + 7]
+      (* 0x18                 *) | DROP                        -> add_bytes [1*16 + 8]
+      (* 0x19                 *) | DUP                         -> add_bytes [1*16 + 9]
+      (* 0x1a                 *) | SWAP                        -> add_bytes [1*16 + 10]
+      
+                                                                   
+      (* 0x2d n:32            *) | LD      d                   -> add_designations (Some 2) [d]
+      (* 0x3d n:32            *) | LDA     d                   -> add_designations (Some 3) [d]
+      (* 0x4d n:32            *) | ST      d                   -> add_designations (Some 4) [d]
+                                                                 
+      (* 0x50 l:32            *) | CJMP    ("z" , s)           -> add_bytes [5*16 + 0]; add_fixup s; add_ints [0]
+      (* 0x51 l:32            *) | CJMP    ("nz", s)           -> add_bytes [5*16 + 1]; add_fixup s; add_ints [0]
+                                                                                             
+      (* 0x52 n:32 n:32       *) | BEGIN   (_, a, l, [], _, _) -> add_bytes [5*16 + 2]; add_ints [a; l] (* with no closure *)
+      (* 0x53 n:32 n:32       *) | BEGIN   (_, a, l,  _, _, _) -> add_bytes [5*16 + 3]; add_ints [a; l] (* with a closure  *)
+      (* 0x54 l:32 n:32 d*:32 *) | CLOSURE (s, ds)             -> add_bytes [5*16 + 4]; add_fixup s; add_ints [0; List.length ds]; add_designations None ds
+      (* 0x55 n:32            *) | CALLC   (n, tail)           -> add_bytes [5*16 + 5]; add_ints [n]
+      (* 0x56 l:32 n:32       *) | CALL    (fn, n, tail)       -> add_bytes [5*16 + 6]; add_fixup fn; add_ints [0; n]
+      (* 0x57 s:32 n:32       *) | TAG     (s, n)              -> add_bytes [5*16 + 7]; add_strings [s]; add_ints [n]
+      (* 0x58 n:32            *) | ARRAY    n                  -> add_bytes [5*16 + 8]; add_ints [n]
+      (* 0x59 n:32 n:32       *) | FAIL    ((l, c), _)         -> add_bytes [5*16 + 9]; add_ints [l; c]
+      (* 0x5a n:32            *) | LINE     n                  -> add_bytes [5*16 + 10]; add_ints [n]
+      (* 0x6p                 *) | PATT     p                  -> add_bytes [6*16 + enum(patt) p]
+                                                                                           
+                                 | EXTERN  s                   -> ()
+                                 | PUBLIC  s                   -> add_public s
+      in
+      List.iter insn_code insns;
+      add_bytes [255];
+      let code = Buffer.to_bytes code in
+      List.iter
+        (fun (ofs, l) ->
+          Bytes.set_int32_ne code ofs (Int32.of_int @@ try M.find l !lmap with Not_found -> failwith (Printf.sprintf "ERROR: undefined label '%s'" l))
+        )
+        !fixups;
+      let pubs = List.map
+        (fun l ->
+          Int32.of_int @@ StringTab.add st l,
+          (Int32.of_int @@ try M.find l !lmap with Not_found -> failwith (Printf.sprintf "ERROR: undefined label '%s'" l))
+        ) @@ S.elements !pubs
+      in
+      let st   = Buffer.to_bytes st.StringTab.buffer in
+      let file = Buffer.create 1024 in
+      Buffer.add_int32_ne file (Int32.of_int @@ Bytes.length st);
+      Buffer.add_int32_ne file (Int32.of_int @@ !glob_count);
+      Buffer.add_int32_ne file (Int32.of_int @@ List.length pubs);
+      List.iter (fun (n, o) -> Buffer.add_int32_ne file n; Buffer.add_int32_ne file o) pubs;
+      Buffer.add_bytes file st;
+      Buffer.add_bytes file code;
+      let f = open_out_bin (Printf.sprintf "%s.bc" cmd#basename) in
+      Buffer.output_buffer f file;
+      close_out f
+      
+  end
+  
 let show_prg p =
   let b = Buffer.create 512 in
   List.iter (fun i -> Buffer.add_string b (show(insn) i); Buffer.add_string b "\n") p;

@@ -1,25 +1,13 @@
 /* Runtime library */
 
-#define _GNU_SOURCE 1
+# define _GNU_SOURCE 1
 
-# include <stdio.h>
-# include <stdio.h>
-# include <string.h>
-# include <stdarg.h>
-# include <stdlib.h>
-# include <sys/mman.h>
-# include <assert.h>
-# include <errno.h>
-# include <regex.h>
-# include <time.h>
-# include <limits.h>
+# include "runtime.h"
 
 # define __ENABLE_GC__
 # ifndef __ENABLE_GC__
 # define alloc malloc
 # endif
-
-# define WORD_SIZE (CHAR_BIT * sizeof(int))
 
 /* # define DEBUG_PRINT 1 */
 
@@ -144,7 +132,7 @@ static void vfailure (char *s, va_list args) {
   exit     (255);
 }
 
-static void failure (char *s, ...) {
+void failure (char *s, ...) {
   va_list args;
 
   va_start (args, s);
