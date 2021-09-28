@@ -70,7 +70,7 @@ bytefile* read_file (char *fname) {
   return file;
 }
 
-/* Disassembles the bytecode pull */
+/* Disassembles the bytecode pool */
 void disassemble (FILE *f, bytefile *bf) {
   
 # define INT    (ip += sizeof (int), *(int*)(ip - sizeof (int)))
