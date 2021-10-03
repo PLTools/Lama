@@ -24,7 +24,8 @@ let show_scope = show(scope);;
 (* load a variable address to the stack      *) | LDA     of Value.designation
 (* store a value into a variable             *) | ST      of Value.designation
 (* store a value into a reference            *) | STI
-(* store a value into array/sexp/string      *) | STA                                  
+(* store a value into array/sexp/string      *) | STA
+(* takes an element of array/string/sexp     *) | ELEM                                                
 (* a label                                   *) | LABEL   of string
 (* a forwarded label                         *) | FLABEL  of string
 (* a scope label                             *) | SLABEL  of string
@@ -48,6 +49,7 @@ let show_scope = show(scope);;
 (* match failure (location, leave a value    *) | FAIL    of Loc.t * bool
 (* external definition                       *) | EXTERN  of string
 (* public   definition                       *) | PUBLIC  of string
+(* import clause                             *) | IMPORT  of string
 (* line info                                 *) | LINE    of int
 with show
                                                    
@@ -126,11 +128,13 @@ module ByteCode =
       let st                 = StringTab.create ()                                                                 in
       let lmap               = Stdlib.ref M.empty                                                                  in
       let pubs               = Stdlib.ref S.empty                                                                  in
+      let imports            = Stdlib.ref S.empty                                                                  in
       let globals            = Stdlib.ref M.empty                                                                  in
       let glob_count         = Stdlib.ref 0                                                                        in
       let fixups             = Stdlib.ref []                                                                       in
       let add_lab   l        = lmap := M.add l (Buffer.length code) !lmap                                          in
       let add_public l       = pubs := S.add l !pubs                                                               in
+      let add_import l       = imports := S.add l !imports                                                         in      
       let add_fixup l        = fixups := (Buffer.length code, l) :: !fixups                                        in      
       let add_bytes          = List.iter (fun x -> Buffer.add_char     code @@ Char .chr                        x) in
       let add_ints           = List.iter (fun x -> Buffer.add_int32_ne code @@ Int32.of_int                     x) in
@@ -175,7 +179,7 @@ module ByteCode =
       (* 0x18                 *) | DROP                        -> add_bytes [1*16 + 8]
       (* 0x19                 *) | DUP                         -> add_bytes [1*16 + 9]
       (* 0x1a                 *) | SWAP                        -> add_bytes [1*16 + 10]
-      
+      (* 0x1b                 *) | ELEM                        -> add_bytes [1*16 + 11]
                                                                    
       (* 0x2d n:32            *) | LD      d                   -> add_designations (Some 2) [d]
       (* 0x3d n:32            *) | LDA     d                   -> add_designations (Some 3) [d]
@@ -183,7 +187,13 @@ module ByteCode =
                                                                  
       (* 0x50 l:32            *) | CJMP    ("z" , s)           -> add_bytes [5*16 + 0]; add_fixup s; add_ints [0]
       (* 0x51 l:32            *) | CJMP    ("nz", s)           -> add_bytes [5*16 + 1]; add_fixup s; add_ints [0]
-                                                                                             
+
+      (* 0x70                 *) | CALL ("Lread", _, _)        -> add_bytes [7*16 + 0]                                                                                          
+      (* 0x71                 *) | CALL ("Lwrite", _, _)       -> add_bytes [7*16 + 1]
+      (* 0x72                 *) | CALL ("Llength", _, _)      -> add_bytes [7*16 + 2]
+      (* 0x72                 *) | CALL ("Lstring", _, _)      -> add_bytes [7*16 + 3]
+      (* 0x72                 *) | CALL (".array", _, _)       -> add_bytes [7*16 + 4]
+                                                                  
       (* 0x52 n:32 n:32       *) | BEGIN   (_, a, l, [], _, _) -> add_bytes [5*16 + 2]; add_ints [a; l] (* with no closure *)
       (* 0x53 n:32 n:32       *) | BEGIN   (_, a, l,  _, _, _) -> add_bytes [5*16 + 3]; add_ints [a; l] (* with a closure  *)
       (* 0x54 l:32 n:32 d*:32 *) | CLOSURE (s, ds)             -> add_bytes [5*16 + 4]; add_fixup s; add_ints [0; List.length ds]; add_designations None ds
@@ -194,9 +204,10 @@ module ByteCode =
       (* 0x59 n:32 n:32       *) | FAIL    ((l, c), _)         -> add_bytes [5*16 + 9]; add_ints [l; c]
       (* 0x5a n:32            *) | LINE     n                  -> add_bytes [5*16 + 10]; add_ints [n]
       (* 0x6p                 *) | PATT     p                  -> add_bytes [6*16 + enum(patt) p]
-                                                                                           
+
                                  | EXTERN  s                   -> ()
                                  | PUBLIC  s                   -> add_public s
+                                 | IMPORT  s                   -> add_import s
       in
       List.iter insn_code insns;
       add_bytes [255];
@@ -305,6 +316,10 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
     | STRING s                -> eval env (cstack, (Value.of_string @@ Bytes.of_string s)::stack, glob, loc, i, o) prg'
     | SEXP (s, n)             -> let vs, stack' = split n stack in                                 
                                  eval env (cstack, (Value.sexp s @@ List.rev vs)::stack', glob, loc, i, o) prg'
+                                 
+    | ELEM                    -> let a :: b :: stack' = stack in
+                                 eval env (env#builtin ".elem" [a; b] (cstack, stack', glob, loc, i, o)) prg'
+                                
     | LD x                    -> eval env (cstack, (match x with
                                                     | Value.Global x -> glob x
                                                     | Value.Local  i -> loc.locals.(i)
@@ -882,7 +897,7 @@ let compile cmd ((imports, infixes), p) =
       List.fold_left
         (fun (i, env, code) p ->
            let env, _, pcode = pattern env ldrop p in
-           i+1, env, ([DUP; CONST i; CALL (".elem", 2, false)] @ pcode) :: code
+           i+1, env, ([DUP; CONST i; ELEM (*CALL (".elem", 2, false)*) ] @ pcode) :: code
         )
         (0, env, [])
         ps
@@ -918,7 +933,7 @@ let compile cmd ((imports, infixes), p) =
           (*Printf.printf "End Bindings..\n";*)
            env,
            ([DUP] @
-            List.concat (List.map (fun i -> [CONST i; CALL (".elem", 2, false)]) path) @
+              List.concat (List.map (fun i -> [CONST i; ELEM (* CALL (".elem", 2, false)*)]) path) @
             [ST dsg; DROP]) :: acc
         )
         (env, [])
@@ -1000,7 +1015,7 @@ let compile cmd ((imports, infixes), p) =
                                add_code (compile_list false lsexp env xs) lsexp false [SEXP (t, List.length xs)]
                              
   | Expr.Elem (a, i)        -> let lelem, env = env#get_label in
-                               add_code (compile_list false lelem env [a; i]) lelem false [CALL (".elem", 2, tail)]
+                               add_code (compile_list false lelem env [a; i]) lelem false [ELEM (* CALL (".elem", 2, tail) *)]
                                
   | Expr.Assign (Expr.Ref x, e) ->  let lassn, env = env#get_label in
                                     let env  , line = env#gen_line x in
@@ -1119,7 +1134,7 @@ let compile cmd ((imports, infixes), p) =
   let code            = if flag then code @ [LABEL lend] else code in
   let topname         = cmd#topname in
   let env, prg        = compile_fundefs [[LABEL topname; BEGIN (topname, (if topname = "main" then 2 else 0), env#nlocals, [], [], [])] @ code @ [END]] env in
-  let prg             = [PUBLIC topname] @ env#get_decls @ List.flatten prg in
+  let prg             = (List.map (fun i -> IMPORT i) imports) @ [PUBLIC topname] @ env#get_decls @ List.flatten prg in
   (*Printf.eprintf "Before propagating closures:\n";
   Printf.eprintf "%s\n%!" env#show_funinfo;
    *)

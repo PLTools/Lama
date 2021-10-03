@@ -241,6 +241,7 @@ let compile cmd env imports code =
           match instr with
           | PUBLIC name -> env#register_public name, []
           | EXTERN name -> env#register_extern name, []
+          | IMPORT name -> env, []
                          
           | CLOSURE (name, closure) ->
              let pushr, popr =
@@ -491,7 +492,9 @@ let compile cmd env imports code =
           | RET ->
              let x = env#peek in
              env, [Mov (x, eax); Jmp env#epilogue]
-            
+
+          | ELEM              -> call env ".elem" 2 false
+                               
           | CALL (f, n, tail) -> call env f n tail
                          
           | CALLC (n, tail) -> callc env n tail

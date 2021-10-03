@@ -13,7 +13,8 @@ void *__stop_custom_data;
 typedef struct {
   char *string_ptr;              /* A pointer to the beginning of the string table */
   int  *public_ptr;              /* A pointer to the beginning of publics table    */
-  char *code_ptr;                /* A pointer to the bytecode itself               */  
+  char *code_ptr;                /* A pointer to the bytecode itself               */
+  int  *global_ptr;              /* A pointer to the global area                   */
   int   stringtab_size;          /* The size (in bytes) of the string table        */
   int   global_area_size;        /* The size (in words) of global area             */
   int   public_symbols_number;   /* The number of public symbols                   */
@@ -49,7 +50,7 @@ bytefile* read_file (char *fname) {
     failure ("%s\n", strerror (errno));
   }
 
-  file = (bytefile*) malloc (sizeof(int)*3 + (size = ftell (f)));
+  file = (bytefile*) malloc (sizeof(int)*4 + (size = ftell (f)));
 
   if (file == 0) {
     failure ("*** FAILURE: unable to allocate memory.\n");
@@ -63,9 +64,10 @@ bytefile* read_file (char *fname) {
   
   fclose (f);
   
-  file->string_ptr = &file->buffer [file->public_symbols_number * 2 * sizeof(int)];
-  file->public_ptr = (int*) file->buffer;
-  file->code_ptr   = &file->string_ptr [file->stringtab_size];
+  file->string_ptr  = &file->buffer [file->public_symbols_number * 2 * sizeof(int)];
+  file->public_ptr  = (int*) file->buffer;
+  file->code_ptr    = &file->string_ptr [file->stringtab_size];
+  file->global_ptr  = (int*) malloc (file->global_area_size * sizeof (int));
   
   return file;
 }
@@ -81,7 +83,7 @@ void disassemble (FILE *f, bytefile *bf) {
   char *ip     = bf->code_ptr;
   char *ops [] = {"+", "-", "*", "/", "%", "<", "<=", ">", ">=", "==", "!=", "&&", "!!"};
   char *pats[] = {"=str", "#string", "#array", "#sexp", "#ref", "#val", "#fun"};
-  char *lds [] = {"LD\t", "LDA\t", "ST\t"};
+  char *lds [] = {"LD", "LDA", "ST"};
   do {
     char x = BYTE,
          h = (x & 0xF0) >> 4,
@@ -145,6 +147,10 @@ void disassemble (FILE *f, bytefile *bf) {
         fprintf (f, "SWAP");
         break;
 
+      case 11:
+        fprintf (f, "ELEM");
+        break;
+        
       default:
         FAIL;
       }
@@ -166,11 +172,11 @@ void disassemble (FILE *f, bytefile *bf) {
     case 5:
       switch (l) {
       case  0:
-        fprintf (f, "CJMPz\t%0x.8x", INT);
+        fprintf (f, "CJMPz\t0x%.8x", INT);
         break;
         
       case  1:
-        fprintf (f, "CJMPnz\t%0x.8x", INT);
+        fprintf (f, "CJMPnz\t0x%.8x", INT);
         break;
         
       case  2:
@@ -234,6 +240,34 @@ void disassemble (FILE *f, bytefile *bf) {
       fprintf (f, "PATT\t%s", pats[l]);
       break;
 
+    case 7: {
+      switch (l) {
+      case 0:
+        fprintf (f, "CALL\tLread");
+        break;
+        
+      case 1:
+        fprintf (f, "CALL\tLwrite");
+        break;
+
+      case 2:
+        fprintf (f, "CALL\tLlength");
+        break;
+
+      case 3:
+        fprintf (f, "CALL\tLstring");
+        break;
+
+      case 4:
+        fprintf (f, "CALL\tBarray");
+        break;
+
+      default:
+        FAIL;
+      }
+    }
+    break;
+      
     default:
       FAIL;
     }
