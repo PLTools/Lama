@@ -299,7 +299,7 @@ let rec eval env (((cstack, stack, glob, loc, i, o) as conf) : config) = functio
    Printf.eprintf "end\n";
     *)
    (match insn with   
-    | PUBLIC _ | EXTERN _ | LINE _ -> eval env conf prg'
+    | IMPORT _ | PUBLIC _ | EXTERN _ | LINE _ -> eval env conf prg'
                                     
     | BINOP  "=="             -> let y::x::stack' = stack in
                                  let z =
