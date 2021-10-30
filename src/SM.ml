@@ -191,8 +191,8 @@ module ByteCode =
       (* 0x70                 *) | CALL ("Lread", _, _)        -> add_bytes [7*16 + 0]                                                                                          
       (* 0x71                 *) | CALL ("Lwrite", _, _)       -> add_bytes [7*16 + 1]
       (* 0x72                 *) | CALL ("Llength", _, _)      -> add_bytes [7*16 + 2]
-      (* 0x72                 *) | CALL ("Lstring", _, _)      -> add_bytes [7*16 + 3]
-      (* 0x72                 *) | CALL (".array", _, _)       -> add_bytes [7*16 + 4]
+      (* 0x73                 *) | CALL ("Lstring", _, _)      -> add_bytes [7*16 + 3]
+      (* 0x74                 *) | CALL (".array", n, _)       -> add_bytes [7*16 + 4]; add_ints [n]
                                                                   
       (* 0x52 n:32 n:32       *) | BEGIN   (_, a, l, [], _, _) -> add_bytes [5*16 + 2]; add_ints [a; l] (* with no closure *)
       (* 0x53 n:32 n:32       *) | BEGIN   (_, a, l,  _, _, _) -> add_bytes [5*16 + 3]; add_ints [a; l] (* with a closure  *)

@@ -209,7 +209,7 @@ void disassemble (FILE *f, bytefile *bf) {
         break;
         
       case  6:
-        fprintf (f, "CALL\t%0x%.8x ", INT);
+        fprintf (f, "CALL\t0x%.8x ", INT);
         fprintf (f, "%d", INT);
         break;
         
@@ -259,7 +259,7 @@ void disassemble (FILE *f, bytefile *bf) {
         break;
 
       case 4:
-        fprintf (f, "CALL\tBarray");
+        fprintf (f, "CALL\tBarray\t%d", INT);
         break;
 
       default:
