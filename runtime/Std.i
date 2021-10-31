@@ -54,3 +54,5 @@ F,kindOf;
 F,compareTags;
 F,flatCompare;
 F,tagHash;
+F,uppercase;
+F,lowercase;

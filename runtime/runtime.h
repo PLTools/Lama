@@ -12,6 +12,7 @@
 # include <regex.h>
 # include <time.h>
 # include <limits.h>
+# include <ctype.h>
 
 # define WORD_SIZE (CHAR_BIT * sizeof(int))
 

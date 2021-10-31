@@ -566,6 +566,16 @@ static void stringcat (void *p) {
   }
 }
 
+extern int Luppercase (void *v) {
+  ASSERT_UNBOXED("Luppercase:1", v);
+  return BOX(toupper ((int) UNBOX(v)));
+}
+
+extern int Llowercase (void *v) {
+  ASSERT_UNBOXED("Llowercase:1", v);
+  return BOX(tolower ((int) UNBOX(v)));
+}
+
 extern int LmatchSubString (char *subj, char *patt, int pos) {
   data *p = TO_DATA(patt), *s = TO_DATA(subj);
   int   n;
