@@ -26,6 +26,7 @@ F,fopen;
 F,fclose;
 F,fread;
 F,fwrite;
+F,fexists;
 F,failure;
 F,read;
 F,write;

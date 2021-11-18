@@ -62,7 +62,7 @@ void __post_gc_subst () {}
 
 # define TO_DATA(x) ((data*)((char*)(x)-sizeof(int)))
 # define TO_SEXP(x) ((sexp*)((char*)(x)-2*sizeof(int)))
-#ifdef DEBUG_PRINT // GET_SEXP_TAG is necessary for printing from space
+# ifdef DEBUG_PRINT // GET_SEXP_TAG is necessary for printing from space
 # define GET_SEXP_TAG(x) (LEN(x))
 #endif
 
@@ -71,7 +71,7 @@ void __post_gc_subst () {}
 # define BOX(x)      ((((int) (x)) << 1) | 0x0001)
 
 /* GC extra roots */
-#define MAX_EXTRA_ROOTS_NUMBER 32
+# define MAX_EXTRA_ROOTS_NUMBER 32
 typedef struct {
   int current_free;
   void ** roots[MAX_EXTRA_ROOTS_NUMBER];
@@ -84,44 +84,44 @@ void clear_extra_roots (void) {
 }
 
 void push_extra_root (void ** p) {
-#ifdef DEBUG_PRINT
+# ifdef DEBUG_PRINT
   indent++; print_indent ();
   printf ("push_extra_root %p %p\n", p, &p); fflush (stdout);
-#endif
+# endif
   if (extra_roots.current_free >= MAX_EXTRA_ROOTS_NUMBER) {
     perror ("ERROR: push_extra_roots: extra_roots_pool overflow");
     exit   (1);
   }
   extra_roots.roots[extra_roots.current_free] = p;
   extra_roots.current_free++;
-#ifdef DEBUG_PRINT
+# ifdef DEBUG_PRINT
   indent--;
-#endif
+# endif
 }
 
 void pop_extra_root (void ** p) {
-#ifdef DEBUG_PRINT
+# ifdef DEBUG_PRINT
   indent++; print_indent ();
   printf ("pop_extra_root %p %p\n", p, &p); fflush (stdout);
-#endif
+# endif
   if (extra_roots.current_free == 0) {
     perror ("ERROR: pop_extra_root: extra_roots are empty");
     exit   (1);
   }
   extra_roots.current_free--;
   if (extra_roots.roots[extra_roots.current_free] != p) {
-#ifdef DEBUG_PRINT
+# ifdef DEBUG_PRINT
     print_indent ();
     printf ("%i %p %p", extra_roots.current_free,
 	    extra_roots.roots[extra_roots.current_free], p);
     fflush (stdout);
-#endif
+# endif
     perror ("ERROR: pop_extra_root: stack invariant violation");
     exit   (1);
   }
-#ifdef DEBUG_PRINT
+# ifdef DEBUG_PRINT
   indent--;
-#endif
+# endif
 }
 
 /* end */
@@ -1425,6 +1425,18 @@ extern void Lfwrite (char *fname, char *contents) {
   }
 
   failure ("fwrite (\"%s\"): %s\n", fname, strerror (errno));
+}
+
+extern void* Lfexists (char *fname) {
+  FILE *f;
+
+  ASSERT_STRING("fexists", fname);
+
+  f = fopen (fname, "r");
+  
+  if (f) return BOX(1);
+
+  return BOX(0);
 }
 
 extern void* Lfst (void *v) {
