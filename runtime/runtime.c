@@ -393,7 +393,7 @@ char* de_hash (int n) {
 typedef struct {
   char *contents;
   int ptr;
-  int len;
+  int len;  
 } StringBuf;
 
 static StringBuf stringBuf;
@@ -421,11 +421,17 @@ static void vprintStringBuf (char *fmt, va_list args) {
   int     written = 0,
           rest    = 0;
   char   *buf     = (char*) BOX(NULL);
-
+  va_list vsnargs;
+  
  again:
+  va_copy (vsnargs, args);
+  
   buf     = &stringBuf.contents[stringBuf.ptr];
   rest    = stringBuf.len - stringBuf.ptr;
-  written = vsnprintf (buf, rest, fmt, args);
+
+  written = vsnprintf (buf, rest, fmt, vsnargs);
+
+  va_end(vsnargs);
   
   if (written >= rest) {
     extendStringBuf ();
@@ -1219,7 +1225,7 @@ static void fix_unboxed (char *s, va_list va) {
       i++;
     }
     s++;
-  }
+  } 
 }
 
 extern void Lfailure (char *s, ...) {

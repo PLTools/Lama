@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 FILES=$(wildcard *.lama)
 ALL=$(sort $(FILES:.lama=.o))
-LAMAC=../src/lamac -ds
+LAMAC=../src/lamac -g
 
 all: $(ALL)
 
