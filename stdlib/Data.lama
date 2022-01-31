@@ -7,6 +7,35 @@ import Collection;
 import Ref;
 
 -- Generic comparison for shared/cyclic data structures
+
+public fun trace (x) {
+  fun tracerec (s, x) {
+    case x of
+      #val -> skip -- printf ("unboxed:%d;", x)
+    | _ ->
+       if memSet (s, x)
+       then printf ("<knot: 0x%.8x>", x)
+       else
+         var s_ = addSet (s, x);
+         printf ("[0x%.8x: ", x);
+         case x of
+           #array -> printf ("a; ")
+         | #fun   -> printf ("f<0x%.8x>; ", x[0])
+         | #sexp  -> printf ("s; ")
+         | #str   -> printf ("c<%s>; ", x)
+         esac;
+         for var i = case x of #fun -> 1 | _ -> 0 esac;, i<x.length, i := i+1
+         do
+           tracerec (s_, x[i])
+         od;
+         printf ("]")
+       fi
+    esac
+  }
+
+  tracerec (emptySet (flatCompare), x)
+}
+
 public infix =?= at < (x, y) {
   var m = ref (emptyMap (flatCompare));
 

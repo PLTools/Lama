@@ -802,6 +802,7 @@ module Expr =
              in
              (match arr with [a] -> a | _ -> Array (List.rev arr)), List.rev ss
         in
+        let escape = String.map (function '"' -> ' ' | x -> x) in
         List.fold_right (fun (loc, _, p, s) ->
                            let make_right =
                              match p with
@@ -813,7 +814,7 @@ module Expr =
                                                                                 )
                            in
                            function
-                           | Var "" -> Call (Var (infix_name "@"), [s; make_right sema])
+                           | Var "" -> Call (Var (infix_name "@@"), [Array [String (escape (show(t) s)); s]; make_right sema])
                            | acc    -> Call (Var "seq", [s; make_right acc])
                         ) ss (Var "")
       };

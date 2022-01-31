@@ -308,35 +308,51 @@ public fun emptyCustomMemo (pred, compare) {
 }
 
 public fun emptyMemo () {
---  ref (emptyMap (compare))
   emptyCustomMemo ({}, compare)
 }
 
 public fun lookupMemo (mm@[p, m], v) {
+  var f = case v of
+            [Right, _] : _ -> true
+          | _              -> false
+          esac;
+
+  if f then
+    skip -- printf ("Looked up 0x%.8x | 0x%.8x | %s\n", mm, v, v.string)
+  fi;
+
+  case
   fun (x) {
     case p of
       #fun -> if p (v) then v else x () fi
     | _    -> x ()
-    esac}   
-  (fun () {case v of
-     #val -> v
-   | _ ->
-      case findMap (m, v) of
-        Some (w) -> w
-      | None ->
-         case v of
-           #str -> mm[1] := addMap (m, v, v); v        
-         | _ ->
-           var vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;          
-           for skip, i < v.length, i := i + 1 do
-             var vci = lookupMemo (mm, vc [i]);
-             vc [i] := vci
-           od;
-           mm [1] := addMap (m, vc, vc);
-           vc
-         esac
-      esac
-   esac})
+    esac
+  }   
+  (fun () {
+     case v of
+       #val -> v
+     | _ ->
+        case findMap (m, v) of
+          Some (w) -> w
+        | None ->
+           case v of
+             #str -> mm[1] := addMap (m, v, v); v
+           | _ ->
+             var v0 = v;
+             var vc = clone (v), i = case vc of #fun -> 1 | _ -> 0 esac;
+--             printf ("Cloning: 0x%.8x\n", v);
+             for skip, i < v.length, i := i + 1 do
+               var vci = lookupMemo (mm, vc [i]);
+               vc [i] := vci
+             od;
+             mm [1] := addMap (m, vc, vc);
+             vc
+           esac 
+        esac
+     esac}) of
+     r -> -- if f then printf ("Result | 0x%.8x | %s\n", r, r.string) fi;
+     r
+     esac
 }
 
 -- Maps of hashed pointers

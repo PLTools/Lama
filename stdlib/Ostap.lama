@@ -9,6 +9,7 @@ import Collection;
 import Ref;
 import Fun;
 import Matcher;
+import Data;
 
 var tab, hct, restab, log = false;
 
@@ -23,7 +24,7 @@ public fun initOstap () {
 }
 
 public fun memo (f) {
-  f := lookupMemo (hct, f);
+  -- f := lookupMemo (hct, f);
   
   if log then printf ("Memoizing %x=%s\n", f, f.string) fi;
   
@@ -131,6 +132,21 @@ public infix @ at * (a, f) {
                        Succ (x, s) -> Succ (f (x), s)
                      | _           -> x
                      esac)}) (s)
+    }
+  }
+}
+
+public infix @@ at * ([name, a], f) {
+  fun (k) {
+    fun (s) {
+      var aa =
+      a (fun (x) {k (case x of                       
+                       Succ (x, s) -> Succ (f (x), s)
+                     | _           -> x
+                     esac)});
+--      printf ("aa=%s\n", aa.string);
+--      printf ("@@: %s\n", name);
+      aa (s)
     }
   }
 }
@@ -294,7 +310,7 @@ public fun expr (ops, opnd) {
       {}         -> fun (c) {opnd @ c}
     | level : tl ->
         var lops = altl (level),
-              next = inner (tl);
+            next = inner (tl);
 
         case level.fst of
           Nona ->

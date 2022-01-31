@@ -4,12 +4,12 @@
 
 # include "runtime.h"
 
-# define __ENABLE_GC__
+# define __ENABLE_GC__ 
 # ifndef __ENABLE_GC__
 # define alloc malloc
 # endif
 
-/* # define DEBUG_PRINT 1 */
+//# define DEBUG_PRINT 1 
 
 #ifdef DEBUG_PRINT
 int indent = 0;
@@ -342,7 +342,7 @@ extern int LtagHash (char *s) {
                
   p = s;
 
-  while (*p && limit++ < 4) {
+  while (*p && limit++ <= 4) {
     char *q = chars;
     int pos = 0;
     
@@ -2075,7 +2075,7 @@ extern void * alloc (size_t size) {
 #endif
     return p;
   }
-  
+
   init_to_space (0);
 #ifdef DEBUG_PRINT
   print_indent ();
