@@ -894,7 +894,7 @@ extern void* Belem (void *p, int i) {
 
 extern void* LmakeArray (int length) {
   data *r;
-  int n;
+  int n, *p;
 
   ASSERT_UNBOXED("makeArray:1", length);
   
@@ -905,7 +905,8 @@ extern void* LmakeArray (int length) {
 
   r->tag = ARRAY_TAG | (n << 3);
 
-  memset (r->contents, 0, n * sizeof(int));
+  p = (int*) r->contents;
+  while (n--) *p++ = BOX(0);
   
   __post_gc ();
 
