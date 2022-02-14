@@ -3,8 +3,8 @@ ALL=$(sort $(FILES:.lama=))
 EXTRA_TARGETS =
 
 ifeq ($(LAMAC),)
-	LAMAC := ../src/lamac
-	EXTRA_TARGETS += $(LAMAC)
+	LAMAC := LAMA=../runtime ../src/lamac -I ../stdlib
+	EXTRA_TARGETS += ../src/lamac
 endif
 
 all: $(EXTRA_TARGETS) $(ALL)
