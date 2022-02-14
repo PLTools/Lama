@@ -65,12 +65,12 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
 
 * Install right [switch](https://opam.ocaml.org/doc/Manual.html#Switches) for OCaml compiler
 
-  `opam switch create lama ocaml-variants.4.10.1+fp+flambda`
+  `opam switch create lama ocaml-variants.4.10.1+flambda`
 
   In above command:
 
   - `opam switch create` is a subcommand to create a new switch
-  - `ocaml-variants.4.10.1+fp+flambda` is name of a standart template for the switch
+  - `ocaml-variants.4.10.1+flambda` is name of a standart template for the switch
   - `lama` is an alias for the switch being created; on success a directory `$(HOME)/.opam/lama` should be created
 
 * Update PATH variable for the fresh switch. (You can add these commands to your `~/.bashrc` for convenience but they should be added by `opam`)
@@ -89,7 +89,9 @@ Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or 
 
 * Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
 
-  `opam pin add Lama https://github.com/JetBrains-Research/Lama-devel.git\#1.10+ocaml4.10 --no-action`
+  `opam pin add Lama https://github.com/JetBrains-Research/Lama.git\#1.10 --no-action`
+
+  The extra '#' sign is added because in various Shells it is a start of comment
 
 * Install *dep*endencies on system-wide *ext*ernal packages and `lama` itself after that.
 
