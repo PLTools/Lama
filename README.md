@@ -1,9 +1,12 @@
-| Lama, branch 1.10               |
-| ------------------------------- |
-| [![Lama 1.10][1]][2] |
+| Lama         1.10    | Lama-devel        1.10     |
+| -------------------- | -------------------------- |
+| [![Lama 1.10][1]][2] | [![Lama-devel 1.10][3]][4] |
 
 [1]:  https://github.com/JetBrains-Research/Lama/workflows/Build/badge.svg?branch=1.10
 [2]:  https://github.com/JetBrains-Research/Lama/actions
+[3]:  https://github.com/JetBrains-Research/Lama-devel/workflows/Build/badge.svg?branch=1.10
+[4]:  https://github.com/JetBrains-Research/Lama-devel/actions
+
 
 
 # Lama
