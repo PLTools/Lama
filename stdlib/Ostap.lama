@@ -188,7 +188,7 @@ public fun list0 (item) {
 public fun observe (name, f) {
   fun (k) {
     fun (s) {
-      printf ("%s at %s\n", name, s.string);
+      printf ("%s at %s\n", name, showMatcher (s));
       f (k)(s)
     }
   }
