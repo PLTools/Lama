@@ -12,7 +12,7 @@ depends: [
   "ocamlfind"   { build }
   "camlp5"      { >= "8.00"}
   "ostap"       { >= "0.5"}
-  "GT"          { >= "0.4.0" & < "0.5" }
+  "GT"          { >= "0.5.0" }
 ]
 
 build: [
