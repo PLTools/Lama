@@ -1,1 +1,5 @@
 commitdate.tex
+*.log
+*.out
+*.synctex.gz
+*.toc

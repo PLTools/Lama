@@ -1,3 +1,6 @@
+% !TEX TS-program = pdflatex
+% !TeX spellcheck = en_US
+% !TEX root = lama-spec.tex
 \section{Expressions}
 \label{sec:expressions}
 
@@ -37,7 +40,7 @@ property ``$e$ is a reference''. The result of assignment operator coincides wit
 assigns 3 to both "\lstinline|x|" and "\lstinline|y|".
 
 \begin{figure}[h]
-  \newcommand{\Ref}[1]{\mathcal{R}\,({#1})}
+  \renewcommand{\Ref}[1]{\mathcal{R}\,({#1})}
   \renewcommand{\arraystretch}{4}
   \[
     \begin{array}{cc}
