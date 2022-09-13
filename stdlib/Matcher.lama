@@ -46,6 +46,14 @@ fun createMatcher (buf, pos, line, col) {
   }
 
   fun matchString (s) {
+
+
+    fun min (x, y) {
+      if x < y then x else y fi
+    }
+    
+    -- printf ("Matching string %s against %s...\n", s, substring (buf, pos, min (10, buf.length - pos)));
+
     if s.length > rest ()
     then Fail (sprintf ("""%s"" expected", s), line, col)
     elif matchSubString (buf, s, pos) then Succ (s, shift (s.length)) 
@@ -55,7 +63,13 @@ fun createMatcher (buf, pos, line, col) {
 
   fun matchRegexp (r) {
     var n;
+
+    fun min (x, y) {
+      if x < y then x else y fi
+    }
     
+    -- printf ("Matching regexp %s against %s...\n", r.string, substring (buf, pos, min (10, buf.length - pos)));
+
     if (n := regexpMatch (r[0], buf, pos)) >= 0
     then Succ (substring (buf, pos, n), shift (n))
     else Fail (sprintf ("%s expected", r[1]), line, col)

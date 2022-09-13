@@ -108,7 +108,7 @@ class options args =
       | Some name -> name
     method get_help = !help
     method get_include_paths = !paths
-    method basename = Filename.chop_suffix (Filename.basename self#get_infile) ".expr"
+    method basename = Filename.chop_suffix (Filename.basename self#get_infile) ".lama"
     method topname =
       match !mode with
       | `Compile -> "init" ^ self#basename

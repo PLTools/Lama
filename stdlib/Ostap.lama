@@ -44,6 +44,7 @@ public fun memo (f) {
       if log then printf ("Applying memoized parser to %s\n", s.string) fi;
       case findMap (deref (t), s) of
         None  ->
+          if log then printf ("New stream item\n") fi;
           t ::= addMap (deref (t), s, [addSet (emptySet (compare), k), emptySet (fun (r1, r2) {
                                                                                    case [r1, r2] of
                                                                                      [Fail (_, _, _), Fail (_, _, _)] -> 0
@@ -51,7 +52,7 @@ public fun memo (f) {
                                                                                    esac
                                                                                  })]);
           f (fun (r) {
-               r := lookupMemo (restab, r);
+               --r := lookupMemo (restab, r);
                if log then printf ("Running continuation with result %s\n", r.string) fi;
                case findMap (deref (t), s) of
                  Some ([ks, rs]) ->                   
@@ -74,6 +75,7 @@ public fun memo (f) {
 }
 
 public fun token (x) {
+  -- printf ("token: %s\n", x.string);
   case x of
     #str -> memo $ fun (k) {fun (s) {k $ matchString (s, x)}}
   | _    -> memo $ fun (k) {fun (s) {k $ matchRegexp (s, x)}}
