@@ -402,6 +402,7 @@ static StringBuf stringBuf;
 
 static void createStringBuf () {
   stringBuf.contents = (char*) malloc (STRINGBUF_INIT);
+  memset(stringBuf.contents, 0, STRINGBUF_INIT);
   stringBuf.ptr      = 0;
   stringBuf.len      = STRINGBUF_INIT;
 }

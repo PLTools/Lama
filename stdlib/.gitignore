@@ -1,6 +1,5 @@
 *.html
 *.sm
-*.log
+/*.log
 *.i
 *.s
-
