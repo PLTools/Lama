@@ -1,0 +1,5 @@
+import List;
+import Array;
+
+printf ("{}.string: %s\n", {}.string);
+printf ("{}.stringcat: %s\n", {}.stringcat)
