@@ -1,1 +1,5 @@
-../stdlib/.gitignore
+*.html
+*.sm
+/*.log
+*.i
+*.s
