@@ -1,3 +1,7 @@
+fun compare (x, y) {
+  x - y
+}
+
 fun bubbleSort (l) {
   fun inner (l) {
     case l of

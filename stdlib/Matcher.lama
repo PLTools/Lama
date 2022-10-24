@@ -46,8 +46,6 @@ fun createMatcher (buf, pos, line, col) {
   }
 
   fun matchString (s) {
-
-
     fun min (x, y) {
       if x < y then x else y fi
     }
