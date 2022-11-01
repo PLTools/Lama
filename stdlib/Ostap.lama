@@ -41,6 +41,7 @@ public fun memo (f) {
          case findHashTab (deref (tab), f) of
            Some (t) -> t
          esac;
+        
       if log then printf ("Applying memoized parser to %s\n", s.string) fi;
       case findMap (deref (t), s) of
         None  ->
@@ -53,6 +54,7 @@ public fun memo (f) {
                                                                                  })]);
           f (fun (r) {
                --r := lookupMemo (restab, r);
+
                if log then printf ("Running continuation with result %s\n", r.string) fi;
                case findMap (deref (t), s) of
                  Some ([ks, rs]) ->                   
@@ -117,7 +119,7 @@ public fun seq (a, b) {
       a (fun (ar) {
                   case ar of             
                     Succ (x, s) -> b (x) (k) (s)
-                  | _           -> k (ar)
+                  | _          -> k (ar)
                   esac
          }) (s)
     }
@@ -130,7 +132,7 @@ public infixr |> after  |  (a, b) {seq (a, b)}
 public infix @ at * (a, f) {
   fun (k) {
     fun (s) {
-      a (fun (x) {k (case x of                       
+      a (fun (x) {k (case x of
                        Succ (x, s) -> Succ (f (x), s)
                      | _           -> x
                      esac)}) (s)
@@ -142,7 +144,7 @@ public infix @@ at * ([name, a], f) {
   fun (k) {
     fun (s) {
       var aa =
-      a (fun (x) {k (case x of                       
+      a (fun (x) {k (case x of               
                        Succ (x, s) -> Succ (f (x), s)
                      | _           -> x
                      esac)});

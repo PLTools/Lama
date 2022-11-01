@@ -16,8 +16,8 @@ fun printColl ([m, _]) {
     | MNode (k, v, b, l, r) ->
       printf ("** key = %s, bf = %d **\n", k.string, b);
       printf (off);
-      printf ("   values :\n");
-      iter (fun ([x, _]) {printf (off); printf ("             %s\n", x.string)}, v);
+      printf ("   values : %s\n", v.string);
+--      iter (fun ([x, _]) {printf (off); printf ("             %s\n", x.string)}, v);
       inner ("  " ++ off, l);
       inner ("  " ++ off, r)
     esac
@@ -34,7 +34,7 @@ public fun validateColl ([t, compare]) {
        if verify (k)
        then
 	 var lh = inner (l, fun (x) {compare (x, k) < 0}),
-	       rh = inner (r, fun (x) {compare (x, k) > 0});
+	     rh = inner (r, fun (x) {compare (x, k) > 0});
 
          if bf == lh - rh
 	 then 1 + if lh > rh then lh else rh fi
@@ -260,7 +260,7 @@ public fun isEmptySet (s) {
 }
 
 public fun addSet (s, v) {
-  insertColl (s, v, true, Set)
+  insertColl (s, v, true, Set) 
 }
 
 public fun memSet (s, v) {
@@ -316,10 +316,6 @@ public fun lookupMemo (mm@[p, m], v) {
             [Right, _] : _ -> true
           | _              -> false
           esac;
-
-  if f then
-    skip -- printf ("Looked up 0x%.8x | 0x%.8x | %s\n", mm, v, v.string)
-  fi;
 
   case
   fun (x) {

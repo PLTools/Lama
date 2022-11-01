@@ -632,6 +632,8 @@ extern void* Lsubstring (void *subj, int p, int l) {
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
   regex_t *b = (regex_t*) malloc (sizeof (regex_t));
 
+  /* printf ("regexp: %s,\t%x\n", regexp, b); */
+  
   memset (b, 0, sizeof (regex_t));
   
   int n = (int) re_compile_pattern (regexp, strlen (regexp), b);
@@ -652,6 +654,8 @@ extern int LregexpMatch (struct re_pattern_buffer *b, char *s, int pos) {
 
   res = re_match (b, s, LEN(TO_DATA(s)->tag), UNBOX(pos), 0);
 
+  /* printf ("regexpMatch %x: %s, res=%d\n", b, s+UNBOX(pos), res); */
+  
   if (res) {
     return BOX (res);
   }

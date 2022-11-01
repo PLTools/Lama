@@ -66,7 +66,7 @@ fun createMatcher (buf, pos, line, col) {
       if x < y then x else y fi
     }
     
-    -- printf ("Matching regexp %s against %s...\n", r.string, substring (buf, pos, min (10, buf.length - pos)));
+    -- printf ("Matching regexp %x against %s...\n", r, substring (buf, pos, min (10, buf.length - pos)));
 
     if (n := regexpMatch (r[0], buf, pos)) >= 0
     then Succ (substring (buf, pos, n), shift (n))
