@@ -1885,7 +1885,7 @@ extern void __init (void) {
   from_space.begin = mmap (NULL, space_size, PROT_READ | PROT_WRITE,
     			   MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
   to_space.begin   = NULL;
-  if (to_space.begin == MAP_FAILED) {
+  if (from_space.begin == MAP_FAILED) {
     perror ("EROOR: init_pool: mmap failed\n");
     exit   (1);
   }
