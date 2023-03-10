@@ -19,8 +19,6 @@ void print_indent (void) {
 }
 #endif
 
-extern size_t __gc_stack_top, __gc_stack_bottom;
-
 /* GC pool structure and data; declared here in order to allow debug print */
 typedef struct {
   size_t * begin;
@@ -363,6 +361,56 @@ char* de_hash (int n) {
   return ++p;
 }
 
+static StringBuf stringBuf;
+
+static void createStringBuf () {
+    stringBuf.contents = (char*) malloc (STRINGBUF_INIT);
+    memset(stringBuf.contents, 0, STRINGBUF_INIT);
+    stringBuf.ptr      = 0;
+    stringBuf.len      = STRINGBUF_INIT;
+}
+
+static void deleteStringBuf () {
+    free (stringBuf.contents);
+}
+
+static void extendStringBuf () {
+    int len = stringBuf.len << 1;
+
+    stringBuf.contents = (char*) realloc (stringBuf.contents, len);
+    stringBuf.len      = len;
+}
+
+static void vprintStringBuf (char *fmt, va_list args) {
+    int     written = 0,
+            rest    = 0;
+    char   *buf     = (char*) BOX(NULL);
+    va_list vsnargs;
+
+    again:
+    va_copy (vsnargs, args);
+
+    buf     = &stringBuf.contents[stringBuf.ptr];
+    rest    = stringBuf.len - stringBuf.ptr;
+
+    written = vsnprintf (buf, rest, fmt, vsnargs);
+
+    va_end(vsnargs);
+
+    if (written >= rest) {
+        extendStringBuf ();
+        goto again;
+    }
+
+    stringBuf.ptr += written;
+}
+
+static void printStringBuf (char *fmt, ...) {
+    va_list args;
+
+    va_start (args, fmt);
+    vprintStringBuf (fmt, args);
+}
 
 int is_valid_heap_pointer (void *p);
 
@@ -1043,8 +1091,6 @@ extern void* Bsexp (int bn, ...) {
 
   return d->contents;
 }
-
-//BsexpTag?
 
 extern int Btag (void *d, int t, int n) {
   data *r; 

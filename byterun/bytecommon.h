@@ -5,6 +5,7 @@
 # include <errno.h>
 # include <stdlib.h>
 # include <string.h>
+# include <stdio.h>
 
 #ifndef LAMA_BYTECOMMON_H
 #define LAMA_BYTECOMMON_H
@@ -24,6 +25,9 @@ typedef struct {
     char  buffer[0];
 } bytefile;
 
+# ifdef __cplusplus
+extern "C"{
+#endif
 /* Gets a string from a string table by an index */
 char* get_string (bytefile *f, int pos) {
     return &f->string_ptr[pos];
@@ -74,6 +78,10 @@ bytefile* read_file (char *fname) {
 
     return file;
 }
+
+# ifdef __cplusplus
+}
+#endif
 
 
 #endif //LAMA_BYTECOMMON_H

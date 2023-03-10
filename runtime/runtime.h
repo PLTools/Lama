@@ -32,7 +32,13 @@
 # define UNBOX(x)    (((int) (x)) >> 1)
 # define BOX(x)      ((((int) (x)) << 1) | 0x0001)
 
+# ifdef __cplusplus
+extern "C"{
+#endif
+
 void failure (char *s, ...);
+
+extern size_t __gc_stack_top, __gc_stack_bottom;
 
 typedef struct {
     int tag;
@@ -54,58 +60,37 @@ typedef struct {
     int len;
 } StringBuf;
 
-static StringBuf stringBuf;
-
 # define STRINGBUF_INIT 128
 
-static void createStringBuf () {
-    stringBuf.contents = (char*) malloc (STRINGBUF_INIT);
-    memset(stringBuf.contents, 0, STRINGBUF_INIT);
-    stringBuf.ptr      = 0;
-    stringBuf.len      = STRINGBUF_INIT;
+extern void __init (void);
+
+extern int LtagHash (char *s);
+extern int Lread    ();
+extern int Lwrite   (int n);
+extern int Llength  (void *p);
+
+extern void* Lstring (void *p);
+
+extern void failure (char *s, ...);
+
+extern int Bclosure_tag_patt (void *x);
+extern int Bboxed_patt       (void *x);
+extern int Bunboxed_patt     (void *x);
+extern int Barray_tag_patt   (void *x);
+extern int Bstring_tag_patt  (void *x);
+extern int Bsexp_tag_patt    (void *x);
+extern int Barray_patt       (void *d, int n);
+extern int Bstring_patt      (void *x, void *y);
+
+extern int   Btag  (void *d, int t, int n);
+extern void* Belem (void *p, int i);
+extern void* Bsta  (void *v, int i, void *x);
+extern void* Bclosure (int bn, void *entry, ...);
+
+extern void Bmatch_failure (void *v, char *fname, int line, int col);
+
+# ifdef __cplusplus
 }
+#endif
 
-static void deleteStringBuf () {
-    free (stringBuf.contents);
-}
-
-static void extendStringBuf () {
-    int len = stringBuf.len << 1;
-
-    stringBuf.contents = (char*) realloc (stringBuf.contents, len);
-    stringBuf.len      = len;
-}
-
-static void vprintStringBuf (char *fmt, va_list args) {
-    int     written = 0,
-            rest    = 0;
-    char   *buf     = (char*) BOX(NULL);
-    va_list vsnargs;
-
-    again:
-    va_copy (vsnargs, args);
-
-    buf     = &stringBuf.contents[stringBuf.ptr];
-    rest    = stringBuf.len - stringBuf.ptr;
-
-    written = vsnprintf (buf, rest, fmt, vsnargs);
-
-    va_end(vsnargs);
-
-    if (written >= rest) {
-        extendStringBuf ();
-        goto again;
-    }
-
-    stringBuf.ptr += written;
-}
-
-static void printStringBuf (char *fmt, ...) {
-    va_list args;
-
-    va_start (args, fmt);
-    vprintStringBuf (fmt, args);
-}
-
-
-# endif
+# endif 
