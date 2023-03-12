@@ -238,7 +238,7 @@ The function takes an accumulator and a pair key-value. The bindings are enumera
 
 Sets are immutable structures with the following interface:
 
-\descr{\lstinline|fun emptySet (f)|}{Creates an empty set. An argument is a comparison function, which returns zero, positive or negative integer values depending on
+\descr{\lstinline|fun emptySet (compare)|}{Creates an empty set. An argument is a comparison function, which returns zero, positive or negative integer values depending on
 the order of its arguments.}
 
 \descr{\lstinline|fun isEmptySet (m)|}{Returns true if an argument set is empty.}
@@ -259,7 +259,7 @@ there is no such element and non-zero otherwise.}
 \descr{\lstinline|fun diff (a, b)|}{Returns a difference between sets "\lstinline|a|" and "\lstinline|b|" (a set of those elements
   of "\lstinline|a|" which are not in "\lstinline|b|") as a new set.}
 
-\descr{\lstinline|fun listSet (l)|}{Converts a list into a set. }
+\descr{\lstinline|fun listSet (l, compare)|}{Converts a list into a set. The second argument is a comparison function as per \lstinline|emptySet|.}
 
 \descr{\lstinline|fun iterSet (f, s)|}{Applied a function "\lstinline|f|" to each element of the set "\lstinline|s|". The elements are
 enumerated in ascending order.}

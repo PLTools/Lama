@@ -354,7 +354,7 @@ extern int LtagHash (char *s) {
     p++;
   }
 
-  if (strcmp (s, de_hash (h)) != 0) {
+  if (strncmp (s, de_hash (h), 5) != 0) {
     failure ("%s <-> %s\n", s, de_hash(h));
   }
   
