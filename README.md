@@ -9,37 +9,31 @@
 
 # Lama
 
-![lama](lama.svg) is a programming language developed by JetBrains Research for educational purposes as an exemplary language to introduce
-the domain of programming languages, compilers and tools. Its general characteristics are:
+![lama](lama.svg) is a programming language developed by JetBrains Research for educational purposes as an exemplary language to introduce the domain of programming languages, compilers, and tools.
+Its general characteristics are:
 
 * procedural with first-class functions - functions can be passed as arguments, placed in data structures,
   returned and "constructed" at runtime via closure mechanism;
 * with lexical static scoping;
-* strict - all arguments of function application are evaluated before function body;
+* strict - all arguments of function application are evaluated before a function body;
 * imperative - variables can be re-assigned, function calls can have side effects;
 * untyped - no static type checking is performed;
 * with S-expressions and pattern-matching;
 * with user-defined infix operators, including those defined in local scopes;
 * with automatic memory management (garbage collection).
 
-The name ![lama](lama.svg) is an acronym for *Lambda-Algol* since the language has borrowed the syntactic shape of
-operators from **Algol-68**; [**Haskell**](http://www.haskell.org) and [**OCaml**](http://ocaml.org) can be
-mentioned as other languages of inspiration.
+The name ![lama](lama.svg) is an acronym for *Lambda-Algol* since the language has borrowed the syntactic shape of operators from **Algol-68**; [**Haskell**](http://www.haskell.org) and [**OCaml**](http://ocaml.org) can be mentioned as other languages of inspiration.
 
-The main purpose of ![lama](lama.svg) is to present a repertoire of constructs with certain runtime behavior and
-relevant implementation techniques. The lack of a type system (a vital feature for a real-word language
-for software engineering) is an intensional decision which allows to show the unchained diversity
-of runtime behaviors, including those which a typical type system is called to prevent. On the other hand
-the language can be used in future as a raw substrate to apply various ways of software verification (including
-type systems) on.
+The main purpose of ![lama](lama.svg) is to present a repertoire of constructs with certain runtime behavior and relevant implementation techniques.
+The lack of a type system (a vital feature for a real-world language
+for software engineering) is an intensional decision that allows showing the unchained diversity of runtime behaviors, including those that a typical type system is called to prevent. 
+On the other hand the language can be used in the future as a raw substrate to apply various ways of software verification (including type systems).
 
-The current implementation contains a native code compiler for **x86-32**, written
-in **OCaml**, a runtime library with garbage-collection support, written in **C**, and a small
-standard library, written in ![lama](lama.svg) itself. The native code compiler uses **gcc** as a toolchain.
+The current implementation contains a native code compiler for **x86-32**, written in **OCaml**, a runtime library with garbage-collection support, written in **C**, and a small standard library, written in ![lama](lama.svg) itself.
+The native code compiler uses **gcc** as a toolchain.
 
-In addition, a source-level reference interpreter is implemented as well as a compiler to a small
-stack machine. The stack machine code can in turn be either interpreted on a stack machine interpreter, or
-used as an intermediate representation by the native code compiler.
+In addition, a source-level reference interpreter is implemented as well as a compiler to a small stack machine. 
+The stack machine code can in turn be either interpreted on a stack machine interpreter, or used as an intermediate representation by the native code compiler.
 
 ## Language Specification
 
@@ -47,70 +41,84 @@ The language specification can be found [here](lama-spec.pdf).
 
 ## Installation
 
-Windows users should get Windows Subsystem for Linux a.k.a WSL (recommended) or cygwin. Ubuntu-based variant of WSL is recommended.
+Supported target: GNU/Linux x86_32 (x86_64 by running 32-bit mode)
+
+***Mac*** users should use either a virtual machine or docker with a Linux distributive inside.
+
+***Windows*** users should get Windows Subsystem for Linux a.k.a WSL (recommended) or cygwin.
+Ubuntu-based variant of WSL is recommended.
 
 * System-wide prerequisites:
 
-  - `sudo apt install gcc-multilib` (in Debian-based GNU/Linux)
+  - `gcc-multilib`
+    
+    For example, (for Debian-based GNU/Linux):
+    ```bash 
+    $ sudo apt install gcc-multilib
+    ```
 
-     On some versions you need to install additional package `lib32gcc-9-dev` in case of errors like
+     On some versions, you need to install the additional package `lib32gcc-9-dev` in case of errors like
        ```
       /usr/bin/ld: cannot find -lgcc
       /usr/bin/ld: skipping incompatible /usr/lib/gcc/x86_64-linux-gnu/9/libgcc.a when searching for -lgcc
        ```
   - [opam](http://opam.ocaml.org) (>= 2.0.4)
-  - [OCaml](http://ocaml.org) (>= 4.10.1). *Optional* because it can be easily installed through opam. Compiler variant with `flambda` switch is recommended
+  - [OCaml](http://ocaml.org) (>= 4.10.1). *Optional* because it can be easily installed through opam.
+  Compiler variant with `flambda` switch is recommended.
 
 * Check that `opam` is installed (using commands `which opam` or `opam --version`)
 
-* Install right [switch](https://opam.ocaml.org/doc/Manual.html#Switches) for OCaml compiler
+**Installation guide**
 
-    ```
+1. Install the right [switch](https://opam.ocaml.org/doc/Manual.html#Switches) for the OCaml compiler
+
+    ```bash
     # for fresh opam 
-    opam switch create 4.14.0+flambda --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda 
+    $ opam switch create lama --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda 
     # for old opam 
-    opam switch create lama ocaml-variants.4.10.1+flambda   
+    $ opam switch create lama ocaml-variants.4.10.1+flambda   
     ```
 
-  In above command:
+    * In the above command:
 
-  - `opam switch create` is a subcommand to create a new switch
-  - `ocaml-variants.4.10.1+flambda` is name of a standart template for the switch
-  - `lama` is an alias for the switch being created; on success a directory `$(HOME)/.opam/lama` should be created
+      - `opam switch create` is a subcommand to create a new switch
+      - `ocaml-variants.4.10.1+flambda` is the name of a standard template for the switch
+      - `lama` is an alias for the switch being created; on success a directory `$(HOME)/.opam/lama` should be created
 
-* Update PATH variable for the fresh switch. (You can add these commands to your `~/.bashrc` for convenience but they should be added by `opam`)
+2. Update PATH variable for the fresh switch. (You can add these commands to your `~/.bashrc` for convenience but they should be added by `opam`)
+    ```bash
+    $ export OPAMSWITCH=lama
+    $ eval $(opam env)
+    ```
 
-  ```
-  export OPAMSWITCH=lama
-  eval $(opam env)
-  ```
+     * Check that the OCaml compiler is now available in PATH by running `which ocamlc`; it should answer with `/home/user/.opam/lama/bin/ocamlc` (or similar) and `ocamlc -v` should answer with
+    ```
+    The OCaml compiler, version 4.10.1
+    Standard library directory: /home/user/.opam/lama/lib/ocaml
+    ```
 
-  Check that OCaml compiler is now available in PATH: running `which ocamlc` should give `/home/user/.opam/lama/bin/ocamlc` (or similar) and `ocamlc -v` should give
+3. Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
 
-  ```
-  The OCaml compiler, version 4.10.1
-  Standard library directory: /home/user/.opam/lama/lib/ocaml
-  ```
+    ```bash
+    $ opam pin add Lama https://github.com/JetBrains-Research/Lama.git\#1.10 --no-action
+    ```
 
-* Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
+    The extra '#' sign is added because in various Shells it is the start of a comment
 
-  `opam pin add Lama https://github.com/JetBrains-Research/Lama.git\#1.10 --no-action`
+4. Install *dep*endencies on system-wide *ext*ernal packages and `lama` itself after that.
 
-  The extra '#' sign is added because in various Shells it is a start of comment
+    ```bash
+    $ opam depext Lama --yes
+    $ opam install Lama --yes
+    ```
 
-* Install *dep*endencies on system-wide *ext*ernal packages and `lama` itself after that.
+5. Check that `lamac` executable was installed: `which lamac` should answer with
 
-  ```
-  opam depext Lama --yes
-  opam install Lama --yes
-  ```
-
-* Check that `lamac` exectuable was installed: `which lamac` should give
-
-  ```
-  /home/user/.opam/lama/bin/lamac
-  ```
+    ```
+    /home/<USER>/.opam/lama/bin/lamac
+    ```
 
 ### Smoke-testing (optional)
 
-Clone the repository and run `make -C tutorial`. It should build local compiler `src/lamac` and a few tutorial executables in `tutorial/`.
+Clone the repository and run `make -C tutorial`. 
+It should build a local compiler `src/lamac` and a few tutorial executables in `tutorial/`.
