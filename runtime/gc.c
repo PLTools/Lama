@@ -50,6 +50,8 @@ void* gc_alloc(size_t size) {
 
     // compact phase
     compact(size);
+
+    return gc_alloc_on_existing_heap(size);
 }
 
 void compact(size_t additional_size) {
@@ -58,14 +60,19 @@ void compact(size_t additional_size) {
     size_t next_heap_size = MAX(live_size * EXTRA_ROOM_HEAP_COEFFICIENT + additional_size, MINIMUM_HEAP_CAPACITY);
 
     memory_chunk new_memory;
-    new_memory.begin = mremap(heap.begin, WORDS_TO_BYTES(heap.size), WORDS_TO_BYTES(next_heap_size), 0);
+    new_memory.begin = mremap(
+            heap.begin,
+            WORDS_TO_BYTES(heap.size),
+            WORDS_TO_BYTES(next_heap_size),
+            MREMAP_MAYMOVE
+            );
     if (new_memory.begin == MAP_FAILED) {
         perror ("ERROR: compact: mremap failed\n");
         exit   (1);
     }
     new_memory.end = new_memory.begin + next_heap_size;
     new_memory.size = next_heap_size;
-    new_memory.current = new_memory.begin + live_size + additional_size;
+    new_memory.current = new_memory.begin + live_size;
 
     update_references(&new_memory);
     physically_relocate(&new_memory);
