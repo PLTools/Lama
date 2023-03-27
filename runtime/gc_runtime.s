@@ -50,7 +50,7 @@ __post_gc:
 __post_gc2:
 			popl	%eax
 			ret
-	
+
 	// Scan stack for roots
 	// strting from __gc_stack_top
 	// till __gc_stack_bottom
@@ -68,13 +68,13 @@ loop:
 	// check that it is not a pointer to code section
 	// i.e. the following is not true:
 	// __executable_start <= (%eax) <= __etext
-check11:	
+check11:
 			leal	__executable_start, %edx
 			cmpl	%ebx, %edx
 			jna	check12
 			jmp	check21
 
-check12:	
+check12:
 			leal	__etext, %edx
 			cmpl	%ebx, %edx
 			jnb	next
@@ -82,7 +82,7 @@ check12:
 	// check that it is not a pointer into the program stack
 	// i.e. the following is not true:
 	// __gc_stack_bottom <= (%eax) <= __gc_stack_top
-check21:	
+check21:
 			cmpl	%ebx, __gc_stack_top
 			jna	check22
 			jmp	loop2
@@ -99,7 +99,7 @@ loop2:
 gc_run_t:
 			pushl 	%eax
   			pushl	%eax
-      			call	gc_test_and_copy_root
+      			call	gc_test_and_mark_root
         		addl	$4, %esp
 			popl	%eax
 
@@ -111,6 +111,6 @@ returnn:
 			movl	$0, %eax
 			popl	%edx
 			popl	%ebx
-			movl	%ebp, %esp 
+			movl	%ebp, %esp
 			popl	%ebp
 			ret

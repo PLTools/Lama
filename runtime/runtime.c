@@ -3,34 +3,19 @@
 # define _GNU_SOURCE 1
 
 # include "runtime.h"
+# include "runtime_common.h"
+# include "gc.h"
 
 # define __ENABLE_GC__ 
 # ifndef __ENABLE_GC__
 # define alloc malloc
 # endif
 
-//# define DEBUG_PRINT 1 
+//# define DEBUG_PRINT 1
 
-#ifdef DEBUG_PRINT
-int indent = 0;
-void print_indent (void) {
-  for (int i = 0; i < indent; i++) printf (" ");
-  printf("| ");
-}
-#endif
-
-extern size_t __gc_stack_top, __gc_stack_bottom;
-
-/* GC pool structure and data; declared here in order to allow debug print */
-typedef struct {
-  size_t * begin;
-  size_t * end;
-  size_t * current;
-  size_t   size;
-} pool;
-
-static pool from_space;
-static pool to_space;
+/* GC memory_chunk structure and data; declared here in order to allow debug print */
+static memory_chunk from_space;
+static memory_chunk to_space;
 size_t      *current;
 /* end */
 
@@ -49,81 +34,6 @@ void __pre_gc_subst () {}
 void __post_gc_subst () {}
 
 # endif
-/* end */
-
-# define STRING_TAG  0x00000001
-# define ARRAY_TAG   0x00000003
-# define SEXP_TAG    0x00000005
-# define CLOSURE_TAG 0x00000007 
-# define UNBOXED_TAG 0x00000009 // Not actually a tag; used to return from LkindOf
-
-# define LEN(x) ((x & 0xFFFFFFF8) >> 3)
-# define TAG(x)  (x & 0x00000007)
-
-# define TO_DATA(x) ((data*)((char*)(x)-sizeof(int)))
-# define TO_SEXP(x) ((sexp*)((char*)(x)-2*sizeof(int)))
-# ifdef DEBUG_PRINT // GET_SEXP_TAG is necessary for printing from space
-# define GET_SEXP_TAG(x) (LEN(x))
-#endif
-
-# define UNBOXED(x)  (((int) (x)) &  0x0001)
-# define UNBOX(x)    (((int) (x)) >> 1)
-# define BOX(x)      ((((int) (x)) << 1) | 0x0001)
-
-/* GC extra roots */
-# define MAX_EXTRA_ROOTS_NUMBER 32
-typedef struct {
-  int current_free;
-  void ** roots[MAX_EXTRA_ROOTS_NUMBER];
-} extra_roots_pool;
-
-static extra_roots_pool extra_roots;
-
-void clear_extra_roots (void) {
-  extra_roots.current_free = 0;
-}
-
-void push_extra_root (void ** p) {
-# ifdef DEBUG_PRINT
-  indent++; print_indent ();
-  printf ("push_extra_root %p %p\n", p, &p); fflush (stdout);
-# endif
-  if (extra_roots.current_free >= MAX_EXTRA_ROOTS_NUMBER) {
-    perror ("ERROR: push_extra_roots: extra_roots_pool overflow");
-    exit   (1);
-  }
-  extra_roots.roots[extra_roots.current_free] = p;
-  extra_roots.current_free++;
-# ifdef DEBUG_PRINT
-  indent--;
-# endif
-}
-
-void pop_extra_root (void ** p) {
-# ifdef DEBUG_PRINT
-  indent++; print_indent ();
-  printf ("pop_extra_root %p %p\n", p, &p); fflush (stdout);
-# endif
-  if (extra_roots.current_free == 0) {
-    perror ("ERROR: pop_extra_root: extra_roots are empty");
-    exit   (1);
-  }
-  extra_roots.current_free--;
-  if (extra_roots.roots[extra_roots.current_free] != p) {
-# ifdef DEBUG_PRINT
-    print_indent ();
-    printf ("%i %p %p", extra_roots.current_free,
-	    extra_roots.roots[extra_roots.current_free], p);
-    fflush (stdout);
-# endif
-    perror ("ERROR: pop_extra_root: stack invariant violation");
-    exit   (1);
-  }
-# ifdef DEBUG_PRINT
-  indent--;
-# endif
-}
-
 /* end */
 
 static void vfailure (char *s, va_list args) {
@@ -153,18 +63,8 @@ void Lassert (void *f, char *s, ...) {
 # define ASSERT_UNBOXED(memo, x)             \
   do if (!UNBOXED(x)) failure ("unboxed value expected in %s\n", memo); while (0)
 # define ASSERT_STRING(memo, x)              \
-  do if (!UNBOXED(x) && TAG(TO_DATA(x)->tag) \
+  do if (!UNBOXED(x) && TAG(TO_DATA(x)->data_header) \
 	 != STRING_TAG) failure ("string value expected in %s\n", memo); while (0)
-
-typedef struct {
-  int tag; 
-  char contents[0];
-} data; 
-
-typedef struct {
-  int tag; 
-  data contents; 
-} sexp;
 
 extern void* alloc    (size_t);
 extern void* Bsexp    (int n, ...);
@@ -172,11 +72,11 @@ extern int   LtagHash (char*);
 
 void *global_sysargs;
 
-// Gets a raw tag
+// Gets a raw data_header
 extern int LkindOf (void *p) {
   if (UNBOXED(p)) return UNBOXED_TAG;
   
-  return TAG(TO_DATA(p)->tag);
+  return TAG(TO_DATA(p)->data_header);
 }
 
 // Compare sexprs tags
@@ -189,15 +89,15 @@ extern int LcompareTags (void *p, void *q) {
   pd = TO_DATA(p);
   qd = TO_DATA(q);
 
-  if (TAG(pd->tag) == SEXP_TAG && TAG(qd->tag) == SEXP_TAG) {
+  if (TAG(pd->data_header) == SEXP_TAG && TAG(qd->data_header) == SEXP_TAG) {
     return
     #ifndef DEBUG_PRINT
       BOX((TO_SEXP(p)->tag) - (TO_SEXP(q)->tag));
     #else
-      BOX((GET_SEXP_TAG(TO_SEXP(p)->tag)) - (GET_SEXP_TAG(TO_SEXP(p)->tag)));
+      BOX((GET_SEXP_TAG(TO_SEXP(p)->data_header)) - (GET_SEXP_TAG(TO_SEXP(p)->data_header)));
     #endif      
   }
-  else failure ("not a sexpr in compareTags: %d, %d\n", TAG(pd->tag), TAG(qd->tag));    
+  else failure ("not a sexpr in compareTags: %d, %d\n", TAG(pd->data_header), TAG(qd->data_header));
           
   return 0; // never happens
 }
@@ -329,7 +229,7 @@ extern int Llength (void *p) {
   ASSERT_BOXED(".length", p);
   
   a = TO_DATA(p);
-  return BOX(LEN(a->tag));
+  return BOX(LEN(a->data_header));
 }
 
 static char* chars = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'";
@@ -369,7 +269,7 @@ char* de_hash (int n) {
 
 #ifdef DEBUG_PRINT
   indent++; print_indent ();
-  printf ("de_hash: tag: %d\n", n); fflush (stdout);
+  printf ("de_hash: data_header: %d\n", n); fflush (stdout);
 #endif
   
   *p-- = 0;
@@ -449,7 +349,7 @@ static void printStringBuf (char *fmt, ...) {
   vprintStringBuf (fmt, args);
 }
 
-int is_valid_heap_pointer (void *p);
+//int is_valid_heap_pointer (void *p);
 
 static void printValue (void *p) {
   data *a = (data*) BOX(NULL);
@@ -463,27 +363,27 @@ static void printValue (void *p) {
     
     a = TO_DATA(p);
 
-    switch (TAG(a->tag)) {      
+    switch (TAG(a->data_header)) {
     case STRING_TAG:
       printStringBuf ("\"%s\"", a->contents);
       break;
 
     case CLOSURE_TAG:
       printStringBuf ("<closure ");
-      for (i = 0; i < LEN(a->tag); i++) {
+      for (i = 0; i < LEN(a->data_header); i++) {
 	if (i) printValue ((void*)((int*) a->contents)[i]);
 	else printStringBuf ("0x%x", (void*)((int*) a->contents)[i]);
 	
-	if (i != LEN(a->tag) - 1) printStringBuf (", ");
+	if (i != LEN(a->data_header) - 1) printStringBuf (", ");
       }
       printStringBuf (">");
       break;
       
     case ARRAY_TAG:
       printStringBuf ("[");
-      for (i = 0; i < LEN(a->tag); i++) {
+      for (i = 0; i < LEN(a->data_header); i++) {
         printValue ((void*)((int*) a->contents)[i]);
-	if (i != LEN(a->tag) - 1) printStringBuf (", ");
+	if (i != LEN(a->data_header) - 1) printStringBuf (", ");
       }
       printStringBuf ("]");
       break;
@@ -492,7 +392,7 @@ static void printValue (void *p) {
 #ifndef DEBUG_PRINT
       char * tag = de_hash (TO_SEXP(p)->tag);
 #else
-      char * tag = de_hash (GET_SEXP_TAG(TO_SEXP(p)->tag));
+      char * data_header = de_hash (GET_SEXP_TAG(TO_SEXP(p)->data_header));
 #endif      
       
       if (strcmp (tag, "cons") == 0) {
@@ -500,7 +400,7 @@ static void printValue (void *p) {
 	
 	printStringBuf ("{");
 
-	while (LEN(a->tag)) {
+	while (LEN(a->data_header)) {
 	  printValue ((void*)((int*) b->contents)[0]);
 	  b = (data*)((int*) b->contents)[1];
 	  if (! UNBOXED(b)) {
@@ -514,11 +414,11 @@ static void printValue (void *p) {
       }
       else {
 	printStringBuf ("%s", tag);
-	if (LEN(a->tag)) {
+	if (LEN(a->data_header)) {
 	  printStringBuf (" (");
-	  for (i = 0; i < LEN(a->tag); i++) {
+	  for (i = 0; i < LEN(a->data_header); i++) {
 	    printValue ((void*)((int*) a->contents)[i]);
-	    if (i != LEN(a->tag) - 1) printStringBuf (", ");
+	    if (i != LEN(a->data_header) - 1) printStringBuf (", ");
 	  }
 	  printStringBuf (")");
 	}
@@ -527,7 +427,7 @@ static void printValue (void *p) {
     break;
 
     default:
-      printStringBuf ("*** invalid tag: 0x%x ***", TAG(a->tag));
+      printStringBuf ("*** invalid data_header: 0x%x ***", TAG(a->data_header));
     }
   }
 }
@@ -540,7 +440,7 @@ static void stringcat (void *p) {
   else {
     a = TO_DATA(p);
 
-    switch (TAG(a->tag)) {      
+    switch (TAG(a->data_header)) {
     case STRING_TAG:
       printStringBuf ("%s", a->contents);
       break;
@@ -549,12 +449,12 @@ static void stringcat (void *p) {
 #ifndef DEBUG_PRINT
       char * tag = de_hash (TO_SEXP(p)->tag);
 #else
-      char * tag = de_hash (GET_SEXP_TAG(TO_SEXP(p)->tag));
+      char * data_header = de_hash (GET_SEXP_TAG(TO_SEXP(p)->data_header));
 #endif   
       if (strcmp (tag, "cons") == 0) {
 	data *b = a;
 	
-	while (LEN(a->tag)) {
+	while (LEN(a->data_header)) {
 	  stringcat ((void*)((int*) b->contents)[0]);
 	  b = (data*)((int*) b->contents)[1];
 	  if (! UNBOXED(b)) {
@@ -563,12 +463,12 @@ static void stringcat (void *p) {
 	  else break;
 	}
       }
-      else printStringBuf ("*** non-list tag: %s ***", tag);
+      else printStringBuf ("*** non-list data_header: %s ***", tag);
     }
     break;
 
     default:
-      printStringBuf ("*** invalid tag: 0x%x ***", TAG(a->tag));
+      printStringBuf ("*** invalid data_header: 0x%x ***", TAG(a->data_header));
     }
   }
 }
@@ -591,9 +491,9 @@ extern int LmatchSubString (char *subj, char *patt, int pos) {
   ASSERT_STRING("matchSubString:2", patt);
   ASSERT_UNBOXED("matchSubString:3", pos);
   
-  n = LEN (p->tag);
+  n = LEN (p->data_header);
 
-  if (n + UNBOX(pos) > LEN(s->tag))
+  if (n + UNBOX(pos) > LEN(s->data_header))
     return BOX(0);
   
   return BOX(strncmp (subj + UNBOX(pos), patt, n) == 0);
@@ -607,7 +507,7 @@ extern void* Lsubstring (void *subj, int p, int l) {
   ASSERT_UNBOXED("substring:2", p);
   ASSERT_UNBOXED("substring:3", l);
       
-  if (pp + ll <= LEN(d->tag)) {
+  if (pp + ll <= LEN(d->data_header)) {
     data *r;
     
     __pre_gc ();
@@ -616,7 +516,7 @@ extern void* Lsubstring (void *subj, int p, int l) {
     r = (data*) alloc (ll + 1 + sizeof (int));
     pop_extra_root (&subj);
 
-    r->tag = STRING_TAG | (ll << 3);
+    r->data_header = STRING_TAG | (ll << 3);
 
     strncpy (r->contents, (char*) subj + pp, ll);
     
@@ -626,7 +526,7 @@ extern void* Lsubstring (void *subj, int p, int l) {
   }
   
   failure ("substring: index out of bounds (position=%d, length=%d, \
-            subject length=%d)", pp, ll, LEN(d->tag));
+            subject length=%d)", pp, ll, LEN(d->data_header));
 }
 
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
@@ -652,7 +552,7 @@ extern int LregexpMatch (struct re_pattern_buffer *b, char *s, int pos) {
   ASSERT_STRING("regexpMatch:2", s);
   ASSERT_UNBOXED("regexpMatch:3", pos);
 
-  res = re_match (b, s, LEN(TO_DATA(s)->tag), UNBOX(pos), 0);
+  res = re_match (b, s, LEN(TO_DATA(s)->data_header), UNBOX(pos), 0);
 
   /* printf ("regexpMatch %x: %s, res=%d\n", b, s+UNBOX(pos), res); */
   
@@ -680,7 +580,7 @@ void *Lclone (void *p) {
   if (UNBOXED(p)) return p;
   else {
     data *a = TO_DATA(p);
-    int t   = TAG(a->tag), l = LEN(a->tag);
+    int t   = TAG(a->data_header), l = LEN(a->data_header);
 
     push_extra_root (&p);
     switch (t) {
@@ -717,7 +617,7 @@ void *Lclone (void *p) {
       break;
        
     default:
-      failure ("invalid tag %d in clone *****\n", t);
+      failure ("invalid data_header %d in clone *****\n", t);
     }
     pop_extra_root (&p);
   }
@@ -743,7 +643,7 @@ int inner_hash (int depth, unsigned acc, void *p) {
   if (UNBOXED(p)) return HASH_APPEND(acc, UNBOX(p));
   else if (is_valid_heap_pointer (p)) {
     data *a = TO_DATA(p);
-    int t = TAG(a->tag), l = LEN(a->tag), i;
+    int t = TAG(a->data_header), l = LEN(a->data_header), i;
 
     acc = HASH_APPEND(acc, t);
     acc = HASH_APPEND(acc, l);    
@@ -773,7 +673,7 @@ int inner_hash (int depth, unsigned acc, void *p) {
 #ifndef DEBUG_PRINT
       int ta = TO_SEXP(p)->tag;
 #else
-      int ta = GET_SEXP_TAG(TO_SEXP(p)->tag);
+      int ta = GET_SEXP_TAG(TO_SEXP(p)->data_header);
 #endif
       acc = HASH_APPEND(acc, ta);
       i = 0;
@@ -781,7 +681,7 @@ int inner_hash (int depth, unsigned acc, void *p) {
     }
 
     default:
-      failure ("invalid tag %d in hash *****\n", t);
+      failure ("invalid data_header %d in hash *****\n", t);
     }
 
     for (; i<l; i++) 
@@ -830,8 +730,8 @@ extern int Lcompare (void *p, void *q) {
     if (is_valid_heap_pointer (p)) {
       if (is_valid_heap_pointer (q)) {
         data *a = TO_DATA(p), *b = TO_DATA(q);
-        int ta = TAG(a->tag), tb = TAG(b->tag);
-        int la = LEN(a->tag), lb = LEN(b->tag);
+        int ta = TAG(a->data_header), tb = TAG(b->data_header);
+        int la = LEN(a->data_header), lb = LEN(b->data_header);
         int i;
     
         COMPARE_AND_RETURN (ta, tb);
@@ -855,7 +755,7 @@ extern int Lcompare (void *p, void *q) {
 #ifndef DEBUG_PRINT
           int ta = TO_SEXP(p)->tag, tb = TO_SEXP(q)->tag;      
 #else
-          int ta = GET_SEXP_TAG(TO_SEXP(p)->tag), tb = GET_SEXP_TAG(TO_SEXP(q)->tag);
+          int ta = GET_SEXP_TAG(TO_SEXP(p)->data_header), tb = GET_SEXP_TAG(TO_SEXP(q)->data_header);
 #endif      
           COMPARE_AND_RETURN (ta, tb);
           COMPARE_AND_RETURN (la, lb);
@@ -864,7 +764,7 @@ extern int Lcompare (void *p, void *q) {
         }
 
         default:
-          failure ("invalid tag %d in compare *****\n", ta);
+          failure ("invalid data_header %d in compare *****\n", ta);
         }
 
         for (; i<la; i++) {
@@ -890,7 +790,7 @@ extern void* Belem (void *p, int i) {
   a = TO_DATA(p);
   i = UNBOX(i);
   
-  if (TAG(a->tag) == STRING_TAG) {
+  if (TAG(a->data_header) == STRING_TAG) {
     return (void*) BOX(a->contents[i]);
   }
   
@@ -908,7 +808,7 @@ extern void* LmakeArray (int length) {
   n = UNBOX(length);
   r = (data*) alloc (sizeof(int) * (n+1));
 
-  r->tag = ARRAY_TAG | (n << 3);
+  r->data_header = ARRAY_TAG | (n << 3);
 
   p = (int*) r->contents;
   while (n--) *p++ = BOX(0);
@@ -928,7 +828,7 @@ extern void* LmakeString (int length) {
   
   r = (data*) alloc (n + 1 + sizeof (int));
 
-  r->tag = STRING_TAG | (n << 3);
+  r->data_header = STRING_TAG | (n << 3);
 
   __post_gc();
   
@@ -1023,7 +923,7 @@ extern void* Bclosure (int bn, void *entry, ...) {
 
   r = (data*) alloc (sizeof(int) * (n+2));
   
-  r->tag = CLOSURE_TAG | ((n + 1) << 3);
+  r->data_header = CLOSURE_TAG | ((n + 1) << 3);
   ((void**) r->contents)[0] = entry;
   
   va_start(args, entry);
@@ -1065,7 +965,7 @@ extern void* Barray (int bn, ...) {
 #endif
   r = (data*) alloc (sizeof(int) * (n+1));
 
-  r->tag = ARRAY_TAG | (n << 3);
+  r->data_header = ARRAY_TAG | (n << 3);
   
   va_start(args, bn);
   
@@ -1102,7 +1002,7 @@ extern void* Bsexp (int bn, ...) {
   d = &(r->contents);
   r->tag = 0;
     
-  d->tag = SEXP_TAG | ((n-1) << 3);
+  d->data_header = SEXP_TAG | ((n - 1) << 3);
   
   va_start(args, bn);
   
@@ -1116,7 +1016,7 @@ extern void* Bsexp (int bn, ...) {
   r->tag = UNBOX(va_arg(args, int));
 
 #ifdef DEBUG_PRINT
-  r->tag = SEXP_TAG | ((r->tag) << 3);
+  r->data_header = SEXP_TAG | ((r->data_header) << 3);
   print_indent ();
   printf("Bsexp: ends\n"); fflush (stdout);
   indent--;
@@ -1136,10 +1036,10 @@ extern int Btag (void *d, int t, int n) {
   else {
     r = TO_DATA(d);
 #ifndef DEBUG_PRINT
-    return BOX(TAG(r->tag) == SEXP_TAG && TO_SEXP(d)->tag == UNBOX(t) && LEN(r->tag) == UNBOX(n));
+    return BOX(TAG(r->data_header) == SEXP_TAG && TO_SEXP(d)->tag == UNBOX(t) && LEN(r->data_header) == UNBOX(n));
 #else
-    return BOX(TAG(r->tag) == SEXP_TAG &&
-               GET_SEXP_TAG(TO_SEXP(d)->tag) == UNBOX(t) && LEN(r->tag) == UNBOX(n));
+    return BOX(TAG(r->data_header) == SEXP_TAG &&
+               GET_SEXP_TAG(TO_SEXP(d)->data_header) == UNBOX(t) && LEN(r->data_header) == UNBOX(n));
 #endif
   }
 }
@@ -1150,7 +1050,7 @@ extern int Barray_patt (void *d, int n) {
   if (UNBOXED(d)) return BOX(0);
   else {
     r = TO_DATA(d);
-    return BOX(TAG(r->tag) == ARRAY_TAG && LEN(r->tag) == UNBOX(n));
+    return BOX(TAG(r->data_header) == ARRAY_TAG && LEN(r->data_header) == UNBOX(n));
   }
 }
 
@@ -1164,16 +1064,16 @@ extern int Bstring_patt (void *x, void *y) {
   else {
     rx = TO_DATA(x); ry = TO_DATA(y);
 
-    if (TAG(rx->tag) != STRING_TAG) return BOX(0);
+    if (TAG(rx->data_header) != STRING_TAG) return BOX(0);
     
-    return BOX(strcmp (rx->contents, ry->contents) == 0 ? 1 : 0);
+    return BOX(strcmp (rx->contents, ry->contents) == 0 ? 1 : 0); // TODO: ???
   }
 }
 
 extern int Bclosure_tag_patt (void *x) {
   if (UNBOXED(x)) return BOX(0);
   
-  return BOX(TAG(TO_DATA(x)->tag) == CLOSURE_TAG);
+  return BOX(TAG(TO_DATA(x)->data_header) == CLOSURE_TAG);
 }
 
 extern int Bboxed_patt (void *x) {
@@ -1187,19 +1087,19 @@ extern int Bunboxed_patt (void *x) {
 extern int Barray_tag_patt (void *x) {
   if (UNBOXED(x)) return BOX(0);
   
-  return BOX(TAG(TO_DATA(x)->tag) == ARRAY_TAG);
+  return BOX(TAG(TO_DATA(x)->data_header) == ARRAY_TAG);
 }
 
 extern int Bstring_tag_patt (void *x) {
   if (UNBOXED(x)) return BOX(0);
   
-  return BOX(TAG(TO_DATA(x)->tag) == STRING_TAG);
+  return BOX(TAG(TO_DATA(x)->data_header) == STRING_TAG);
 }
 
 extern int Bsexp_tag_patt (void *x) {
   if (UNBOXED(x)) return BOX(0);
   
-  return BOX(TAG(TO_DATA(x)->tag) == SEXP_TAG);
+  return BOX(TAG(TO_DATA(x)->data_header) == SEXP_TAG);
 }
 
 extern void* Bsta (void *v, int i, void *x) {
@@ -1207,7 +1107,7 @@ extern void* Bsta (void *v, int i, void *x) {
     ASSERT_BOXED(".sta:3", x);
     //    ASSERT_UNBOXED(".sta:2", i);
   
-    if (TAG(TO_DATA(x)->tag) == STRING_TAG)((char*) x)[UNBOX(i)] = (char) UNBOX(v);
+    if (TAG(TO_DATA(x)->data_header) == STRING_TAG)((char*) x)[UNBOX(i)] = (char) UNBOX(v);
     else ((int*) x)[UNBOX(i)] = (int) v;
 
     return v;
@@ -1264,19 +1164,19 @@ extern void* /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
 
   push_extra_root (&a);
   push_extra_root (&b);
-  d  = (data *) alloc (sizeof(int) + LEN(da->tag) + LEN(db->tag) + 1);
+  d  = (data *) alloc (sizeof(int) + LEN(da->data_header) + LEN(db->data_header) + 1);
   pop_extra_root (&b);
   pop_extra_root (&a);
 
   da = TO_DATA(a);
   db = TO_DATA(b);
   
-  d->tag = STRING_TAG | ((LEN(da->tag) + LEN(db->tag)) << 3);
+  d->data_header = STRING_TAG | ((LEN(da->data_header) + LEN(db->data_header)) << 3);
 
-  strncpy (d->contents               , da->contents, LEN(da->tag));
-  strncpy (d->contents + LEN(da->tag), db->contents, LEN(db->tag));
+  strncpy (d->contents               , da->contents, LEN(da->data_header));
+  strncpy (d->contents + LEN(da->data_header), db->contents, LEN(db->data_header));
   
-  d->contents[LEN(da->tag) + LEN(db->tag)] = 0;
+  d->contents[LEN(da->data_header) + LEN(db->data_header)] = 0;
 
   __post_gc();
   
@@ -1314,7 +1214,7 @@ extern void* LgetEnv (char *var) {
   void *s;
   
   if (e == NULL)
-    return BOX(0);
+    return BOX(0); // TODO add (void*) cast?
 
   __pre_gc ();
 
@@ -1446,9 +1346,9 @@ extern void* Lfexists (char *fname) {
 
   f = fopen (fname, "r");
   
-  if (f) return BOX(1);
+  if (f) return BOX(1); // (void*) cast?
 
-  return BOX(0);
+  return BOX(0); // (void*) cast?
 }
 
 extern void* Lfst (void *v) {
@@ -1582,7 +1482,7 @@ static size_t SPACE_SIZE = 256 * 1024 * 1024;
 // static size_t SPACE_SIZE = 128;
 // static size_t SPACE_SIZE = 1024 * 1024;
 
-static int free_pool (pool * p) {
+static int free_pool (memory_chunk * p) {
   size_t *a = p->begin, b = p->size;
   p->begin   = NULL;
   p->size    = 0;
@@ -1746,58 +1646,58 @@ extern size_t * gc_copy (size_t *obj) {
     exit (1);
   }
 
-  if (IS_FORWARD_PTR(d->tag)) {
+  if (IS_FORWARD_PTR(d->data_header)) {
 #ifdef DEBUG_PRINT
     print_indent ();
-    printf ("gc_copy: IS_FORWARD_PTR: return! %p -> %p\n", obj, (size_t *) d->tag);
+    printf ("gc_copy: IS_FORWARD_PTR: return! %p -> %p\n", obj, (size_t *) d->data_header);
     fflush(stdout);
     indent--;
 #endif
-    return (size_t *) d->tag;
+    return (size_t *) d->data_header;
   }
 
   copy = current;
 #ifdef DEBUG_PRINT
   objj = d;
 #endif
-  switch (TAG(d->tag)) {
+  switch (TAG(d->data_header)) {
     case CLOSURE_TAG:
 #ifdef DEBUG_PRINT
       print_indent ();
-      printf ("gc_copy:closure_tag; len =  %zu\n", LEN(d->tag)); fflush (stdout);
+      printf ("gc_copy:closure_tag; len =  %zu\n", LEN(d->data_header)); fflush (stdout);
 #endif
-      i = LEN(d->tag);
-      // current += LEN(d->tag) + 1;
-      // current += ((LEN(d->tag) + 1) * sizeof(int) -1) / sizeof(size_t) + 1;
+      i = LEN(d->data_header);
+      // current += LEN(d->data_header) + 1;
+      // current += ((LEN(d->data_header) + 1) * sizeof(int) -1) / sizeof(size_t) + 1;
       current += i+1;
-      *copy = d->tag;
+      *copy = d->data_header;
       copy++;
-      d->tag = (int) copy;
+      d->data_header = (int) copy;
       copy_elements (copy, obj, i);
       break;
     
     case ARRAY_TAG:
 #ifdef DEBUG_PRINT
       print_indent ();
-      printf ("gc_copy:array_tag; len =  %zu\n", LEN(d->tag)); fflush (stdout);
+      printf ("gc_copy:array_tag; len =  %zu\n", LEN(d->data_header)); fflush (stdout);
 #endif
-      current += ((LEN(d->tag) + 1) * sizeof (int) - 1) / sizeof (size_t) + 1;
-      *copy = d->tag;
+      current += ((LEN(d->data_header) + 1) * sizeof (int) - 1) / sizeof (size_t) + 1;
+      *copy = d->data_header;
       copy++;
-      i = LEN(d->tag);
-      d->tag = (int) copy;
+      i = LEN(d->data_header);
+      d->data_header = (int) copy;
       copy_elements (copy, obj, i);
       break;
 
     case STRING_TAG:
 #ifdef DEBUG_PRINT
       print_indent ();
-      printf ("gc_copy:string_tag; len = %d\n", LEN(d->tag) + 1); fflush (stdout);
+      printf ("gc_copy:string_tag; len = %d\n", LEN(d->data_header) + 1); fflush (stdout);
 #endif
-      current += (LEN(d->tag) + sizeof(int)) / sizeof(size_t) + 1;
-      *copy = d->tag;
+      current += (LEN(d->data_header) + sizeof(int)) / sizeof(size_t) + 1;
+      *copy = d->data_header;
       copy++;
-      d->tag = (int) copy;
+      d->data_header = (int) copy;
       strcpy ((char*)&copy[0], (char*) obj);
       break;
 
@@ -1805,31 +1705,31 @@ extern size_t * gc_copy (size_t *obj) {
       s = TO_SEXP(obj);
 #ifdef DEBUG_PRINT
       objj = s;
-      len1 = LEN(s->contents.tag);
-      len2 = LEN(s->tag);
-      len3 = LEN(d->tag);
+      len1 = LEN(s->contents.data_header);
+      len2 = LEN(s->data_header);
+      len3 = LEN(d->data_header);
       print_indent ();
       printf ("gc_copy:sexp_tag; len1 = %li, len2=%li, len3 = %li\n",
 	      len1, len2, len3);
       fflush (stdout);
 #endif
-      i = LEN(s->contents.tag);
+      i = LEN(s->contents.data_header);
       current += i + 2;
       *copy = s->tag;
       copy++;
-      *copy = d->tag;
+      *copy = d->data_header;
       copy++;
-      d->tag = (int) copy;
+      d->data_header = (int) copy;
       copy_elements (copy, obj, i);
       break;
 
   default:
 #ifdef DEBUG_PRINT
     print_indent ();
-    printf ("ERROR: gc_copy: weird tag: %p", TAG(d->tag)); fflush (stdout);
+    printf ("ERROR: gc_copy: weird data_header: %p", TAG(d->data_header)); fflush (stdout);
     indent--;
 #endif
-    perror ("ERROR: gc_copy: weird tag");
+    perror ("ERROR: gc_copy: weird data_header");
     exit (1);
     return (obj);
   }
@@ -1871,31 +1771,6 @@ extern void gc_root_scan_data (void) {
     gc_test_and_copy_root ((size_t**)p);
     p++;
   }
-}
-
-static inline void init_extra_roots (void) {
-  extra_roots.current_free = 0;
-}
-
-extern void __init (void) {
-  size_t space_size = SPACE_SIZE * sizeof(size_t);
-
-  srandom (time (NULL));
-  
-  from_space.begin = mmap (NULL, space_size, PROT_READ | PROT_WRITE,
-    			   MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
-  to_space.begin   = NULL;
-  if (from_space.begin == MAP_FAILED) {
-    perror ("EROOR: init_pool: mmap failed\n");
-    exit   (1);
-  }
-  from_space.current = from_space.begin;
-  from_space.end     = from_space.begin + SPACE_SIZE;
-  from_space.size    = SPACE_SIZE;
-  to_space.current   = NULL;
-  to_space.end       = NULL;
-  to_space.size      = 0;
-  init_extra_roots ();
 }
 
 static void* gc (size_t size) {
@@ -1987,19 +1862,19 @@ static void printFromSpace (void) {
     printf ("data at %p", cur);
     d  = (data *) cur;
 
-    switch (TAG(d->tag)) {
+    switch (TAG(d->data_header)) {
 
     case STRING_TAG:
       printf ("(=>%p): STRING\n\t%s; len = %i %zu\n",
 	      d->contents, d->contents,
-	      LEN(d->tag), LEN(d->tag) + 1 + sizeof(int));
+	      LEN(d->data_header), LEN(d->data_header) + 1 + sizeof(int));
       fflush (stdout);
-      len = (LEN(d->tag) + sizeof(int)) / sizeof(size_t) + 1;
+      len = (LEN(d->data_header) + sizeof(int)) / sizeof(size_t) + 1;
       break;
 
     case CLOSURE_TAG:
       printf ("(=>%p): CLOSURE\n\t", d->contents);
-      len = LEN(d->tag);
+      len = LEN(d->data_header);
       for (int i = 0; i < len; i++) {
 	int elem = ((int*)d->contents)[i];
 	if (UNBOXED(elem)) printf ("%d ", elem);
@@ -2012,7 +1887,7 @@ static void printFromSpace (void) {
 
     case ARRAY_TAG:
       printf ("(=>%p): ARRAY\n\t", d->contents);
-      len = LEN(d->tag);
+      len = LEN(d->data_header);
       for (int i = 0; i < len; i++) {
 	int elem = ((int*)d->contents)[i];
 	if (UNBOXED(elem)) printf ("%d ", elem);
@@ -2026,9 +1901,9 @@ static void printFromSpace (void) {
     case SEXP_TAG:
       s = (sexp *) d;
       d = (data *) &(s->contents);
-      char * tag = de_hash (GET_SEXP_TAG(s->tag));
-      printf ("(=>%p): SEXP\n\ttag(%s) ", s->contents.contents, tag);
-      len = LEN(d->tag);
+      char * data_header = de_hash (GET_SEXP_TAG(s->data_header));
+      printf ("(=>%p): SEXP\n\tdata_header(%s) ", s->contents.contents, data_header);
+      len = LEN(d->data_header);
       tmp = (s->contents.contents);
       for (int i = 0; i < len; i++) {
 	int elem = ((int*)tmp)[i];
@@ -2046,8 +1921,8 @@ static void printFromSpace (void) {
       return;
 
     default:
-      printf ("\nprintFromSpace: ERROR: bad tag %d", TAG(d->tag));
-      perror ("\nprintFromSpace: ERROR: bad tag");
+      printf ("\nprintFromSpace: ERROR: bad data_header %d", TAG(d->data_header));
+      perror ("\nprintFromSpace: ERROR: bad data_header");
       fflush (stdout);
       exit   (1);
     }
