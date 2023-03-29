@@ -127,6 +127,7 @@ void pop_extra_root (void ** p) {
 /* end */
 
 static void vfailure (char *s, va_list args) {
+  fflush   (stdout);
   fprintf  (stderr, "*** FAILURE: ");
   vfprintf (stderr, s, args); // vprintf (char *, va_list) <-> printf (char *, ...)
   exit     (255);
