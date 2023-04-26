@@ -17,7 +17,8 @@ __gc_stack_top:	        .long	0
 			.extern	gc_test_and_copy_root
 			.text
 
-__gc_init:		movl	%ebp, __gc_stack_bottom
+__gc_init:
+            movl	%ebp, __gc_stack_bottom
 			addl	$4, __gc_stack_bottom
 			call	__init
 			ret
@@ -60,7 +61,9 @@ __gc_root_scan_stack:
 			pushl	%ebx
 			pushl	%edx
 			movl	__gc_stack_top, %eax
-			jmp 	next
+			// jmp 	next
+			cmpl %eax, __gc_stack_bottom
+			jb returnn
 
 loop:
 			movl	(%eax), %ebx
@@ -106,7 +109,7 @@ gc_run_t:
 next:
 			addl	$4, %eax
 			cmpl	%eax, __gc_stack_bottom
-			jne	loop
+			jnb	loop
 returnn:
 			movl	$0, %eax
 			popl	%edx

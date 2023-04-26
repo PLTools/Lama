@@ -1,21 +1,25 @@
 #ifndef __LAMA_GC__
 #define __LAMA_GC__
 
+// this flag makes GC behavior a bit different for testing purposes.
+#define DEBUG_VERSION
+
 # define GET_MARK_BIT(x) (((int) (x)) & 1)
 # define SET_MARK_BIT(x) (x = (((int) (x)) | 1))
 # define RESET_MARK_BIT(x) (x = (((int) (x)) & (~1)))
-# define GET_FORWARD_ADDRESS(x) (((int) (x)) & (~1)) // since last bit is used as mark-bit and due to correct alignment we can expect that last bit doesn't influence address (it should always be zero)
-# define SET_FORWARD_ADDRESS(x, addr) (x = (((int) (x)) | ((int) (addr))))
+# define GET_FORWARD_ADDRESS(x) (((size_t) (x)) & (~1)) // since last bit is used as mark-bit and due to correct alignment we can expect that last bit doesn'test_small_tree_compaction influence address (it should always be zero)
+# define SET_FORWARD_ADDRESS(x, addr) (x = (GET_MARK_BIT(x) | ((int) (addr))))
 # define EXTRA_ROOM_HEAP_COEFFICIENT 2 // TODO: tune this parameter
+#ifdef DEBUG_VERSION
 # define MINIMUM_HEAP_CAPACITY (1<<8) // TODO: tune this parameter
+#else
+# define MINIMUM_HEAP_CAPACITY (1<<8) // TODO: tune this parameter
+#endif
 
 
 #include <stddef.h>
 #include <stdbool.h>
 #include "runtime_common.h"
-
-// this flag makes GC behavior a bit different for testing purposes.
-#define DEBUG_VERSION
 
 typedef enum { ARRAY, CLOSURE, STRING, SEXP } lama_type;
 
@@ -53,27 +57,37 @@ void* gc_alloc(size_t);
 // takes number of words as a parameter
 void *gc_alloc_on_existing_heap(size_t);
 
-void collect();
-
-// specific for mark-and-compact gc
+// specific for mark-and-compact_phase gc
 void mark(void *obj);
+void mark_phase(void);
+// written in ASM, scans stack for pointers to the heap and starts marking process
+extern void __gc_root_scan_stack(void); // TODO: write without ASM, since it is absolutely not necessary
+// marks each pointer from extra roots
+void scan_extra_roots(void);
+#ifndef DEBUG_VERSION
+// marks each valid pointer from global area
+void scan_global_area(void);
+#endif
 // takes number of words that are required to be allocated somewhere on the heap
-void compact(size_t additional_size);
+void compact_phase(size_t additional_size);
 // specific for Lisp-2 algorithm
 size_t compute_locations();
 void update_references(memory_chunk *);
 void physically_relocate(memory_chunk *);
 
-
 // written in ASM
 extern void __gc_init           (void); // MANDATORY TO CALL BEFORE ANY INTERACTION WITH GC (apart from cases where we are working with virtual stack as happens in tests)
+extern void __init              (void); // should be called before interaction with GC in case of using in tests with virtual stack, otherwise it is automatically invoked by __gc_init
+extern void __shutdown          (void); // mostly useful for tests but basically you want to call this in case you want to deallocate all object allocated via GC
+// written in ASM
 extern void __pre_gc            (void);
+// written in ASM
 extern void __post_gc           (void);
-extern void __gc_root_scan_stack(void); // TODO: write without ASM, since it is absolutely not necessary
 
 // invoked from ASM
 extern void gc_test_and_mark_root(size_t ** root);
 inline bool is_valid_heap_pointer(const size_t *);
+inline bool is_valid_pointer(const size_t *);
 
 void clear_extra_roots (void);
 
@@ -86,8 +100,11 @@ void pop_extra_root (void ** p);
 
 #ifdef DEBUG_VERSION
 
-// test-only function, these pointer parameters are just a fancy way to return two values at a time
-void objects_snapshot(void *objects_ptr, size_t objects_cnt);
+// makes a snapshot of current objects in heap (both alive and dead), writes these ids to object_ids_buf,
+// returns number of ids dumped
+// object_ids_buf is pointer to area preallocated by user for dumping ids of objects in heap
+// object_ids_buf_size is in WORDS, NOT BYTES
+size_t objects_snapshot(int *object_ids_buf, size_t object_ids_buf_size);
 
 // essential function to mock program stack
 void set_stack(size_t stack_top, size_t stack_bottom);
@@ -100,11 +117,15 @@ void set_extra_roots(size_t extra_roots_size, void** extra_roots_ptr);
 
 /* Utility functions */
 
+// accepts pointer to the start of the region and to the end of the region
+// scans it and if it meets a pointer, it should be modified in according to forward address
+void scan_and_fix_region(memory_chunk *old_heap, void *start, void *end);
+
 // takes a pointer to an object content as an argument, returns forwarding address
 size_t get_forward_address(void *obj);
 
 // takes a pointer to an object content as an argument, sets forwarding address to value 'addr'
-size_t set_forward_address(void *obj, size_t addr);
+void set_forward_address(void *obj, size_t addr);
 
 // takes a pointer to an object content as an argument, returns whether this object was marked as live
 bool is_marked(void *obj);
@@ -139,8 +160,8 @@ size_t string_size(size_t len);
 // TODO: ask if it is actually so? number of captured elements is actually sz-1 and 1 extra word is code ptr?
 // returns number of bytes that are required to allocate closure with 'sz-1' captured values (header included)
 size_t closure_size(size_t sz);
-// returns number of bytes that are required to allocate s-expression with 'sz' fields (header included)
-size_t sexp_size(size_t sz);
+// returns number of bytes that are required to allocate s-expression with 'members' fields (header included)
+size_t sexp_size(size_t members);
 
 // returns an iterator over object fields, obj is ptr to object header
 // (in case of s-exp, it is mandatory that obj ptr is very beginning of the object,
@@ -160,5 +181,10 @@ bool field_is_done_iterator(obj_field_iterator *it);
 void* get_obj_header_ptr(void *ptr, lama_type type);
 void* get_object_content_ptr(void *header_ptr);
 void* get_end_of_obj(void *header_ptr);
+
+void *alloc_string(int len);
+void *alloc_array(int len);
+void *alloc_sexp(int members);
+void *alloc_closure(int captured);
 
 #endif
