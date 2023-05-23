@@ -61,9 +61,7 @@ __gc_root_scan_stack:
 			pushl	%ebx
 			pushl	%edx
 			movl	__gc_stack_top, %eax
-			// jmp 	next
-			cmpl %eax, __gc_stack_bottom
-			jb returnn
+			jmp 	next
 
 loop:
 			movl	(%eax), %ebx
@@ -109,7 +107,7 @@ gc_run_t:
 next:
 			addl	$4, %eax
 			cmpl	%eax, __gc_stack_bottom
-			jnb	loop
+			jne	loop
 returnn:
 			movl	$0, %eax
 			popl	%edx

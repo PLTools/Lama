@@ -1,8 +1,7 @@
 #ifndef __LAMA_GC__
 #define __LAMA_GC__
 
-// this flag makes GC behavior a bit different for testing purposes.
-#define DEBUG_VERSION
+#include "runtime_common.h"
 
 # define GET_MARK_BIT(x) (((int) (x)) & 1)
 # define SET_MARK_BIT(x) (x = (((int) (x)) | 1))
@@ -11,15 +10,14 @@
 # define SET_FORWARD_ADDRESS(x, addr) (x = (GET_MARK_BIT(x) | ((int) (addr))))
 # define EXTRA_ROOM_HEAP_COEFFICIENT 2 // TODO: tune this parameter
 #ifdef DEBUG_VERSION
-# define MINIMUM_HEAP_CAPACITY (1<<8) // TODO: tune this parameter
+# define MINIMUM_HEAP_CAPACITY (8) // TODO: tune this parameter
 #else
-# define MINIMUM_HEAP_CAPACITY (1<<8) // TODO: tune this parameter
+# define MINIMUM_HEAP_CAPACITY (1<<3) // TODO: tune this parameter
 #endif
 
 
 #include <stddef.h>
 #include <stdbool.h>
-#include "runtime_common.h"
 
 typedef enum { ARRAY, CLOSURE, STRING, SEXP } lama_type;
 

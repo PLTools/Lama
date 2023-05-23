@@ -1,7 +1,9 @@
 #ifndef __LAMA_RUNTIME_COMMON__
 #define __LAMA_RUNTIME_COMMON__
+#include <stddef.h>
 
-#define DEBUG_VERSION
+// this flag makes GC behavior a bit different for testing purposes.
+//#define DEBUG_VERSION
 
 # define STRING_TAG  0x00000001
 //# define STRING_TAG  0x00000000
@@ -19,11 +21,13 @@
 
 
 # define SEXP_ONLY_HEADER_SZ (2 * sizeof(int))
+
 # ifndef DEBUG_VERSION
 # define DATA_HEADER_SZ (sizeof(size_t) + sizeof(int))
 # else
 # define DATA_HEADER_SZ (sizeof(size_t) + sizeof(size_t) + sizeof(int))
 #endif
+
 # define MEMBER_SIZE sizeof(int)
 
 # define TO_DATA(x) ((data*)((char*)(x)-DATA_HEADER_SZ))

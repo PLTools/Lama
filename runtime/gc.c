@@ -10,13 +10,17 @@
 #include <string.h>
 #include <assert.h>
 
-#ifdef DEBUG_VERSION
+//#ifdef DEBUG_VERSION
 #include <signal.h>
-#endif
+#include <unistd.h>
+#include <execinfo.h>
+
+//#endif
 
 #ifndef DEBUG_VERSION
-static const size_t INIT_HEAP_SIZE = 1 << 18;
+static const size_t INIT_HEAP_SIZE = MINIMUM_HEAP_CAPACITY;
 #else
+//static const size_t INIT_HEAP_SIZE = 1 << 28;
 static const size_t INIT_HEAP_SIZE = 8;
 #endif
 
@@ -36,6 +40,23 @@ memory_chunk heap;
 #else
 static memory_chunk heap;
 #endif
+
+#ifdef DEBUG_VERSION
+void dump_heap();
+#endif
+
+//#ifdef DEBUG_VERSION
+void handler(int sig) {
+    void *array[10];
+    size_t size;
+
+    // get void*'s for all entries on the stack
+    size = backtrace(array, 10);
+
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+    exit(1);
+}
+//#endif
 
 void *alloc(size_t size) {
 #ifdef DEBUG_VERSION
@@ -79,9 +100,10 @@ void mark_phase(void) {
 void compact_phase(size_t additional_size) {
     size_t live_size = compute_locations();
 
+    // all in words
     size_t next_heap_size = MAX(live_size * EXTRA_ROOM_HEAP_COEFFICIENT + additional_size, MINIMUM_HEAP_CAPACITY);
     size_t next_heap_pseudo_size = MAX(next_heap_size, heap.size); // this is weird but here is why it happens:
-    // if we allocate too little heap right now, we may loose access to some alive objects
+    // if we allocate too little heap right now, we may lose access to some alive objects
     // however, after we physically relocate all of our objects we will shrink allocated memory if it is possible
 
     memory_chunk old_heap = heap;
@@ -125,8 +147,8 @@ size_t compute_locations() {
     for (; !heap_is_done_iterator(&scan_iter); heap_next_obj_iterator(&scan_iter)) {
         void *header_ptr = scan_iter.current;
         void *obj_content = get_object_content_ptr(header_ptr);
-        size_t sz = BYTES_TO_WORDS(obj_size_header_ptr(header_ptr));
         if (is_marked(obj_content)) {
+            size_t sz = BYTES_TO_WORDS(obj_size_header_ptr(header_ptr));
             // forward address is responsible for object header pointer
             set_forward_address(obj_content, (size_t) free_ptr);
             free_ptr += sz;
@@ -143,7 +165,7 @@ void scan_and_fix_region(memory_chunk *old_heap, void *start, void *end) {
         // this can't be expressed via is_valid_heap_pointer, because this pointer may point area corresponding to the old heap
         if (is_valid_pointer((size_t *) ptr_value)
             && (size_t) old_heap->begin <= ptr_value
-            && ptr_value < (size_t) old_heap->current
+            && ptr_value <= (size_t) old_heap->current
                 ) {
             void *obj_ptr = (void*) heap.begin + ((void *) ptr_value - (void *) old_heap->begin);
             void *new_addr = (void*) heap.begin + ((void *) get_forward_address(obj_ptr) - (void *) old_heap->begin);
@@ -163,8 +185,13 @@ void update_references(memory_chunk *old_heap) {
                     obj_next_ptr_field_iterator(&field_iter)
                     ) {
 
+
+                size_t *field_value = *(size_t **) field_iter.cur_field;
+                if (field_value < old_heap->begin || field_value > old_heap->current) {
+                    continue;
+                }
                 // this pointer should also be modified according to old_heap->begin
-                void *field_obj_content_addr = (void *) heap.begin + (*(void **) field_iter.cur_field - (void *) old_heap->begin); // TODO: vstack_create iterator method 'dereference', so that code would be a bit more readable
+                void *field_obj_content_addr = (void *) heap.begin + (*(void **) field_iter.cur_field - (void *) old_heap->begin);
                 // important, we calculate new_addr very carefully here, because objects may relocate to another memory chunk
                 void *new_addr =
                         heap.begin + ((size_t *) get_forward_address(field_obj_content_addr) - (size_t *) old_heap->begin);
@@ -172,17 +199,19 @@ void update_references(memory_chunk *old_heap) {
                 // since, we want fields to point to an actual content, we need to add this extra content_offset
                 // because forward_address itself is a pointer to the object's header
                 size_t content_offset = get_header_size(get_type_row_ptr(field_obj_content_addr));
+#ifdef DEBUG_VERSION
                 if (!is_valid_heap_pointer((void *) (new_addr + content_offset))) {
                     fprintf(stderr, "ur: incorrect pointer assignment: on object with id %d", TO_DATA(get_object_content_ptr(it.current))->id);
                     exit(1);
                 }
+#endif
                 *(void **) field_iter.cur_field = new_addr + content_offset;
             }
         }
         heap_next_obj_iterator(&it);
     }
     // fix pointers from stack
-    scan_and_fix_region(old_heap, (void*) __gc_stack_top, (void*) __gc_stack_bottom);
+    scan_and_fix_region(old_heap, (void*) __gc_stack_top + 4, (void*) __gc_stack_bottom);
 
      // fix pointers from extra_roots
     scan_and_fix_region(old_heap, (void*) extra_roots.roots, (size_t*) extra_roots.roots + extra_roots.current_free);
@@ -198,6 +227,8 @@ void physically_relocate(memory_chunk *old_heap) {
 
     while (!heap_is_done_iterator(&from_iter)) {
         void *obj = get_object_content_ptr(from_iter.current);
+        heap_iterator next_iter = from_iter;
+        heap_next_obj_iterator(&next_iter);
         if (is_marked(obj)) {
             // Move the object from its old location to its new location relative to
             // the heap's (possibly new) location, 'to' points to future object header
@@ -205,12 +236,12 @@ void physically_relocate(memory_chunk *old_heap) {
             memmove(to, from_iter.current, obj_size_header_ptr(from_iter.current));
             unmark_object(get_object_content_ptr(to));
         }
-        heap_next_obj_iterator(&from_iter);
+        from_iter = next_iter;
     }
 }
 
 bool is_valid_heap_pointer(const size_t *p) {
-    return !UNBOXED(p) && (size_t) heap.begin <= (size_t) p && (size_t) p < (size_t) heap.current;
+    return !UNBOXED(p) && (size_t) heap.begin <= (size_t) p && (size_t) p <= (size_t) heap.current;
 }
 
 bool is_valid_pointer(const size_t *p) {
@@ -218,6 +249,7 @@ bool is_valid_pointer(const size_t *p) {
 }
 
 void mark(void *obj) {
+    fprintf(stderr, "obj ptr is %p, heap.begin is %p, heap.current is %p\n", obj, (void *) heap.begin, (void *) heap.current);
     if (!is_valid_heap_pointer(obj)) {
         return;
     }
@@ -245,17 +277,21 @@ void scan_extra_roots(void) {
 #ifndef DEBUG_VERSION
 void scan_global_area(void) {
     // __start_custom_data is pointing to beginning of global area, thus all dereferencings are safe
-    for (const size_t *ptr = &__start_custom_data; ptr < &__stop_custom_data; ++ptr) {
+    for (size_t *ptr = (size_t *) &__start_custom_data; ptr < (size_t *) &__stop_custom_data; ++ptr) {
         mark(*(void **)ptr);
     }
 }
 #endif
 
 extern void gc_test_and_mark_root(size_t **root) {
+    fprintf(stderr, "root ptr is %p, stack_top is %p, stack_bottom is %p\n", root, (void*) __gc_stack_top, (void*) __gc_stack_bottom);
     mark((void *) *root);
 }
 
 extern void __init(void) {
+//#ifdef DEBUG_VERSION
+    signal(SIGSEGV, handler);
+//#endif
     size_t space_size = INIT_HEAP_SIZE * sizeof(size_t);
 
     srandom(time(NULL));
@@ -327,6 +363,36 @@ size_t objects_snapshot(int *object_ids_buf, size_t object_ids_buf_size) {
         ids_ptr[i] = d->id;
     }
     return i;
+}
+
+extern char* de_hash (int);
+
+void dump_heap() {
+    size_t i = 0;
+    for (
+            heap_iterator it = heap_begin_iterator();
+            !heap_is_done_iterator(&it);
+            heap_next_obj_iterator(&it), ++i
+            ) {
+        void *header_ptr = it.current;
+        void *content_ptr = get_object_content_ptr(header_ptr);
+        data *d = TO_DATA(content_ptr);
+        lama_type t = get_type_header_ptr(header_ptr);
+        switch (t) {
+            case ARRAY:
+                fprintf(stderr, "of kind ARRAY\n");
+                break;
+            case CLOSURE:
+                fprintf(stderr, "of kind CLOSURE\n");
+                break;
+            case STRING:
+                fprintf(stderr, "of kind STRING\n");
+                break;
+            case SEXP:
+                fprintf(stderr, "of kind SEXP with tag %s\n", de_hash(TO_SEXP(content_ptr)->tag));
+                break;
+        }
+    }
 }
 
 void set_stack(size_t stack_top, size_t stack_bottom) {
@@ -403,14 +469,16 @@ lama_type get_type_header_ptr(void *ptr) {
             return CLOSURE;
         case SEXP_TAG:
             return SEXP;
-        default:
+        default: {
 #ifdef DEBUG_VERSION
             fprintf(stderr, "ERROR: get_type_header_ptr: unknown object header, cur_id=%d", cur_id);
             raise(SIGINT); // only for debug purposes
 #else
-            perror("ERROR: get_type_header_ptr: unknown object header");
+
+            fprintf(stderr, "ERROR: get_type_header_ptr: unknown object header, ptr is %p, heap size is %d\n", ptr, heap.size);
 #endif
             exit(1);
+        }
     }
 }
 
@@ -430,12 +498,16 @@ size_t obj_size_header_ptr(void *ptr) {
             return closure_size(len);
         case SEXP:
             return sexp_size(len);
-        default:
-            perror("ERROR: obj_size_header_ptr: unknown object header");
+        default: {
 #ifdef DEBUG_VERSION
+            fprintf(stderr, "ERROR: obj_size_header_ptr: unknown object header, cur_id=%d", cur_id);
             raise(SIGINT); // only for debug purposes
+#else
+
+            perror("ERROR: obj_size_header_ptr: unknown object header");
 #endif
             exit(1);
+        }
     }
 }
 
@@ -531,7 +603,9 @@ size_t get_header_size(lama_type type) {
 void *alloc_string(int len) {
     data *obj = alloc(string_size(len));
     obj->data_header = STRING_TAG | (len << 3);
+#ifdef DEBUG_VERSION
     obj->id = cur_id;
+#endif
     obj->forward_address = 0;
     return obj;
 }
@@ -539,7 +613,9 @@ void *alloc_string(int len) {
 void *alloc_array(int len) {
     data *obj = alloc(array_size(len));
     obj->data_header = ARRAY_TAG | (len << 3);
+#ifdef DEBUG_VERSION
     obj->id = cur_id;
+#endif
     obj->forward_address = 0;
     return obj;
 }
@@ -547,7 +623,9 @@ void *alloc_array(int len) {
 void *alloc_sexp(int members) {
     sexp *obj = alloc(sexp_size(members));
     obj->sexp_header = obj->contents.data_header = SEXP_TAG | (members << 3);
+#ifdef DEBUG_VERSION
     obj->contents.id = cur_id;
+#endif
     obj->contents.forward_address = 0;
     obj->tag = 0;
     return obj;
@@ -556,7 +634,9 @@ void *alloc_sexp(int members) {
 void *alloc_closure(int captured) {
     data *obj = alloc(closure_size(captured));
     obj->data_header = CLOSURE_TAG | (captured << 3);
+#ifdef DEBUG_VERSION
     obj->id = cur_id;
+#endif
     obj->forward_address = 0;
     return obj;
 }

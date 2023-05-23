@@ -5,6 +5,8 @@
 #include "gc.h"
 #include "runtime_common.h"
 
+#ifdef DEBUG_VERSION
+
 // function from runtime that maps string to int value
 extern int LtagHash (char *s);
 
@@ -44,7 +46,7 @@ virt_stack* init_test() {
     __init();
     virt_stack *st = vstack_create();
     vstack_init(st);
-    __gc_stack_bottom = (size_t) vstack_top(st);
+    __gc_stack_bottom = (size_t) vstack_top(st) - 4;
     return st;
 }
 
@@ -166,9 +168,9 @@ void test_small_tree_compaction(void) {
     // this one will increase heap size
     call_runtime_function(vstack_top(st), Bstring, 1, "aaaaaaaaaaaaaaaaaaaaaa");
 
-    size_t l = call_runtime_function(vstack_top(st), Bstring, 1, "left-s");
-    size_t r = call_runtime_function(vstack_top(st), Bstring, 1, "right-s");
-    vstack_push(st, call_runtime_function(vstack_top(st), Bsexp, 4, BOX(3), (size_t)l, (size_t) r, LtagHash("tree")));
+    vstack_push(st, call_runtime_function(vstack_top(st), Bstring, 1, "left-s"));
+    vstack_push(st, call_runtime_function(vstack_top(st), Bstring, 1, "right-s"));
+    vstack_push(st, call_runtime_function(vstack_top(st), Bsexp, 4, BOX(3), vstack_kth_from_start(st, 0), vstack_kth_from_start(st, 1), LtagHash("tree")));
     force_gc_cycle(st);
     const int SZ = 10;
     int ids[SZ];
@@ -240,7 +242,10 @@ void run_stress_test_random_obj_forest(int seed) {
     cleanup_test(st);
 }
 
+#endif
+
 int main(int argc, char ** argv) {
+#ifdef DEBUG_VERSION
     no_gc_tests();
 
     test_simple_string_alloc();
@@ -256,4 +261,5 @@ int main(int argc, char ** argv) {
     for (int s = 0; s < 100; ++s) {
         run_stress_test_random_obj_forest(s);
     }
+#endif
 }

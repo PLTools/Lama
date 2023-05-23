@@ -219,7 +219,7 @@ int Ls__Infix_37 (void *p, void *q) {
 
 extern int Llength (void *p) {
     ASSERT_BOXED(".length", p);
-    return BOX(obj_size_row_ptr(p));
+    return BOX(LEN(TO_DATA(p)->data_header));
 }
 
 static char* chars = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'";
@@ -339,13 +339,12 @@ static void printStringBuf (char *fmt, ...) {
     vprintStringBuf (fmt, args);
 }
 
-//int is_valid_heap_pointer (void *p);
-
 static void printValue (void *p) {
     data *a = (data*) BOX(NULL);
     int i   = BOX(0);
-    if (UNBOXED(p)) printStringBuf ("%d", UNBOX(p));
-    else {
+    if (UNBOXED(p)) {
+        printStringBuf ("%d", UNBOX(p));
+    } else {
         if (!is_valid_heap_pointer(p)) {
             printStringBuf ("0x%x", p);
             return;
@@ -378,16 +377,11 @@ static void printValue (void *p) {
                 break;
 
             case SEXP_TAG: {
-#ifndef DEBUG_PRINT
                 char * tag = de_hash (TO_SEXP(p)->tag);
-#else
-                char * data_header = de_hash (GET_SEXP_TAG(TO_SEXP(p)->data_header));
-#endif
-
                 if (strcmp (tag, "cons") == 0) {
                     data *b = a;
                     printStringBuf ("{");
-                    while (LEN(a->data_header)) {
+                    while (LEN(b->data_header)) {
                         printValue ((void*)((int*) b->contents)[0]);
                         b = (data*)((int*) b->contents)[1];
                         if (! UNBOXED(b)) {
@@ -432,15 +426,12 @@ static void stringcat (void *p) {
                 break;
 
             case SEXP_TAG: {
-#ifndef DEBUG_PRINT
                 char * tag = de_hash (TO_SEXP(p)->tag);
-#else
-                char * data_header = de_hash (GET_SEXP_TAG(TO_SEXP(p)->data_header));
-#endif
+
                 if (strcmp (tag, "cons") == 0) {
                     data *b = a;
 
-                    while (LEN(a->data_header)) {
+                    while (LEN(b->data_header)) {
                         stringcat ((void*)((int*) b->contents)[0]);
                         b = (data*)((int*) b->contents)[1];
                         if (! UNBOXED(b)) {
@@ -840,7 +831,7 @@ extern void* Bstring (void *p) {
     print_indent ();
     printf ("\tBstring: call strncpy: %p %p %p %i\n", &p, p, s, n); fflush(stdout);
 #endif
-    strncpy ((char*)s, p, n + 1); // +1 because of '\0' in the end of C-strings
+    strncpy ((char*) &TO_DATA(s)->contents, p, n + 1); // +1 because of '\0' in the end of C-strings
 #ifdef DEBUG_PRINT
     print_indent ();
     printf ("\tBstring: ends\n"); fflush(stdout);
@@ -965,6 +956,7 @@ extern void* Barray (int bn, ...) {
 #ifdef DEBUG_PRINT
     indent--;
 #endif
+
     return r->contents;
 }
 
@@ -1038,13 +1030,22 @@ extern int Btag (void *d, int t, int n) {
     }
 }
 
+int get_tag(data *d) {
+//    printf("%")
+    return TAG(d->data_header);
+}
+
+int get_len(data *d) {
+    return LEN(d->data_header);
+}
+
 extern int Barray_patt (void *d, int n) {
     data *r;
 
     if (UNBOXED(d)) return BOX(0);
     else {
         r = TO_DATA(d);
-        return BOX(TAG(r->data_header) == ARRAY_TAG && LEN(r->data_header) == UNBOX(n));
+        return BOX(get_tag(r) == ARRAY_TAG && get_len(r) == UNBOX(n));
     }
 }
 
@@ -1071,6 +1072,7 @@ extern int Bclosure_tag_patt (void *x) {
 }
 
 extern int Bboxed_patt (void *x) {
+
     return BOX(UNBOXED(x) ? 0 : 1);
 }
 
