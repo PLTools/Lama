@@ -10,19 +10,11 @@
 #include <string.h>
 #include <assert.h>
 
-//#ifdef DEBUG_VERSION
 #include <signal.h>
 #include <unistd.h>
 #include <execinfo.h>
 
-//#endif
-
-#ifndef DEBUG_VERSION
 static const size_t INIT_HEAP_SIZE = MINIMUM_HEAP_CAPACITY;
-#else
-//static const size_t INIT_HEAP_SIZE = 1 << 28;
-static const size_t INIT_HEAP_SIZE = 8;
-#endif
 
 #ifdef DEBUG_VERSION
 size_t cur_id = 0;
@@ -45,7 +37,6 @@ static memory_chunk heap;
 void dump_heap();
 #endif
 
-//#ifdef DEBUG_VERSION
 void handler(int sig) {
     void *array[10];
     size_t size;
@@ -56,7 +47,6 @@ void handler(int sig) {
     backtrace_symbols_fd(array, size, STDERR_FILENO);
     exit(1);
 }
-//#endif
 
 void *alloc(size_t size) {
 #ifdef DEBUG_VERSION
@@ -249,7 +239,6 @@ bool is_valid_pointer(const size_t *p) {
 }
 
 void mark(void *obj) {
-    fprintf(stderr, "obj ptr is %p, heap.begin is %p, heap.current is %p\n", obj, (void *) heap.begin, (void *) heap.current);
     if (!is_valid_heap_pointer(obj)) {
         return;
     }
@@ -284,14 +273,11 @@ void scan_global_area(void) {
 #endif
 
 extern void gc_test_and_mark_root(size_t **root) {
-    fprintf(stderr, "root ptr is %p, stack_top is %p, stack_bottom is %p\n", root, (void*) __gc_stack_top, (void*) __gc_stack_bottom);
     mark((void *) *root);
 }
 
 extern void __init(void) {
-//#ifdef DEBUG_VERSION
     signal(SIGSEGV, handler);
-//#endif
     size_t space_size = INIT_HEAP_SIZE * sizeof(size_t);
 
     srandom(time(NULL));

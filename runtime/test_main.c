@@ -46,7 +46,7 @@ virt_stack* init_test() {
     __init();
     virt_stack *st = vstack_create();
     vstack_init(st);
-    __gc_stack_bottom = (size_t) vstack_top(st) - 4;
+    __gc_stack_bottom = (size_t) vstack_top(st);
     return st;
 }
 
@@ -55,7 +55,7 @@ void cleanup_test(virt_stack *st) {
     __shutdown();
 }
 void force_gc_cycle(virt_stack *st) {
-    __gc_stack_top = (size_t) vstack_top(st);
+    __gc_stack_top = (size_t) vstack_top(st) - 4;
     gc_alloc(0);
     __gc_stack_top = 0;
 }
@@ -67,7 +67,7 @@ void test_simple_string_alloc(void) {
         vstack_push(st, BOX(i));
     }
 
-    vstack_push(st, call_runtime_function(vstack_top(st), Bstring, 1, "abc"));
+    vstack_push(st, call_runtime_function(vstack_top(st) - 4, Bstring, 1, "abc"));
 
     const int N = 10;
     int ids[N];
@@ -81,7 +81,7 @@ void test_simple_array_alloc(void) {
     virt_stack* st = init_test();
 
     // allocate array [ BOX(1) ] and push it onto the stack
-    vstack_push(st, call_runtime_function(vstack_top(st), Barray, 2, BOX(1), BOX(1)));
+    vstack_push(st, call_runtime_function(vstack_top(st) - 4, Barray, 2, BOX(1), BOX(1)));
 
     const int N = 10;
     int ids[N];
@@ -96,7 +96,7 @@ void test_simple_sexp_alloc(void) {
 
     // allocate sexp with one boxed field and push it onto the stack
     // calling runtime function Bsexp(BOX(2), BOX(1), LtagHash("test"))
-    vstack_push(st, call_runtime_function(vstack_top(st), Bsexp, 3, BOX(2), BOX(1), LtagHash("test")));
+    vstack_push(st, call_runtime_function(vstack_top(st) - 4, Bsexp, 3, BOX(2), BOX(1), LtagHash("test")));
 
     const int N = 10;
     int ids[N];
@@ -110,7 +110,7 @@ void test_simple_closure_alloc(void) {
     virt_stack* st = init_test();
 
     // allocate closure with boxed captured value and push it onto the stack
-    vstack_push(st, call_runtime_function(vstack_top(st), Bclosure, 3, BOX(1), NULL, BOX(1)));
+    vstack_push(st, call_runtime_function(vstack_top(st) - 4, Bclosure, 3, BOX(1), NULL, BOX(1)));
 
     const int N = 10;
     int ids[N];
@@ -123,7 +123,7 @@ void test_simple_closure_alloc(void) {
 void test_single_object_allocation_with_collection_virtual_stack(void) {
     virt_stack *st = init_test();
 
-    vstack_push(st, call_runtime_function(vstack_top(st), Bstring, 1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    vstack_push(st, call_runtime_function(vstack_top(st) - 4, Bstring, 1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
 
     const int N = 10;
     int ids[N];
@@ -136,7 +136,7 @@ void test_single_object_allocation_with_collection_virtual_stack(void) {
 void test_garbage_is_reclaimed(void) {
     virt_stack *st = init_test();
 
-    call_runtime_function(vstack_top(st), Bstring, 1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    call_runtime_function(vstack_top(st) - 4, Bstring, 1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 
     force_gc_cycle(st);
 
@@ -151,7 +151,7 @@ void test_garbage_is_reclaimed(void) {
 void test_alive_are_not_reclaimed(void) {
     virt_stack *st = init_test();
 
-    vstack_push(st, call_runtime_function(vstack_top(st), Bstring, 1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    vstack_push(st, call_runtime_function(vstack_top(st) - 4, Bstring, 1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
 
     force_gc_cycle(st);
 
@@ -166,11 +166,11 @@ void test_alive_are_not_reclaimed(void) {
 void test_small_tree_compaction(void) {
     virt_stack *st = init_test();
     // this one will increase heap size
-    call_runtime_function(vstack_top(st), Bstring, 1, "aaaaaaaaaaaaaaaaaaaaaa");
+    call_runtime_function(vstack_top(st) - 4, Bstring, 1, "aaaaaaaaaaaaaaaaaaaaaa");
 
-    vstack_push(st, call_runtime_function(vstack_top(st), Bstring, 1, "left-s"));
-    vstack_push(st, call_runtime_function(vstack_top(st), Bstring, 1, "right-s"));
-    vstack_push(st, call_runtime_function(vstack_top(st), Bsexp, 4, BOX(3), vstack_kth_from_start(st, 0), vstack_kth_from_start(st, 1), LtagHash("tree")));
+    vstack_push(st, call_runtime_function(vstack_top(st) - 4, Bstring, 1, "left-s"));
+    vstack_push(st, call_runtime_function(vstack_top(st) - 4, Bstring, 1, "right-s"));
+    vstack_push(st, call_runtime_function(vstack_top(st) - 4, Bsexp, 4, BOX(3), vstack_kth_from_start(st, 0), vstack_kth_from_start(st, 1), LtagHash("tree")));
     force_gc_cycle(st);
     const int SZ = 10;
     int ids[SZ];
@@ -206,7 +206,7 @@ size_t generate_random_obj_forest(virt_stack *st, int cnt, int seed) {
         size_t obj;
 
         if (rand() % 2) {
-            obj = call_runtime_function(vstack_top(st), Bsexp, 4, BOX(3), field[0], field[1], LtagHash("test"));
+            obj = call_runtime_function(vstack_top(st) - 4, Bsexp, 4, BOX(3), field[0], field[1], LtagHash("test"));
         } else {
             obj = BOX(1);
         }

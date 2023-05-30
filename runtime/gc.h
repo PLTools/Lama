@@ -10,9 +10,9 @@
 # define SET_FORWARD_ADDRESS(x, addr) (x = (GET_MARK_BIT(x) | ((int) (addr))))
 # define EXTRA_ROOM_HEAP_COEFFICIENT 2 // TODO: tune this parameter
 #ifdef DEBUG_VERSION
-# define MINIMUM_HEAP_CAPACITY (8) // TODO: tune this parameter
+# define MINIMUM_HEAP_CAPACITY (8)
 #else
-# define MINIMUM_HEAP_CAPACITY (1<<3) // TODO: tune this parameter
+# define MINIMUM_HEAP_CAPACITY (1<<10)
 #endif
 
 
