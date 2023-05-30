@@ -291,21 +291,6 @@ void mark(void *obj) {
             queue_enqueue(&q_tail_iter, field_value);
         }
     }
-/*    if (!is_valid_heap_pointer(obj)) {
-        return;
-    }
-    if (is_marked(obj)) {
-        return;
-    }
-    mark_object(obj);
-    void *header_ptr = get_obj_header_ptr(obj, get_type_row_ptr(obj));
-    for (
-            obj_field_iterator ptr_field_it = ptr_field_begin_iterator(header_ptr);
-            !field_is_done_iterator(&ptr_field_it);
-            obj_next_ptr_field_iterator(&ptr_field_it)
-            ) {
-        mark(* (void **) ptr_field_it.cur_field);
-    }*/
 }
 
 void scan_extra_roots(void) {
