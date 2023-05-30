@@ -238,8 +238,60 @@ bool is_valid_pointer(const size_t *p) {
     return !UNBOXED(p);
 }
 
+static inline void queue_enqueue(heap_iterator *tail_iter, void *obj) {
+    void *tail = tail_iter->current;
+    void *tail_content = get_object_content_ptr(tail);
+    set_forward_address(tail_content, (size_t) obj);
+    make_enqueued(obj);
+    heap_next_obj_iterator(tail_iter);
+}
+
+static inline void *queue_dequeue(heap_iterator *head_iter) {
+    void *head = head_iter->current;
+    void *head_content = get_object_content_ptr(head);
+    void *value = (void*) get_forward_address(head_content);
+    make_dequeued(value);
+    heap_next_obj_iterator(head_iter);
+    return value;
+}
+
 void mark(void *obj) {
     if (!is_valid_heap_pointer(obj)) {
+        return;
+    }
+
+    if (is_marked(obj)) {
+        return;
+    }
+
+    // TL;DR: [q_head_iter, q_tail_iter) q_head_iter -- current dequeue's victim, q_tail_iter -- place for next enqueue
+    // in forward_address of corresponding element we store address of element to be removed after dequeue operation
+    heap_iterator q_head_iter = heap_begin_iterator();
+    // iterator where we will write address of the element that is going to be enqueued
+    heap_iterator q_tail_iter = q_head_iter;
+    queue_enqueue(&q_tail_iter, obj);
+
+    // invariant: queue contains only objects that are valid heap pointers (each corresponding to content of unmarked object)
+    // also each object is in queue only once
+    while (q_head_iter.current != q_tail_iter.current) { // means the queue is not empty
+        void *cur_obj = queue_dequeue(&q_head_iter);
+        mark_object(cur_obj);
+        void *header_ptr = get_obj_header_ptr(cur_obj, get_type_row_ptr(cur_obj));
+        for (
+                obj_field_iterator ptr_field_it = ptr_field_begin_iterator(header_ptr);
+                !field_is_done_iterator(&ptr_field_it);
+                obj_next_ptr_field_iterator(&ptr_field_it)
+                ) {
+            void *field_value = * (void **) ptr_field_it.cur_field;
+            if (!is_valid_heap_pointer(field_value) || is_marked(field_value) || is_enqueued(field_value)) {
+                continue;
+            }
+            // if we came to this point it must be true that field_value is unmarked and not currently in queue
+            // thus, we maintain the invariant
+            queue_enqueue(&q_tail_iter, field_value);
+        }
+    }
+/*    if (!is_valid_heap_pointer(obj)) {
         return;
     }
     if (is_marked(obj)) {
@@ -253,7 +305,7 @@ void mark(void *obj) {
             obj_next_ptr_field_iterator(&ptr_field_it)
             ) {
         mark(* (void **) ptr_field_it.cur_field);
-    }
+    }*/
 }
 
 void scan_extra_roots(void) {
@@ -420,6 +472,21 @@ void mark_object(void *obj) {
 void unmark_object(void *obj) {
     data *d = TO_DATA(obj);
     RESET_MARK_BIT(d->forward_address);
+}
+
+bool is_enqueued(void *obj) {
+    data *d = TO_DATA(obj);
+    return IS_ENQUEUED(d->forward_address) != 0;
+}
+
+void make_enqueued(void *obj) {
+    data *d = TO_DATA(obj);
+    MAKE_ENQUEUED(d->forward_address);
+}
+
+void make_dequeued(void *obj) {
+    data *d = TO_DATA(obj);
+    MAKE_DEQUEUED(d->forward_address);
 }
 
 heap_iterator heap_begin_iterator() {

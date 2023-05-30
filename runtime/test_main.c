@@ -226,7 +226,7 @@ size_t generate_random_obj_forest(virt_stack *st, int cnt, int seed) {
 void run_stress_test_random_obj_forest(int seed) {
     virt_stack *st = init_test();
 
-    const int SZ = 10000;
+    const int SZ = 100000;
 
     size_t expectedAlive = generate_random_obj_forest(st, SZ, seed);
 
@@ -244,6 +244,8 @@ void run_stress_test_random_obj_forest(int seed) {
 
 #endif
 
+#include <time.h>
+
 int main(int argc, char ** argv) {
 #ifdef DEBUG_VERSION
     no_gc_tests();
@@ -257,9 +259,15 @@ int main(int argc, char ** argv) {
     test_alive_are_not_reclaimed();
     test_small_tree_compaction();
 
+    time_t start, end;
+    double diff;
+    time(&start);
     // stress test
     for (int s = 0; s < 100; ++s) {
         run_stress_test_random_obj_forest(s);
     }
+    time(&end);
+    diff = difftime(end, start);
+    printf ("Stress tests took %.2lf seconds to complete\n", diff);
 #endif
 }

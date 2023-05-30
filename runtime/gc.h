@@ -5,9 +5,12 @@
 
 # define GET_MARK_BIT(x) (((int) (x)) & 1)
 # define SET_MARK_BIT(x) (x = (((int) (x)) | 1))
+# define IS_ENQUEUED(x) (((int) (x)) & 2)
+# define MAKE_ENQUEUED(x) (x = (((int) (x)) | 2))
+# define MAKE_DEQUEUED(x) (x = (((int) (x)) & (~2)))
 # define RESET_MARK_BIT(x) (x = (((int) (x)) & (~1)))
-# define GET_FORWARD_ADDRESS(x) (((size_t) (x)) & (~1)) // since last bit is used as mark-bit and due to correct alignment we can expect that last bit doesn'test_small_tree_compaction influence address (it should always be zero)
-# define SET_FORWARD_ADDRESS(x, addr) (x = (GET_MARK_BIT(x) | ((int) (addr))))
+# define GET_FORWARD_ADDRESS(x) (((size_t) (x)) & (~3)) // since last 2 bits are used for mark-bit and enqueued-bit and due to correct alignment we can expect that last 2 bits don't influence address (they should always be zero)
+# define SET_FORWARD_ADDRESS(x, addr) (x = ((x & 3) | ((int) (addr)))) // take the last two bits as they are and make all others zero
 # define EXTRA_ROOM_HEAP_COEFFICIENT 2 // TODO: tune this parameter
 #ifdef DEBUG_VERSION
 # define MINIMUM_HEAP_CAPACITY (8)
@@ -133,6 +136,15 @@ void mark_object(void *obj);
 
 // takes a pointer to an object content as an argument, marks the object as dead
 void unmark_object(void *obj);
+
+// takes a pointer to an object content as an argument, returns whether this object was enqueued to the queue (which is used in mark phase)
+bool is_enqueued(void *obj);
+
+// takes a pointer to an object content as an argument, marks object as enqueued
+void make_enqueued(void *obj);
+
+// takes a pointer to an object content as an argument, unmarks object as enqueued
+void make_dequeued(void *obj);
 
 // returns iterator to an object with the lowest address
 heap_iterator heap_begin_iterator();
