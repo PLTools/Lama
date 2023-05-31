@@ -481,11 +481,12 @@ lama_type get_type_header_ptr (void *ptr) {
       fprintf(stderr, "ERROR: get_type_header_ptr: unknown object header, cur_id=%d", cur_id);
       raise(SIGINT);   // only for debug purposes
 #else
-      fprintf(stderr,
-              "ERROR: get_type_header_ptr: unknown object header, ptr is %p, "
-              "heap size is %d\n",
-              ptr,
-              heap.size);
+      fprintf(
+          stderr,
+          "ERROR: get_type_header_ptr: unknown object header, ptr is %p, tag %i, heap size is %d\n",
+          ptr,
+          TAG(*header),
+          heap.size);
 #endif
       exit(1);
     }
