@@ -1,12 +1,10 @@
-name: Build
+name: Main workflow
 
 on:
   pull_request:
   push:
-    paths-ignore:
-      - 'README.md'
-    branches:
-      - '1.10'
+
+permissions: read-all
 
 jobs:
   build:
@@ -14,27 +12,29 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          #- macos-latest
-          - ubuntu-20.04
-          #- windows-latest
-        ocaml-version:
-          #- 4.11.0
-          - 4.10.1
-          #- 4.09.1
-          #- 4.08.1
+#          - macos-latest
+          - ubuntu-latest
+#          - windows-latest
+        ocaml-compiler:
+#          - "4.11.1"
+          # - 4.10.x
+          # - 4.11.x
+          - 4.13.1
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Use OCaml ${{ matrix.ocaml-version }}
-        uses: avsm/setup-ocaml@v1
+      - name: Checkout tree
+        uses: actions/checkout@v3
+
+      - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
         with:
-          ocaml-version: ${{ matrix.ocaml-version }}
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
 
       - run: opam pin add Lama.dev . --no-action
       - run: opam depext Lama.dev --yes --with-test
       - run: opam install . --deps-only --with-test
+      - run: eval $(opam env)
       - run: opam exec -- make #dune build
       - run: opam exec -- make regression # dune runtest
