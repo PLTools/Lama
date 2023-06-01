@@ -18,7 +18,7 @@
 #ifdef DEBUG_VERSION
 #  define MINIMUM_HEAP_CAPACITY (8)
 #else
-#  define MINIMUM_HEAP_CAPACITY (1 << 10)
+#  define MINIMUM_HEAP_CAPACITY (1 << 25)
 #endif
 
 #include <stdbool.h>

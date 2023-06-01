@@ -215,7 +215,7 @@ void physically_relocate (memory_chunk *old_heap) {
   heap_iterator from_iter = heap_begin_iterator();
 
   while (!heap_is_done_iterator(&from_iter)) {
-    void         *obj       = get_object_content_ptr(from_iter.current);
+    void *obj = get_object_content_ptr(from_iter.current);
     heap_iterator next_iter = from_iter;
     heap_next_obj_iterator(&next_iter);
     if (is_marked(obj)) {
