@@ -18,7 +18,7 @@
 #ifdef DEBUG_VERSION
 #  define MINIMUM_HEAP_CAPACITY (8)
 #else
-#  define MINIMUM_HEAP_CAPACITY (1 << 25)
+#  define MINIMUM_HEAP_CAPACITY (1 << 10)
 #endif
 
 #include <stdbool.h>
@@ -193,7 +193,7 @@ void obj_next_ptr_field_iterator (obj_field_iterator *it);
 // returns if we are done iterating over fields of the object
 bool field_is_done_iterator (obj_field_iterator *it);
 // ptr is pointer to the actual object content, returns pointer to the very beginning of the object (header)
-void *get_obj_header_ptr (void *ptr, lama_type type);
+void *get_obj_header_ptr (void *ptr);
 void *get_object_content_ptr (void *header_ptr);
 void *get_end_of_obj (void *header_ptr);
 

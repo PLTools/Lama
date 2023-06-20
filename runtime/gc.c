@@ -16,7 +16,7 @@
 
 static const size_t INIT_HEAP_SIZE = MINIMUM_HEAP_CAPACITY;
 
-#ifdef DEBUG_VERSION
+#ifdef FULL_INVARIANT_CHECKS
 size_t cur_id = 0;
 #endif
 
@@ -49,7 +49,7 @@ void handler (int sig) {
 }
 
 void *alloc (size_t size) {
-#ifdef DEBUG_VERSION
+#ifdef FULL_INVARIANT_CHECKS
   ++cur_id;
 #endif
   size    = BYTES_TO_WORDS(size);
@@ -60,6 +60,83 @@ void *alloc (size_t size) {
   }
   return p;
 }
+
+#ifdef FULL_INVARIANT_CHECKS
+
+// precondition: obj_content is a valid address pointing to the content of an object
+static void objects_dfs(FILE *f, void *obj_content) {
+  void *obj_header = get_obj_header_ptr(obj_content);
+  data *obj_data = TO_DATA(obj_content);
+  // internal mark-bit for this dfs, should be recovered by the caller
+  if ((obj_data->forward_address & 2) != 0) {
+    return;
+  }
+  // set this bit as 1
+  obj_data->forward_address |= 2;
+  fprintf(f, "%zu ", obj_data->id);
+  // first cycle: print object's fields
+  for (obj_field_iterator field_it = ptr_field_begin_iterator(obj_header);
+       !field_is_done_iterator(&field_it);
+       obj_next_field_iterator(&field_it)) {
+    size_t field_value = *(size_t *) field_it.cur_field;
+    if (is_valid_heap_pointer((size_t *) field_value)) {
+      fprintf(f, "%zu ", TO_DATA(field_value)->id);
+    } else {
+      fprintf(f, "%d ", UNBOX(field_value));
+    }
+  }
+  fprintf(f, "\n");
+  for (obj_field_iterator field_it = ptr_field_begin_iterator(obj_header);
+       !field_is_done_iterator(&field_it);
+       obj_next_field_iterator(&field_it)) {
+    size_t field_value = *(size_t *) field_it.cur_field;
+    if (is_valid_heap_pointer((size_t *) field_value)) {
+      objects_dfs(f, (void*) field_value);
+    }
+  }
+}
+
+FILE *print_objects_traversal(bool marked) {
+  FILE *f = tmpfile();
+  for (heap_iterator it = heap_begin_iterator();
+       !heap_is_done_iterator(&it);
+       heap_next_obj_iterator(&it)) {
+    void *obj_header = it.current;
+    data *obj_data = TO_DATA(get_object_content_ptr(obj_header));
+    if ((obj_data->forward_address & 1) == marked) {
+      objects_dfs(f, get_object_content_ptr(obj_header));
+    }
+  }
+
+  // resetting bit that represent mark-bit for this internal dfs-traversal
+  for (heap_iterator it = heap_begin_iterator();
+       !heap_is_done_iterator(&it);
+       heap_next_obj_iterator(&it)) {
+    void *obj_header = it.current;
+    data *obj_data = TO_DATA(get_object_content_ptr(obj_header));
+    obj_data->forward_address &= (~2);
+  }
+}
+
+int files_cmp(FILE *f1, FILE *f2) {
+  int symbol1, symbol2;
+  int position = 0;
+
+  while ((symbol1 = fgetc(f1)) != EOF && (symbol2 = fgetc(f2)) != EOF) {
+    if (symbol1 != symbol2) {
+      return position;
+    }
+    ++position;
+  }
+
+  if (symbol1 != EOF || symbol2 != EOF) {
+    return position;
+  }
+
+  return -1;
+}
+
+#endif
 
 void *gc_alloc_on_existing_heap (size_t size) {
   if (heap.current + size <= heap.end) {
@@ -73,8 +150,23 @@ void *gc_alloc_on_existing_heap (size_t size) {
 
 void *gc_alloc (size_t size) {
   mark_phase();
+#ifdef FULL_INVARIANT_CHECKS
+  FILE *heap_before_compaction = print_objects_traversal(1);
+#endif
 
   compact_phase(size);
+#ifdef FULL_INVARIANT_CHECKS
+  FILE *heap_after_compaction = print_objects_traversal(0);
+
+  int pos = files_cmp(heap_before_compaction, heap_after_compaction);
+  if (pos >= 0) { // position of difference is found
+    fprintf(stderr, "GC invariant is broken\n");
+    exit(1);
+  }
+
+  fclose(heap_before_compaction);
+  fclose(heap_after_compaction);
+#endif
 
   return gc_alloc_on_existing_heap(size);
 }
@@ -112,13 +204,13 @@ void compact_phase (size_t additional_size) {
   update_references(&old_heap);
   physically_relocate(&old_heap);
 
-  // shrink it if possible, otherwise this code won'test_small_tree_compaction do anything, in both cases references
+  // shrink it if possible, otherwise this code won't do anything, in both cases references
   // will remain valid
   heap.begin = mremap(
       heap.begin,
       WORDS_TO_BYTES(heap.size),
       WORDS_TO_BYTES(next_heap_size),
-      0   // in this case we don't set MREMAP_MAYMOVE because it shouldn'test_small_tree_compaction move :)
+      0   // in this case we don't set MREMAP_MAYMOVE because it shouldn't move :)
   );
   if (heap.begin == MAP_FAILED) {
     perror("ERROR: compact_phase: mremap failed\n");
@@ -268,7 +360,7 @@ void mark (void *obj) {
     // while the queue is non-empty
     void *cur_obj = queue_dequeue(&q_head_iter);
     mark_object(cur_obj);
-    void *header_ptr = get_obj_header_ptr(cur_obj, get_type_row_ptr(cur_obj));
+    void *header_ptr = get_obj_header_ptr(cur_obj);
     for (obj_field_iterator ptr_field_it = ptr_field_begin_iterator(header_ptr);
          !field_is_done_iterator(&ptr_field_it);
          obj_next_ptr_field_iterator(&ptr_field_it)) {
@@ -559,7 +651,10 @@ bool field_is_done_iterator (obj_field_iterator *it) {
   return it->cur_field >= get_end_of_obj(it->obj_ptr);
 }
 
-void *get_obj_header_ptr (void *ptr, lama_type type) { return ptr - get_header_size(type); }
+void *get_obj_header_ptr (void *ptr) {
+  lama_type type = get_type_row_ptr(ptr);
+  return ptr - get_header_size(type);
+}
 
 void *get_object_content_ptr (void *header_ptr) {
   lama_type type = get_type_header_ptr(header_ptr);
@@ -595,7 +690,7 @@ void *alloc_string (int len) {
 void *alloc_array (int len) {
   data *obj        = alloc(array_size(len));
   obj->data_header = ARRAY_TAG | (len << 3);
-#ifdef DEBUG_VERSION
+#ifdef FULL_INVARIANT_CHECKS
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
@@ -605,7 +700,7 @@ void *alloc_array (int len) {
 void *alloc_sexp (int members) {
   sexp *obj        = alloc(sexp_size(members));
   obj->sexp_header = obj->contents.data_header = SEXP_TAG | (members << 3);
-#ifdef DEBUG_VERSION
+#ifdef FULL_INVARIANT_CHECKS
   obj->contents.id = cur_id;
 #endif
   obj->contents.forward_address = 0;
@@ -616,7 +711,7 @@ void *alloc_sexp (int members) {
 void *alloc_closure (int captured) {
   data *obj        = alloc(closure_size(captured));
   obj->data_header = CLOSURE_TAG | (captured << 3);
-#ifdef DEBUG_VERSION
+#ifdef FULL_INVARIANT_CHECKS
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;

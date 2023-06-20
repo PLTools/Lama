@@ -4,6 +4,7 @@
 
 // this flag makes GC behavior a bit different for testing purposes.
 //#define DEBUG_VERSION
+//#define FULL_INVARIANT_CHECKS
 
 #define STRING_TAG 0x00000001
 //# define STRING_TAG  0x00000000
@@ -48,7 +49,7 @@ typedef struct {
   // other utility info (i.e., size for array, number of fields for s-expression)
   int data_header;
 
-#ifdef DEBUG_VERSION
+#ifdef FULL_INVARIANT_CHECKS
   size_t id;
 #endif
 

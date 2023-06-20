@@ -503,7 +503,7 @@ extern void *Lsubstring (void *subj, int p, int l) {
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
   regex_t *b = (regex_t *)malloc(sizeof(regex_t));
 
-  /* printf ("regexp: %s,\test_small_tree_compaction%x\n", regexp, b); */
+  /* printf ("regexp: %s,\t%x\n", regexp, b); */
 
   memset(b, 0, sizeof(regex_t));
 
@@ -1020,7 +1020,7 @@ extern int Btag (void *d, int t, int n) {
                && LEN(r->data_header) == UNBOX(n));
 #else
     return BOX(TAG(r->data_header) == SEXP_TAG
-               && GET_SEXP_TAG(TO_SEXP(d)->data_header) == UNBOX(test_small_tree_compaction)
+               && GET_SEXP_TAG(TO_SEXP(d)->data_header) == UNBOX(t)
                && LEN(r->data_header) == UNBOX(n));
 #endif
   }
