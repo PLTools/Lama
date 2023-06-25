@@ -43,7 +43,7 @@ void handler (int sig) {
 
   // get void*'s for all entries on the stack
   size = backtrace(array, 10);
-
+  fprintf(stderr, "heap size is %zu\n", heap.size);
   backtrace_symbols_fd(array, size, STDERR_FILENO);
   exit(1);
 }
@@ -52,7 +52,9 @@ void *alloc (size_t size) {
 #ifdef FULL_INVARIANT_CHECKS
   ++cur_id;
 #endif
+  size_t bytes_sz = size;
   size    = BYTES_TO_WORDS(size);
+  fprintf(stderr, "allocation of size %zu words (%zu bytes)\n", size, bytes_sz);
   void *p = gc_alloc_on_existing_heap(size);
   if (!p) {
     // not enough place in heap, need to perform GC cycle
@@ -64,7 +66,32 @@ void *alloc (size_t size) {
 #ifdef FULL_INVARIANT_CHECKS
 
 // precondition: obj_content is a valid address pointing to the content of an object
-static void objects_dfs(FILE *f, void *obj_content) {
+static void print_object_info(FILE *f, void *obj_content) {
+  data *d = TO_DATA(obj_content);
+  size_t obj_tag = TAG(d->data_header);
+  size_t obj_id = d->id;
+  fprintf(f, "id %zu tag %zu | ", obj_id, obj_tag);
+}
+
+static void print_unboxed (FILE *f, int unboxed) {
+  fprintf(f, "unboxed %d | ", UNBOX(unboxed));
+}
+
+static void print_stack_content (FILE *f) {
+  fprintf(f, "Stack content:\n");
+  for (size_t *stack_ptr = (size_t *) ((void*)__gc_stack_top + 4); stack_ptr < (size_t *) __gc_stack_bottom; ++stack_ptr) {
+    size_t value = *stack_ptr;
+    if (is_valid_heap_pointer((size_t *) value)) {
+      print_object_info(f, (void *) value);
+    } else {
+      print_unboxed(f, (int) value);
+    }
+    fprintf(f, "\n");
+  }
+}
+
+// precondition: obj_content is a valid address pointing to the content of an object
+static void objects_dfs (FILE *f, void *obj_content) {
   void *obj_header = get_obj_header_ptr(obj_content);
   data *obj_data = TO_DATA(obj_content);
   // internal mark-bit for this dfs, should be recovered by the caller
@@ -73,16 +100,19 @@ static void objects_dfs(FILE *f, void *obj_content) {
   }
   // set this bit as 1
   obj_data->forward_address |= 2;
-  fprintf(f, "%zu ", obj_data->id);
+  fprintf(f, "object at addr %p: ", obj_content);
+  print_object_info(f, obj_content);
+  /*fprintf(f, "object id: %zu | ", obj_data->id);*/
   // first cycle: print object's fields
   for (obj_field_iterator field_it = ptr_field_begin_iterator(obj_header);
        !field_is_done_iterator(&field_it);
        obj_next_field_iterator(&field_it)) {
     size_t field_value = *(size_t *) field_it.cur_field;
     if (is_valid_heap_pointer((size_t *) field_value)) {
-      fprintf(f, "%zu ", TO_DATA(field_value)->id);
+      print_object_info(f, (void *) field_value);
+      /*fprintf(f, "%zu ", TO_DATA(field_value)->id);*/
     } else {
-      fprintf(f, "%d ", UNBOX(field_value));
+      print_unboxed(f, (int) field_value);
     }
   }
   fprintf(f, "\n");
@@ -96,8 +126,9 @@ static void objects_dfs(FILE *f, void *obj_content) {
   }
 }
 
-FILE *print_objects_traversal(bool marked) {
-  FILE *f = tmpfile();
+FILE *print_objects_traversal(char *filename, bool marked) {
+  FILE *f = fopen(filename, "w+");
+  ftruncate(fileno(f), 0);
   for (heap_iterator it = heap_begin_iterator();
        !heap_is_done_iterator(&it);
        heap_next_obj_iterator(&it)) {
@@ -116,24 +147,25 @@ FILE *print_objects_traversal(bool marked) {
     data *obj_data = TO_DATA(get_object_content_ptr(obj_header));
     obj_data->forward_address &= (~2);
   }
+  fflush(f);
+  return f;
 }
 
 int files_cmp(FILE *f1, FILE *f2) {
   int symbol1, symbol2;
   int position = 0;
 
-  while ((symbol1 = fgetc(f1)) != EOF && (symbol2 = fgetc(f2)) != EOF) {
+  while (true) {
+    symbol1 = fgetc(f1);
+    symbol2 = fgetc(f2);
+    if (symbol1 == EOF && symbol2 == EOF) {
+      return -1;
+    }
     if (symbol1 != symbol2) {
       return position;
     }
     ++position;
   }
-
-  if (symbol1 != EOF || symbol2 != EOF) {
-    return position;
-  }
-
-  return -1;
 }
 
 #endif
@@ -149,29 +181,36 @@ void *gc_alloc_on_existing_heap (size_t size) {
 }
 
 void *gc_alloc (size_t size) {
+  fprintf(stderr, "GC cycle has started\n");
+#ifdef FULL_INVARIANT_CHECKS
+  print_objects_traversal("before-mark", 0);
+#endif
   mark_phase();
 #ifdef FULL_INVARIANT_CHECKS
-  FILE *heap_before_compaction = print_objects_traversal(1);
+  FILE *heap_before_compaction = print_objects_traversal("after-mark", 1);
 #endif
 
   compact_phase(size);
 #ifdef FULL_INVARIANT_CHECKS
-  FILE *heap_after_compaction = print_objects_traversal(0);
+  FILE *heap_after_compaction = print_objects_traversal("after-compaction", 0);
 
   int pos = files_cmp(heap_before_compaction, heap_after_compaction);
   if (pos >= 0) { // position of difference is found
-    fprintf(stderr, "GC invariant is broken\n");
+    fprintf(stderr, "GC invariant is broken, pos is %d\n", pos);
     exit(1);
   }
 
   fclose(heap_before_compaction);
   fclose(heap_after_compaction);
 #endif
-
+  fprintf(stderr, "GC cycle has finished\n");
   return gc_alloc_on_existing_heap(size);
 }
 
 void mark_phase (void) {
+#ifdef FULL_INVARIANT_CHECKS
+  print_stack_content(stderr);
+#endif
   __gc_root_scan_stack();
   scan_extra_roots();
 #ifndef DEBUG_VERSION
@@ -204,7 +243,7 @@ void compact_phase (size_t additional_size) {
   update_references(&old_heap);
   physically_relocate(&old_heap);
 
-  // shrink it if possible, otherwise this code won't do anything, in both cases references
+/*  // shrink it if possible, otherwise this code won't do anything, in both cases references
   // will remain valid
   heap.begin = mremap(
       heap.begin,
@@ -218,10 +257,12 @@ void compact_phase (size_t additional_size) {
   }
   heap.end     = heap.begin + next_heap_size;
   heap.size    = next_heap_size;
+*/
   heap.current = heap.begin + live_size;
 }
 
 size_t compute_locations () {
+  fprintf(stderr, "GC compute_locations started\n");
   size_t       *free_ptr  = heap.begin;
   heap_iterator scan_iter = heap_begin_iterator();
 
@@ -236,11 +277,13 @@ size_t compute_locations () {
     }
   }
 
+  fprintf(stderr, "GC compute_locations finished\n");
   // it will return number of words
   return free_ptr - heap.begin;
 }
 
 void scan_and_fix_region (memory_chunk *old_heap, void *start, void *end) {
+  fprintf(stderr, "GC scan_and_fix_region started\n");
   for (size_t *ptr = (size_t *)start; ptr < (size_t *)end; ++ptr) {
     size_t ptr_value = *ptr;
     // this can't be expressed via is_valid_heap_pointer, because this pointer may point area corresponding to the old
@@ -254,9 +297,11 @@ void scan_and_fix_region (memory_chunk *old_heap, void *start, void *end) {
       *(void **)ptr         = new_addr + content_offset;
     }
   }
+  fprintf(stderr, "GC scan_and_fix_region finished\n");
 }
 
 void update_references (memory_chunk *old_heap) {
+  fprintf(stderr, "GC update_references started\n");
   heap_iterator it = heap_begin_iterator();
   while (!heap_is_done_iterator(&it)) {
     if (is_marked(get_object_content_ptr(it.current))) {
@@ -301,9 +346,11 @@ void update_references (memory_chunk *old_heap) {
   // fix pointers from static area
   scan_and_fix_region(old_heap, (void *)&__start_custom_data, (void *)&__stop_custom_data);
 #endif
+  fprintf(stderr, "GC update_references finished\n");
 }
 
 void physically_relocate (memory_chunk *old_heap) {
+  fprintf(stderr, "GC physically_relocate started\n");
   heap_iterator from_iter = heap_begin_iterator();
 
   while (!heap_is_done_iterator(&from_iter)) {
@@ -319,6 +366,7 @@ void physically_relocate (memory_chunk *old_heap) {
     }
     from_iter = next_iter;
   }
+  fprintf(stderr, "GC physically_relocate finished\n");
 }
 
 bool is_valid_heap_pointer (const size_t *p) {

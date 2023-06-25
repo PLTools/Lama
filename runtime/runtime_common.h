@@ -22,7 +22,7 @@
 
 #define SEXP_ONLY_HEADER_SZ (2 * sizeof(int))
 
-#ifndef DEBUG_VERSION
+#ifndef FULL_INVARIANT_CHECKS
 #  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(int))
 #else
 #  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(size_t) + sizeof(int))
