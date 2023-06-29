@@ -74,10 +74,12 @@ static void print_object_info(FILE *f, void *obj_content) {
 }
 
 static void print_unboxed (FILE *f, int unboxed) {
-  fprintf(f, "unboxed %d | ", UNBOX(unboxed));
+  fprintf(f, "unboxed %zu | ", unboxed);
 }
 
-static void print_stack_content (FILE *f) {
+static FILE *print_stack_content (char *filename) {
+  FILE *f = fopen(filename, "w+");
+  ftruncate(fileno(f), 0);
   fprintf(f, "Stack content:\n");
   for (size_t *stack_ptr = (size_t *) ((void*)__gc_stack_top + 4); stack_ptr < (size_t *) __gc_stack_bottom; ++stack_ptr) {
     size_t value = *stack_ptr;
@@ -88,6 +90,8 @@ static void print_stack_content (FILE *f) {
     }
     fprintf(f, "\n");
   }
+  fprintf(f, "Stack content end.\n");
+  return f;
 }
 
 // precondition: obj_content is a valid address pointing to the content of an object
@@ -154,7 +158,6 @@ FILE *print_objects_traversal(char *filename, bool marked) {
 int files_cmp(FILE *f1, FILE *f2) {
   int symbol1, symbol2;
   int position = 0;
-
   while (true) {
     symbol1 = fgetc(f1);
     symbol2 = fgetc(f2);
@@ -183,7 +186,7 @@ void *gc_alloc_on_existing_heap (size_t size) {
 void *gc_alloc (size_t size) {
   fprintf(stderr, "GC cycle has started\n");
 #ifdef FULL_INVARIANT_CHECKS
-  print_objects_traversal("before-mark", 0);
+  FILE *stack_before = print_stack_content("stack-dump-before-compaction");
 #endif
   mark_phase();
 #ifdef FULL_INVARIANT_CHECKS
@@ -192,9 +195,15 @@ void *gc_alloc (size_t size) {
 
   compact_phase(size);
 #ifdef FULL_INVARIANT_CHECKS
+  FILE *stack_after = print_stack_content("stack-dump-after-compaction");
   FILE *heap_after_compaction = print_objects_traversal("after-compaction", 0);
 
-  int pos = files_cmp(heap_before_compaction, heap_after_compaction);
+  int pos = files_cmp(stack_before, stack_after);
+  if (pos >= 0) { // position of difference is found
+    fprintf(stderr, "Stack is modified incorrectly, see position %d\n", pos);
+    exit(1);
+  }
+  pos = files_cmp(heap_before_compaction, heap_after_compaction);
   if (pos >= 0) { // position of difference is found
     fprintf(stderr, "GC invariant is broken, pos is %d\n", pos);
     exit(1);
@@ -208,14 +217,13 @@ void *gc_alloc (size_t size) {
 }
 
 void mark_phase (void) {
-#ifdef FULL_INVARIANT_CHECKS
-  print_stack_content(stderr);
-#endif
+  fprintf(stderr, "marking has started\n");
   __gc_root_scan_stack();
   scan_extra_roots();
 #ifndef DEBUG_VERSION
   scan_global_area();
 #endif
+  fprintf(stderr, "marking has finished\n");
 }
 
 void compact_phase (size_t additional_size) {
@@ -393,6 +401,7 @@ static inline void *queue_dequeue (heap_iterator *head_iter) {
 }
 
 void mark (void *obj) {
+//  fprintf(stderr, "Marking object with content address %p on the heap\n", obj);
   if (!is_valid_heap_pointer(obj) || is_marked(obj)) { return; }
 
   // TL;DR: [q_head_iter, q_tail_iter) q_head_iter -- current dequeue's victim, q_tail_iter -- place for next enqueue
@@ -440,7 +449,19 @@ void scan_global_area (void) {
 }
 #endif
 
-extern void gc_test_and_mark_root (size_t **root) { mark((void *)*root); }
+extern void gc_test_and_mark_root (size_t **root) {
+  fprintf(stderr, "stack addresses: [%p, %p)\n", (void*)__gc_stack_top + 4, (void*)__gc_stack_bottom);
+  if (is_valid_pointer(*root) && !is_valid_heap_pointer(*root)) {
+    fprintf(stderr, "Found weird pointer on the stack by address %p, value is %p (stack starts at %p, ends at %p)\n", root, *root, (void*)__gc_stack_top + 4, (void*)__gc_stack_bottom);
+  } else {
+    if (is_valid_pointer(*root)) {
+      fprintf(stderr, "Object that is supposed to be on the heap on the stack by address %p, value is %p\n", root, *root);
+    } else {
+      fprintf(stderr, "Value on the stack by address %p, value is %d\n", root, UNBOX(*root));
+    }
+  }
+  mark((void *)*root);
+}
 
 extern void __init (void) {
   signal(SIGSEGV, handler);
@@ -477,7 +498,7 @@ void clear_extra_roots (void) { extra_roots.current_free = 0; }
 
 void push_extra_root (void **p) {
   if (extra_roots.current_free >= MAX_EXTRA_ROOTS_NUMBER) {
-    perror("ERROR: push_extra_roots: extra_roots_pool overflow");
+    perror("ERROR: push_extra_roots: extra_roots_pool overflow\n");
     exit(1);
   }
   extra_roots.roots[extra_roots.current_free] = p;
@@ -486,12 +507,12 @@ void push_extra_root (void **p) {
 
 void pop_extra_root (void **p) {
   if (extra_roots.current_free == 0) {
-    perror("ERROR: pop_extra_root: extra_roots are empty");
+    perror("ERROR: pop_extra_root: extra_roots are empty\n");
     exit(1);
   }
   extra_roots.current_free--;
   if (extra_roots.roots[extra_roots.current_free] != p) {
-    perror("ERROR: pop_extra_root: stack invariant violation");
+    perror("ERROR: pop_extra_root: stack invariant violation\n");
     exit(1);
   }
 }
@@ -650,7 +671,7 @@ size_t obj_size_header_ptr (void *ptr) {
       fprintf(stderr, "ERROR: obj_size_header_ptr: unknown object header, cur_id=%d", cur_id);
       raise(SIGINT);   // only for debug purposes
 #else
-      perror("ERROR: obj_size_header_ptr: unknown object header");
+      perror("ERROR: obj_size_header_ptr: unknown object header\n");
 #endif
       exit(1);
     }
@@ -717,7 +738,7 @@ size_t get_header_size (lama_type type) {
     case CLOSURE:
     case ARRAY: return DATA_HEADER_SZ;
     case SEXP: return SEXP_ONLY_HEADER_SZ + DATA_HEADER_SZ;
-    default: perror("ERROR: get_header_size: unknown object type");
+    default: perror("ERROR: get_header_size: unknown object type\n");
 #ifdef DEBUG_VERSION
       raise(SIGINT);   // only for debug purposes
 #endif
