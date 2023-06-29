@@ -890,10 +890,10 @@ extern void *Bclosure (int bn, void *entry, ...) {
   fflush(stdout);
 #endif
   argss = (ebp + 12);
-  for (i = 0; i < n; i++, argss++) { push_extra_root((void **)argss); }
+  // for (i = 0; i < n; i++, argss++) { push_extra_root((void **)argss); }
 
   r = (data *)alloc_closure(n + 1);
-
+  // push_extra_root(&r);
   ((void **)r->contents)[0] = entry;
 
   va_start(args, entry);
@@ -907,8 +907,9 @@ extern void *Bclosure (int bn, void *entry, ...) {
 
   __post_gc();
 
+  // pop_extra_root(&r);
   argss--;
-  for (i = 0; i < n; i++, argss--) { pop_extra_root((void **)argss); }
+  //for (i = 0; i < n; i++, argss--) { pop_extra_root((void **)argss); }
 
 #ifdef DEBUG_PRINT
   print_indent();
@@ -1019,8 +1020,7 @@ extern int Btag (void *d, int t, int n) {
     return BOX(TAG(r->data_header) == SEXP_TAG && TO_SEXP(d)->tag == UNBOX(t)
                && LEN(r->data_header) == UNBOX(n));
 #else
-    return BOX(TAG(r->data_header) == SEXP_TAG
-               && GET_SEXP_TAG(TO_SEXP(d)->data_header) == UNBOX(t)
+    return BOX(TAG(r->data_header) == SEXP_TAG && GET_SEXP_TAG(TO_SEXP(d)->data_header) == UNBOX(t)
                && LEN(r->data_header) == UNBOX(n));
 #endif
   }
@@ -1407,6 +1407,7 @@ extern void set_args (int argc, char *argv[]) {
   __post_gc();
 
   global_sysargs = p;
+
   push_extra_root((void **)&global_sysargs);
 #ifdef DEBUG_PRINT
   print_indent();
