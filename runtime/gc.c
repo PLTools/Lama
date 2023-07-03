@@ -54,12 +54,14 @@ void *alloc (size_t size) {
 #endif
   size_t bytes_sz = size;
   size            = BYTES_TO_WORDS(size);
-  fprintf(stderr, "allocation of size %zu words (%zu bytes)\n", size, bytes_sz);
+  fprintf(stderr, "allocation of size %zu words (%zu bytes): ", size, bytes_sz);
   void *p = gc_alloc_on_existing_heap(size);
   if (!p) {
     // not enough place in heap, need to perform GC cycle
-    return gc_alloc(size);
+    p = gc_alloc(size);
+    //    return gc_alloc(size);
   }
+  //   fprintf(stderr, "%p, tag=%zu\n", p, tag);
   return p;
 }
 
@@ -181,7 +183,7 @@ void *gc_alloc_on_existing_heap (size_t size) {
 }
 
 void *gc_alloc (size_t size) {
-  fprintf(stderr, "GC cycle has started\n");
+  fprintf(stderr, "===============================GC cycle has started\n");
   // #ifdef FULL_INVARIANT_CHECKS
   FILE *stack_before = print_stack_content("stack-dump-before-compaction");
   FILE *heap_before  = print_objects_traversal("before-mark", 0);
@@ -212,17 +214,26 @@ void *gc_alloc (size_t size) {
   fclose(heap_before_compaction);
   fclose(heap_after_compaction);
   // #endif
-  fprintf(stderr, "GC cycle has finished\n");
+  fprintf(stderr, "===============================GC cycle has finished\n");
   return gc_alloc_on_existing_heap(size);
 }
 
 void mark_phase (void) {
   fprintf(stderr, "marking has started\n");
+  fprintf(stderr,
+          "__gc_root_scan_stack started: gc_top=%p bot=%p\n",
+          __gc_stack_top,
+          __gc_stack_bottom);
   __gc_root_scan_stack();
+  fprintf(stderr, "__gc_root_scan_stack finished\n");
+  fprintf(stderr, "scan_extra_roots started\n");
   scan_extra_roots();
-#ifndef DEBUG_VERSION
+  fprintf(stderr, "scan_extra_roots finished\n");
+  // #ifndef DEBUG_VERSION
+  fprintf(stderr, "scan_global_area started\n");
   scan_global_area();
-#endif
+  fprintf(stderr, "scan_global_area finished\n");
+  // #endif
   fprintf(stderr, "marking has finished\n");
 }
 
@@ -309,10 +320,38 @@ void scan_and_fix_region (memory_chunk *old_heap, void *start, void *end) {
 }
 
 void scan_and_fix_region_roots (memory_chunk *old_heap) {
-  fprintf(stderr, "extra roots started %i\n", extra_roots.current_free);
+  fprintf(stderr, "extra roots started: number os extra roots %i\n", extra_roots.current_free);
   for (int i = 0; i < extra_roots.current_free; i++) {
     size_t *ptr       = extra_roots.roots[i];
     size_t  ptr_value = *ptr;
+    if (extra_roots.roots[i] > __gc_stack_top && extra_roots.roots[i] <= __gc_stack_bottom) {
+      if (is_valid_heap_pointer(ptr_value)) {
+        fprintf(stderr,
+                "|\tskip extra root: %p (%p), since it points to Lama's stack top=%p bot=%p\n",
+                extra_roots.roots[i],
+                ptr_value,
+                __gc_stack_top,
+                __gc_stack_bottom);
+      } else if ((extra_roots.roots[i] <= (void *)&__stop_custom_data
+                  && extra_roots.roots[i] >= (void *)&__start_custom_data)
+                 || (extra_roots.roots[i] <= (void *)&__stop_custom_data
+                     && extra_roots.roots[i] >= (void *)&__start_custom_data)) {
+        fprintf(
+            stderr,
+            "|\tskip extra root: %p (%p), since it points to Lama's static area stop=%p start=%p\n",
+            extra_roots.roots[i],
+            ptr_value,
+            (void *)&__stop_custom_data,
+            (void *)&__start_custom_data);
+        exit(1);
+      } else {
+        fprintf(stderr,
+                "|\tskip extra root: %p (%p): not a valid Lama pointer \n",
+                extra_roots.roots[i],
+                ptr_value);
+      }
+      continue;
+    }
     if (is_valid_pointer((size_t *)ptr_value) && (size_t)old_heap->begin <= ptr_value
         && ptr_value <= (size_t)old_heap->current) {
       void *obj_ptr = (void *)heap.begin + ((void *)ptr_value - (void *)old_heap->begin);
@@ -320,10 +359,10 @@ void scan_and_fix_region_roots (memory_chunk *old_heap) {
           (void *)heap.begin + ((void *)get_forward_address(obj_ptr) - (void *)old_heap->begin);
       size_t content_offset = get_header_size(get_type_row_ptr(obj_ptr));
       *(void **)ptr         = new_addr + content_offset;
-      fprintf(stderr, "extra root %p -> %p\n", ptr_value, *ptr);
+      fprintf(stderr, "|\textra root (%p) %p -> %p\n", extra_roots.roots[i], ptr_value, *ptr);
     }
   }
-  fprintf(stderr, "extra roots finished\n");
+  fprintf(stderr, "|\textra roots finished\n");
 }
 
 void update_references (memory_chunk *old_heap) {
@@ -362,15 +401,16 @@ void update_references (memory_chunk *old_heap) {
     heap_next_obj_iterator(&it);
   }
   // fix pointers from stack
-  scan_and_fix_region(old_heap, (void *)__gc_stack_top + 4, (void *)__gc_stack_bottom);
+  scan_and_fix_region(old_heap, (void *)__gc_stack_top + 4, (void *)__gc_stack_bottom + 4);
 
   // fix pointers from extra_roots
   scan_and_fix_region_roots(old_heap);
 
-#ifndef DEBUG_VERSION
+  // #ifndef DEBUG_VERSION
   // fix pointers from static area
+  assert((void *)&__stop_custom_data >= (void *)&__start_custom_data);
   scan_and_fix_region(old_heap, (void *)&__start_custom_data, (void *)&__stop_custom_data);
-#endif
+  // #endif
   fprintf(stderr, "GC update_references finished\n");
 }
 
@@ -467,26 +507,30 @@ void scan_global_area (void) {
 #endif
 
 extern void gc_test_and_mark_root (size_t **root) {
-  fprintf(
-      stderr, "stack addresses: [%p, %p)\n", (void *)__gc_stack_top + 4, (void *)__gc_stack_bottom);
-  if (is_valid_pointer(*root) && !is_valid_heap_pointer(*root)) {
-    fprintf(stderr,
-            "Found weird pointer on the stack by address %p, value is %p (stack starts at %p, ends "
-            "at %p)\n",
-            root,
-            *root,
-            (void *)__gc_stack_top + 4,
-            (void *)__gc_stack_bottom);
-  } else {
-    if (is_valid_pointer(*root)) {
-      fprintf(stderr,
-              "Object that is supposed to be on the heap on the stack by address %p, value is %p\n",
-              root,
-              *root);
-    } else {
-      fprintf(stderr, "Value on the stack by address %p, value is %d\n", root, UNBOX(*root));
-    }
-  }
+  fprintf(stderr,
+          "\troot = %p (%p), stack addresses: [%p, %p)\n",
+          root,
+          *root,
+          (void *)__gc_stack_top + 4,
+          (void *)__gc_stack_bottom);
+  // if (is_valid_pointer(*root) && !is_valid_heap_pointer(*root)) {
+  //   fprintf(stderr,
+  //           "Found weird pointer on the stack by address %p, value is %p (stack starts at %p, ends "
+  //           "at %p)\n",
+  //           root,
+  //           *root,
+  //           (void *)__gc_stack_top + 4,
+  //           (void *)__gc_stack_bottom);
+  // } else {
+  //   if (is_valid_pointer(*root)) {
+  //     // fprintf(stderr,
+  //     //         "Object that is supposed to be on the heap on the stack by address %p, value is %p\n",
+  //     //         root,
+  //     //         *root);
+  //   } else {
+  //     fprintf(stderr, "Value on the stack by address %p, value is %d\n", root, UNBOX(*root));
+  //   }
+  // }
   mark((void *)*root);
 }
 
@@ -528,6 +572,7 @@ void push_extra_root (void **p) {
     perror("ERROR: push_extra_roots: extra_roots_pool overflow\n");
     exit(1);
   }
+  assert(p >= __gc_stack_top || p < __gc_stack_bottom);
   extra_roots.roots[extra_roots.current_free] = p;
   extra_roots.current_free++;
 }
@@ -669,12 +714,15 @@ lama_type get_type_header_ptr (void *ptr) {
       fprintf(stderr, "ERROR: get_type_header_ptr: unknown object header, cur_id=%d", cur_id);
       raise(SIGINT);   // only for debug purposes
 #else
-      fprintf(
-          stderr,
-          "ERROR: get_type_header_ptr: unknown object header, ptr is %p, tag %i, heap size is %d\n",
-          ptr,
-          TAG(*header),
-          heap.size);
+      fprintf(stderr,
+              "ERROR: get_type_header_ptr: unknown object header, ptr is %p, tag %i, heap size is "
+              "%d cur_id=%d stack_top=%p stack_bot=%p ",
+              ptr,
+              TAG(*header),
+              heap.size,
+              cur_id,
+              __gc_stack_top,
+              __gc_stack_bottom);
       FILE *heap_before_compaction = print_objects_traversal("dump_kill", 1);
       close(heap_before_compaction);
       kill(getpid(), SIGSEGV);
@@ -780,6 +828,7 @@ size_t get_header_size (lama_type type) {
 void *alloc_string (int len) {
   data *obj        = alloc(string_size(len));
   obj->data_header = STRING_TAG | (len << 3);
+  fprintf(stderr, "%p, [STRING] tag=%zu\n", obj, TAG(obj->data_header));
 #ifdef DEBUG_VERSION
   obj->id = cur_id;
 #endif
@@ -790,6 +839,7 @@ void *alloc_string (int len) {
 void *alloc_array (int len) {
   data *obj        = alloc(array_size(len));
   obj->data_header = ARRAY_TAG | (len << 3);
+  fprintf(stderr, "%p, [ARRAY] tag=%zu\n", obj, TAG(obj->data_header));
 #ifdef FULL_INVARIANT_CHECKS
   obj->id = cur_id;
 #endif
@@ -800,6 +850,7 @@ void *alloc_array (int len) {
 void *alloc_sexp (int members) {
   sexp *obj        = alloc(sexp_size(members));
   obj->sexp_header = obj->contents.data_header = SEXP_TAG | (members << 3);
+  fprintf(stderr, "%p, SEXP tag=%zu\n", obj, TAG(obj->contents.data_header));
 #ifdef FULL_INVARIANT_CHECKS
   obj->contents.id = cur_id;
 #endif
@@ -812,6 +863,7 @@ void *alloc_closure (int captured) {
 
   data *obj        = alloc(closure_size(captured));
   obj->data_header = CLOSURE_TAG | (captured << 3);
+  fprintf(stderr, "%p, [CLOSURE] tag=%zu\n", obj, TAG(obj->data_header));
 #ifdef FULL_INVARIANT_CHECKS
   obj->id = cur_id;
 #endif

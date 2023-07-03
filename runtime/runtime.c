@@ -890,10 +890,10 @@ extern void *Bclosure (int bn, void *entry, ...) {
   fflush(stdout);
 #endif
   argss = (ebp + 12);
-  // for (i = 0; i < n; i++, argss++) { push_extra_root((void **)argss); }
+  for (i = 0; i < n; i++, argss++) { push_extra_root((void **)argss); }
 
   r = (data *)alloc_closure(n + 1);
-  // push_extra_root(&r);
+  push_extra_root(&r);
   ((void **)r->contents)[0] = entry;
 
   va_start(args, entry);
@@ -907,9 +907,9 @@ extern void *Bclosure (int bn, void *entry, ...) {
 
   __post_gc();
 
-  // pop_extra_root(&r);
+  pop_extra_root(&r);
   argss--;
-  //for (i = 0; i < n; i++, argss--) { pop_extra_root((void **)argss); }
+  for (i = 0; i < n; i++, argss--) { pop_extra_root((void **)argss); }
 
 #ifdef DEBUG_PRINT
   print_indent();
@@ -1344,6 +1344,16 @@ extern int Lread () {
   scanf("%d", &result);
 
   return BOX(result);
+}
+
+extern int Lbinoperror (void) {
+  fprintf(stderr, "ERROR: POINTER ARITHMETICS is forbidden; EXIT\n");
+  exit(1);
+}
+
+extern int Lbinoperror2 (void) {
+  fprintf(stderr, "ERROR: Comparing BOXED and UNBOXED value ; EXIT\n");
+  exit(1);
 }
 
 /* Lwrite is an implementation of the "write" construct */

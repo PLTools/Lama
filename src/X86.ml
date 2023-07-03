@@ -306,9 +306,32 @@ let compile cmd env imports code =
               | _         -> [Mov (v, eax); Mov (eax, I (0, x)); Mov (eax, x)]
              )
 
-          | BINOP op ->
+    | BINOP op ->
 	     let x, y, env' = env#pop2 in
              env'#push y,
+             (match op with
+             |"<" | "<=" | "==" | "!=" | ">=" | ">" ->
+              [Push (eax);
+              Push (edx);
+              Mov (y, eax);
+              Binop("&&", L(1), eax);
+              Mov (x, edx);
+              Binop("&&", L(1), edx);
+              Binop("cmp", eax, edx);
+              CJmp ("nz", "_ERROR2");
+              Pop (edx);
+              Pop (eax)]
+             (* | "+" | "-" | "*" | "/" -> *)
+             | _ ->
+             [Mov (y, eax);
+              Binop("&&", L(1), eax);
+              Binop("cmp", L(0), eax);
+              CJmp ("z", "_ERROR");
+              Mov (x, eax);
+              Binop("&&", L(1), eax);
+              Binop("cmp", L(0), eax);
+              CJmp ("z", "_ERROR")]
+              | _ -> []) @
              (match op with
 	      | "/" ->
                  [Mov (y, eax);
@@ -442,6 +465,12 @@ let compile cmd env imports code =
                      [Mov   (M "_init", eax);
                       Binop ("test", eax, eax);
                       CJmp  ("z", "_continue");
+                      Ret;
+                      Label ("_ERROR"); 
+                      Call "Lbinoperror";
+                      Ret;
+                      Label ("_ERROR2"); 
+                      Call "Lbinoperror2";
                       Ret;
                       Label "_continue";
                       Mov (L 1, M "_init");
