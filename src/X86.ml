@@ -309,7 +309,7 @@ let compile cmd env imports code =
     | BINOP op ->
 	     let x, y, env' = env#pop2 in
              env'#push y,
-             (match op with
+             (* (match op with
              |"<" | "<=" | "==" | "!=" | ">=" | ">" ->
               [Push (eax);
               Push (edx);
@@ -331,7 +331,7 @@ let compile cmd env imports code =
               Binop("&&", L(1), eax);
               Binop("cmp", L(0), eax);
               CJmp ("z", "_ERROR")]
-              | _ -> []) @
+              | _ -> []) @ *)
              (match op with
 	      | "/" ->
                  [Mov (y, eax);
