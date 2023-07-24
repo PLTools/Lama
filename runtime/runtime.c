@@ -808,11 +808,16 @@ extern void *Bstring (void *p) {
   void *s = NULL;
 
   __pre_gc();
+  void *before_frame = __builtin_frame_address(0);
 #ifdef DEBUG_PRINT
   indent++;
   print_indent();
   printf("Bstring: call LmakeString %s %p %p %p %i\n", p, &p, p, s, n);
   fflush(stdout);
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
 #endif
   push_extra_root(&p);
   s = LmakeString(BOX(n));
@@ -829,8 +834,15 @@ extern void *Bstring (void *p) {
   fflush(stdout);
   indent--;
 #endif
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
   __post_gc();
-
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
   return s;
 }
 
@@ -875,6 +887,7 @@ extern void *Lstring (void *p) {
 }
 
 extern void *Bclosure (int bn, void *entry, ...) {
+  void *before_frame = __builtin_frame_address(0);
   va_list       args;
   int           i, ai;
   register int *ebp asm("ebp");
@@ -882,7 +895,15 @@ extern void *Bclosure (int bn, void *entry, ...) {
   data         *r;
   int           n = UNBOX(bn);
 
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
   __pre_gc();
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
 #ifdef DEBUG_PRINT
   indent++;
   print_indent();
@@ -917,17 +938,30 @@ extern void *Bclosure (int bn, void *entry, ...) {
   fflush(stdout);
   indent--;
 #endif
-
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
   return r->contents;
 }
 
 extern void *Barray (int bn, ...) {
+  void *before_frame = __builtin_frame_address(0);
   va_list args;
   int     i, ai;
   data   *r;
   int     n = UNBOX(bn);
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
 
   __pre_gc();
+
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
 
 #ifdef DEBUG_PRINT
   indent++;
@@ -951,6 +985,10 @@ extern void *Barray (int bn, ...) {
   indent--;
 #endif
 
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
   return r->contents;
 }
 
@@ -959,6 +997,7 @@ extern memory_chunk heap;
 #endif
 
 extern void *Bsexp (int bn, ...) {
+  void *before_frame = __builtin_frame_address(0);
   va_list args;
   int     i;
   int     ai;
@@ -967,7 +1006,15 @@ extern void *Bsexp (int bn, ...) {
   data   *d;
   int     n = UNBOX(bn);
 
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
   __pre_gc();
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
 
 #ifdef DEBUG_PRINT
   indent++;
@@ -1007,6 +1054,10 @@ extern void *Bsexp (int bn, ...) {
 
   __post_gc();
 
+  if (before_frame != __builtin_frame_address(0)) {
+    fprintf(stderr, "ERROR!!!!!!! stack pointer moved\n");
+    exit(1);
+  }
   return d->contents;
 }
 
@@ -1347,13 +1398,13 @@ extern int Lread () {
 }
 
 extern int Lbinoperror (void) {
-  fprintf(stderr, "ERROR: POINTER ARITHMETICS is forbidden; EXIT\n");
-  exit(1);
+/*  fprintf(stderr, "ERROR: POINTER ARITHMETICS is forbidden; EXIT\n");
+  exit(1);*/
 }
 
 extern int Lbinoperror2 (void) {
-  fprintf(stderr, "ERROR: Comparing BOXED and UNBOXED value ; EXIT\n");
-  exit(1);
+/*  fprintf(stderr, "ERROR: Comparing BOXED and UNBOXED value ; EXIT\n");
+  exit(1);*/
 }
 
 /* Lwrite is an implementation of the "write" construct */
