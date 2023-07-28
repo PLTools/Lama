@@ -741,6 +741,7 @@ lama_type get_type_header_ptr (void *ptr) {
       fprintf(stderr, "ERROR: get_type_header_ptr: unknown object header, cur_id=%d", cur_id);
       raise(SIGINT);   // only for debug purposes
 #else
+#ifdef FULL_INVARIANT_CHECKS
       fprintf(stderr,
               "ERROR: get_type_header_ptr: unknown object header, ptr is %p, tag %i, heap size is "
               "%d cur_id=%d stack_top=%p stack_bot=%p ",
@@ -752,6 +753,7 @@ lama_type get_type_header_ptr (void *ptr) {
               (void *)__gc_stack_bottom);
       FILE *heap_before_compaction = print_objects_traversal("dump_kill", 1);
       fclose(heap_before_compaction);
+#endif
       kill(getpid(), SIGSEGV);
 #endif
       exit(1);
