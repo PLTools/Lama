@@ -1,9 +1,9 @@
 # Common settings
-BasedOnStyle:    LLVM
-TabWidth:        2
-IndentWidth:     2
-UseTab:          Never
-ColumnLimit:     100
+BasedOnStyle: LLVM
+TabWidth: 2
+IndentWidth: 2
+UseTab: Never
+ColumnLimit: 100
 IndentCaseLabels: true
 
 # https://clang.llvm.org/docs/ClangFormatStyleOptions.html
@@ -11,22 +11,22 @@ IndentCaseLabels: true
 Language: Cpp
 
 DisableFormat:   false
-Standard: Cpp11
+Standard: Auto
 
 AccessModifierOffset: -4
 AlignAfterOpenBracket: true
-AlignConsecutiveAssignments: true
-AlignConsecutiveDeclarations: true
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: Consecutive
 AlignEscapedNewlines: Right
 AlignOperands:   true
 AlignTrailingComments: false
 AllowAllParametersOfDeclarationOnNextLine: true
-AllowShortBlocksOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: All
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AllowShortLoopsOnASingleLine: true
-AlwaysBreakAfterDefinitionReturnType: false
+AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
 AlwaysBreakTemplateDeclarations: Yes
@@ -38,26 +38,25 @@ BitFieldColonSpacing: Both
 # Configure each individual brace in BraceWrapping
 BreakBeforeBraces: Attach
 # Control of individual brace wrapping cases
-BraceWrapping: {
-    AfterClass: 'true'
-    AfterControlStatement: 'true'
-    AfterEnum : 'true'
-    AfterFunction : 'true'
-    AfterNamespace : 'true'
-    AfterStruct : 'true'
-    AfterUnion : 'true'
-    BeforeCatch : 'true'
-    BeforeElse : 'true'
-    IndentBraces : 'false'
-    AfterExternBlock : 'true'
-    SplitEmptyFunction : 'false'
-    SplitEmptyRecord : 'false'
-    SplitEmptyNamespace : 'true'
-}
+BraceWrapping:
+    AfterClass: true
+    AfterControlStatement: Always
+    AfterEnum : true
+    AfterFunction : true
+    AfterNamespace : true
+    AfterStruct : true
+    AfterUnion : true
+    BeforeCatch : true
+    BeforeElse : true
+    IndentBraces : false
+    AfterExternBlock : true
+    SplitEmptyFunction : false
+    SplitEmptyRecord : false
+    SplitEmptyNamespace : true
+
 
 BreakAfterJavaFieldAnnotations: true
 BreakBeforeInheritanceComma: false
-BreakArrays: false
 BreakBeforeBinaryOperators: NonAssignment
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializersBeforeComma: true
@@ -97,17 +96,17 @@ SpaceAfterCStyleCast: false
 SpaceAfterLogicalNot: false
 SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: Custom
-SpaceBeforeParensOptions: {
-  AfterControlStatements: 'true'
-  AfterForeachMacros: 'true'
-  AfterFunctionDeclarationName: 'true'
-  AfterFunctionDefinitionName: 'true'
-  AfterIfMacros: 'true'
-  AfterOverloadedOperator: 'true'
-  AfterRequiresInClause: 'true'
-  AfterRequiresInExpression: 'true'
-  BeforeNonEmptyParentheses: 'false'
-}
+SpaceBeforeParensOptions:
+  AfterControlStatements: true
+  AfterForeachMacros: true
+  AfterFunctionDeclarationName: true
+  AfterFunctionDefinitionName: true
+  AfterIfMacros: true
+  AfterOverloadedOperator: true
+  AfterRequiresInClause: true
+  AfterRequiresInExpression: true
+  BeforeNonEmptyParentheses: false
+
 SpaceBeforeRangeBasedForLoopColon: false
 SpaceInEmptyBlock: true
 SpaceInEmptyParentheses: false
@@ -120,14 +119,12 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 SpaceAfterTemplateKeyword: true
 SpaceBeforeInheritanceColon: true
-VerilogBreakBetweenInstancePorts: true
 
 SortUsingDeclarations: true
 SortIncludes: CaseInsensitive
 
 IndentGotoLabels: false
 InsertBraces: false
-InsertNewlineAtEOF: true
 
 # Comments are for developers, they should arrange them
 ReflowComments: false
@@ -135,10 +132,3 @@ ReflowComments: false
 IncludeBlocks: Regroup
 IndentPPDirectives: AfterHash
 SeparateDefinitionBlocks: Always
-
-IntegerLiteralSeparator:
-  Binary:  4
-  Decimal: 0
-  Hex: 0
-
----

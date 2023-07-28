@@ -1,5 +1,5 @@
 CC=gcc
-FLAGS=-m32 -g2 -fstack-protector-all -DFULL_INVARIANT_CHECKS
+FLAGS=-m32 -g2 -fstack-protector-all -DFULL_INVARIANT_CHECKS -DLAMA_ENV
 
 all: gc_runtime.o gc.o runtime.o
 	ar rc runtime.a gc_runtime.o runtime.o gc.o

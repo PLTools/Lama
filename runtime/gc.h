@@ -66,10 +66,10 @@ void mark (void *obj);
 void mark_phase (void);
 // written in ASM, scans stack for pointers to the heap and starts marking process
 extern void
-    __gc_root_scan_stack (void);   // TODO: write without ASM, since it is absolutely not necessary
+    __gc_root_scan_stack (void);
 // marks each pointer from extra roots
 void scan_extra_roots (void);
-#ifndef DEBUG_VERSION
+#ifdef LAMA_ENV
 // marks each valid pointer from global area
 void scan_global_area (void);
 #endif
@@ -105,14 +105,15 @@ void pop_extra_root (void **p);
 
 /* Functions for tests */
 
-#ifdef DEBUG_VERSION
-
+#if defined(FULL_INVARIANT_CHECKS) && defined(DEBUG_VERSION)
 // makes a snapshot of current objects in heap (both alive and dead), writes these ids to object_ids_buf,
 // returns number of ids dumped
 // object_ids_buf is pointer to area preallocated by user for dumping ids of objects in heap
 // object_ids_buf_size is in WORDS, NOT BYTES
 size_t objects_snapshot (int *object_ids_buf, size_t object_ids_buf_size);
+#endif
 
+#ifdef DEBUG_VERSION
 // essential function to mock program stack
 void set_stack (size_t stack_top, size_t stack_bottom);
 

@@ -12,8 +12,6 @@
 #  define alloc malloc
 #endif
 
-//# define DEBUG_PRINT 1
-
 #ifdef __ENABLE_GC__
 
 /* GC extern invariant for built-in functions */
@@ -31,6 +29,24 @@ void __post_gc_subst () { }
 
 #endif
 /* end */
+
+#define PRE_GC()                                                                                   \
+  bool flag = true;                                                                                \
+  if (__gc_stack_top == 0) { flag = false; }                                                       \
+  __pre_gc();                                                                                      \
+  assert(__gc_stack_top != 0);                                                                     \
+  assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);
+
+#define POST_GC()                                                                                  \
+  assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);                                    \
+  __post_gc();                                                                                     \
+                                                                                                   \
+  if (!flag && __gc_stack_top != 0) {                                                              \
+    fprintf(stderr, "Moving stack???\n");                                                          \
+    assert(false);                                                                                 \
+  }
+
+extern size_t __gc_stack_top, __gc_stack_bottom;
 
 static void vfailure (char *s, va_list args) {
   fprintf(stderr, "*** FAILURE: ");
@@ -68,7 +84,6 @@ void Lassert (void *f, char *s, ...) {
       failure("string value expected in %s\n", memo);                                              \
   while (0)
 
-//extern void* alloc    (size_t);
 extern void *Bsexp (int n, ...);
 extern int   LtagHash (char *);
 
@@ -92,14 +107,10 @@ extern int LcompareTags (void *p, void *q) {
   qd = TO_DATA(q);
 
   if (TAG(pd->data_header) == SEXP_TAG && TAG(qd->data_header) == SEXP_TAG) {
-    return
-#ifndef DEBUG_PRINT
-        BOX((TO_SEXP(p)->tag) - (TO_SEXP(q)->tag));
-#else
-        BOX((GET_SEXP_TAG(TO_SEXP(p)->data_header)) - (GET_SEXP_TAG(TO_SEXP(p)->data_header)));
-#endif
-  } else
+    return BOX((TO_SEXP(p)->tag) - (TO_SEXP(q)->tag));
+  } else {
     failure("not a sexpr in compareTags: %d, %d\n", TAG(pd->data_header), TAG(qd->data_header));
+  }
 
   return 0;   // never happens
 }
@@ -108,7 +119,7 @@ extern int LcompareTags (void *p, void *q) {
 void *Ls__Infix_58 (void *p, void *q) {
   void *res;
 
-  __pre_gc();
+  PRE_GC();
 
   push_extra_root(&p);
   push_extra_root(&q);
@@ -116,7 +127,7 @@ void *Ls__Infix_58 (void *p, void *q) {
   pop_extra_root(&q);
   pop_extra_root(&p);
 
-  __post_gc();
+  POST_GC();
 
   return res;
 }
@@ -257,33 +268,16 @@ extern int LtagHash (char *s) {
 }
 
 char *de_hash (int n) {
-  //  static char *chars = (char*) BOX (NULL);
   static char buf[6] = {0, 0, 0, 0, 0, 0};
   char       *p      = (char *)BOX(NULL);
   p                  = &buf[5];
 
-#ifdef DEBUG_PRINT
-  indent++;
-  print_indent();
-  printf("de_hash: data_header: %d\n", n);
-  fflush(stdout);
-#endif
-
   *p-- = 0;
 
   while (n != 0) {
-#ifdef DEBUG_PRINT
-    print_indent();
-    printf("char: %c\n", chars[n & 0x003F]);
-    fflush(stdout);
-#endif
     *p-- = chars[n & 0x003F];
     n    = n >> 6;
   }
-
-#ifdef DEBUG_PRINT
-  indent--;
-#endif
 
   return ++p;
 }
@@ -480,7 +474,7 @@ extern void *Lsubstring (void *subj, int p, int l) {
   if (pp + ll <= LEN(d->data_header)) {
     data *r;
 
-    __pre_gc();
+    PRE_GC();
 
     push_extra_root(&subj);
     r = (data *)alloc_string(ll);
@@ -488,7 +482,7 @@ extern void *Lsubstring (void *subj, int p, int l) {
 
     strncpy(r->contents, (char *)subj + pp, ll);
 
-    __post_gc();
+    POST_GC();
 
     return r->contents;
   }
@@ -537,85 +531,39 @@ void *Lclone (void *p) {
   sexp *sobj;
   void *res;
   int   n;
-#ifdef DEBUG_PRINT
-  register int *ebp asm("ebp");
-  indent++;
-  print_indent();
-  printf("Lclone arg: %p %p\n", &p, p);
-  fflush(stdout);
-#endif
-  __pre_gc();
-
   if (UNBOXED(p)) return p;
-  else {
-    data *a = TO_DATA(p);
-    int   t = TAG(a->data_header), l = LEN(a->data_header);
 
-    push_extra_root(&p);
-    switch (t) {
-      case STRING_TAG:
-#ifdef DEBUG_PRINT
-        print_indent();
-        printf("Lclone: string1 &p=%p p=%p\n", &p, p);
-        fflush(stdout);
-#endif
-        res = Bstring(TO_DATA(p)->contents);
-#ifdef DEBUG_PRINT
-        print_indent();
-        printf("Lclone: string2 %p %p\n", &p, p);
-        fflush(stdout);
-#endif
-        break;
+  PRE_GC();
 
-      case ARRAY_TAG:
-#ifdef DEBUG_PRINT
-        print_indent();
-        printf("Lclone: array &p=%p p=%p ebp=%p\n", &p, p, ebp);
-        fflush(stdout);
-#endif
-        obj = (data *)alloc_array(l);
-        memcpy(obj, TO_DATA(p), array_size(l));
-        res = (void *)obj->contents;
-        break;
-      case CLOSURE_TAG:
-#ifdef DEBUG_PRINT
-        print_indent();
-        printf("Lclone: closure &p=%p p=%p ebp=%p\n", &p, p, ebp);
-        fflush(stdout);
-#endif
-        obj = (data *)alloc_closure(l);
-        memcpy(obj, TO_DATA(p), closure_size(l));
-        res = (void *)(obj->contents);
-        break;
+  data *a = TO_DATA(p);
+  int   t = TAG(a->data_header), l = LEN(a->data_header);
 
-      case SEXP_TAG:
-#ifdef DEBUG_PRINT
-        print_indent();
-        printf("Lclone: sexp\n");
-        fflush(stdout);
-#endif
-        sobj = (sexp *)alloc_sexp(l);
-        memcpy(sobj, TO_SEXP(p), sexp_size(l));
-        res = (void *)sobj->contents.contents;
-        break;
+  push_extra_root(&p);
+  switch (t) {
+    case STRING_TAG: res = Bstring(TO_DATA(p)->contents); break;
 
-      default: failure("invalid data_header %d in clone *****\n", t);
-    }
-    pop_extra_root(&p);
+    case ARRAY_TAG:
+      obj = (data *)alloc_array(l);
+      memcpy(obj, TO_DATA(p), array_size(l));
+      res = (void *)obj->contents;
+      break;
+    case CLOSURE_TAG:
+      obj = (data *)alloc_closure(l);
+      memcpy(obj, TO_DATA(p), closure_size(l));
+      res = (void *)(obj->contents);
+      break;
+
+    case SEXP_TAG:
+      sobj = (sexp *)alloc_sexp(l);
+      memcpy(sobj, TO_SEXP(p), sexp_size(l));
+      res = (void *)sobj->contents.contents;
+      break;
+
+    default: failure("invalid data_header %d in clone *****\n", t);
   }
-#ifdef DEBUG_PRINT
-  print_indent();
-  printf("Lclone ends1\n");
-  fflush(stdout);
-#endif
+  pop_extra_root(&p);
 
-  __post_gc();
-#ifdef DEBUG_PRINT
-  print_indent();
-  printf("Lclone ends2\n");
-  fflush(stdout);
-  indent--;
-#endif
+  POST_GC();
   return res;
 }
 
@@ -654,13 +602,9 @@ int inner_hash (int depth, unsigned acc, void *p) {
       case ARRAY_TAG: i = 0; break;
 
       case SEXP_TAG: {
-#ifndef DEBUG_PRINT
         int ta = TO_SEXP(p)->tag;
-#else
-        int ta = GET_SEXP_TAG(TO_SEXP(p)->data_header);
-#endif
-        acc = HASH_APPEND(acc, ta);
-        i   = 0;
+        acc    = HASH_APPEND(acc, ta);
+        i      = 0;
         break;
       }
 
@@ -728,12 +672,7 @@ extern int Lcompare (void *p, void *q) {
             break;
 
           case SEXP_TAG: {
-#ifndef DEBUG_PRINT
             int ta = TO_SEXP(p)->tag, tb = TO_SEXP(q)->tag;
-#else
-            int ta = GET_SEXP_TAG(TO_SEXP(p)->data_header),
-                tb = GET_SEXP_TAG(TO_SEXP(q)->data_header);
-#endif
             COMPARE_AND_RETURN(ta, tb);
             COMPARE_AND_RETURN(la, lb);
             i = 0;
@@ -775,7 +714,7 @@ extern void *LmakeArray (int length) {
 
   ASSERT_UNBOXED("makeArray:1", length);
 
-  __pre_gc();
+  PRE_GC();
 
   n = UNBOX(length);
   r = (data *)alloc_array(n);
@@ -783,7 +722,7 @@ extern void *LmakeArray (int length) {
   p = (int *)r->contents;
   while (n--) *p++ = BOX(0);
 
-  __post_gc();
+  POST_GC();
 
   return r->contents;
 }
@@ -794,11 +733,11 @@ extern void *LmakeString (int length) {
 
   ASSERT_UNBOXED("makeString", length);
 
-  __pre_gc();
+  PRE_GC();
 
   r = (data *)alloc_string(n);   // '\0' in the end of the string is taken into account
 
-  __post_gc();
+  POST_GC();
 
   return r->contents;
 }
@@ -807,42 +746,15 @@ extern void *Bstring (void *p) {
   int   n = strlen(p);
   void *s = NULL;
 
-  __pre_gc();
-  void *before_frame = __builtin_frame_address(0);
-#ifdef DEBUG_PRINT
-  indent++;
-  print_indent();
-  printf("Bstring: call LmakeString %s %p %p %p %i\n", p, &p, p, s, n);
-  fflush(stdout);
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
-#endif
+  PRE_GC();
+
   push_extra_root(&p);
   s = LmakeString(BOX(n));
   pop_extra_root(&p);
-#ifdef DEBUG_PRINT
-  print_indent();
-  printf("\tBstring: call strncpy: %p %p %p %i\n", &p, p, s, n);
-  fflush(stdout);
-#endif
   strncpy((char *)&TO_DATA(s)->contents, p, n + 1);   // +1 because of '\0' in the end of C-strings
-#ifdef DEBUG_PRINT
-  print_indent();
-  printf("\tBstring: ends\n");
-  fflush(stdout);
-  indent--;
-#endif
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
-  __post_gc();
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
+
+  POST_GC();
+
   return s;
 }
 
@@ -851,7 +763,7 @@ extern void *Lstringcat (void *p) {
 
   /* ASSERT_BOXED("stringcat", p); */
 
-  __pre_gc();
+  PRE_GC();
 
   createStringBuf();
   stringcat(p);
@@ -862,7 +774,7 @@ extern void *Lstringcat (void *p) {
 
   deleteStringBuf();
 
-  __post_gc();
+  POST_GC();
 
   return s;
 }
@@ -870,7 +782,7 @@ extern void *Lstringcat (void *p) {
 extern void *Lstring (void *p) {
   void *s = (void *)BOX(NULL);
 
-  __pre_gc();
+  PRE_GC();
 
   createStringBuf();
   printValue(p);
@@ -881,13 +793,12 @@ extern void *Lstring (void *p) {
 
   deleteStringBuf();
 
-  __post_gc();
+  POST_GC();
 
   return s;
 }
 
 extern void *Bclosure (int bn, void *entry, ...) {
-  void *before_frame = __builtin_frame_address(0);
   va_list       args;
   int           i, ai;
   register int *ebp asm("ebp");
@@ -895,21 +806,8 @@ extern void *Bclosure (int bn, void *entry, ...) {
   data         *r;
   int           n = UNBOX(bn);
 
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
-  __pre_gc();
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
-#ifdef DEBUG_PRINT
-  indent++;
-  print_indent();
-  printf("Bclosure: create n = %d\n", n);
-  fflush(stdout);
-#endif
+  PRE_GC();
+
   argss = (ebp + 12);
   for (i = 0; i < n; i++, argss++) { push_extra_root((void **)argss); }
 
@@ -926,49 +824,22 @@ extern void *Bclosure (int bn, void *entry, ...) {
 
   va_end(args);
 
-  __post_gc();
+  POST_GC();
 
   pop_extra_root(&r);
   argss--;
   for (i = 0; i < n; i++, argss--) { pop_extra_root((void **)argss); }
-
-#ifdef DEBUG_PRINT
-  print_indent();
-  printf("Bclosure: ends\n", n);
-  fflush(stdout);
-  indent--;
-#endif
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
   return r->contents;
 }
 
 extern void *Barray (int bn, ...) {
-  void *before_frame = __builtin_frame_address(0);
   va_list args;
   int     i, ai;
   data   *r;
   int     n = UNBOX(bn);
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
 
-  __pre_gc();
+  PRE_GC();
 
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
-
-#ifdef DEBUG_PRINT
-  indent++;
-  print_indent();
-  printf("Barray: create n = %d\n", n);
-  fflush(stdout);
-#endif
   r = (data *)alloc_array(n);
 
   va_start(args, bn);
@@ -980,15 +851,7 @@ extern void *Barray (int bn, ...) {
 
   va_end(args);
 
-  __post_gc();
-#ifdef DEBUG_PRINT
-  indent--;
-#endif
-
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
+  POST_GC();
   return r->contents;
 }
 
@@ -997,7 +860,6 @@ extern memory_chunk heap;
 #endif
 
 extern void *Bsexp (int bn, ...) {
-  void *before_frame = __builtin_frame_address(0);
   va_list args;
   int     i;
   int     ai;
@@ -1006,22 +868,8 @@ extern void *Bsexp (int bn, ...) {
   data   *d;
   int     n = UNBOX(bn);
 
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
-  __pre_gc();
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "WARNING!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
+  PRE_GC();
 
-#ifdef DEBUG_PRINT
-  indent++;
-  print_indent();
-  printf("Bsexp: allocate %zu!\n", sizeof(int) * (n + 1));
-  fflush(stdout);
-#endif
   int fields_cnt = n - 1;
   r              = (sexp *)alloc_sexp(fields_cnt);
   d              = &(r->contents);
@@ -1032,32 +880,15 @@ extern void *Bsexp (int bn, ...) {
   for (i = 0; i < n - 1; i++) {
     ai = va_arg(args, int);
 
-#ifdef DEBUG_VERSION
-    if (!UNBOXED(ai)) { assert(is_valid_heap_pointer((size_t *)ai)); }
-#endif
-
     p                       = (size_t *)ai;
     ((int *)d->contents)[i] = ai;
   }
 
   r->tag = UNBOX(va_arg(args, int));
 
-#ifdef DEBUG_PRINT
-  r->data_header = SEXP_TAG | ((r->data_header) << 3);
-  print_indent();
-  printf("Bsexp: ends\n");
-  fflush(stdout);
-  indent--;
-#endif
-
   va_end(args);
 
-  __post_gc();
-
-  if (before_frame != __builtin_frame_address(0)) {
-    fprintf(stderr, "ERROR!!!!!!! stack pointer moved\n");
-    exit(1);
-  }
+  POST_GC();
   return d->contents;
 }
 
@@ -1067,20 +898,12 @@ extern int Btag (void *d, int t, int n) {
   if (UNBOXED(d)) return BOX(0);
   else {
     r = TO_DATA(d);
-#ifndef DEBUG_PRINT
     return BOX(TAG(r->data_header) == SEXP_TAG && TO_SEXP(d)->tag == UNBOX(t)
                && LEN(r->data_header) == UNBOX(n));
-#else
-    return BOX(TAG(r->data_header) == SEXP_TAG && GET_SEXP_TAG(TO_SEXP(d)->data_header) == UNBOX(t)
-               && LEN(r->data_header) == UNBOX(n));
-#endif
   }
 }
 
-int get_tag (data *d) {
-  //    printf("%")
-  return TAG(d->data_header);
-}
+int get_tag (data *d) { return TAG(d->data_header); }
 
 int get_len (data *d) { return LEN(d->data_header); }
 
@@ -1106,7 +929,7 @@ extern int Bstring_patt (void *x, void *y) {
 
     if (TAG(rx->data_header) != STRING_TAG) return BOX(0);
 
-    return BOX(strcmp(rx->contents, ry->contents) == 0 ? 1 : 0);   // TODO: ???
+    return BOX(strcmp(rx->contents, ry->contents) == 0 ? 1 : 0);
   }
 }
 
@@ -1141,7 +964,6 @@ extern int Bsexp_tag_patt (void *x) {
 extern void *Bsta (void *v, int i, void *x) {
   if (UNBOXED(i)) {
     ASSERT_BOXED(".sta:3", x);
-    //    ASSERT_UNBOXED(".sta:2", i);
 
     if (TAG(TO_DATA(x)->data_header) == STRING_TAG) ((char *)x)[UNBOX(i)] = (char)UNBOX(v);
     else ((int *)x)[UNBOX(i)] = (int)v;
@@ -1197,7 +1019,7 @@ extern void * /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
   da = TO_DATA(a);
   db = TO_DATA(b);
 
-  __pre_gc();
+  PRE_GC();
 
   push_extra_root(&a);
   push_extra_root(&b);
@@ -1210,10 +1032,9 @@ extern void * /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
 
   strncpy(d->contents, da->contents, LEN(da->data_header));
   strncpy(d->contents + LEN(da->data_header), db->contents, LEN(db->data_header));
-
   d->contents[LEN(da->data_header) + LEN(db->data_header)] = 0;
 
-  __post_gc();
+  POST_GC();
 
   return d->contents;
 }
@@ -1231,13 +1052,13 @@ extern void *Lsprintf (char *fmt, ...) {
 
   vprintStringBuf(fmt, args);
 
-  __pre_gc();
+  PRE_GC();
 
   push_extra_root((void **)&fmt);
   s = Bstring(stringBuf.contents);
   pop_extra_root((void **)&fmt);
 
-  __post_gc();
+  POST_GC();
 
   deleteStringBuf();
 
@@ -1248,13 +1069,13 @@ extern void *LgetEnv (char *var) {
   char *e = getenv(var);
   void *s;
 
-  if (e == NULL) return (void *)BOX(0);   // TODO add (void*) cast?
+  if (e == NULL) return (void *)BOX(0);
 
-  __pre_gc();
+  PRE_GC();
 
   s = Bstring(e);
 
-  __post_gc();
+  POST_GC();
 
   return s;
 }
@@ -1373,9 +1194,9 @@ extern void *Lfexists (char *fname) {
 
   f = fopen(fname, "r");
 
-  if (f) return (void *)BOX(1);   // (void*) cast?
+  if (f) return (void *)BOX(1);
 
-  return (void *)BOX(0);   // (void*) cast?
+  return (void *)BOX(0);
 }
 
 extern void *Lfst (void *v) { return Belem(v, BOX(0)); }
@@ -1398,12 +1219,12 @@ extern int Lread () {
 }
 
 extern int Lbinoperror (void) {
-/*  fprintf(stderr, "ERROR: POINTER ARITHMETICS is forbidden; EXIT\n");
+  /*  fprintf(stderr, "ERROR: POINTER ARITHMETICS is forbidden; EXIT\n");
   exit(1);*/
 }
 
 extern int Lbinoperror2 (void) {
-/*  fprintf(stderr, "ERROR: Comparing BOXED and UNBOXED value ; EXIT\n");
+  /*  fprintf(stderr, "ERROR: Comparing BOXED and UNBOXED value ; EXIT\n");
   exit(1);*/
 }
 
@@ -1433,49 +1254,23 @@ extern int Ltime () {
 
 extern void set_args (int argc, char *argv[]) {
   data *a;
-  int   n = argc, *p = NULL;
+  int   n = argc;
+  int  *p = NULL;
   int   i;
 
-  __pre_gc();
-
-#ifdef DEBUG_PRINT
-  indent++;
-  print_indent();
-  printf("set_args: call: n=%i &p=%p p=%p: ", n, &p, p);
-  fflush(stdout);
-  for (i = 0; i < n; i++) printf("%s ", argv[i]);
-  printf("EE\n");
-#endif
+  PRE_GC();
 
   p = LmakeArray(BOX(n));
   push_extra_root((void **)&p);
 
-  for (i = 0; i < n; i++) {
-#ifdef DEBUG_PRINT
-    print_indent();
-    printf("set_args: iteration %i %p %p ->\n", i, &p, p);
-    fflush(stdout);
-#endif
-    ((int *)p)[i] = (int)Bstring(argv[i]);
-#ifdef DEBUG_PRINT
-    print_indent();
-    printf("set_args: iteration %i <- %p %p\n", i, &p, p);
-    fflush(stdout);
-#endif
-  }
+  for (i = 0; i < n; i++) { ((int *)p)[i] = (int)Bstring(argv[i]); }
 
   pop_extra_root((void **)&p);
-  __post_gc();
+  POST_GC();
 
   global_sysargs = p;
 
   push_extra_root((void **)&global_sysargs);
-#ifdef DEBUG_PRINT
-  print_indent();
-  printf("set_args: end\n", n, &p, p);
-  fflush(stdout);
-  indent--;
-#endif
 }
 
 /* GC starts here */
