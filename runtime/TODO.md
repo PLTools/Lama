@@ -10,9 +10,10 @@
 - [x] Fix warnings in ML code
 - [x] TODO: debug flag doesn't compile
 - [x] Sexp: move the tag to be `contents[0]` instead of the word in sexp header; i.e. get rid of sexp as separate data structure
+- Run Lama compiler on Lama
+- [ ] Add more stress tests (for graph-like structures) to `stdlib/regression` and unit tests
 - [ ] Magic constants
 - [ ] Normal documentation: a-la doxygen
 - [ ] Think: normal debug mode
 - [ ] Fix warnings in C code
-- [ ] Add more stress tests to `stdlib/regression` and unit tests
 - [ ] Modes (like FULL_INVARIANTS) -> separate files
