@@ -354,7 +354,8 @@ static void printValue (void *p) {
     switch (TAG(a->data_header)) {
       case STRING_TAG: printStringBuf("\"%s\"", a->contents); break;
 
-      case CLOSURE_TAG:
+      case CLOSURE_TAG: {
+
         printStringBuf("<closure ");
         for (i = 0; i < LEN(a->data_header); i++) {
           if (i) printValue((void *)((int *)a->contents)[i]);
@@ -363,8 +364,8 @@ static void printValue (void *p) {
         }
         printStringBuf(">");
         break;
-
-      case ARRAY_TAG:
+      }
+      case ARRAY_TAG: {
         printStringBuf("[");
         for (i = 0; i < LEN(a->data_header); i++) {
           printValue((void *)((int *)a->contents)[i]);
@@ -372,28 +373,31 @@ static void printValue (void *p) {
         }
         printStringBuf("]");
         break;
+      }
 
       case SEXP_TAG: {
-        char *tag = de_hash(TO_SEXP(p)->tag);
+        sexp *sa  = (sexp *)a;
+        char *tag = de_hash(sa->tag);
         if (strcmp(tag, "cons") == 0) {
-          data *b = a;
+          sexp *sb = sa;
           printStringBuf("{");
-          while (LEN(b->data_header)) {
-            printValue((void *)((int *)b->contents)[0]);
-            b = (data *)((int *)b->contents)[1];
-            if (!UNBOXED(b)) {
+          while (LEN(sb->data_header)) {
+            printValue((void *)((int *)sb->contents)[0]);
+            int list_next = ((int *)sb->contents)[1];
+            if (!UNBOXED(list_next)) {
               printStringBuf(", ");
-              b = TO_DATA(b);
+              sb = TO_SEXP(list_next);
             } else break;
           }
           printStringBuf("}");
         } else {
           printStringBuf("%s", tag);
+          sexp *sexp_a = (sexp *)a;
           if (LEN(a->data_header)) {
             printStringBuf(" (");
-            for (i = 0; i < LEN(a->data_header); i++) {
-              printValue((void *)((int *)a->contents)[i]);
-              if (i != LEN(a->data_header) - 1) printStringBuf(", ");
+            for (i = 0; i < LEN(sexp_a->data_header); i++) {
+              printValue((void *)((int *)sexp_a->contents)[i]);
+              if (i != LEN(sexp_a->data_header) - 1) printStringBuf(", ");
             }
             printStringBuf(")");
           }
@@ -554,9 +558,9 @@ void *Lclone (void *p) {
       break;
 
     case SEXP_TAG:
-      sobj = (sexp *)alloc_sexp(l);
-      memcpy(sobj, TO_SEXP(p), sexp_size(l));
-      res = (void *)sobj->contents.contents;
+      obj = (data *)alloc_sexp(l);
+      memcpy(obj, TO_DATA(p), sexp_size(l));
+      res = (void *)obj->contents;
       break;
 
     default: failure("invalid data_header %d in clone *****\n", t);
@@ -604,7 +608,8 @@ int inner_hash (int depth, unsigned acc, void *p) {
       case SEXP_TAG: {
         int ta = TO_SEXP(p)->tag;
         acc    = HASH_APPEND(acc, ta);
-        i      = 0;
+        i      = 1;
+        ++l;
         break;
       }
 
@@ -654,6 +659,7 @@ extern int Lcompare (void *p, void *q) {
         int   ta = TAG(a->data_header), tb = TAG(b->data_header);
         int   la = LEN(a->data_header), lb = LEN(b->data_header);
         int   i;
+        int   shift = 0;
 
         COMPARE_AND_RETURN(ta, tb);
 
@@ -672,10 +678,11 @@ extern int Lcompare (void *p, void *q) {
             break;
 
           case SEXP_TAG: {
-            int ta = TO_SEXP(p)->tag, tb = TO_SEXP(q)->tag;
-            COMPARE_AND_RETURN(ta, tb);
+            int tag_a = TO_SEXP(p)->tag, tag_b = TO_SEXP(q)->tag;
+            COMPARE_AND_RETURN(tag_a, tag_b);
             COMPARE_AND_RETURN(la, lb);
-            i = 0;
+            i     = 0;
+            shift = 1;
             break;
           }
 
@@ -683,7 +690,7 @@ extern int Lcompare (void *p, void *q) {
         }
 
         for (; i < la; i++) {
-          int c = Lcompare(((void **)a->contents)[i], ((void **)b->contents)[i]);
+          int c = Lcompare(((void **)a->contents)[i + shift], ((void **)b->contents)[i + shift]);
           if (c != BOX(0)) return BOX(c);
         }
 
@@ -697,15 +704,17 @@ extern int Lcompare (void *p, void *q) {
 extern void *Belem (void *p, int i) {
   data *a = (data *)BOX(NULL);
 
-  ASSERT_BOXED(".elem:1", p);
+  if (UNBOXED(p)) { ASSERT_BOXED(".elem:1", p); }
   ASSERT_UNBOXED(".elem:2", i);
 
   a = TO_DATA(p);
   i = UNBOX(i);
 
-  if (TAG(a->data_header) == STRING_TAG) { return (void *)BOX(a->contents[i]); }
-
-  return (void *)((int *)a->contents)[i];
+  switch (TAG(a->data_header)) {
+    case STRING_TAG: return (void *)BOX(a->contents[i]);
+    case SEXP_TAG: return (void *)((int *)a->contents)[i + 1];
+    default: return (void *)((int *)a->contents)[i];
+  }
 }
 
 extern void *LmakeArray (int length) {
@@ -864,32 +873,29 @@ extern void *Bsexp (int bn, ...) {
   int     i;
   int     ai;
   size_t *p;
-  sexp   *r;
-  data   *d;
+  data   *r;
   int     n = UNBOX(bn);
 
   PRE_GC();
 
-  int fields_cnt = n - 1;
-  r              = (sexp *)alloc_sexp(fields_cnt);
-  d              = &(r->contents);
-  r->tag         = 0;
+  int fields_cnt   = n - 1;
+  r                = (data *)alloc_sexp(fields_cnt);
+  ((sexp *)r)->tag = 0;
 
   va_start(args, bn);
 
-  for (i = 0; i < n - 1; i++) {
-    ai = va_arg(args, int);
-
+  for (i = 1; i < n; i++) {
+    ai                      = va_arg(args, int);
     p                       = (size_t *)ai;
-    ((int *)d->contents)[i] = ai;
+    ((int *)r->contents)[i] = ai;
   }
 
-  r->tag = UNBOX(va_arg(args, int));
+  ((sexp *)r)->tag = UNBOX(va_arg(args, int));
 
   va_end(args);
 
   POST_GC();
-  return d->contents;
+  return (int *)r->contents;
 }
 
 extern int Btag (void *d, int t, int n) {
@@ -964,14 +970,24 @@ extern int Bsexp_tag_patt (void *x) {
 extern void *Bsta (void *v, int i, void *x) {
   if (UNBOXED(i)) {
     ASSERT_BOXED(".sta:3", x);
+    data *d = TO_DATA(x);
 
-    if (TAG(TO_DATA(x)->data_header) == STRING_TAG) ((char *)x)[UNBOX(i)] = (char)UNBOX(v);
-    else ((int *)x)[UNBOX(i)] = (int)v;
-
-    return v;
+    switch (TAG(d->data_header)) {
+      case STRING_TAG: {
+        ((char *)x)[UNBOX(i)] = (char)UNBOX(v);
+        break;
+      }
+      case SEXP_TAG: {
+        ((int *)x)[UNBOX(i) + 1] = (int)v;
+        break;
+      }
+      default: {
+        ((int *)x)[UNBOX(i)] = (int)v;
+      }
+    }
+  } else {
+    *(void **)x = v;
   }
-
-  *(void **)x = v;
 
   return v;
 }

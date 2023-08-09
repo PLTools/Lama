@@ -256,8 +256,6 @@ void compact_phase (size_t additional_size) {
       MAX(live_size * EXTRA_ROOM_HEAP_COEFFICIENT + additional_size, MINIMUM_HEAP_CAPACITY);
   size_t next_heap_pseudo_size =
       MAX(next_heap_size, heap.size);   // this is weird but here is why it happens:
-  // if we allocate too little heap right now, we may lose access to some alive objects
-  // however, after we physically relocate all of our objects we will shrink allocated memory if it is possible
 
   memory_chunk old_heap = heap;
   heap.begin            = mremap(
@@ -273,21 +271,6 @@ void compact_phase (size_t additional_size) {
   update_references(&old_heap);
   physically_relocate(&old_heap);
 
-  /*  // shrink it if possible, otherwise this code won't do anything, in both cases references
-  // will remain valid
-  heap.begin = mremap(
-      heap.begin,
-      WORDS_TO_BYTES(heap.size),
-      WORDS_TO_BYTES(next_heap_size),
-      0   // in this case we don't set MREMAP_MAYMOVE because it shouldn't move :)
-  );
-  if (heap.begin == MAP_FAILED) {
-    perror("ERROR: compact_phase: mremap failed\n");
-    exit(1);
-  }
-  heap.end     = heap.begin + next_heap_size;
-  heap.size    = next_heap_size;
-*/
   heap.current = heap.begin + live_size;
 }
 
@@ -741,7 +724,7 @@ lama_type get_type_header_ptr (void *ptr) {
       fprintf(stderr, "ERROR: get_type_header_ptr: unknown object header, cur_id=%d", cur_id);
       raise(SIGINT);   // only for debug purposes
 #else
-#ifdef FULL_INVARIANT_CHECKS
+#  ifdef FULL_INVARIANT_CHECKS
       fprintf(stderr,
               "ERROR: get_type_header_ptr: unknown object header, ptr is %p, tag %i, heap size is "
               "%d cur_id=%d stack_top=%p stack_bot=%p ",
@@ -753,7 +736,7 @@ lama_type get_type_header_ptr (void *ptr) {
               (void *)__gc_stack_bottom);
       FILE *heap_before_compaction = print_objects_traversal("dump_kill", 1);
       fclose(heap_before_compaction);
-#endif
+#  endif
       kill(getpid(), SIGSEGV);
 #endif
       exit(1);
@@ -794,15 +777,23 @@ size_t string_size (size_t len) {
 
 size_t closure_size (size_t sz) { return get_header_size(CLOSURE) + MEMBER_SIZE * sz; }
 
-size_t sexp_size (size_t members) { return get_header_size(SEXP) + MEMBER_SIZE * members; }
+size_t sexp_size (size_t members) { return get_header_size(SEXP) + MEMBER_SIZE * (members + 1); }
 
 obj_field_iterator field_begin_iterator (void *obj) {
   lama_type          type = get_type_header_ptr(obj);
   obj_field_iterator it = {.type = type, .obj_ptr = obj, .cur_field = get_object_content_ptr(obj)};
-  // since string doesn't have any actual fields we set cur_field to the end of object
-  if (type == STRING) { it.cur_field = get_end_of_obj(it.obj_ptr); }
-  // skip first member which is basically pointer to the code
-  if (type == CLOSURE) { it.cur_field += MEMBER_SIZE; }
+  switch (type) {
+    case STRING: {
+      it.cur_field = get_end_of_obj(it.obj_ptr);
+      break;
+    }
+    case CLOSURE:
+    case SEXP: {
+      it.cur_field += MEMBER_SIZE;
+      break;
+    }
+    default: break;
+  }
   return it;
 }
 
@@ -843,8 +834,8 @@ size_t get_header_size (lama_type type) {
   switch (type) {
     case STRING:
     case CLOSURE:
-    case ARRAY: return DATA_HEADER_SZ;
-    case SEXP: return SEXP_ONLY_HEADER_SZ + DATA_HEADER_SZ;
+    case ARRAY:
+    case SEXP: return DATA_HEADER_SZ;
     default: perror("ERROR: get_header_size: unknown object type\n");
 #ifdef DEBUG_VERSION
       raise(SIGINT);   // only for debug purposes
@@ -881,15 +872,15 @@ void *alloc_array (int len) {
 
 void *alloc_sexp (int members) {
   sexp *obj        = alloc(sexp_size(members));
-  obj->sexp_header = obj->contents.data_header = SEXP_TAG | (members << 3);
+  obj->data_header = SEXP_TAG | (members << 3);
 #ifdef DEBUG_VERSION
-  fprintf(stderr, "%p, SEXP tag=%zu\n", obj, TAG(obj->contents.data_header));
+  fprintf(stderr, "%p, SEXP tag=%zu\n", obj, TAG(obj->data_header));
 #endif
 #ifdef FULL_INVARIANT_CHECKS
-  obj->contents.id = cur_id;
+  obj->id = cur_id;
 #endif
-  obj->contents.forward_address = 0;
-  obj->tag                      = 0;
+  obj->forward_address = 0;
+  obj->tag             = 0;
   return obj;
 }
 
