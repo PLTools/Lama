@@ -37,6 +37,12 @@ void __post_gc_subst () { }
   assert(__gc_stack_top != 0);                                                                     \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);
 
+//#define PRE_GC()                                                                                   \
+//  bool flag = true;                                                                                \
+//  if (__gc_stack_top == 0) { flag = false; }                                                       \
+//  if (!flag) __gc_stack_top = (size_t)__builtin_frame_address(0);                                  \
+//  assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);
+
 #define POST_GC()                                                                                  \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);                                    \
   __post_gc();                                                                                     \
@@ -45,6 +51,9 @@ void __post_gc_subst () { }
     fprintf(stderr, "Moving stack???\n");                                                          \
     assert(false);                                                                                 \
   }
+
+//#define POST_GC()                                                                                  \
+//  if (!flag) { __gc_stack_top = 0; }
 
 extern size_t __gc_stack_top, __gc_stack_bottom;
 
