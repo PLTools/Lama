@@ -37,12 +37,6 @@ void __post_gc_subst () { }
   assert(__gc_stack_top != 0);                                                                     \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);
 
-//#define PRE_GC()                                                                                   \
-//  bool flag = true;                                                                                \
-//  if (__gc_stack_top == 0) { flag = false; }                                                       \
-//  if (!flag) __gc_stack_top = (size_t)__builtin_frame_address(0);                                  \
-//  assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);
-
 #define POST_GC()                                                                                  \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);                                    \
   __post_gc();                                                                                     \
@@ -51,9 +45,6 @@ void __post_gc_subst () { }
     fprintf(stderr, "Moving stack???\n");                                                          \
     assert(false);                                                                                 \
   }
-
-//#define POST_GC()                                                                                  \
-//  if (!flag) { __gc_stack_top = 0; }
 
 extern size_t __gc_stack_top, __gc_stack_bottom;
 
@@ -434,13 +425,13 @@ static void stringcat (void *p) {
         char *tag = de_hash(TO_SEXP(p)->tag);
 
         if (strcmp(tag, "cons") == 0) {
-          data *b = a;
+          sexp *b = (sexp *)a;
 
           while (LEN(b->data_header)) {
             stringcat((void *)((int *)b->contents)[0]);
-            b = (data *)((int *)b->contents)[1];
-            if (!UNBOXED(b)) {
-              b = TO_DATA(b);
+            int next_b = ((int *)b->contents)[1];
+            if (!UNBOXED(next_b)) {
+              b = TO_SEXP(next_b);
             } else break;
           }
         } else printStringBuf("*** non-list data_header: %s ***", tag);
