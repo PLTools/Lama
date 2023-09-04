@@ -23,6 +23,6 @@ expr_tests:
 	make -j -C deep-expressions
 
 clean:
-	$(RM) test*.log *.s *.sm *~ $(TESTS) *.i $(DEBUG_FILES)
+	$(RM) test*.log *.s *.sm *~ $(TESTS) *.i $(DEBUG_FILES) test111
 	$(MAKE) clean -C expressions
 	$(MAKE) clean -C deep-expressions
