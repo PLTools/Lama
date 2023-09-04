@@ -1,0 +1,17 @@
+var x;
+
+fun test (n, m) {
+  var i, s, continue = 1;
+  s := 0;
+  for i := 0, i <= n && continue, i := i + 1 do
+    s := s + i;
+    if s > m then continue := 0 fi
+  od;
+  
+  s
+}
+
+x := read ();
+
+write (test (10, 100));
+write (test (100, 10))

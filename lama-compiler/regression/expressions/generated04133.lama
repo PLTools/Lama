@@ -1,0 +1,6 @@
+var x0, x1, y;
+
+x0 := read ();
+x1 := read ();
+y := 22-23-29+x0-41;
+write (y)

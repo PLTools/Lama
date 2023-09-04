@@ -1,0 +1,9 @@
+var x, y;
+
+x := read ();
+write (x);
+y := read ();
+write (y);
+if x then x else y fi := 18;
+write (x);
+write (y)

@@ -1,0 +1,191 @@
+-- States: partial maps from variables into values
+
+import Collection;
+import List;
+import Lexer;
+import Parser;
+import Fun;
+
+-- State with a stack of scopes; each scope is a map from names to
+-- their kinds and values
+fun makeState (scopes, level) {
+  -- Searches a scope stack and performed a speficified action
+  -- on the found binding
+  fun lookup (name, action) {
+    fun lookupInScopes (scopes) {
+      case scopes of
+        {}         -> error (sprintf ("name ""%s"" is undefined", name), getLoc (name))
+      | s : scopes ->
+         case findMap (s, name) of
+           None     -> lookupInScopes (scopes)
+         | Some (x) -> x
+         esac
+      esac
+    }
+
+    lookupInScopes (scopes)  
+  }
+  
+  -- Makes and assignment in scopes
+  fun assign (name, value) {
+    fun assignInScopes (scopes) {
+      case scopes of
+        {}         -> error (sprintf ("name ""%s"" is undefined", name), getLoc (name))
+      | s : scopes ->
+         case findMap (s, name) of
+           None     -> s : assignInScopes (scopes)
+         | Some (_) -> addMap (s, name, value) : scopes
+         esac
+      esac    
+    }
+
+    makeState (assignInScopes (scopes), level)
+  }
+
+  -- Enters a new scope
+  fun enterScope () {
+    makeState (emptyMap (compare) : scopes, level+1)
+  }
+
+  -- Leaves a scope
+  fun leaveScope () {
+    makeState (scopes.tl, level-1)
+  }
+
+  -- Adds a name into a scope
+  fun addName (name, value) {
+    case scopes of
+      s : scopes ->
+       case findMap (s, name) of
+         None     -> makeState (addMap (s, name, value) : scopes, level)
+       | Some (_) -> error (sprintf ("duplicate ""%s"" name definition", name), getLoc (name))
+       esac
+    esac
+  }
+
+  -- Enters a function; this drops all local scopes and creates a new one
+  fun enterFunction (env) {
+    fun enterScopes (scopes) {
+      case scopes of        
+        {_, _}     -> scopes
+      | _ : scopes -> enterScopes (scopes)
+      esac
+    }
+    
+    case emptyMap (compare) : env +++ enterScopes (scopes) of
+      scopes -> makeState (scopes, scopes.size)
+    esac
+  }
+  
+  -- Leaves a function: replaces the global scope in the state with a given one
+  fun leaveFunction (global) {
+    fun replaceGlobal (scopes) {
+      case scopes of
+        {_, _}     -> global
+      | s : scopes -> s : replaceGlobal (scopes)
+      esac    
+    }
+
+    case replaceGlobal (scopes) of
+      scopes -> makeState (scopes, scopes.size)
+    esac
+  }
+
+  --- Gets a global scope from a state
+  fun getGlobal () {
+    fun findGlobal (scopes) {
+      case scopes of
+        {_, _}     -> scopes
+      | _ : scopes -> findGlobal (scopes)
+      esac
+    }
+
+    findGlobal (scopes)
+  }
+
+  -- Converts a state into environment
+  fun toEnv (l) {
+    case foldr (fun ([acc, i, n], st) {
+                  if n == 0 then [acc, i+1, n]
+                elif i < 2  then [acc, i+1, n-1]
+	        else [st : acc, i+1, n-1]
+	          fi
+                }, [{}, 0, l], scopes) of
+      [scopes, _, _] -> scopes
+    esac
+  }
+
+  -- Gets the level
+  fun getLevel () {
+    level
+  }
+
+  -- Gets the scopes
+  fun getScopes () {
+    scopes
+  }
+  
+  [lookup, assign, enterScope, leaveScope, addName, enterFunction, leaveFunction, getGlobal, toEnv, getLevel, getScopes]
+}
+
+-- Accessors functions
+public fun lookup (state, x) {
+  state [0] (x)
+}
+
+public infix <- before : (state, [x, v]) {
+  state [1] (x, v)
+}
+
+public fun enterScope (state) {
+  state [2] ()
+}
+
+public fun leaveScope (state) {
+  state [3] ()
+}
+
+public fun addName (state, name, value) {
+  state [4] (name, value)
+}
+
+public fun enterFunction (state, env) {
+  state [5] (env)
+}
+
+public fun leaveFunction (state, global) {
+  state [6] (global)
+}
+
+public fun getGlobal (state) {
+  state [7] ()
+}
+
+public fun toEnv (state, level) {
+  state [8] (level)
+}
+
+public fun getLevel (state) {
+  state [9] ()
+}
+
+public fun getScopes (state) {
+  state [10] ()
+}
+
+-- Creates an empty state
+public fun emptyState () {
+  makeState ({}, 0)
+}
+
+-- Map over the list of scopes
+public fun mapScopes (scopes, f) {
+  map (fun (m) {
+         foldl (fun (m, [k, v]) {
+                  addMap (m, k, f (v))
+                },
+                emptyMap (compare),
+                bindings (m))
+       }, scopes)
+}
+

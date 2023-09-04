@@ -691,9 +691,8 @@ extern int Lcompare (void *p, void *q) {
 
         for (; i < la; i++) {
           int c = Lcompare(((void **)a->contents)[i + shift], ((void **)b->contents)[i + shift]);
-          if (c != BOX(0)) return BOX(c);
+          if (c != BOX(0)) return c;
         }
-
         return BOX(0);
       } else return BOX(-1);
     } else if (is_valid_heap_pointer(q)) return BOX(1);

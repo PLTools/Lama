@@ -1,0 +1,4 @@
+var x;
+
+(x := read (); write (x); x) := 18;
+write (x)

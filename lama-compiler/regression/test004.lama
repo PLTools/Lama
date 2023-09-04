@@ -1,0 +1,3 @@
+var x = read (), y = read (), z;
+z := ((x + y) + (x - y)) + ((x - y) - (x + y));
+write (z)

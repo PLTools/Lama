@@ -1,0 +1,4 @@
+var x, y;
+
+write (read () + read ())
+

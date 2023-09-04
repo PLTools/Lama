@@ -1,0 +1,12 @@
+var x;
+
+x := read ();
+
+write (x);
+
+(var x;
+ x := read ();
+ write (x)
+);
+
+write (x)

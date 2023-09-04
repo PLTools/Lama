@@ -1,0 +1,31 @@
+-- Manifests a top-level environment
+import Lazy;
+import Fun;
+
+public fun getMode (args) {
+  args [0] ()
+}
+
+public fun getInFile (args) {
+  args [1] ()
+}
+
+public fun dumpSM (args, smCode) {
+  if args [2] () then
+    fwrite (args.getBaseName ++ ".sm", force $ smCode)
+  fi
+}
+
+public fun dumpAST (args, ast) {
+  if args [3] () then
+    fwrite (args.getBaseName ++ ".ast", force $ ast)
+  fi
+}
+
+public fun getBaseName (args) {
+  force (lazy ((var name = args.getInFile;
+               if (matchSubString (name, ".lama", name.length - 5))
+               then substring (name, 0, name.length - 5)
+               else name
+               fi)))
+}

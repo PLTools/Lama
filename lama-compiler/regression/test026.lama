@@ -1,0 +1,5 @@
+var x =  read (), y = read ();
+write (
+  if x then 6 else 8 fi +
+  if y then 12 else 16 fi
+)

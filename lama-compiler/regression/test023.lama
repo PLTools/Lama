@@ -1,0 +1,8 @@
+var s = 0;
+
+repeat
+  var n = read ();
+  s := s + n
+until (n == 0);
+
+write (s)  

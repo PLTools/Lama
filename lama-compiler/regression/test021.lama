@@ -1,0 +1,10 @@
+var n, f = 1;
+
+n := read ();
+
+for skip, n >= 1, n := n-1
+do
+  f := f * n
+od;
+
+write (f)

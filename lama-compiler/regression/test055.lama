@@ -1,0 +1,23 @@
+fun map (f, l) {
+  case l of
+    Nil          -> Nil
+  | Cons (h, tl) -> Cons (f (h), map (f, tl))
+  esac
+}
+
+fun a (x) {x + 1}
+fun b (x) {x + 2}
+
+fun print_list (x) {
+  case x of
+    Nil          -> skip
+  | Cons (h, tl) -> write (h); print_list (tl)
+  esac
+}
+
+val x = read ();
+
+print_list (Cons (1, Cons (2, Cons (3, Nil))));
+print_list (map (a, Cons (1, Cons (2, Cons (3, Nil)))));
+print_list (map (b, Cons (1, Cons (2, Cons (3, Nil)))))
+

@@ -1,0 +1,25 @@
+-- World: holds input-output streams
+
+import List;
+
+-- Creates a world; "input" is expected to be a
+-- list of integers
+public fun createWorld (input) {
+  [input, {}]
+}
+
+-- Writes an output into a world
+public fun writeWorld (n, [input, output]) {
+  [input, n:output]
+}
+
+-- Reads an input from a world; the result is
+-- a pair --- the value read, the new world
+public fun readWorld ([n:input, output]) {
+  [n, [input, output]]
+}
+
+-- Gets an output from a world
+public fun getOutput ([_, output]) {
+  reverse (output)
+}

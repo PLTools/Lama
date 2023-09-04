@@ -24,6 +24,8 @@ uninstall:
 regression:
 	$(MAKE) clean check -C regression
 	$(MAKE) clean check -C stdlib/regression
+	bash deploy_build.sh
+	$(MAKE) -C lama-compiler
 
 clean:
 	$(MAKE) clean -C src
@@ -31,3 +33,5 @@ clean:
 	$(MAKE) clean -C stdlib
 	$(MAKE) clean -C regression
 	$(MAKE) clean -C bench
+	$(MAKE) clean -C lama-compiler
+	if [ -d tmp-lama ]; then rm -Rf tmp-lama; fi

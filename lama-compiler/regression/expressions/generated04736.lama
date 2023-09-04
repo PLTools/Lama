@@ -1,0 +1,6 @@
+var x0, x1, y;
+
+x0 := read ();
+x1 := read ();
+y := (x0+x0)*(42+x0+54);
+write (y)

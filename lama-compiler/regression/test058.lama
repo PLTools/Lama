@@ -1,0 +1,23 @@
+fun f () {
+  var x, l = Nil;
+  fun g () {x}
+  
+  x := 1;
+  l := Cons (g, l);
+
+  x := 2;
+  l := Cons (g, l);
+
+  l
+}
+
+fun p (l) {
+  case l of
+    Nil -> skip
+  | Cons (h, tl) -> write (h ()); p (tl)
+  esac
+}
+
+val x = read ();
+
+p (f ())

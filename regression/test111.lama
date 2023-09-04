@@ -1,0 +1,21 @@
+import Std;
+
+fun printString (s) {
+  var i;
+  for i := 0, i < s.length, i := i + 1 do
+    write (s[i])
+  od
+}
+
+fun printListConcat ( str_list ) {
+	printString (stringcat ( str_list ))
+}
+
+var l = { "a" , "b" , "c" , "d" };
+printListConcat (l);
+
+l := { "ab" };
+printListConcat (l);
+
+l := {};
+printListConcat (l)
