@@ -1,9 +1,11 @@
-.PHONY: all 
+.PHONY: all
 
 all:
-	make -C src
-	make -C runtime
-	make -C regression
+	@echo "build Lama in Lama"
+	@make -C src
+	@make -C runtime
+	@echo "regression Lama in Lama"
+	@make -C regression
 
 clean:
 	make clean -C src

@@ -7,7 +7,7 @@ LAMAC = ../../src/lama-impl
 check: $(TESTS)
 
 $(TESTS): %: %.lama
-	@echo $@
+	@echo "lama-compiler/regression/deep-expressions/$@"
 	@cat $@.input | $(LAMAC) -i $< > $@.log && diff $@.log orig/$@.log
 	@cat $@.input | $(LAMAC) -s $< > $@.log && diff $@.log orig/$@.log
 	@LAMA_RUNTIME=../../runtime $(LAMAC) $< && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log

@@ -9,10 +9,10 @@ RM=rm -rf
 check: $(TESTS) expr_tests
 
 $(TESTS): %: %.lama
-	@echo $@
-	@ulimit -s -S 32768; cat $@.input | $(LAMAC) $@.lama -i > $@.log && diff $@.log orig/$@.log 
+	@echo "lama-compiler/regression/$@"
+	@ulimit -s -S 32768; cat $@.input | $(LAMAC) $@.lama -i > $@.log && diff $@.log orig/$@.log
 	@ulimit -s -S 32768; cat $@.input | $(LAMAC) $@.lama -s > $@.log && diff $@.log orig/$@.log
-	$(LAMAC) $@.lama && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log
+	@$(LAMAC) $@.lama && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log
 
 expr_tests:
 	make -C expressions
