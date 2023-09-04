@@ -19,8 +19,8 @@ ctest111:
 	@LAMA=../runtime $(LAMAC) test111.lama && cat test111.input | ./test111 > test111.log && diff test111.log orig/test111.log
 
 expr_tests:
-	make -j -C expressions
-	make -j -C deep-expressions
+	make -j8 -C expressions
+	make -j8 -C deep-expressions
 
 clean:
 	$(RM) test*.log *.s *.sm *~ $(TESTS) *.i $(DEBUG_FILES) test111

@@ -22,8 +22,8 @@ uninstall:
 	$(RM) `opam var bin`/$(EXECUTABLE)
 
 regression:
-	$(MAKE) clean check -j -C regression
-	$(MAKE) clean check -j -C stdlib/regression
+	$(MAKE) clean check -j8 -C regression
+	$(MAKE) clean check -j8 -C stdlib/regression
 	bash deploy_build.sh
 	$(MAKE) -C lama-compiler
 
