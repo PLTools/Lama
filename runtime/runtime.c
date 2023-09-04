@@ -1234,13 +1234,13 @@ extern int Lread () {
 }
 
 extern int Lbinoperror (void) {
-  /*  fprintf(stderr, "ERROR: POINTER ARITHMETICS is forbidden; EXIT\n");
-  exit(1);*/
+  fprintf(stderr, "ERROR: POINTER ARITHMETICS is forbidden; EXIT\n");
+  exit(1);
 }
 
 extern int Lbinoperror2 (void) {
-  /*  fprintf(stderr, "ERROR: Comparing BOXED and UNBOXED value ; EXIT\n");
-  exit(1);*/
+  fprintf(stderr, "ERROR: Comparing BOXED and UNBOXED value ; EXIT\n");
+  exit(1);
 }
 
 /* Lwrite is an implementation of the "write" construct */
