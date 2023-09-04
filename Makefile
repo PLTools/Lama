@@ -32,6 +32,7 @@ clean:
 	$(MAKE) clean -C runtime
 	$(MAKE) clean -C stdlib
 	$(MAKE) clean -C regression
+	$(MAKE) clean -C byterun
 	$(MAKE) clean -C bench
 	$(MAKE) clean -C lama-compiler
 	if [ -d tmp-lama ]; then rm -Rf tmp-lama; fi
