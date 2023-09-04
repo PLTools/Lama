@@ -65,8 +65,7 @@ void *gc_alloc_on_existing_heap(size_t);
 void mark (void *obj);
 void mark_phase (void);
 // written in ASM, scans stack for pointers to the heap and starts marking process
-extern void
-    __gc_root_scan_stack (void);
+extern void __gc_root_scan_stack (void);
 // marks each pointer from extra roots
 void scan_extra_roots (void);
 #ifdef LAMA_ENV
@@ -93,9 +92,9 @@ extern void __pre_gc (void);
 extern void __post_gc (void);
 
 // invoked from ASM
-extern void gc_test_and_mark_root (size_t **root);
-inline bool is_valid_heap_pointer (const size_t *);
-inline bool is_valid_pointer (const size_t *);
+extern void        gc_test_and_mark_root (size_t **root);
+bool               is_valid_heap_pointer (const size_t *);
+static inline bool is_valid_pointer (const size_t *);
 
 void clear_extra_roots (void);
 

@@ -820,7 +820,7 @@ extern void *Bclosure (int bn, void *entry, ...) {
   for (i = 0; i < n; i++, argss++) { push_extra_root((void **)argss); }
 
   r = (data *)alloc_closure(n + 1);
-  push_extra_root(&r);
+  push_extra_root((void **)&r);
   ((void **)r->contents)[0] = entry;
 
   va_start(args, entry);
@@ -834,7 +834,7 @@ extern void *Bclosure (int bn, void *entry, ...) {
 
   POST_GC();
 
-  pop_extra_root(&r);
+  pop_extra_root((void **)&r);
   argss--;
   for (i = 0; i < n; i++, argss--) { pop_extra_root((void **)argss); }
   return r->contents;

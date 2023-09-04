@@ -1,8 +1,10 @@
+FLAGS=-no-pie -m32 -g2 -fstack-protector-all
+
 all: byterun.o
-	$(CC) -m32 -g -o byterun byterun.o ../runtime/runtime.a 
+	$(CC) $(FLAGS) -o byterun byterun.o ../runtime/runtime.a
 
 byterun.o: byterun.c
-	$(CC) -g -fstack-protector-all -m32 -c byterun.c
+	$(CC) $(FLAGS) -g -c byterun.c
 
 clean:
-	$(RM) *.a *.o *~
+	$(RM) *.a *.o *~ byterun

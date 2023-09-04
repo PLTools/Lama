@@ -460,11 +460,11 @@ void physically_relocate (memory_chunk *old_heap) {
 #endif
 }
 
-bool is_valid_heap_pointer (const size_t *p) {
+inline bool is_valid_heap_pointer (const size_t *p) {
   return !UNBOXED(p) && (size_t)heap.begin <= (size_t)p && (size_t)p <= (size_t)heap.current;
 }
 
-bool is_valid_pointer (const size_t *p) { return !UNBOXED(p); }
+static inline bool is_valid_pointer (const size_t *p) { return !UNBOXED(p); }
 
 static inline void queue_enqueue (heap_iterator *tail_iter, void *obj) {
   void *tail         = tail_iter->current;
