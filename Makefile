@@ -21,10 +21,21 @@ uninstall:
 	$(RM) -r `opam var share`/Lama
 	$(RM) `opam var bin`/$(EXECUTABLE)
 
+regression-all: regression regression-expressions regression-lama-in-lama
+
 regression:
 	$(MAKE) clean check -j8 -C regression
 	$(MAKE) clean check -j8 -C stdlib/regression
-	bash deploy_build.sh
+
+regression-expressions:
+	$(MAKE) clean check -j8 -C regression/expressions
+	$(MAKE) clean check -j8 -C regression/deep-expressions
+
+regression-lama-in-lama: all
+	mkdir tmp-lama
+	cp runtime/Std.i tmp-lama
+	cp runtime/runtime.a tmp-lama
+	cp -R stdlib/* tmp-lama
 	$(MAKE) -C lama-compiler
 
 clean:

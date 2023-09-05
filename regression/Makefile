@@ -6,7 +6,7 @@ LAMAC=../src/lamac
 .PHONY: check $(TESTS)
 
 
-check: ctest111 $(TESTS) expr_tests
+check: ctest111 $(TESTS)
 
 $(TESTS): %: %.lama
 	@echo "regression/$@"
@@ -17,10 +17,6 @@ $(TESTS): %: %.lama
 ctest111:
 	@echo "regression/test111"
 	@LAMA=../runtime $(LAMAC) test111.lama && cat test111.input | ./test111 > test111.log && diff test111.log orig/test111.log
-
-expr_tests:
-	make -j8 -C expressions
-	make -j8 -C deep-expressions
 
 clean:
 	$(RM) test*.log *.s *.sm *~ $(TESTS) *.i $(DEBUG_FILES) test111
