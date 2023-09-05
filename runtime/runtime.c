@@ -96,7 +96,7 @@ extern int LkindOf (void *p) {
   return TAG(TO_DATA(p)->data_header);
 }
 
-// Compare sexprs tags
+// Compare s-exprs tags
 extern int LcompareTags (void *p, void *q) {
   data *pd, *qd;
 
@@ -111,8 +111,8 @@ extern int LcompareTags (void *p, void *q) {
   } else {
     failure("not a sexpr in compareTags: %d, %d\n", TAG(pd->data_header), TAG(qd->data_header));
   }
-
-  return 0;   // never happens
+  // dead code
+  return 0;
 }
 
 // Functional synonym for built-in operator ":";
@@ -1165,17 +1165,15 @@ extern void *Lfread (char *fname) {
 
   f = fopen(fname, "r");
 
-  if (f) {
-    if (fseek(f, 0l, SEEK_END) >= 0) {
-      long  size = ftell(f);
-      void *s    = LmakeString(BOX(size));
+  if (f && fseek(f, 0l, SEEK_END) >= 0) {
+    long  size = ftell(f);
+    void *s    = LmakeString(BOX(size));
 
-      rewind(f);
+    rewind(f);
 
-      if (fread(s, 1, size, f) == size) {
-        fclose(f);
-        return s;
-      }
+    if (fread(s, 1, size, f) == size) {
+      fclose(f);
+      return s;
     }
   }
 
@@ -1190,16 +1188,11 @@ extern void Lfwrite (char *fname, char *contents) {
 
   f = fopen(fname, "w");
 
-  if (f) {
-    if (fprintf(f, "%s", contents) < 0)
-      ;
-    else {
-      fclose(f);
-      return;
-    }
+  if (f && !(fprintf(f, "%s", contents) < 0)) {
+    fclose(f);
+  } else {
+    failure("fwrite (\"%s\"): %s\n", fname, strerror(errno));
   }
-
-  failure("fwrite (\"%s\"): %s\n", fname, strerror(errno));
 }
 
 extern void *Lfexists (char *fname) {
@@ -1287,11 +1280,3 @@ extern void set_args (int argc, char *argv[]) {
 
   push_extra_root((void **)&global_sysargs);
 }
-
-/* GC starts here */
-
-static int enable_GC = 1;
-
-extern void LenableGC () { enable_GC = 1; }
-
-extern void LdisableGC () { enable_GC = 0; }

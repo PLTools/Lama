@@ -9,12 +9,14 @@
 #define MAKE_ENQUEUED(x) (x = (((int)(x)) | 2))
 #define MAKE_DEQUEUED(x) (x = (((int)(x)) & (~2)))
 #define RESET_MARK_BIT(x) (x = (((int)(x)) & (~1)))
-#define GET_FORWARD_ADDRESS(x)                                                                     \
-  (((size_t)(x))                                                                                   \
-   & (~3))   // since last 2 bits are used for mark-bit and enqueued-bit and due to correct alignment we can expect that last 2 bits don't influence address (they should always be zero)
-#define SET_FORWARD_ADDRESS(x, addr)                                                               \
-  (x = ((x & 3) | ((int)(addr))))   // take the last two bits as they are and make all others zero
-#define EXTRA_ROOM_HEAP_COEFFICIENT 2   // TODO: tune this parameter
+// since last 2 bits are used for mark-bit and enqueued-bit and due to correct
+// alignment we can expect that last 2 bits don't influence address (they
+// should always be zero)
+#define GET_FORWARD_ADDRESS(x) (((size_t)(x)) & (~3))
+// take the last two bits as they are and make all others zero
+#define SET_FORWARD_ADDRESS(x, addr) (x = ((x & 3) | ((int)(addr))))
+// if heap is full after gc shows in how many times it has to be extended
+#define EXTRA_ROOM_HEAP_COEFFICIENT 2
 #ifdef DEBUG_VERSION
 #  define MINIMUM_HEAP_CAPACITY (8)
 #else
@@ -31,27 +33,18 @@ typedef struct {
 } heap_iterator;
 
 typedef struct {
-  // holds type of object, which fields we are iterating over
-  lama_type type;
-  // here a pointer to the object header is stored
-  void *obj_ptr;
-  void *cur_field;
+  lama_type type;   // holds type of object, which fields we are iterating over
+  void     *obj_ptr;   // place to store a pointer to the object header
+  void     *cur_field;
 } obj_field_iterator;
 
+// Memory pool for linear memory allocation
 typedef struct {
   size_t *begin;
   size_t *end;
   size_t *current;
   size_t  size;
 } memory_chunk;
-
-/* GC extra roots */
-#define MAX_EXTRA_ROOTS_NUMBER 32
-
-typedef struct {
-  int    current_free;
-  void **roots[MAX_EXTRA_ROOTS_NUMBER];
-} extra_roots_pool;
 
 // the only GC-related function that should be exposed, others are useful for tests and internal implementation
 // allocates object of the given size on the heap
@@ -79,31 +72,56 @@ size_t compute_locations ();
 void   update_references (memory_chunk *);
 void   physically_relocate (memory_chunk *);
 
-// written in ASM
-extern void __gc_init (
-    void);   // MANDATORY TO CALL BEFORE ANY INTERACTION WITH GC (apart from cases where we are working with virtual stack as happens in tests)
-extern void __init (
-    void);   // should be called before interaction with GC in case of using in tests with virtual stack, otherwise it is automatically invoked by __gc_init
-extern void __shutdown (
-    void);   // mostly useful for tests but basically you want to call this in case you want to deallocate all object allocated via GC
-// written in ASM
+// ============================================================================
+//                            GC extra roots
+// ============================================================================
+// Lama's program stack is continuous, i.e. it never interleaves with runtime
+// function's activation records. But some valid Lama's pointers can escape
+// into runtime. Those values (theirs stack addresses) has to be registered in
+// an auxiliary data structure called `extra_roots_pool`.
+// extra_roots_pool is a simple LIFO stack. During `pop` it compares that pop's
+// argument is equal to the current stack top.
+#define MAX_EXTRA_ROOTS_NUMBER 32
+
+typedef struct {
+  int    current_free;
+  void **roots[MAX_EXTRA_ROOTS_NUMBER];
+} extra_roots_pool;
+
+void clear_extra_roots (void);
+void push_extra_root (void **p);
+void pop_extra_root (void **p);
+
+// ============================================================================
+//                   Implemented in GASM: see gc_runtime.s
+// ============================================================================
+// MANDATORY TO CALL BEFORE ANY INTERACTION WITH GC (apart from cases where we
+// are working with virtual stack as happens in tests)
+extern void __gc_init (void);
+// should be called before interaction with GC in case of using in tests with
+// virtual stack, otherwise it is automatically invoked by `__gc_init`
+extern void __init (void);
+// mostly useful for tests but basically you want to call this in case you want
+// to deallocate all object allocated via GC
+extern void __shutdown (void);
+// Next two functions sets and unsets `__gc_stack_top`
+// The first (`__pre_gc`) should be called in the very beginning of any runtime
+// function during the execution of which garbage collection can be initiated.
+// The last one is a `companion function` which has to be called at the very
+// end of any function that called `__prec_gc`
 extern void __pre_gc (void);
-// written in ASM
 extern void __post_gc (void);
 
-// invoked from ASM
+// ============================================================================
+//                    invoked from GASM: see gc_runtime.s
+// ============================================================================
 extern void        gc_test_and_mark_root (size_t **root);
 bool               is_valid_heap_pointer (const size_t *);
 static inline bool is_valid_pointer (const size_t *);
 
-void clear_extra_roots (void);
-
-void push_extra_root (void **p);
-
-void pop_extra_root (void **p);
-
-/* Functions for tests */
-
+// ============================================================================
+//                     Auxiliary functions for tests
+// ============================================================================
 #if defined(FULL_INVARIANT_CHECKS) && defined(DEBUG_VERSION)
 // makes a snapshot of current objects in heap (both alive and dead), writes these ids to object_ids_buf,
 // returns number of ids dumped
@@ -118,11 +136,11 @@ void set_stack (size_t stack_top, size_t stack_bottom);
 
 // function to mock extra roots (Lama specific)
 void set_extra_roots (size_t extra_roots_size, void **extra_roots_ptr);
-
 #endif
 
-/* Utility functions */
-
+// ============================================================================
+//                          Utility functions
+// ============================================================================
 // accepts pointer to the start of the region and to the end of the region
 // scans it and if it meets a pointer, it should be modified in according to forward address
 void scan_and_fix_region (memory_chunk *old_heap, void *start, void *end);
