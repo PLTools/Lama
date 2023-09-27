@@ -9,6 +9,9 @@ all:
 	$(MAKE) -C runtime
 	$(MAKE) -C byterun
 	$(MAKE) -C stdlib
+	$(MAKE) -C runtime unit_tests.o
+	$(MAKE) -C runtime invariants_check.o
+	$(MAKE) -C runtime invariants_check_debug_print.o
 
 STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.lama runtime/runtime.a runtime/Std.i)
 
@@ -37,6 +40,11 @@ regression-lama-in-lama: all
 	cp runtime/runtime.a tmp-lama
 	cp -R stdlib/* tmp-lama
 	$(MAKE) -C lama-compiler
+
+unit_tests:
+	./runtime/unit_tests.o
+	./runtime/invariants_check.o
+	./runtime/invariants_check_debug_print.o
 
 clean:
 	$(MAKE) clean -C src

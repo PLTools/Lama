@@ -1,23 +1,38 @@
 CC=gcc
-FLAGS=-no-pie -m32 -g2 -fstack-protector-all -DLAMA_ENV
+COMMON_FLAGS=-no-pie -m32 -g2 -fstack-protector-all
+PROD_FLAGS=$(COMMON_FLAGS) -DLAMA_ENV
+TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
+UNIT_TESTS_FLAGS=$(TEST_FLAGS)
+INVARIANTS_CHECK_FLAGS=$(TEST_FLAGS) -DFULL_INVARIANT_CHECKS
 
+# this target is the most important one, its' artefacts should be used as a runtime of Lama
 all: gc_runtime.o gc.o runtime.o
 	ar rc runtime.a gc_runtime.o runtime.o gc.o
 
-test.o: gc.c gc.h gc_runtime.s runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
-	$(CC) -o test.o -DDEBUG_VERSION $(FLAGS) gc.c gc_runtime.s virt_stack.c ext_arr.c runtime.c test_main.c test_util.s
+# this is a target that runs unit tests, scenarios are written in a single file `test_main.c`
+unit_tests.o: gc.c gc.h gc_runtime.s runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
+	$(CC) -o unit_tests.o $(UNIT_TESTS_FLAGS) gc.c gc_runtime.s virt_stack.c runtime.c test_main.c test_util.s
+
+# this target also runs unit tests but with additional expensive checks of GC invariants which aren't used in production version
+invariants_check.o: gc.c gc.h gc_runtime.s runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
+	$(CC) -o invariants_check.o $(INVARIANTS_CHECK_FLAGS) gc.c gc_runtime.s virt_stack.c runtime.c test_main.c test_util.s
+
+# this target also runs unit tests but with additional expensive checks of GC invariants which aren't used in production version
+# additionally, it prints debug information
+invariants_check_debug_print.o: gc.c gc.h gc_runtime.s runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
+	$(CC) -o invariants_check_debug_print.o $(INVARIANTS_CHECK_FLAGS) -DDEBUG_PRINT gc.c gc_runtime.s virt_stack.c runtime.c test_main.c test_util.s
 
 virt_stack.o: virt_stack.h virt_stack.c
-	$(CC) $(FLAGS) -c virt_stack.c
+	$(CC) $(PROD_FLAGS) -c virt_stack.c
 
 gc.o: gc.c gc.h
-	$(CC) -rdynamic $(FLAGS) -c gc.c
+	$(CC) -rdynamic $(PROD_FLAGS) -c gc.c
 
 gc_runtime.o: gc_runtime.s
-	$(CC) $(FLAGS) -c gc_runtime.s
+	$(CC) $(PROD_FLAGS) -c gc_runtime.s
 
 runtime.o: runtime.c runtime.h
-	$(CC) $(FLAGS) -c runtime.c
+	$(CC) $(PROD_FLAGS) -c runtime.c
 
 clean:
 	$(RM) *.a *.o *~

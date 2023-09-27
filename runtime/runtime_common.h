@@ -17,7 +17,7 @@
 
 #define SEXP_ONLY_HEADER_SZ (sizeof(int))
 
-#ifndef FULL_INVARIANT_CHECKS
+#ifndef DEBUG_VERSION
 #  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(int))
 #else
 #  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(size_t) + sizeof(int))
@@ -44,7 +44,7 @@ typedef struct {
   // other utility info (i.e., size for array, number of fields for s-expression)
   int data_header;
 
-#ifdef FULL_INVARIANT_CHECKS
+#ifdef DEBUG_VERSION
   size_t id;
 #endif
 
@@ -59,7 +59,7 @@ typedef struct {
   // other utility info (i.e., size for array, number of fields for s-expression)
   int data_header;
 
-#ifdef FULL_INVARIANT_CHECKS
+#ifdef DEBUG_VERSION
   size_t id;
 #endif
 

@@ -16,7 +16,7 @@
 
 static const size_t INIT_HEAP_SIZE = MINIMUM_HEAP_CAPACITY;
 
-#ifdef FULL_INVARIANT_CHECKS
+#ifdef DEBUG_VERSION
 size_t cur_id = 0;
 #endif
 
@@ -49,12 +49,12 @@ void handler (int sig) {
 }
 
 void *alloc (size_t size) {
-#ifdef FULL_INVARIANT_CHECKS
+#ifdef DEBUG_VERSION
   ++cur_id;
 #endif
   size_t bytes_sz = size;
   size            = BYTES_TO_WORDS(size);
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "allocation of size %zu words (%zu bytes): ", size, bytes_sz);
 #endif
   void *p = gc_alloc_on_existing_heap(size);
@@ -184,7 +184,7 @@ void *gc_alloc_on_existing_heap (size_t size) {
 }
 
 void *gc_alloc (size_t size) {
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "===============================GC cycle has started\n");
 #endif
 #ifdef FULL_INVARIANT_CHECKS
@@ -217,32 +217,34 @@ void *gc_alloc (size_t size) {
   fclose(heap_before_compaction);
   fclose(heap_after_compaction);
 #endif
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "===============================GC cycle has finished\n");
 #endif
   return gc_alloc_on_existing_heap(size);
 }
 
 void mark_phase (void) {
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "marking has started\n");
   fprintf(stderr,
           "__gc_root_scan_stack has started: gc_top=%p bot=%p\n",
-          __gc_stack_top,
-          __gc_stack_bottom);
+          (void *)__gc_stack_top,
+          (void *)__gc_stack_bottom);
 #endif
   __gc_root_scan_stack();
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "__gc_root_scan_stack has finished\n");
   fprintf(stderr, "scan_extra_roots has started\n");
 #endif
   scan_extra_roots();
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "scan_extra_roots has finished\n");
   fprintf(stderr, "scan_global_area has started\n");
 #endif
+#ifdef LAMA_ENV
   scan_global_area();
-#ifdef DEBUG_VERSION
+#endif
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "scan_global_area has finished\n");
   fprintf(stderr, "marking has finished\n");
 #endif
@@ -254,8 +256,7 @@ void compact_phase (size_t additional_size) {
   // all in words
   size_t next_heap_size =
       MAX(live_size * EXTRA_ROOM_HEAP_COEFFICIENT + additional_size, MINIMUM_HEAP_CAPACITY);
-  size_t next_heap_pseudo_size =
-      MAX(next_heap_size, heap.size);   // this is weird but here is why it happens:
+  size_t next_heap_pseudo_size = MAX(next_heap_size, heap.size);
 
   memory_chunk old_heap = heap;
   heap.begin            = mremap(
@@ -275,7 +276,7 @@ void compact_phase (size_t additional_size) {
 }
 
 size_t compute_locations () {
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "GC compute_locations started\n");
 #endif
   size_t       *free_ptr  = heap.begin;
@@ -292,7 +293,7 @@ size_t compute_locations () {
     }
   }
 
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "GC compute_locations finished\n");
 #endif
   // it will return number of words
@@ -300,7 +301,7 @@ size_t compute_locations () {
 }
 
 void scan_and_fix_region (memory_chunk *old_heap, void *start, void *end) {
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "GC scan_and_fix_region started\n");
 #endif
   for (size_t *ptr = (size_t *)start; ptr < (size_t *)end; ++ptr) {
@@ -316,14 +317,14 @@ void scan_and_fix_region (memory_chunk *old_heap, void *start, void *end) {
       *(void **)ptr         = new_addr + content_offset;
     }
   }
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "GC scan_and_fix_region finished\n");
 #endif
 }
 
 void scan_and_fix_region_roots (memory_chunk *old_heap) {
-#ifdef DEBUG_VERSION
-  fprintf(stderr, "extra roots started: number os extra roots %i\n", extra_roots.current_free);
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
+  fprintf(stderr, "extra roots started: number of extra roots %i\n", extra_roots.current_free);
 #endif
   for (int i = 0; i < extra_roots.current_free; i++) {
     size_t *ptr       = (size_t *)extra_roots.roots[i];
@@ -339,12 +340,14 @@ void scan_and_fix_region_roots (memory_chunk *old_heap) {
     ) {
 #ifdef DEBUG_VERSION
       if (is_valid_heap_pointer((size_t *)ptr_value)) {
+#  ifdef DEBUG_PRINT
         fprintf(stderr,
                 "|\tskip extra root: %p (%p), since it points to Lama's stack top=%p bot=%p\n",
                 extra_roots.roots[i],
-                ptr_value,
-                __gc_stack_top,
-                __gc_stack_bottom);
+                (void *)ptr_value,
+                (void *)__gc_stack_top,
+                (void *)__gc_stack_bottom);
+#  endif
       }
 #  ifdef LAMA_ENV
       else if ((extra_roots.roots[i] <= (void *)&__stop_custom_data
@@ -353,17 +356,19 @@ void scan_and_fix_region_roots (memory_chunk *old_heap) {
             stderr,
             "|\tskip extra root: %p (%p), since it points to Lama's static area stop=%p start=%p\n",
             extra_roots.roots[i],
-            ptr_value,
+            (void *)ptr_value,
             (void *)&__stop_custom_data,
             (void *)&__start_custom_data);
         exit(1);
       }
 #  endif
       else {
+#  ifdef DEBUG_PRINT
         fprintf(stderr,
                 "|\tskip extra root: %p (%p): not a valid Lama pointer \n",
                 extra_roots.roots[i],
-                ptr_value);
+                (void *)ptr_value);
+#  endif
       }
 #endif
       continue;
@@ -374,18 +379,22 @@ void scan_and_fix_region_roots (memory_chunk *old_heap) {
           (void *)heap.begin + ((void *)get_forward_address(obj_ptr) - (void *)old_heap->begin);
       size_t content_offset = get_header_size(get_type_row_ptr(obj_ptr));
       *(void **)ptr         = new_addr + content_offset;
-#ifdef DEBUG_VERSION
-      fprintf(stderr, "|\textra root (%p) %p -> %p\n", extra_roots.roots[i], ptr_value, *ptr);
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
+      fprintf(stderr,
+              "|\textra root (%p) %p -> %p\n",
+              extra_roots.roots[i],
+              (void *)ptr_value,
+              (void *)*ptr);
 #endif
     }
   }
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "|\textra roots finished\n");
 #endif
 }
 
 void update_references (memory_chunk *old_heap) {
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "GC update_references started\n");
 #endif
   heap_iterator it = heap_begin_iterator();
@@ -410,9 +419,11 @@ void update_references (memory_chunk *old_heap) {
         size_t content_offset = get_header_size(get_type_row_ptr(field_obj_content_addr));
 #ifdef DEBUG_VERSION
         if (!is_valid_heap_pointer((void *)(new_addr + content_offset))) {
+#  ifdef DEBUG_PRINT
           fprintf(stderr,
                   "ur: incorrect pointer assignment: on object with id %d",
                   TO_DATA(get_object_content_ptr(it.current))->id);
+#  endif
           exit(1);
         }
 #endif
@@ -431,13 +442,13 @@ void update_references (memory_chunk *old_heap) {
   assert((void *)&__stop_custom_data >= (void *)&__start_custom_data);
   scan_and_fix_region(old_heap, (void *)&__start_custom_data, (void *)&__stop_custom_data);
 #endif
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "GC update_references finished\n");
 #endif
 }
 
 void physically_relocate (memory_chunk *old_heap) {
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "GC physically_relocate started\n");
 #endif
   heap_iterator from_iter = heap_begin_iterator();
@@ -455,7 +466,7 @@ void physically_relocate (memory_chunk *old_heap) {
     }
     from_iter = next_iter;
   }
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "GC physically_relocate finished\n");
 #endif
 }
@@ -532,7 +543,7 @@ void scan_global_area (void) {
 #endif
 
 extern void gc_test_and_mark_root (size_t **root) {
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr,
           "\troot = %p (%p), stack addresses: [%p, %p)\n",
           root,
@@ -563,7 +574,7 @@ extern void __init (void) {
 
 extern void __shutdown (void) {
   munmap(heap.begin, heap.size);
-#ifdef FULL_INVARIANT_CHECKS
+#ifdef DEBUG_VERSION
   cur_id = 0;
 #endif
   heap.begin        = NULL;
@@ -600,7 +611,7 @@ void pop_extra_root (void **p) {
 
 /* Functions for tests */
 
-#if defined(FULL_INVARIANT_CHECKS) && defined(DEBUG_VERSION)
+#if defined(DEBUG_VERSION)
 size_t objects_snapshot (int *object_ids_buf, size_t object_ids_buf_size) {
   size_t *ids_ptr = (size_t *)object_ids_buf;
   size_t  i       = 0;
@@ -720,11 +731,12 @@ lama_type get_type_header_ptr (void *ptr) {
     case CLOSURE_TAG: return CLOSURE;
     case SEXP_TAG: return SEXP;
     default: {
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
       fprintf(stderr, "ERROR: get_type_header_ptr: unknown object header, cur_id=%d", cur_id);
       raise(SIGINT);   // only for debug purposes
 #else
 #  ifdef FULL_INVARIANT_CHECKS
+#    ifdef DEBUG_PRINT
       fprintf(stderr,
               "ERROR: get_type_header_ptr: unknown object header, ptr is %p, tag %i, heap size is "
               "%d cur_id=%d stack_top=%p stack_bot=%p ",
@@ -734,6 +746,7 @@ lama_type get_type_header_ptr (void *ptr) {
               cur_id,
               (void *)__gc_stack_top,
               (void *)__gc_stack_bottom);
+#    endif
       FILE *heap_before_compaction = print_objects_traversal("dump_kill", 1);
       fclose(heap_before_compaction);
 #  endif
@@ -847,10 +860,10 @@ size_t get_header_size (lama_type type) {
 void *alloc_string (int len) {
   data *obj        = alloc(string_size(len));
   obj->data_header = STRING_TAG | (len << 3);
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "%p, [STRING] tag=%zu\n", obj, TAG(obj->data_header));
 #endif
-#ifdef FULL_INVARIANT_CHECKS
+#ifdef DEBUG_VERSION
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
@@ -860,10 +873,10 @@ void *alloc_string (int len) {
 void *alloc_array (int len) {
   data *obj        = alloc(array_size(len));
   obj->data_header = ARRAY_TAG | (len << 3);
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "%p, [ARRAY] tag=%zu\n", obj, TAG(obj->data_header));
 #endif
-#ifdef FULL_INVARIANT_CHECKS
+#ifdef DEBUG_VERSION
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
@@ -873,10 +886,10 @@ void *alloc_array (int len) {
 void *alloc_sexp (int members) {
   sexp *obj        = alloc(sexp_size(members));
   obj->data_header = SEXP_TAG | (members << 3);
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "%p, SEXP tag=%zu\n", obj, TAG(obj->data_header));
 #endif
-#ifdef FULL_INVARIANT_CHECKS
+#ifdef DEBUG_VERSION
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
@@ -888,10 +901,10 @@ void *alloc_closure (int captured) {
 
   data *obj        = alloc(closure_size(captured));
   obj->data_header = CLOSURE_TAG | (captured << 3);
-#ifdef DEBUG_VERSION
+#if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "%p, [CLOSURE] tag=%zu\n", obj, TAG(obj->data_header));
 #endif
-#ifdef FULL_INVARIANT_CHECKS
+#ifdef DEBUG_VERSION
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;

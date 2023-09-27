@@ -22,15 +22,15 @@ void test_correct_structure_sizes (void) {
   // something like induction base
   assert((array_size(0) == get_header_size(ARRAY)));
   assert((string_size(0) == get_header_size(STRING) + 1));   // +1 is because of  '\0'
-  assert((sexp_size(0) == get_header_size(SEXP)));
+  assert((sexp_size(0) == get_header_size(SEXP) + MEMBER_SIZE));
   assert((closure_size(0) == get_header_size(CLOSURE)));
 
   // just check correctness for some small sizes
   for (int k = 1; k < 20; ++k) {
-    assert((array_size(k) == get_header_size(ARRAY) + sizeof(int) * k));
+    assert((array_size(k) == get_header_size(ARRAY) + MEMBER_SIZE * k));
     assert((string_size(k) == get_header_size(STRING) + k + 1));
-    assert((sexp_size(k) == get_header_size(SEXP) + sizeof(int) * k));
-    assert((closure_size(k) == get_header_size(CLOSURE) + sizeof(int) * k));
+    assert((sexp_size(k) == get_header_size(SEXP) + MEMBER_SIZE * (k + 1)));
+    assert((closure_size(k) == get_header_size(CLOSURE) + MEMBER_SIZE * k));
   }
 }
 
