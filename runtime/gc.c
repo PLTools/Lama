@@ -22,7 +22,7 @@ size_t cur_id = 0;
 
 static extra_roots_pool extra_roots;
 
-extern size_t __gc_stack_top, __gc_stack_bottom;
+size_t __gc_stack_top = 0, __gc_stack_bottom = 0;
 #ifdef LAMA_ENV
 extern const size_t __start_custom_data, __stop_custom_data;
 #endif
@@ -38,8 +38,8 @@ void dump_heap ();
 #endif
 
 void handler (int sig) {
-  void  *array[10];
-  size_t size;
+  void *array[10];
+  int   size;
 
   // get void*'s for all entries on the stack
   size = backtrace(array, 10);
@@ -59,9 +59,8 @@ void *alloc (size_t size) {
 #endif
   void *p = gc_alloc_on_existing_heap(size);
   if (!p) {
-    // not enough place in heap, need to perform GC cycle
+    // not enough place in the heap, need to perform GC cycle
     p = gc_alloc(size);
-    //    return gc_alloc(size);
   }
   return p;
 }
@@ -223,17 +222,23 @@ void *gc_alloc (size_t size) {
   return gc_alloc_on_existing_heap(size);
 }
 
+static void gc_root_scan_stack () {
+  for (size_t *p = (size_t *)(__gc_stack_top + 4); p < (size_t *)__gc_stack_bottom; ++p) {
+    gc_test_and_mark_root((size_t **)p);
+  }
+}
+
 void mark_phase (void) {
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "marking has started\n");
   fprintf(stderr,
-          "__gc_root_scan_stack has started: gc_top=%p bot=%p\n",
+          "gc_root_scan_stack has started: gc_top=%p bot=%p\n",
           (void *)__gc_stack_top,
           (void *)__gc_stack_bottom);
 #endif
-  __gc_root_scan_stack();
+  gc_root_scan_stack();
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
-  fprintf(stderr, "__gc_root_scan_stack has finished\n");
+  fprintf(stderr, "gc_root_scan_stack has finished\n");
   fprintf(stderr, "scan_extra_roots has started\n");
 #endif
   scan_extra_roots();
@@ -554,7 +559,12 @@ extern void gc_test_and_mark_root (size_t **root) {
   mark((void *)*root);
 }
 
-extern void __init (void) {
+void __gc_init (void) {
+  __gc_stack_bottom = (size_t)__builtin_frame_address(1) + 4;
+  __init();
+}
+
+void __init (void) {
   signal(SIGSEGV, handler);
   size_t space_size = INIT_HEAP_SIZE * sizeof(size_t);
 

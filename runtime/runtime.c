@@ -30,23 +30,18 @@ void __post_gc_subst () { }
 #endif
 /* end */
 
+extern size_t __gc_stack_top, __gc_stack_bottom;
+
 #define PRE_GC()                                                                                   \
-  bool flag = true;                                                                                \
-  if (__gc_stack_top == 0) { flag = false; }                                                       \
-  __pre_gc();                                                                                      \
+  bool flag = false;                                                                               \
+  flag      = __gc_stack_top == 0;                                                                 \
+  if (flag) { __gc_stack_top = (size_t)__builtin_frame_address(0); }                               \
   assert(__gc_stack_top != 0);                                                                     \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);
 
 #define POST_GC()                                                                                  \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);                                    \
-  __post_gc();                                                                                     \
-                                                                                                   \
-  if (!flag && __gc_stack_top != 0) {                                                              \
-    fprintf(stderr, "Moving stack???\n");                                                          \
-    assert(false);                                                                                 \
-  }
-
-extern size_t __gc_stack_top, __gc_stack_bottom;
+  if (flag) { __gc_stack_top = 0; }
 
 static void vfailure (char *s, va_list args) {
   fprintf(stderr, "*** FAILURE: ");

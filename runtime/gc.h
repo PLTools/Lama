@@ -58,8 +58,6 @@ void *gc_alloc_on_existing_heap(size_t);
 // specific for mark-and-compact_phase gc
 void mark (void *obj);
 void mark_phase (void);
-// written in ASM, scans stack for pointers to the heap and starts marking process
-extern void __gc_root_scan_stack (void);
 // marks each pointer from extra roots
 void scan_extra_roots (void);
 #ifdef LAMA_ENV
@@ -100,23 +98,15 @@ void pop_extra_root (void **p);
 // ============================================================================
 // MANDATORY TO CALL BEFORE ANY INTERACTION WITH GC (apart from cases where we
 // are working with virtual stack as happens in tests)
-extern void __gc_init (void);
+void __gc_init (void);
 
 // should be called before interaction with GC in case of using in tests with
 // virtual stack, otherwise it is automatically invoked by `__gc_init`
-extern void __init (void);
+void __init (void);
 
 // mostly useful for tests but basically you want to call this in case you want
 // to deallocate all object allocated via GC
 extern void __shutdown (void);
-
-// Next two functions sets and unsets `__gc_stack_top`
-// The first (`__pre_gc`) should be called in the very beginning of any runtime
-// function during the execution of which garbage collection can be initiated.
-// The last one is a `companion function` which has to be called at the very
-// end of any function that previously called `__pre_gc`
-extern void __pre_gc (void);
-extern void __post_gc (void);
 
 
 // ============================================================================
