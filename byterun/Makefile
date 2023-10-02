@@ -1,4 +1,4 @@
-FLAGS=-no-pie -m32 -g2 -fstack-protector-all
+FLAGS=-m32 -g2 -fstack-protector-all
 
 all: byterun.o
 	$(CC) $(FLAGS) -o byterun byterun.o ../runtime/runtime.a
