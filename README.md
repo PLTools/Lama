@@ -2,8 +2,8 @@
 | ------------------- |
 | [![Lama 1.2][1]][2] |
 
-[1]:  https://github.com/PLTools/Lama/Lama/workflows/Build/badge.svg?branch=1.10
-[2]:  https://github.com/PLTools/Lama//Lama/actions
+[1]:  https://github.com/PLTools/Lama/workflows/Build/badge.svg?branch=1.10
+[2]:  https://github.com/PLTools/Lama/actions
 
 # Lama
 
