@@ -124,3 +124,7 @@ It should build a local compiler `src/lamac` and a few tutorial executables in `
 ### Useful links
 
 * [Plugin for VS Code](https://marketplace.visualstudio.com/items?itemName=arsavelev.lsp-lama)
+
+### Changes in Lama 1.2
+
+* New garbage collector: single-threaded stop-the-world `LISP2` (see GC Handbook for details: [1st edition](https://www.cs.kent.ac.uk/people/staff/rej/gcbook/), [2nd edition](http://gchandbook.org/)) [mark-compact](https://www.memorymanagement.org/glossary/m.html#term-mark-compact).
