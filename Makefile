@@ -46,6 +46,9 @@ unit_tests:
 	./runtime/invariants_check.o
 	./runtime/invariants_check_debug_print.o
 
+negative_scenarios_tests:
+	$(MAKE) -C runtime negative_tests
+
 clean:
 	$(MAKE) clean -C src
 	$(MAKE) clean -C runtime
