@@ -120,3 +120,7 @@ Ubuntu-based variant of WSL is recommended.
 
 Clone the repository and run `make -C tutorial`.
 It should build a local compiler `src/lamac` and a few tutorial executables in `tutorial/`.
+
+### Useful links
+
+* [Plugin for VS Code](https://marketplace.visualstudio.com/items?itemName=arsavelev.lsp-lama)
