@@ -24,7 +24,7 @@ uninstall:
 	$(RM) -r `opam var share`/Lama
 	$(RM) `opam var bin`/$(EXECUTABLE)
 
-regression-all: regression regression-expressions regression-lama-in-lama
+regression-all: regression regression-expressions
 
 regression:
 	$(MAKE) clean check -j8 -C regression
@@ -33,13 +33,6 @@ regression:
 regression-expressions:
 	$(MAKE) clean check -j8 -C regression/expressions
 	$(MAKE) clean check -j8 -C regression/deep-expressions
-
-regression-lama-in-lama: all
-	mkdir tmp-lama
-	cp runtime/Std.i tmp-lama
-	cp runtime/runtime.a tmp-lama
-	cp -R stdlib/* tmp-lama
-	$(MAKE) -C lama-compiler
 
 unit_tests:
 	./runtime/unit_tests.o
@@ -56,5 +49,3 @@ clean:
 	$(MAKE) clean -C regression
 	$(MAKE) clean -C byterun
 	$(MAKE) clean -C bench
-	$(MAKE) clean -C lama-compiler
-	if [ -d tmp-lama ]; then rm -Rf tmp-lama; fi

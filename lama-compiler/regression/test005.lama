@@ -1,6 +1,0 @@
-var x, y, z;
-
-x := read ();
-y := read ();
-z := ((x + y) + (x - y)) + ((x - y) - (x / y));
-write (z)

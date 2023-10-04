@@ -1,6 +1,0 @@
-var x = 0;
-
-if x
-then write(1)
-else write(2)
-fi
