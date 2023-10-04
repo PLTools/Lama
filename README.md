@@ -98,7 +98,7 @@ Ubuntu-based variant of WSL is recommended.
 3. Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
 
     ```bash
-    $ opam pin add Lama https://github.com/PLTools/Lama.git\#1.2 --no-action
+    $ opam pin add Lama https://github.com/PLTools/Lama.git\#v1.2 --no-action
     ```
 
     The extra '#' sign is added because in various Shells it is the start of a comment
