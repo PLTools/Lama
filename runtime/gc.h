@@ -1,3 +1,23 @@
+// ============================================================================
+//                              GC
+// ============================================================================
+// This is an implementation of a compactifying garbage collection algorithm.
+// GC algorithm itself consists of two major stages:
+//      1. Marking roots
+//      2. Compacting stage
+// Compacting is implemented in a very similar fashion to LISP2 algorithm,
+// which is well-known.
+// Most important pieces of code to discover to understand how everything works:
+//  - void *gc_alloc (size_t): this function is basically called whenever we are
+// not able to allocate memory on the existing heap via simple bump allocator.
+//  - mark_phase(): this function will tell you everything you need to know
+// about marking. I would also recommend to pay attention to the fact that
+// marking is implemented without usage of any additional memory. Already
+// allocated space is sufficient (for details see 'void mark (void *obj)').
+//  - void compact_phase (size_t additional_size): the whole compaction phase
+// can be understood by looking at this piece of code plus couple of other
+// functions used in there. It is basically an implementation of LISP2.
+
 #ifndef __LAMA_GC__
 #define __LAMA_GC__
 
