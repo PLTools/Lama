@@ -1,11 +1,9 @@
-| Lama         1.10    | Lama-devel        1.10     |
-| -------------------- | -------------------------- |
-| [![Lama 1.10][1]][2] | [![Lama-devel 1.10][3]][4] |
+| Lama         1.2    |
+| ------------------- |
+| [![Lama 1.2][1]][2] |
 
-[1]:  https://github.com/JetBrains-Research/Lama/workflows/Build/badge.svg?branch=1.10
-[2]:  https://github.com/JetBrains-Research/Lama/actions
-[3]:  https://github.com/JetBrains-Research/Lama-devel/workflows/Build/badge.svg?branch=1.10
-[4]:  https://github.com/JetBrains-Research/Lama-devel/actions
+[1]:  https://github.com/PLTools/Lama/Lama/workflows/Build/badge.svg?branch=1.10
+[2]:  https://github.com/PLTools/Lama//Lama/actions
 
 # Lama
 
@@ -26,13 +24,13 @@ The name ![lama](lama.svg) is an acronym for *Lambda-Algol* since the language h
 
 The main purpose of ![lama](lama.svg) is to present a repertoire of constructs with certain runtime behavior and relevant implementation techniques.
 The lack of a type system (a vital feature for a real-world language
-for software engineering) is an intensional decision that allows showing the unchained diversity of runtime behaviors, including those that a typical type system is called to prevent. 
+for software engineering) is an intensional decision that allows showing the unchained diversity of runtime behaviors, including those that a typical type system is called to prevent.
 On the other hand the language can be used in the future as a raw substrate to apply various ways of software verification (including type systems).
 
 The current implementation contains a native code compiler for **x86-32**, written in **OCaml**, a runtime library with garbage-collection support, written in **C**, and a small standard library, written in ![lama](lama.svg) itself.
 The native code compiler uses **gcc** as a toolchain.
 
-In addition, a source-level reference interpreter is implemented as well as a compiler to a small stack machine. 
+In addition, a source-level reference interpreter is implemented as well as a compiler to a small stack machine.
 The stack machine code can in turn be either interpreted on a stack machine interpreter, or used as an intermediate representation by the native code compiler.
 
 ## Language Specification
@@ -51,9 +49,9 @@ Ubuntu-based variant of WSL is recommended.
 * System-wide prerequisites:
 
   - `gcc-multilib`
-    
+
     For example, (for Debian-based GNU/Linux):
-    ```bash 
+    ```bash
     $ sudo apt install gcc-multilib
     ```
 
@@ -73,10 +71,10 @@ Ubuntu-based variant of WSL is recommended.
 1. Install the right [switch](https://opam.ocaml.org/doc/Manual.html#Switches) for the OCaml compiler
 
     ```bash
-    # for fresh opam 
-    $ opam switch create lama --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda 
-    # for old opam 
-    $ opam switch create lama ocaml-variants.4.10.1+flambda   
+    # for fresh opam
+    $ opam switch create lama --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda
+    # for old opam
+    $ opam switch create lama ocaml-variants.4.13.1+flambda
     ```
 
     * In the above command:
@@ -100,7 +98,7 @@ Ubuntu-based variant of WSL is recommended.
 3. Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
 
     ```bash
-    $ opam pin add Lama https://github.com/JetBrains-Research/Lama.git\#1.10 --no-action
+    $ opam pin add Lama https://github.com/PLTools/Lama.git\#1.2 --no-action
     ```
 
     The extra '#' sign is added because in various Shells it is the start of a comment
@@ -120,5 +118,13 @@ Ubuntu-based variant of WSL is recommended.
 
 ### Smoke-testing (optional)
 
-Clone the repository and run `make -C tutorial`. 
+Clone the repository and run `make -C tutorial`.
 It should build a local compiler `src/lamac` and a few tutorial executables in `tutorial/`.
+
+### Useful links
+
+* [Plugin for VS Code](https://marketplace.visualstudio.com/items?itemName=arsavelev.lsp-lama)
+
+### Changes in Lama 1.2
+
+* New garbage collector: single-threaded stop-the-world `LISP2` (see GC Handbook for details: [1st edition](https://www.cs.kent.ac.uk/people/staff/rej/gcbook/), [2nd edition](http://gchandbook.org/)) [mark-compact](https://www.memorymanagement.org/glossary/m.html#term-mark-compact).

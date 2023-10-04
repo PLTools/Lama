@@ -7,10 +7,10 @@ LAMAC = ../../src/lamac
 check: $(TESTS)
 
 $(TESTS): %: %.lama
-	@echo $@
+	@echo "regression/deep-expressions/$@"
 	@LAMA=../../runtime $(LAMAC) $< && cat $@.input | ./$@ > $@.log && diff $@.log orig/$@.log
-	@cat $@.input | $(LAMAC) -i $< > $@.log && diff $@.log orig/$@.log
-	@cat $@.input | $(LAMAC) -s $< > $@.log && diff $@.log orig/$@.log
+	@cat $@.input | LAMA=../../runtime $(LAMAC) -i $< > $@.log && diff $@.log orig/$@.log
+	@cat $@.input | LAMA=../../runtime $(LAMAC) -s $< > $@.log && diff $@.log orig/$@.log
 
 clean:
 	rm -f *.log *.s *~

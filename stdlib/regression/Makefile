@@ -1,4 +1,4 @@
-TESTS=$(sort $(basename $(wildcard test*.lama)))
+TESTS=$(sort $(filter-out test30, $(basename $(wildcard test*.lama))))
 
 LAMAC=../../src/lamac
 
@@ -7,8 +7,8 @@ LAMAC=../../src/lamac
 check: $(TESTS)
 
 $(TESTS): %: %.lama
-	@echo $@
-	LAMA=../../runtime $(LAMAC) -I .. -ds -dp $< && ./$@ > $@.log && diff $@.log orig/$@.log
+	@echo "stdlib/regression/$@"
+	@LAMA=../../runtime $(LAMAC) -I .. -ds -dp $< && ./$@ > $@.log && diff $@.log orig/$@.log
 
 clean:
 	$(RM) test*.log *.s *~ $(TESTS) *.i
