@@ -7,29 +7,6 @@
 #include "gc.h"
 #include "runtime_common.h"
 
-#define __ENABLE_GC__
-#ifndef __ENABLE_GC__
-#  define alloc malloc
-#endif
-
-#ifdef __ENABLE_GC__
-
-/* GC extern invariant for built-in functions */
-extern void __pre_gc ();
-extern void __post_gc ();
-
-#else
-
-#  define __pre_gc __pre_gc_subst
-#  define __post_gc __post_gc_subst
-
-void __pre_gc_subst () { }
-
-void __post_gc_subst () { }
-
-#endif
-/* end */
-
 extern size_t __gc_stack_top, __gc_stack_bottom;
 
 #define PRE_GC()                                                                                   \
