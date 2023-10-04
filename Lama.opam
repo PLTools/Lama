@@ -14,7 +14,7 @@ bug-reports: "https://github.com/PLTools/Lama/issues"
 depends: [
   "ocaml"       { >= "4.13.1" }
   "ocamlfind"   { build }
-  "camlp5"      { >= "8.00.05"}
+  "camlp5"      { >= "8.00.05" }
   "ostap"       { >= "0.5"}
   "GT"          { >= "0.5.1" }
 ]
