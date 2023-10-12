@@ -55,7 +55,7 @@ Ubuntu-based variant of WSL is recommended.
     $ sudo apt install gcc-multilib
     ```
 
-     On some versions, you need to install the additional package `lib32gcc-9-dev` in case of errors like
+     On some versions, you need to install the additional package `lib32gcc-V-dev` (where `V` is output of `gcc --version`, e. g. `sudo apt install lib32gcc-9-dev`) in case of errors like
        ```
       /usr/bin/ld: cannot find -lgcc
       /usr/bin/ld: skipping incompatible /usr/lib/gcc/x86_64-linux-gnu/9/libgcc.a when searching for -lgcc
