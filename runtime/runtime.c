@@ -60,6 +60,8 @@ extern void *Bsexp (int n, ...);
 extern int   LtagHash (char *);
 
 void *global_sysargs;
+void *global_stdout;
+void *global_stderr;
 
 // Gets a raw data_header
 extern int LkindOf (void *p) {
@@ -1249,6 +1251,8 @@ extern void set_args (int argc, char *argv[]) {
   POST_GC();
 
   global_sysargs = p;
+  global_stdout = stdout;
+  global_stderr = stderr;
 
   push_extra_root((void **)&global_sysargs);
 }

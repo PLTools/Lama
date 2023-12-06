@@ -2,6 +2,8 @@ F,assert;
 F,getEnv;
 F,system;
 V,sysargs;
+V,stdout;
+V,stderr;
 F,stringInt;
 F,makeArray;
 F,string;
