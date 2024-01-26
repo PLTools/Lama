@@ -672,7 +672,7 @@ extern int Lcompare (void *p, void *q) {
   }
 }
 
-extern void *Belem (void *p, int i) {
+extern void *Belem (void *p, long i) {
   data *a = (data *)BOX(NULL);
 
   if (UNBOXED(p)) { ASSERT_BOXED(".elem:1", p); }
@@ -682,7 +682,7 @@ extern void *Belem (void *p, int i) {
   i = UNBOX(i);
 
   switch (TAG(a->data_header)) {
-    case STRING_TAG: return (void *)BOX(a->contents[i]);
+    case STRING_TAG: return (void *)BOX((char)a->contents[i]);
     case SEXP_TAG: return (void *)((int *)a->contents)[i + 1];
     default: return (void *)((int *)a->contents)[i];
   }
@@ -866,17 +866,19 @@ extern void *Bsexp (int bn, ...) {
   va_end(args);
 
   POST_GC();
-  return (int *)r->contents;
+  // printf("bsexp: %ld %p", r->contents, r->contents);
+  // fflush(stdout);
+  return (void *)r->contents;
 }
 
-extern int Btag (void *d, int t, int n) {
+extern long Btag (void *d, int t, int n) {
   data *r;
 
   if (UNBOXED(d)) return BOX(0);
   else {
     r = TO_DATA(d);
-    return BOX(TAG(r->data_header) == SEXP_TAG && TO_SEXP(d)->tag == UNBOX(t)
-               && LEN(r->data_header) == UNBOX(n));
+    return (long)BOX(TAG(r->data_header) == SEXP_TAG && TO_SEXP(d)->tag == UNBOX(t)
+                     && LEN(r->data_header) == UNBOX(n));
   }
 }
 
@@ -938,7 +940,7 @@ extern int Bsexp_tag_patt (void *x) {
   return BOX(TAG(TO_DATA(x)->data_header) == SEXP_TAG);
 }
 
-extern void *Bsta (void *v, int i, void *x) {
+extern void *Bsta (void *v, long i, void *x) {
   if (UNBOXED(i)) {
     ASSERT_BOXED(".sta:3", x);
     data *d = TO_DATA(x);
@@ -1070,7 +1072,7 @@ extern void *LgetEnv (char *var) {
 extern int Lsystem (char *cmd) { return BOX(system(cmd)); }
 
 extern void Lfprintf (FILE *f, char *s, ...) {
-  va_list args = (va_list)BOX(NULL);
+  va_list args;   // = (va_list)BOX(NULL);
 
   ASSERT_BOXED("fprintf:1", f);
   ASSERT_STRING("fprintf:2", s);
@@ -1082,7 +1084,7 @@ extern void Lfprintf (FILE *f, char *s, ...) {
 }
 
 extern void Lprintf (char *s, ...) {
-  va_list args = (va_list)BOX(NULL);
+  va_list args;   // = (va_list)BOX(NULL);
 
   ASSERT_STRING("printf:1", s);
 
@@ -1188,12 +1190,13 @@ extern void *Lhd (void *v) { return Belem(v, BOX(0)); }
 extern void *Ltl (void *v) { return Belem(v, BOX(1)); }
 
 /* Lread is an implementation of the "read" construct */
-extern int Lread () {
-  int result = BOX(0);
+extern long Lread () {
+  // int result = BOX(0);
+  int64_t result = BOX(0);
 
   printf("> ");
   fflush(stdout);
-  scanf("%d", &result);
+  scanf("%li", &result);
 
   return BOX(result);
 }
@@ -1209,8 +1212,8 @@ extern int Lbinoperror2 (void) {
 }
 
 /* Lwrite is an implementation of the "write" construct */
-extern int Lwrite (int n) {
-  printf("%d\n", UNBOX(n));
+extern long Lwrite (long n) {
+  printf("%ld\n", UNBOX(n));
   fflush(stdout);
 
   return 0;

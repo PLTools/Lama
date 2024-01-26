@@ -37,11 +37,12 @@
 #define SET_FORWARD_ADDRESS(x, addr) (x = ((x & 3) | ((int)(addr))))
 // if heap is full after gc shows in how many times it has to be extended
 #define EXTRA_ROOM_HEAP_COEFFICIENT 2
-#ifdef DEBUG_VERSION
-#  define MINIMUM_HEAP_CAPACITY (8)
-#else
-#  define MINIMUM_HEAP_CAPACITY (1 << 2)
-#endif
+// #ifdef DEBUG_VERSION
+// #  define MINIMUM_HEAP_CAPACITY (8)
+// #else
+// #  define MINIMUM_HEAP_CAPACITY (1 << 2)
+#define MINIMUM_HEAP_CAPACITY (1 << 16)
+// #endif
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -65,7 +66,6 @@ typedef struct {
   size_t *current;
   size_t  size;
 } memory_chunk;
-
 
 // the only GC-related function that should be exposed, others are useful for tests and internal implementation
 // allocates object of the given size on the heap
@@ -91,7 +91,6 @@ size_t compute_locations ();
 void   update_references (memory_chunk *);
 void   physically_relocate (memory_chunk *);
 
-
 // ============================================================================
 //                            GC extra roots
 // ============================================================================
@@ -112,7 +111,6 @@ void clear_extra_roots (void);
 void push_extra_root (void **p);
 void pop_extra_root (void **p);
 
-
 // ============================================================================
 //                   Implemented in GASM: see gc_runtime.s
 // ============================================================================
@@ -128,14 +126,12 @@ void __init (void);
 // to deallocate all object allocated via GC
 extern void __shutdown (void);
 
-
 // ============================================================================
 //                    invoked from GASM: see gc_runtime.s
 // ============================================================================
 extern void        gc_test_and_mark_root (size_t **root);
 bool               is_valid_heap_pointer (const size_t *);
 static inline bool is_valid_pointer (const size_t *);
-
 
 // ============================================================================
 //                     Auxiliary functions for tests
@@ -148,7 +144,6 @@ static inline bool is_valid_pointer (const size_t *);
 size_t objects_snapshot (int *object_ids_buf, size_t object_ids_buf_size);
 #endif
 
-
 #ifdef DEBUG_VERSION
 // essential function to mock program stack
 void set_stack (size_t stack_top, size_t stack_bottom);
@@ -156,7 +151,6 @@ void set_stack (size_t stack_top, size_t stack_bottom);
 // function to mock extra roots (Lama specific)
 void set_extra_roots (size_t extra_roots_size, void **extra_roots_ptr);
 #endif
-
 
 // ============================================================================
 //                          Utility functions

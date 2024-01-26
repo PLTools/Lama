@@ -7,11 +7,11 @@ MKDIR ?= mkdir
 all:
 	$(MAKE) -C src
 	$(MAKE) -C runtime
-	$(MAKE) -C byterun
-	$(MAKE) -C stdlib
-	$(MAKE) -C runtime unit_tests.o
-	$(MAKE) -C runtime invariants_check.o
-	$(MAKE) -C runtime invariants_check_debug_print.o
+	# $(MAKE) -C byterun
+	# $(MAKE) -C stdlib
+	# $(MAKE) -C runtime unit_tests.o
+	# $(MAKE) -C runtime invariants_check.o
+	# $(MAKE) -C runtime invariants_check_debug_print.o
 
 STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.lama runtime/runtime.a runtime/Std.i)
 

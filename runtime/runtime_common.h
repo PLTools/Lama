@@ -12,13 +12,14 @@
 #define CLOSURE_TAG 0x00000007
 #define UNBOXED_TAG 0x00000009   // Not actually a data_header; used to return from LkindOf
 
-#define LEN(x) ((x & 0xFFFFFFF8) >> 3)
+#define LEN(x) (long)(((int)x & 0xFFFFFFF8) >> 3)
 #define TAG(x) (x & 0x00000007)
 
 #define SEXP_ONLY_HEADER_SZ (sizeof(int))
 
 #ifndef DEBUG_VERSION
-#  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(int))
+// #  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(int))
+#  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(long))
 #else
 #  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(size_t) + sizeof(int))
 #endif
@@ -28,9 +29,9 @@
 #define TO_DATA(x) ((data *)((char *)(x)-DATA_HEADER_SZ))
 #define TO_SEXP(x) ((sexp *)((char *)(x)-DATA_HEADER_SZ))
 
-#define UNBOXED(x) (((int)(x)) & 0x0001)
-#define UNBOX(x) (((int)(x)) >> 1)
-#define BOX(x) ((((int)(x)) << 1) | 0x0001)
+#define UNBOXED(x) (((long)(x)) & 0x0001)
+#define UNBOX(x) (((long)(x)) >> 1)
+#define BOX(x) ((((long)(x)) << 1) | 0x0001)
 
 #define BYTES_TO_WORDS(bytes) (((bytes)-1) / sizeof(size_t) + 1)
 #define WORDS_TO_BYTES(words) ((words) * sizeof(size_t))
@@ -42,7 +43,7 @@
 typedef struct {
   // store tag in the last three bits to understand what structure this is, other bits are filled with
   // other utility info (i.e., size for array, number of fields for s-expression)
-  int data_header;
+  long data_header;
 
 #ifdef DEBUG_VERSION
   size_t id;
@@ -57,7 +58,7 @@ typedef struct {
 typedef struct {
   // store tag in the last three bits to understand what structure this is, other bits are filled with
   // other utility info (i.e., size for array, number of fields for s-expression)
-  int data_header;
+  long data_header;
 
 #ifdef DEBUG_VERSION
   size_t id;
