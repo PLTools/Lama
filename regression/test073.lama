@@ -10,8 +10,6 @@ fun fact (n) {
 
 n := read ();
 
-fun f () {}
-
 for i := n, i >= 1, i := i-1 do
   write (i);
   write (fact (i))

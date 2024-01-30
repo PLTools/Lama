@@ -330,8 +330,8 @@ static void printValue (void *p) {
 
         printStringBuf("<closure ");
         for (i = 0; i < LEN(a->data_header); i++) {
-          if (i) printValue((void *)((int *)a->contents)[i]);
-          else printStringBuf("0x%x", (void *)((int *)a->contents)[i]);
+          if (i) printValue((void *)((long *)a->contents)[i]);
+          else printStringBuf("0x%x", (void *)((long *)a->contents)[i]);
           if (i != LEN(a->data_header) - 1) printStringBuf(", ");
         }
         printStringBuf(">");
@@ -340,7 +340,7 @@ static void printValue (void *p) {
       case ARRAY_TAG: {
         printStringBuf("[");
         for (i = 0; i < LEN(a->data_header); i++) {
-          printValue((void *)((int *)a->contents)[i]);
+          printValue((void *)((long *)a->contents)[i]);
           if (i != LEN(a->data_header) - 1) printStringBuf(", ");
         }
         printStringBuf("]");
@@ -354,8 +354,8 @@ static void printValue (void *p) {
           sexp *sb = sa;
           printStringBuf("{");
           while (LEN(sb->data_header)) {
-            printValue((void *)((int *)sb->contents)[0]);
-            int list_next = ((int *)sb->contents)[1];
+            printValue((void *)((long *)sb->contents)[0]);
+            int list_next = ((long *)sb->contents)[1];
             if (!UNBOXED(list_next)) {
               printStringBuf(", ");
               sb = TO_SEXP(list_next);
@@ -368,7 +368,7 @@ static void printValue (void *p) {
           if (LEN(a->data_header)) {
             printStringBuf(" (");
             for (i = 0; i < LEN(sexp_a->data_header); i++) {
-              printValue((void *)((int *)sexp_a->contents)[i]);
+              printValue((void *)((long *)sexp_a->contents)[i]);
               if (i != LEN(sexp_a->data_header) - 1) printStringBuf(", ");
             }
             printStringBuf(")");
@@ -400,8 +400,8 @@ static void stringcat (void *p) {
           sexp *b = (sexp *)a;
 
           while (LEN(b->data_header)) {
-            stringcat((void *)((int *)b->contents)[0]);
-            int next_b = ((int *)b->contents)[1];
+            stringcat((void *)((long *)b->contents)[0]);
+            int next_b = ((long *)b->contents)[1];
             if (!UNBOXED(next_b)) {
               b = TO_SEXP(next_b);
             } else break;
@@ -683,8 +683,8 @@ extern void *Belem (void *p, long i) {
 
   switch (TAG(a->data_header)) {
     case STRING_TAG: return (void *)BOX((char)a->contents[i]);
-    case SEXP_TAG: return (void *)((int *)a->contents)[i + 1];
-    default: return (void *)((int *)a->contents)[i];
+    case SEXP_TAG: return (void *)((long *)((sexp *)a)->contents)[i];
+    default: return (void *)((long *)a->contents)[i];
   }
 }
 
@@ -798,8 +798,8 @@ extern void *Bclosure (int bn, void *entry, ...) {
   va_start(args, entry);
 
   for (i = 0; i < n; i++) {
-    ai                          = va_arg(args, int);
-    ((int *)r->contents)[i + 1] = ai;
+    ai                             = va_arg(args, size_t);
+    ((size_t *)r->contents)[i + 1] = ai;
   }
 
   va_end(args);
@@ -825,8 +825,8 @@ extern void *Barray (int bn, ...) {
   va_start(args, bn);
 
   for (i = 0; i < n; i++) {
-    ai                      = va_arg(args, int);
-    ((int *)r->contents)[i] = ai;
+    ai                       = va_arg(args, long);
+    ((long *)r->contents)[i] = ai;
   }
 
   va_end(args);
@@ -844,31 +844,31 @@ extern void *Bsexp (int bn, ...) {
   int     i;
   int     ai;
   size_t *p;
-  data   *r;
+  sexp   *r;
   int     n = UNBOX(bn);
 
   PRE_GC();
 
-  int fields_cnt   = n - 1;
-  r                = (data *)alloc_sexp(fields_cnt);
-  ((sexp *)r)->tag = 0;
+  int fields_cnt = n - 1;
+  r              = alloc_sexp(fields_cnt);
+  r->tag         = 0;
 
   va_start(args, bn);
 
-  for (i = 1; i < n; i++) {
-    ai                      = va_arg(args, int);
-    p                       = (size_t *)ai;
-    ((int *)r->contents)[i] = ai;
+  for (i = 0; i < fields_cnt; i++) {
+    ai                       = va_arg(args, long);
+    p                        = (long *)ai;
+    ((long *)r->contents)[i] = ai;
   }
 
-  ((sexp *)r)->tag = UNBOX(va_arg(args, int));
+  r->tag = UNBOX(va_arg(args, long));
 
   va_end(args);
 
   POST_GC();
-  // printf("bsexp: %ld %p", r->contents, r->contents);
+  // printf("bsexp: %s", de_hash(((sexp *)r)->tag));
   // fflush(stdout);
-  return (void *)r->contents;
+  return (void *)((data *)r)->contents;
 }
 
 extern long Btag (void *d, int t, int n) {
@@ -951,11 +951,11 @@ extern void *Bsta (void *v, long i, void *x) {
         break;
       }
       case SEXP_TAG: {
-        ((int *)x)[UNBOX(i) + 1] = (int)v;
+        ((long *)((sexp *)d)->contents)[UNBOX(i)] = (long)v;
         break;
       }
       default: {
-        ((int *)x)[UNBOX(i)] = (int)v;
+        ((long *)x)[UNBOX(i)] = (long)v;
       }
     }
   } else {

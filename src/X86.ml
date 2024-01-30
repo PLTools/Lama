@@ -3,94 +3,94 @@ open Language
 
 (* X86 codegeneration interface *)
 
-(* The registers: *)
-(* let regs = [| "%ebx"; "%ecx"; "%esi"; "%edi"; "%eax"; "%edx"; "%ebp"; "%esp" |] *)
-(* Registers %rbp, %rbx and %r12 through %r15 “belong” to the calling function and the called function is required to preserve their values.  *)
+type register = Register of string [@@deriving gt ~options:{ show }]
 
-let temp_regs = [| "%r10"; "%r11"; "%r12"; "%r13"; "%r14"; "%r15"; "%rbx" |]
-(* "%r16";
-   "%r17";
-   "%r18";
-   "%r19";
-   "%r20";
-   "%r21";
-   "%r22";
-   "%r23";
-   "%r24";
-   "%r25";
-   "%r26";
-   "%r27";
-   "%r28";
-   "%r29";
-   "%r30";
-   "%r31"; *)
+module Registers : sig
+  val rax : register
+  val rdi : register
+  val rsi : register
+  val rdx : register
+  val rcx : register
+  val rbp : register
+  val rsp : register
+  val r8 : register
+  val r9 : register
+  val r10 : register
+  val r11 : register
+  val r12 : register
+  val r13 : register
+  val r14 : register
+  val r15 : register
 
-(* rbx --- callee-saved *)
-(* callee-saved *)
-(* let callee_saved_regs = [| "%rbx"; "%r15"; "%r12"; "%r13"; "%r14" |] *)
-let callee_saved_regs = [||]
+  val argument_registers : register array
+  (** All of argument registers are caller-saved *)
 
-(* rax preserved for return value and temporal values *)
-(* rdx used to pass 3rd argument to functions; 2nd return register (we do not use it) *)
-(* rbp --- base pointer; callee-saved *)
-let args_regs = [| "%rdi"; "%rsi"; "%rdx"; "%rcx"; "%r8"; "%r9" |]
+  val extra_caller_saved_registers : register array
+  (** Caller saved registers that are not used for arguments *)
+end = struct
+  (* Caller-saved special registers *)
+  let rax = Register "%rax"
 
-let regs =
-  Array.append
-    (Array.append (Array.append temp_regs callee_saved_regs) args_regs)
-    [| "%rax"; "%rbp"; "%rsp" |]
+  (* Caller-saved special and argument registers *)
+  let rdx = Register "%rdx"
 
-(* We can not freely operate with all register; only 3 by now *)
-(* let num_of_regs = Array.length regs - 5 *)
-(* let num_of_regs = Array.length regs *)
-let num_of_regs = Array.length temp_regs
-let max_free_arg_regs = Array.length args_regs
+  (* Caller-saved argument registers *)
+  let rdi = Register "%rdi"
+  let rsi = Register "%rsi"
+  let rcx = Register "%rcx"
+  let r8 = Register "%r8"
+  let r9 = Register "%r9"
 
-(* Simpliest algo:
-   1. Temporary registers are used for register allocation
-   1.1. We save all alive temp registers before function call (I guess)
-   2. args_regs are used to pass arguments
-   3. rax is used for return value and special temporary register *)
+  (* Extra caller-saved registers *)
+  let r10 = Register "%r10"
+  let r11 = Register "%r11"
+
+  (* Callee-saved special registers *)
+  let rbp = Register "%rbp"
+  let rsp = Register "%rsp"
+
+  (* r12-15 registes are calee-saved *)
+  (* They are not used in compilation for simplicity*)
+  let r12 = Register "%r12"
+  let r13 = Register "%r13"
+  let r14 = Register "%r14"
+  let r15 = Register "%r15"
+  let argument_registers = [| rdi; rsi; rdx; rcx; r8; r9 |]
+  let extra_caller_saved_registers = [| r10; r11; r12; r13; r14; r15 |]
+end
 
 (* We need to know the word size to calculate offsets correctly *)
-(* let word_size = 4 *)
 let word_size = 8
 
 (* We need to distinguish the following operand types: *)
 type opnd =
-  | R of int (* hard register                    *)
+  | R of register (* hard register                    *)
   | S of int (* a position on the hardware stack *)
-  | C (* a saved closure                  *)
   | M of string (* a named memory location          *)
   | L of int (* an immediate operand             *)
   | I of int * opnd (* an indirect operand with offset  *)
 [@@deriving gt ~options:{ show }]
 
+type argument_location = Register of opnd | Stack
+
 let show_opnd = show opnd
 
 (* For convenience we define the following synonyms for the registers: *)
-(* TODO: fix *)
-let args_regs_ind =
-  [|
-    Array.length regs - 9;
-    Array.length regs - 8;
-    Array.length regs - 7;
-    Array.length regs - 6;
-    Array.length regs - 5;
-    Array.length regs - 4;
-  |]
-
-let r10 = R 0
-let rbx = R 6
-let rcx = R (Array.length regs - 6)
-let r8 = R (Array.length regs - 5)
-let r9 = R (Array.length regs - 4)
-let rsi = R (Array.length regs - 8)
-let rdi = R (Array.length regs - 9)
-let rax = R (Array.length regs - 3)
-let rdx = R (Array.length regs - 7)
-let rbp = R (Array.length regs - 2)
-let rsp = R (Array.length regs - 1)
+let rax = R Registers.rax
+let rdx = R Registers.rdx
+let rbp = R Registers.rbp
+let rsp = R Registers.rsp
+let rdi = R Registers.rdi
+let rsi = R Registers.rsi
+let rcx = R Registers.rcx
+let r8 = R Registers.r8
+let r9 = R Registers.r9
+let r10 = R Registers.r10
+let r11 = R Registers.r11
+let r12 = R Registers.r12
+let r13 = R Registers.r13
+let r14 = R Registers.r14
+let r15 = R Registers.r15
 
 (* Now x86 instruction (we do not need all of them): *)
 type instr =
@@ -139,13 +139,11 @@ type instr =
 
 (* Instruction printer *)
 let stack_offset i =
-  if i >= 0 then (i + 1) * word_size else 8 + ((-i - 1) * word_size)
+  if i >= 0 then (i + 1) * word_size else (-i + 1) * word_size
 
 let show instr =
   let rec opnd = function
-    | R i -> regs.(i)
-    (* | C -> "4(%ebp)" *)
-    | C -> Printf.sprintf "%d(%%rbp)" word_size
+    | R (Register name) -> name
     | S i ->
         if i >= 0 then Printf.sprintf "-%d(%%rbp)" (stack_offset i)
         else Printf.sprintf "%d(%%rbp)" (stack_offset i)
@@ -191,16 +189,12 @@ let show instr =
 (* Opening stack machine to use instructions without fully qualified names *)
 open SM
 
-(* Symbolic stack machine evaluator
+(*
+  Compile binary operation
 
-     compile : env -> prg -> env * instr list
-
-   Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
-   of x86 instructions
-*)
-let compile cmd env imports code =
-  (* SM.print_prg code; *)
-  flush stdout;
+  compile_binop : env -> string -> env * instr list
+ *)
+let compile_binop env op =
   let suffix = function
     | "<" -> "l"
     | "<=" -> "le"
@@ -210,6 +204,150 @@ let compile cmd env imports code =
     | ">" -> "g"
     | _ -> failwith "unknown operator"
   in
+  let in_memory = function M _ | S _ | I _ -> true | R _ | L _ -> false in
+  let without_extra op =
+    let x, env = env#pop in
+    let y = env#peek in
+    (env, op x y)
+  in
+  let with_rdx op =
+    if not env#rdx_in_use then
+      let x, env = env#pop in
+      let y = env#peek in
+      (env, op x y rdx)
+    else
+      let extra, env = env#allocate in
+      let _, env = env#pop in
+      let x, env = env#pop in
+      let y = env#peek in
+      let code = op x y rdx in
+      (env, [ Mov (rdx, extra) ] @ code @ [ Mov (extra, rdx) ])
+  in
+  let with_extra op =
+    let extra, env = env#allocate in
+    let _, env = env#pop in
+    let x, env = env#pop in
+    let y = env#peek in
+    if in_memory x then
+      (env, [ Mov (rdx, extra) ] @ op x y extra @ [ Mov (extra, rdx) ])
+    else (env, op x y extra)
+  in
+  match op with
+  | "/" ->
+      with_rdx (fun x y rdx ->
+          [
+            Mov (y, rax);
+            Sar1 rax;
+            Binop ("^", rdx, rdx);
+            Cltd;
+            Sar1 x;
+            IDiv x;
+            Sal1 rax;
+            Or1 rax;
+            Mov (rax, y);
+          ])
+  | "%" ->
+      with_rdx (fun x y rdx ->
+          [
+            Mov (y, rax);
+            Sar1 rax;
+            Cltd;
+            Sar1 x;
+            IDiv x;
+            Sal1 rdx;
+            Or1 rdx;
+            Mov (rdx, y);
+          ])
+  | "<" | "<=" | "==" | "!=" | ">=" | ">" ->
+      if in_memory env#peek then
+        with_extra (fun x y extra ->
+            [
+              Binop ("^", rax, rax);
+              Mov (x, extra);
+              Binop ("cmp", extra, y);
+              Set (suffix op, "%al");
+              Sal1 rax;
+              Or1 rax;
+              Mov (rax, y);
+            ])
+      else
+        without_extra (fun x y ->
+            [
+              Binop ("^", rax, rax);
+              Binop ("cmp", x, y);
+              Set (suffix op, "%al");
+              Sal1 rax;
+              Or1 rax;
+              Mov (rax, y);
+            ])
+  | "*" ->
+    without_extra (fun x y ->
+      if in_memory y then
+            [
+              Dec y;
+              Mov (x, rax);
+              Sar1 rax;
+              Binop (op, y, rax);
+              Or1 rax;
+              Mov (rax, y);
+            ]
+      else
+            [ Dec y; Mov (x, rax); Sar1 rax; Binop (op, rax, y); Or1 y ])
+  | "&&" ->
+      with_extra (fun x y extra ->
+          [
+            Dec x;
+            Mov (x, rax);
+            Binop (op, x, rax);
+            Mov (L 0, rax);
+            Set ("ne", "%al");
+            Dec y;
+            Mov (y, extra);
+            Binop (op, y, extra);
+            Mov (L 0, extra);
+            Set ("ne", "%dl");
+            Binop (op, extra, rax);
+            Set ("ne", "%al");
+            Sal1 rax;
+            Or1 rax;
+            Mov (rax, y);
+          ])
+  | "!!" ->
+      without_extra (fun x y ->
+          [
+            Mov (y, rax);
+            Sar1 rax;
+            Sar1 x;
+            Binop (op, x, rax);
+            Mov (L 0, rax);
+            Set ("ne", "%al");
+            Sal1 rax;
+            Or1 rax;
+            Mov (rax, y);
+          ])
+  | "+" ->
+      without_extra (fun x y ->
+          if in_memory x && in_memory y then
+            [ Mov (x, rax); Dec rax; Binop ("+", rax, y) ]
+          else [ Binop (op, x, y); Dec y ])
+  | "-" ->
+      without_extra (fun x y ->
+          if in_memory x && in_memory y then
+            [ Mov (x, rax); Binop (op, rax, y); Or1 y ]
+          else [ Binop (op, x, y); Or1 y ])
+  | _ ->
+      failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
+
+(* Symbolic stack machine evaluator
+
+     compile : env -> prg -> env * instr list
+
+   Take an environment, a stack machine program, and returns a pair ---
+   the updated environment and the list of x86 instructions
+*)
+let compile cmd env imports code =
+  (* SM.print_prg code;
+     flush stdout; *)
   let box n = (n lsl 1) lor 1 in
   let rec compile' env scode =
     let on_stack = function S _ -> true | _ -> false in
@@ -218,204 +356,115 @@ let compile cmd env imports code =
       else [ Mov (x, s) ]
     in
     let callc env n tail =
-      failwith (Printf.sprintf "Not implemented %s: %d" __FILE__ __LINE__)
-    in
-    let trololo env n tail =
-      let tail = tail && env#nargs = n in
-      if tail then
-        let rec push_args env acc = function
-          | 0 -> (env, acc)
-          | n ->
-              let x, env = env#pop in
-              if x = env#loc (Value.Arg (n - 1)) then push_args env acc (n - 1)
-              else
-                push_args env (mov x (env#loc (Value.Arg (n - 1))) @ acc) (n - 1)
-        in
-        let env, pushs = push_args env [] n in
-        let closure, env = env#pop in
-        let _, env = env#allocate in
-        ( env,
-          pushs
-          @ [
-              Mov (closure, rdx); Mov (I (0, rdx), rax); Mov (rbp, rsp); Pop rbp;
-            ]
-          @ (if env#has_closure then [ Pop rbx ] else [])
-          @ [ Jmp "*%eax" ] ) (* UGLY!!! *)
-      else
-        let pushr, popr =
-          List.split
-          @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
-        in
-        let pushr, popr = (env#save_closure @ pushr, env#rest_closure @ popr) in
-        let env, code =
-          let rec push_args env acc = function
+      (* romanv: let tail = tail && env#nargs = n && f.[0] <> '.' in *)
+      let env, code =
+        let stack_slots, env, setup_args_code =
+          let rec pop_args env acc = function
             | 0 -> (env, acc)
             | n ->
                 let x, env = env#pop in
-                push_args env (Push x :: acc) (n - 1)
+                pop_args env (x :: acc) (n - 1)
           in
-          let env, pushs = push_args env [] n in
-          let pushs = List.rev pushs in
-          let closure, env = env#pop in
-          let call_closure =
-            if on_stack closure then
-              [ Mov (closure, rdx); Mov (rdx, rax); CallI rax ]
-            else [ Mov (closure, rdx); CallI closure ]
+          let move_args args arg_locs =
+            List.fold_left2
+              (fun acc arg arg_loc ->
+                match arg_loc with
+                | Register r -> Mov (arg, r) :: acc
+                | Stack -> Push arg :: acc)
+              [] args arg_locs
           in
-          ( env,
-            pushr @ pushs @ call_closure
-            @ [ Binop ("+", L (word_size * List.length pushs), rsp) ]
-            @ List.rev popr )
+          let env, args = pop_args env [] n in
+          let arg_locs, stack_slots =
+            env#arguments_locations (List.length args)
+          in
+          let setup_args_code = move_args args arg_locs in
+          (stack_slots, env, setup_args_code)
         in
-        let y, env = env#allocate in
-        (env, code @ [ Mov (rax, y) ])
+        let closure, env = env#pop in
+        let call_closure =
+          if on_stack closure then
+            [ Mov (closure, r15); Mov (r15, rax); CallI rax ]
+          else [ Mov (closure, r15); CallI closure ]
+        in
+        let pushr, popr =
+          List.split @@ List.map (fun r -> (Push r, Pop r)) env#live_registers
+        in
+        let pushr, popr = (env#save_closure @ pushr, env#rest_closure @ popr) in
+        let aligned, align_prologue, align_epilogue =
+          ( (stack_slots + List.length pushr) mod 2 == 0,
+            [ Binop ("-", L 8, rsp) ],
+            [ Binop ("+", L 8, rsp) ] )
+        in
+        ( env,
+          pushr
+          @ (if not aligned then align_prologue else [])
+          @ setup_args_code @ call_closure
+          @ (if not aligned then align_epilogue else [])
+          @ (if stack_slots != 0 then
+               [ Binop ("+", L (word_size * stack_slots), rsp) ]
+             else [])
+          @ List.rev popr )
+      in
+      let y, env = env#allocate in
+      (env, code @ [ Mov (rax, y) ])
     in
     let call env f n tail =
-      let tail = tail && env#nargs = n && f.[0] <> '.' in
+      (* romanv: let tail = tail && env#nargs = n && f.[0] <> '.' in *)
       let f =
         match f.[0] with
         | '.' -> "B" ^ String.sub f 1 (String.length f - 1)
         | _ -> f
       in
-      (* TODO *)
-      (* if tail then
-           (* failwith (Printf.sprintf "Not implemented %s: %d" __FILE__ __LINE__) *)
-           let rec push_args env acc = function
-             | 0 -> (env, acc)
-             | n ->
-                 (* TODO *)
-                 let x, env = env#pop in
-                 if x = env#loc (Value.Arg (n - 1)) then push_args env acc (n - 1)
-                 else
-                   push_args env (mov x (env#loc (Value.Arg (n - 1))) @ acc) (n - 1)
-           in
-           let env, pushs = push_args env [] n in
-           let _, env = env#allocate in
-           ( env,
-             pushs
-             @ [ Mov (rbp, rsp); Pop rbp ]
-             @ (if env#has_closure then [ Pop rbx ] else [])
-             @ [ Jmp f ] )
-         else *)
-      let pushr, popr =
-        List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
-      in
-      let pushr, popr = (env#save_closure @ pushr, env#rest_closure @ popr) in
       let env, code =
-        let stack_slots, env, pushs =
-          let rec popn env acc = function
+        let stack_slots, env, setup_args_code =
+          let rec pop_args env acc = function
             | 0 -> (env, acc)
             | n ->
-                let t, env = env#pop in
-                popn env (t :: acc) (n - 1)
+                let x, env = env#pop in
+                pop_args env (x :: acc) (n - 1)
           in
-          let push_args2 env args =
-            let rec push_args' env acc stack_slots_acc = function
-              | [] -> (stack_slots_acc, env, acc)
-              | arg :: args -> (
-                  let y, env = env#pop_for_arg_2 in
-                  match y with
-                  | R _ ->
-                      push_args' env (Mov (arg, y) :: acc) stack_slots_acc args
-                  | L 0 ->
-                      push_args' env (Push arg :: acc) (stack_slots_acc + 1)
-                        args
-                  | _ ->
-                      failwith
-                        (Printf.sprintf "Should never happend %s: %d" __FILE__
-                           __LINE__))
-            in
-            push_args' env [] 0 args
-          in
-          let fix_locs locs =
+          let fix_args args =
             match f with
-            | "Bsta" -> List.rev locs
-            | "Barray" -> L (box n) :: locs
-            | "Bsexp" -> L (box n) :: locs
-            | _ -> locs
+            | "Bsta" -> List.rev args
+            | "Barray" -> L (box n) :: args
+            | "Bsexp" -> L (box n) :: args
+            | "Bclosure" -> L (box (n - 1)) :: args
+            | _ -> args
           in
-          (*TODO B functions!*)
-          let env, locs = popn env [] n in
-          let locs = fix_locs locs in
-          let stack_slots, env, pushsc = push_args2 env locs in
-          (stack_slots, env, pushsc)
+          let move_args args arg_locs =
+            List.fold_left2
+              (fun acc arg arg_loc ->
+                match arg_loc with
+                | Register r -> Mov (arg, r) :: acc
+                | Stack -> Push arg :: acc)
+              [] args arg_locs
+          in
+          let env, args = pop_args env [] n in
+          let args = fix_args args in
+          let arg_locs, stack_slots =
+            env#arguments_locations (List.length args)
+          in
+          let setup_args_code = move_args args arg_locs in
+          (stack_slots, env, setup_args_code)
         in
-        (* (* TODO: wrong arguments order *)
-           let push_args env acc n =
-             let rec push_args' env acc = function
-               | 0 -> (env, acc)
-               | 1 when String.equal f "Bsexp" ->
-                   let y, env = env#pop_for_arg 1 in
-                   (env, Mov (L (box n), y) :: acc)
-               | n -> (
-                   let x, env = env#pop in
-                   let y, env = env#pop_for_arg n in
-                   match y with
-                   | R _ -> push_args' env (Mov (x, y) :: acc) (n - 1)
-                   | _ ->
-                       failwith
-                         (Printf.sprintf "Not implemented %s: %d" __FILE__ __LINE__)
-                   (* push_args env (Push x :: acc) (n - 1)) *))
-             in
-             match f with
-             | "Bsexp" -> push_args' env [] (n + 1)
-             | _ -> push_args' env [] n
-           in
-           let env, pushs = push_args env [] n in
-           (* TODO: rdi!!!! look above
-              let pushs =
-                match f with
-                | "Barray" -> List.rev @@ (Push (L (box n)) :: pushs)
-                (* | "Bsexp" -> List.rev @@ (Push (L (box n)) :: pushs) *)
-                | "Bsexp" -> List.rev @@ (Mov (L (box n), rdi) :: pushs)
-                | "Bsta" -> pushs
-                | _ -> List.rev pushs
-              in *)
-        *)
-        (* TODO: we have to know if stack is aligned *)
+        let pushr, popr =
+          List.split @@ List.map (fun r -> (Push r, Pop r)) env#live_registers
+        in
+        let pushr, popr = (env#save_closure @ pushr, env#rest_closure @ popr) in
         let aligned, align_prologue, align_epilogue =
-          ( List.length pushr mod 2 == 0,
+          ( (stack_slots + List.length pushr) mod 2 == 0,
             [ Binop ("-", L 8, rsp) ],
             [ Binop ("+", L 8, rsp) ] )
         in
-        let push_arg_registers =
-          [ Push rdi; Push rsi; Push rdx; Push rcx; Push r8; Push r9 ]
-        in
-        let pop_arg_registers =
-          [ Pop r9; Pop r8; Pop rcx; Pop rdx; Pop rsi; Pop rdi ]
-        in
-        let nullify_argument_registers, _ =
-          Array.fold_left
-            (fun (acc, i) a ->
-              if i < max_free_arg_regs - env#get_n_free_arg_regs then
-                (acc, i + 1)
-              else (acc @ [ R a ], i + 1))
-            ([], 0) args_regs_ind
-        in
-        ( env#restore_n_free_arg_regs,
+        ( env,
           pushr
-          (* @ List.map (fun a -> Mov (L 0, a)) nullify_argument_registers *)
-          @ push_arg_registers
           @ (if not aligned then align_prologue else [])
-          @ pushs
-          (* TODO *)
-          (* @ [ Call f; Binop ("+", L (word_size * List.length pushs), rsp) ] *)
-          (* TODO: stack has to be aligned by 16!!! i.e. two words *)
-          (* @ [ Push (L 0); Call f; Binop ("+", L word_size, rsp) ] *)
-          @ [ Call f ]
-          (* @ (if env#get_n_free_arg_regs == 0 then
-               [
-                 Binop
-                   ( "+",
-                     L ((word_size * List.length pushs) - max_free_arg_regs),
-                     rsp );
-               ]
-             else []) *)
+          @ setup_args_code @ [ Call f ]
           @ (if not aligned then align_epilogue else [])
           @ (if stack_slots != 0 then
                [ Binop ("+", L (word_size * stack_slots), rsp) ]
              else [])
-          @ pop_arg_registers @ List.rev popr )
+          @ List.rev popr )
       in
       let y, env = env#allocate in
       (env, code @ [ Mov (rax, y) ])
@@ -441,25 +490,18 @@ let compile cmd env imports code =
             | EXTERN name -> (env#register_extern name, [])
             | IMPORT _ -> (env, [])
             | CLOSURE (name, closure) ->
-                let pushr, popr =
-                  List.split
-                  @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers 0)
+                let l, env = env#allocate in
+                let env, push_closure_code =
+                  List.fold_left
+                    (fun (env, code) c ->
+                      let cr, env = env#allocate in
+                      (env, Mov (env#loc c, cr) :: code))
+                    (env, []) closure
                 in
-                let closure_len = List.length closure in
-                let push_closure =
-                  List.map (fun d -> Push (env#loc d)) @@ List.rev closure
+                let env, call_code =
+                  call env ".closure" (1 + List.length closure) false
                 in
-                let s, env = env#allocate in
-                ( env,
-                  pushr @ push_closure
-                  @ [
-                      Push (M ("$" ^ name));
-                      Push (L (box closure_len));
-                      Call "Bclosure";
-                      Binop ("+", L (word_size * (closure_len + 2)), rsp);
-                      Mov (rax, s);
-                    ]
-                  @ List.rev popr @ env#reload_closure )
+                (env, push_closure_code @ (Mov (M ("$" ^ name), l) :: call_code))
             | CONST n ->
                 let s, env' = env#allocate in
                 (env', [ Mov (L (box n), s) ])
@@ -487,8 +529,9 @@ let compile cmd env imports code =
                   | _ -> [ Mov (s, env'#loc x) ] ))
             | STA -> call env ".sta" 3 false
             | STI -> (
-                let v, x, env' = env#pop2 in
-                ( env'#push x,
+                let v, env = env#pop in
+                let x = env#peek in
+                ( env,
                   match x with
                   | S _ | M _ ->
                       [
@@ -497,161 +540,8 @@ let compile cmd env imports code =
                         Mov (rdx, I (0, rax));
                         Mov (rdx, x);
                       ]
-                      @ env#reload_closure
                   | _ -> [ Mov (v, rax); Mov (rax, I (0, x)); Mov (rax, x) ] ))
-            | BINOP op -> (
-                let x, y, env' = env#pop2 in
-                ( env'#push y,
-                  (* (match op with
-                     |"<" | "<=" | "==" | "!=" | ">=" | ">" ->
-                      [Push (eax);
-                      Push (edx);
-                      Mov (y, eax);
-                      Binop("&&", L(1), eax);
-                      Mov (x, edx);
-                      Binop("&&", L(1), edx);
-                      Binop("cmp", eax, edx);
-                      CJmp ("nz", "_ERROR2");
-                      Pop (edx);
-                      Pop (eax)]
-                     (* | "+" | "-" | "*" | "/" -> *)
-                     | _ ->
-                     [Mov (y, eax);
-                      Binop("&&", L(1), eax);
-                      Binop("cmp", L(0), eax);
-                      CJmp ("z", "_ERROR");
-                      Mov (x, eax);
-                      Binop("&&", L(1), eax);
-                      Binop("cmp", L(0), eax);
-                      CJmp ("z", "_ERROR")]
-                      | _ -> []) @ *)
-                  match op with
-                  | "/" ->
-                      [
-                        Mov (y, rax);
-                        Sar1 rax;
-                        Binop ("^", rdx, rdx);
-                        Cltd;
-                        Sar1 x;
-                        IDiv x;
-                        Sal1 rax;
-                        Or1 rax;
-                        Mov (rax, y);
-                      ]
-                      (* [
-                           Mov (y, rax);
-                           Sar1 rax;
-                           Cltd;
-                           (* x := x >> 1 ?? *)
-                           Sar1 x;
-                           (*!!!*)
-                           IDiv x;
-                           Sal1 rax;
-                           Or1 rax;
-                           Mov (rax, y);
-                         ] *)
-                  | "%" ->
-                      [
-                        Mov (y, rax);
-                        Sar1 rax;
-                        Cltd;
-                        (* x := x >> 1 ?? *)
-                        Sar1 x;
-                        (*!!!*)
-                        IDiv x;
-                        Sal1 rdx;
-                        Or1 rdx;
-                        Mov (rdx, y);
-                      ]
-                      @ env#reload_closure
-                  | "<" | "<=" | "==" | "!=" | ">=" | ">" -> (
-                      match x with
-                      | M _ | S _ ->
-                          [
-                            Binop ("^", rax, rax);
-                            Mov (x, rdx);
-                            Binop ("cmp", rdx, y);
-                            Set (suffix op, "%al");
-                            Sal1 rax;
-                            Or1 rax;
-                            Mov (rax, y);
-                          ]
-                          @ env#reload_closure
-                      | _ ->
-                          [
-                            Binop ("^", rax, rax);
-                            (* TODO: WTF?!?: why are they in wrong order?!? *)
-                            Binop ("cmp", x, y);
-                            (* Binop ("cmp", y, x); *)
-                            Set (suffix op, "%al");
-                            Sal1 rax;
-                            Or1 rax;
-                            Mov (rax, y);
-                          ])
-                  | "*" ->
-                      if on_stack y then
-                        [
-                          Dec y;
-                          Mov (x, rax);
-                          Sar1 rax;
-                          Binop (op, y, rax);
-                          Or1 rax;
-                          Mov (rax, y);
-                        ]
-                      else
-                        [
-                          Dec y;
-                          Mov (x, rax);
-                          Sar1 rax;
-                          Binop (op, rax, y);
-                          Or1 y;
-                        ]
-                  | "&&" ->
-                      [
-                        Dec x;
-                        (*!!!*)
-                        Mov (x, rax);
-                        Binop (op, x, rax);
-                        Mov (L 0, rax);
-                        Set ("ne", "%al");
-                        Dec y;
-                        (*!!!*)
-                        Mov (y, rdx);
-                        Binop (op, y, rdx);
-                        Mov (L 0, rdx);
-                        Set ("ne", "%dl");
-                        Binop (op, rdx, rax);
-                        Set ("ne", "%al");
-                        Sal1 rax;
-                        Or1 rax;
-                        Mov (rax, y);
-                      ]
-                      @ env#reload_closure
-                  | "!!" ->
-                      [
-                        Mov (y, rax);
-                        Sar1 rax;
-                        Sar1 x;
-                        (*!!!*)
-                        Binop (op, x, rax);
-                        Mov (L 0, rax);
-                        Set ("ne", "%al");
-                        Sal1 rax;
-                        Or1 rax;
-                        Mov (rax, y);
-                      ]
-                  | "+" ->
-                      if on_stack x && on_stack y then
-                        [ Mov (x, rax); Dec rax; Binop ("+", rax, y) ]
-                      else [ Binop (op, x, y); Dec y ]
-                  | "-" ->
-                      if on_stack x && on_stack y then
-                        [ Mov (x, rax); Binop (op, rax, y); Or1 y ]
-                      else [ Binop (op, x, y); Or1 y ]
-                  | _ ->
-                      failwith
-                        (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__
-                           __LINE__) ))
+            | BINOP op -> compile_binop env op
             | LABEL s | FLABEL s | SLABEL s -> (env, [ Label s ])
             | JMP l -> ((env#set_stack l)#set_barrier, [ Jmp l ])
             | CJMP (s, l) ->
@@ -708,7 +598,6 @@ let compile cmd env imports code =
                        @ List.flatten
                        @@ List.map stabs_scope scopes)
                   @ [ Meta "\t.cfi_startproc" ]
-                  @ (if has_closure then [ Push rdx ] else [])
                   @ (if f = cmd#topname then
                        [
                          Mov (M "_init", rax);
@@ -727,30 +616,31 @@ let compile cmd env imports code =
                      else [])
                   @ [
                       Push rbp;
-                      Meta
-                        ("\t.cfi_def_cfa_offset\t"
-                        ^ if has_closure then "12" else "8");
-                      Meta
-                        ("\t.cfi_offset 5, -"
-                        ^ if has_closure then "12" else "8");
+                      (* romanv: incorrect *)
+                      Meta "\t.cfi_def_cfa_offset\t8";
+                      Meta "\t.cfi_offset 5, -8";
                       Mov (rsp, rbp);
                       Meta "\t.cfi_def_cfa_register\t5";
                       Binop ("-", M ("$" ^ env#lsize), rsp);
-                      (*TODO*)
-                      (* Mov (rsp, edi);
-                         Mov (M "$filler", rsi);
-                         Mov (M ("$" ^ env#allocated_size), rcx);
-                         Repmovsl; *)
+                      Mov (rdi, r12);
+                      Mov (rsi, r13);
+                      Mov (rcx, r14);
+                      Mov (rsp, rdi);
+                      Mov (M "$filler", rsi);
+                      Mov (M ("$" ^ env#allocated_size), rcx);
+                      Repmovsl;
+                      Mov (r12, rdi);
+                      Mov (r13, rsi);
+                      Mov (r14, rcx);
                     ]
                   @ (if f = "main" then
-                       (* TODO: numbers! *)
                        [
+                         Push (R Registers.rdi);
+                         Push (R Registers.rsi);
                          Call "__gc_init";
-                         (*
-                            Push (I (12, rbp));
-                            Push (I (8, rbp));
-                            Call "set_args";
-                            Binop ("+", L 8, rsp); *)
+                         Pop (R Registers.rsi);
+                         Pop (R Registers.rdi);
+                         Call "set_args";
                        ]
                      else [])
                   @
@@ -771,7 +661,6 @@ let compile cmd env imports code =
                     Mov (rbp, rsp);
                     Pop rbp;
                   ]
-                  @ env#rest_closure
                   @ (if name = "main" then [ Binop ("^", rax, rax) ] else [])
                   @ [
                       Meta "\t.cfi_restore\t5";
@@ -836,15 +725,20 @@ let compile cmd env imports code =
             | FAIL ((line, col), value) ->
                 let v, env = if value then (env#peek, env) else env#pop in
                 let s, env = env#string cmd#get_infile in
+                let vr, env = env#allocate in
+                let sr, env = env#allocate in
+                let liner, env = env#allocate in
+                let colr, env = env#allocate in
+                let env, code = call env ".match_failure" 4 false in
+                let _, env = env#pop in
                 ( env,
                   [
-                    Push (L (box col));
-                    Push (L (box line));
-                    Push (M ("$" ^ s));
-                    Push v;
-                    Call "Bmatch_failure";
-                    Binop ("+", L (4 * word_size), rsp);
-                  ] )
+                    Mov (L col, colr);
+                    Mov (L line, liner);
+                    Mov (M ("$" ^ s), sr);
+                    Mov (v, vr);
+                  ]
+                  @ code )
             | i ->
                 invalid_arg
                   (Printf.sprintf "invalid SM insn: %s\n" (GT.show insn i))
@@ -855,6 +749,122 @@ let compile cmd env imports code =
           @ code' @ code'' )
   in
   compile' env code
+
+module AbstractSymbolicStack : sig
+  type 'a t
+  type 'a symbolic_location = Stack of int | Register of 'a
+
+  val empty : 'a array -> 'a t
+  val is_empty : _ t -> bool
+  val live_registers : 'a t -> 'a list
+  val stack_size : _ t -> int
+  val allocate : 'a t -> 'a t * 'a symbolic_location
+  val pop : 'a t -> 'a t * 'a symbolic_location
+  val peek : 'a t -> 'a symbolic_location
+  val peek2 : 'a t -> 'a symbolic_location * 'a symbolic_location
+end = struct
+  type 'a symbolic_location = Stack of int | Register of 'a
+
+  (* Last allocated position on symbolic stack *)
+  type stack_state = S of int | R of int | E
+  type 'a t = stack_state * 'a array
+
+  let empty registers = (E, registers)
+
+  let next (state, registers) =
+    let state =
+      match state with
+      | S n -> S (n + 1)
+      | R n when n + 1 = Array.length registers -> S 0
+      | R n -> R (n + 1)
+      | E -> R 0
+    in
+    (state, registers)
+
+  let previos (state, registers) =
+    let state =
+      match state with
+      | S 0 -> R (Array.length registers - 1)
+      | S n -> S (n - 1)
+      | R 0 -> E
+      | R n -> R (n - 1)
+      | E -> failwith (Printf.sprintf "Empty stack %s: %d" __FILE__ __LINE__)
+    in
+    (state, registers)
+
+  let location (state, registers) =
+    match state with
+    | S n -> Stack n
+    | R n -> Register registers.(n)
+    | E -> failwith (Printf.sprintf "Empty stack %s: %d" __FILE__ __LINE__)
+
+  let is_empty (state, _) = match state with E -> true | _ -> false
+
+  let live_registers (stack, registers) =
+    match stack with
+    | S _ -> Array.to_list registers
+    | R n -> Array.to_list (Array.sub registers 0 (n + 1))
+    | E -> []
+
+  let stack_size (state, _) = match state with S n -> n + 1 | R _ | E -> 0
+
+  let allocate state =
+    let state = next state in
+    (state, location state)
+
+  let pop stack = (previos stack, location stack)
+  let peek stack = location stack
+  let peek2 stack = (location stack, location (previos stack))
+end
+
+module SymbolicStack : sig
+  type t
+
+  val empty : int -> int -> t
+  val is_empty : t -> bool
+  val live_registers : t -> opnd list
+  val stack_size : t -> int
+  val allocate : t -> t * opnd
+  val pop : t -> t * opnd
+  val peek : t -> opnd
+  val peek2 : t -> opnd * opnd
+end = struct
+  type t = { state : register AbstractSymbolicStack.t; nlocals : int }
+
+  (* romanv: add free args registers? *)
+  let empty _nargs nlocals =
+    {
+      state = AbstractSymbolicStack.empty Registers.extra_caller_saved_registers;
+      nlocals;
+    }
+
+  let opnd_from_loc v = function
+    | AbstractSymbolicStack.Register r -> R r
+    | AbstractSymbolicStack.Stack n -> S (n + v.nlocals)
+
+  let is_empty v = AbstractSymbolicStack.is_empty v.state
+
+  let live_registers v =
+    List.map (fun r -> R r) (AbstractSymbolicStack.live_registers v.state)
+
+  let stack_size v = AbstractSymbolicStack.stack_size v.state
+
+  let allocate v =
+    let state, loc = AbstractSymbolicStack.allocate v.state in
+    ({ v with state }, opnd_from_loc v loc)
+
+  let pop v =
+    let state, loc = AbstractSymbolicStack.pop v.state in
+    ({ v with state }, opnd_from_loc v loc)
+
+  let peek v = opnd_from_loc v (AbstractSymbolicStack.peek v.state)
+
+  let peek2 v =
+    let loc1, loc2 = AbstractSymbolicStack.peek2 v.state in
+    (opnd_from_loc v loc1, opnd_from_loc v loc2)
+end
+
+(* Environment for symbolic stack machine *)
 
 (* A set of strings *)
 module S = Set.Make (String)
@@ -867,6 +877,10 @@ class env prg =
   let chars =
     "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'"
   in
+  let argument_registers =
+    Array.map (fun r -> R r) Registers.argument_registers
+  in
+  let num_of_argument_registers = Array.length argument_registers in
   (* let make_assoc l i =
        List.combine l (List.init (List.length l) (fun x -> x + i))
      in *)
@@ -880,17 +894,8 @@ class env prg =
     val stringm = M.empty (* a string map                      *)
     val scount = 0 (* string count                      *)
     val stack_slots = 0 (* maximal number of stack positions *)
-
-    val n_free_arg_regs =
-      Array.length args_regs (* number of free argument refisters *)
-
-    method get_n_free_arg_regs = n_free_arg_regs
-
-    method restore_n_free_arg_regs =
-      {<n_free_arg_regs = Array.length args_regs>}
-
     val static_size = 0 (* static data size                  *)
-    val stack = [] (* symbolic stack                    *)
+    val stack = SymbolicStack.empty 0 0 (* symbolic stack                    *)
     val nargs = 0 (* number of function arguments      *)
     val locals = [] (* function local variables          *)
     val fname = "" (* function name                     *)
@@ -907,16 +912,15 @@ class env prg =
     method register_extern name = {<externs = S.add name externs>}
     method max_locals_size = max_locals_size
     method has_closure = has_closure
-    method save_closure = if has_closure then [ Push rdx ] else []
-    method rest_closure = if has_closure then [ Pop rdx ] else []
-    method reload_closure = if has_closure then [ Mov (C (*S 0*), rdx) ] else []
+    method save_closure = if has_closure then [ Push r15 ] else []
+    method rest_closure = if has_closure then [ Pop r15 ] else []
     method fname = fname
 
     method leave =
       if stack_slots > max_locals_size then {<max_locals_size = stack_slots>}
       else self
 
-    method show_stack = GT.show list (GT.show opnd) stack
+    method show_stack = GT.show opnd (SymbolicStack.peek stack)
 
     method print_locals =
       Printf.printf "LOCALS: size = %d\n" static_size;
@@ -929,7 +933,7 @@ class env prg =
       Printf.printf "END LOCALS\n"
 
     (* Assert empty stack *)
-    method assert_empty_stack = assert (stack = [])
+    method assert_empty_stack = assert (SymbolicStack.is_empty stack)
 
     (* check barrier condition *)
     method is_barrier = barrier
@@ -941,7 +945,7 @@ class env prg =
     method drop_barrier = {<barrier = false>}
 
     (* drop stack *)
-    method drop_stack = {<stack = []>}
+    method drop_stack = {<stack = SymbolicStack.empty nargs static_size>}
 
     (* associates a stack to a label *)
     method set_stack l =
@@ -964,69 +968,41 @@ class env prg =
       | Value.Global name -> M ("global_" ^ name)
       | Value.Fun name -> M ("$" ^ name)
       | Value.Local i -> S i
-      (* | Value.Arg i -> S (-(i + if has_closure then 2 else 1)) *)
-      | Value.Arg 0 -> rdi
-      | Value.Arg 1 -> rsi
-      | Value.Arg 2 -> rdx
-      | Value.Arg 3 -> rcx
-      | Value.Arg 4 -> r8
-      | Value.Arg 5 -> r9
-      | Value.Arg i -> S (-(i - 5 + if has_closure then 2 else 1))
-      | Value.Access i -> I (word_size * (i + 1), rdx)
+      | Value.Arg i when i < num_of_argument_registers -> argument_registers.(i)
+      | Value.Arg i -> S (-(i - num_of_argument_registers) - 1)
+      | Value.Access i -> I (word_size * (i + 1), r15)
 
     (* allocates a fresh position on a symbolic stack *)
     method allocate =
-      let x, n =
-        let allocate' = function
-          (* | [] -> (rbx, 0) *)
-          | [] -> (r10, 0)
-          | S n :: _ -> (S (n + 1), n + 2)
-          | R n :: _ when n < num_of_regs -> (R (n + 1), stack_slots)
-          | _ -> (S static_size, static_size + 1)
-        in
-        allocate' stack
+      let stack, opnd = SymbolicStack.allocate stack in
+      let stack_slots =
+        max stack_slots (static_size + SymbolicStack.stack_size stack)
       in
-      (x, {<stack_slots = max n stack_slots; stack = x :: stack>})
-
-    (* pushes an operand to the symbolic stack *)
-    method push y = {<stack = y :: stack>}
+      (opnd, {<stack_slots; stack>})
 
     (* pops one operand from the symbolic stack *)
     method pop =
-      let[@ocaml.warning "-8"] (x :: stack') = stack in
-      (x, {<stack = stack'>})
+      let stack, opnd = SymbolicStack.pop stack in
+      (opnd, {<stack>})
 
-    (* pops one operand from the symbolic stack *)
-    method pop_for_arg_2 =
-      if n_free_arg_regs > 0 then
-        let n' = n_free_arg_regs - 1 in
-        (R (Array.length regs - 3 - n' - 1), {<n_free_arg_regs = n'>})
-      else (L 0, {<>})
-    (* failwith (Printf.sprintf "Not implemented %s: %d" __FILE__ __LINE__) *)
+    (* is rdx register in use *)
+    method rdx_in_use = nargs > 2
 
-    method pop_for_arg n =
-      if n_free_arg_regs > 0 then
-        let n' = n_free_arg_regs - 1 in
-        (* (R (Array.length regs - 3 - n' - 1), {<n_free_arg_regs = n'>}) *)
-        ( R (Array.length regs - 3 - max_free_arg_regs + n - 1),
-          {<n_free_arg_regs = n'>} )
-      else failwith (Printf.sprintf "Not implemented %s: %d" __FILE__ __LINE__)
-    (*
-             let[@ocaml.warning "-8"] (x :: stack') = stack in
-             (x, {<stack = stack'>}) *)
-
-    (* pops two operands from the symbolic stack *)
-    method pop2 =
-      let[@ocaml.warning "-8"] (x :: y :: stack') = stack in
-      (x, y, {<stack = stack'>})
+    method arguments_locations n =
+      if n < num_of_argument_registers then
+        ( Array.to_list (Array.sub argument_registers 0 n)
+          |> List.map (fun r -> Register r),
+          0 )
+      else
+        ( (Array.to_list argument_registers |> List.map (fun r -> Register r))
+          @ List.init (n - num_of_argument_registers) (fun _ -> Stack),
+          n - num_of_argument_registers )
 
     (* peeks the top of the stack (the stack does not change) *)
-    method peek = List.hd stack
+    method peek = SymbolicStack.peek stack
 
     (* peeks two topmost values from the stack (the stack itself does not change) *)
-    method peek2 =
-      let[@ocaml.warning "-8"] (x :: y :: _) = stack in
-      (x, y)
+    method peek2 = SymbolicStack.peek2 stack
 
     (* tag hash: gets a hash for a string tag *)
     method hash tag =
@@ -1084,7 +1060,7 @@ class env prg =
       {<nargs
        ; static_size = nlocals
        ; stack_slots = nlocals
-       ; stack = []
+       ; stack = SymbolicStack.empty nargs nlocals
        ; fname = f
        ; has_closure
        ; first_line = true>}
@@ -1096,14 +1072,11 @@ class env prg =
     method lsize = Printf.sprintf "L%s_SIZE" fname
 
     (* returns a list of live registers *)
-    method live_registers depth =
-      let rec inner d acc = function
-        | [] -> acc
-        | (R _ as r) :: tl ->
-            inner (d + 1) (if d >= depth then r :: acc else acc) tl
-        | _ :: tl -> inner (d + 1) acc tl
-      in
-      inner 0 [] stack
+    method live_registers =
+      Array.to_list
+        (Array.sub argument_registers 0
+           (min nargs (Array.length argument_registers)))
+      @ SymbolicStack.live_registers stack
 
     (* generate a line number information for current function *)
     method gen_line line =

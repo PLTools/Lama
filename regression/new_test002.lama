@@ -1,0 +1,15 @@
+fun f (a, b, c, d, e, f, g, h) {
+    var i = 9, j = 10;
+    write (a);
+    write (b);
+    write (c);
+    write (d);
+    write (e);
+    write (f);
+    write (g);
+    write (h);
+    write (i);
+    write (j)
+}
+
+f (1, 2, 3, 4, 5, 6, 7, 8)

@@ -24,7 +24,7 @@
 #  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(size_t) + sizeof(int))
 #endif
 
-#define MEMBER_SIZE sizeof(int)
+#define MEMBER_SIZE sizeof(long)
 
 #define TO_DATA(x) ((data *)((char *)(x)-DATA_HEADER_SZ))
 #define TO_SEXP(x) ((sexp *)((char *)(x)-DATA_HEADER_SZ))
@@ -68,7 +68,7 @@ typedef struct {
   // last bit can be used because due to alignment we can assume that last two bits are always 0's
   size_t forward_address;
   int    tag;
-  int    contents[0];
+  long    contents[0];
 } sexp;
 
 #endif
