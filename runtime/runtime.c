@@ -612,7 +612,7 @@ extern int LflatCompare (void *p, void *q) {
   } else BOX(1);
 }
 
-extern int Lcompare (void *p, void *q) {
+extern long Lcompare (void *p, void *q) {
 #define COMPARE_AND_RETURN(x, y)                                                                   \
   do                                                                                               \
     if (x != y) return BOX(x - y);                                                                 \
@@ -966,12 +966,12 @@ extern void *Bsta (void *v, long i, void *x) {
 }
 
 static void fix_unboxed (char *s, va_list va) {
-  size_t *p = (size_t *)va;
+  long *p = (long *)va;
   int     i = 0;
 
   while (*s) {
     if (*s == '%') {
-      size_t n = p[i];
+      long n = p[i];
       if (UNBOXED(n)) { p[i] = UNBOX(n); }
       i++;
     }

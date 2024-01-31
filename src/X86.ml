@@ -3,60 +3,85 @@ open Language
 
 (* X86 codegeneration interface *)
 
-type register = Register of string [@@deriving gt ~options:{ show }]
+module Register : sig
+  type t
+
+  val from_names : l8:string -> l64:string -> t
+  val from_number : int -> t
+  val of_8bit : t -> t
+  val of_64bit : t -> t
+  val show : t -> string
+end = struct
+  (* Other sizes skipped as they are not used *)
+  type register_desc = { name8 : string; name64 : string }
+  type t = string * register_desc
+
+  let from_names ~l8 ~l64 = (l64, { name8 = l8; name64 = l64 })
+
+  let from_number n =
+    let name64 = Printf.sprintf "%%r%s" (string_of_int n) in
+    let name8 = Printf.sprintf "%%r%sb" (string_of_int n) in
+    (name64, { name8; name64 })
+
+  let of_8bit (_, { name8; name64 }) = (name8, { name8; name64 })
+  let of_64bit (_, { name8; name64 }) = (name64, { name8; name64 })
+  let show (name, _) = name
+end
 
 module Registers : sig
-  val rax : register
-  val rdi : register
-  val rsi : register
-  val rdx : register
-  val rcx : register
-  val rbp : register
-  val rsp : register
-  val r8 : register
-  val r9 : register
-  val r10 : register
-  val r11 : register
-  val r12 : register
-  val r13 : register
-  val r14 : register
-  val r15 : register
+  val rax : Register.t
+  val rdi : Register.t
+  val rsi : Register.t
+  val rdx : Register.t
+  val rcx : Register.t
+  val rbp : Register.t
+  val rsp : Register.t
+  val r8 : Register.t
+  val r9 : Register.t
+  val r10 : Register.t
+  val r11 : Register.t
+  val r12 : Register.t
+  val r13 : Register.t
+  val r14 : Register.t
+  val r15 : Register.t
 
-  val argument_registers : register array
+  val argument_registers : Register.t array
   (** All of argument registers are caller-saved *)
 
-  val extra_caller_saved_registers : register array
+  val extra_caller_saved_registers : Register.t array
   (** Caller saved registers that are not used for arguments *)
 end = struct
   (* Caller-saved special registers *)
-  let rax = Register "%rax"
+  let rax = Register.from_names ~l8:"%al" ~l64:"%rax"
 
   (* Caller-saved special and argument registers *)
-  let rdx = Register "%rdx"
+  let rdx = Register.from_names ~l8:"%dl" ~l64:"%rdx"
 
   (* Caller-saved argument registers *)
-  let rdi = Register "%rdi"
-  let rsi = Register "%rsi"
-  let rcx = Register "%rcx"
-  let r8 = Register "%r8"
-  let r9 = Register "%r9"
+  let rdi = Register.from_names ~l8:"%dil" ~l64:"%rdi"
+  let rsi = Register.from_names ~l8:"%sil" ~l64:"%rsi"
+  let rcx = Register.from_names ~l8:"%cl" ~l64:"%rcx"
+  let r8 = Register.from_number 8
+  let r9 = Register.from_number 9
 
   (* Extra caller-saved registers *)
-  let r10 = Register "%r10"
-  let r11 = Register "%r11"
+  let r10 = Register.from_number 10
+  let r11 = Register.from_number 11
 
   (* Callee-saved special registers *)
-  let rbp = Register "%rbp"
-  let rsp = Register "%rsp"
+  let rbp = Register.from_names ~l8:"%bpl" ~l64:"%rbp"
+  let rsp = Register.from_names ~l8:"%spl" ~l64:"%rsp"
 
-  (* r12-15 registes are calee-saved *)
-  (* They are not used in compilation for simplicity*)
-  let r12 = Register "%r12"
-  let r13 = Register "%r13"
-  let r14 = Register "%r14"
-  let r15 = Register "%r15"
+  (* r12-15 registes are calee-saved in X86_64
+     But we are using them as caller-save for simplicity
+     This disallows calling Lama code from C
+     While does not affects C calls from Lama *)
+  let r12 = Register.from_number 12
+  let r13 = Register.from_number 13
+  let r14 = Register.from_number 14
+  let r15 = Register.from_number 15
   let argument_registers = [| rdi; rsi; rdx; rcx; r8; r9 |]
-  let extra_caller_saved_registers = [| r10; r11; r12; r13; r14; r15 |]
+  let extra_caller_saved_registers = [| r10; r11; r12; r13; r14 |]
 end
 
 (* We need to know the word size to calculate offsets correctly *)
@@ -64,16 +89,25 @@ let word_size = 8
 
 (* We need to distinguish the following operand types: *)
 type opnd =
-  | R of register (* hard register                    *)
+  | R of Register.t (* hard register                    *)
   | S of int (* a position on the hardware stack *)
   | M of string (* a named memory location          *)
   | L of int (* an immediate operand             *)
   | I of int * opnd (* an indirect operand with offset  *)
-[@@deriving gt ~options:{ show }]
+
+let as_register opnd =
+  match opnd with R r -> r | _ -> failwith "as_register: not a register"
 
 type argument_location = Register of opnd | Stack
 
-let show_opnd = show opnd
+let rec show_opnd = function
+  | R r -> Printf.sprintf "R %s" (Register.show r)
+  | S i -> Printf.sprintf "S %d" i
+  | M s -> Printf.sprintf "M %s" s
+  | L i -> Printf.sprintf "L %d" i
+  | I (i, o) -> Printf.sprintf "I %d %s" i (show_opnd o)
+
+(* We need to know the word size to calculate offsets correctly *)
 
 (* For convenience we define the following synonyms for the registers: *)
 let rax = R Registers.rax
@@ -105,10 +139,10 @@ type instr =
   | IDiv of opnd
   (* see instruction set reference                         *)
   | Cltd
-  (* sets a value from flags; the first operand is the     *)
-  | Set of string * string
-  (* suffix, which determines the value being set, the     *)
-  (* the second --- (sub)register name                     *)
+  (* sets a value from flags; the first operand is the
+     suffix, which determines the value being set, the
+     the second --- (sub)register name *)
+  | Set of string * Register.t
   (* pushes the operand on the hardware stack              *)
   | Push of opnd
   (* pops from the hardware stack to the operand           *)
@@ -143,7 +177,7 @@ let stack_offset i =
 
 let show instr =
   let rec opnd = function
-    | R (Register name) -> name
+    | R r -> Register.show r
     | S i ->
         if i >= 0 then Printf.sprintf "-%d(%%rbp)" (stack_offset i)
         else Printf.sprintf "%d(%%rbp)" (stack_offset i)
@@ -165,7 +199,8 @@ let show instr =
   in
   match instr with
   | Cltd -> "\tcqo"
-  | Set (suf, s) -> Printf.sprintf "\tset%s\t%s" suf s
+  | Set (suf, r) ->
+      Printf.sprintf "\tset%s\t%s" suf (Register.show (Register.of_8bit r))
   | IDiv s1 -> Printf.sprintf "\tidivq\t%s" (opnd s1)
   | Binop (op, s1, s2) ->
       Printf.sprintf "\t%s\t%s,\t%s" (binop op) (opnd s1) (opnd s2)
@@ -205,36 +240,33 @@ let compile_binop env op =
     | _ -> failwith "unknown operator"
   in
   let in_memory = function M _ | S _ | I _ -> true | R _ | L _ -> false in
+  let x, y = env#peek2 in
   let without_extra op =
-    let x, env = env#pop in
-    let y = env#peek in
-    (env, op x y)
+    let _x, env = env#pop in
+    (env, op ())
   in
   let with_rdx op =
     if not env#rdx_in_use then
-      let x, env = env#pop in
-      let y = env#peek in
-      (env, op x y rdx)
+      let _x, env = env#pop in
+      (env, op rdx)
     else
       let extra, env = env#allocate in
-      let _, env = env#pop in
-      let x, env = env#pop in
-      let y = env#peek in
-      let code = op x y rdx in
+      let _extra, env = env#pop in
+      let _x, env = env#pop in
+      let code = op rdx in
       (env, [ Mov (rdx, extra) ] @ code @ [ Mov (extra, rdx) ])
   in
   let with_extra op =
     let extra, env = env#allocate in
-    let _, env = env#pop in
-    let x, env = env#pop in
-    let y = env#peek in
-    if in_memory x then
-      (env, [ Mov (rdx, extra) ] @ op x y extra @ [ Mov (extra, rdx) ])
-    else (env, op x y extra)
+    let _extra, env = env#pop in
+    let _x, env = env#pop in
+    if in_memory extra then
+      (env, [ Mov (rdx, extra) ] @ op extra @ [ Mov (extra, rdx) ])
+    else (env, op extra)
   in
   match op with
   | "/" ->
-      with_rdx (fun x y rdx ->
+      with_rdx (fun rdx ->
           [
             Mov (y, rax);
             Sar1 rax;
@@ -247,7 +279,7 @@ let compile_binop env op =
             Mov (rax, y);
           ])
   | "%" ->
-      with_rdx (fun x y rdx ->
+      with_rdx (fun rdx ->
           [
             Mov (y, rax);
             Sar1 rax;
@@ -259,30 +291,30 @@ let compile_binop env op =
             Mov (rdx, y);
           ])
   | "<" | "<=" | "==" | "!=" | ">=" | ">" ->
-      if in_memory env#peek then
-        with_extra (fun x y extra ->
+      if in_memory x then
+        with_extra (fun extra ->
             [
               Binop ("^", rax, rax);
               Mov (x, extra);
               Binop ("cmp", extra, y);
-              Set (suffix op, "%al");
+              Set (suffix op, Registers.rax);
               Sal1 rax;
               Or1 rax;
               Mov (rax, y);
             ])
       else
-        without_extra (fun x y ->
+        without_extra (fun () ->
             [
               Binop ("^", rax, rax);
               Binop ("cmp", x, y);
-              Set (suffix op, "%al");
+              Set (suffix op, Registers.rax);
               Sal1 rax;
               Or1 rax;
               Mov (rax, y);
             ])
   | "*" ->
-    without_extra (fun x y ->
-      if in_memory y then
+      without_extra (fun () ->
+          if in_memory y then
             [
               Dec y;
               Mov (x, rax);
@@ -291,47 +323,46 @@ let compile_binop env op =
               Or1 rax;
               Mov (rax, y);
             ]
-      else
-            [ Dec y; Mov (x, rax); Sar1 rax; Binop (op, rax, y); Or1 y ])
+          else [ Dec y; Mov (x, rax); Sar1 rax; Binop (op, rax, y); Or1 y ])
   | "&&" ->
-      with_extra (fun x y extra ->
+      with_extra (fun extra ->
           [
             Dec x;
             Mov (x, rax);
             Binop (op, x, rax);
             Mov (L 0, rax);
-            Set ("ne", "%al");
+            Set ("ne", Registers.rax);
             Dec y;
             Mov (y, extra);
             Binop (op, y, extra);
             Mov (L 0, extra);
-            Set ("ne", "%dl");
+            Set ("ne", as_register extra);
             Binop (op, extra, rax);
-            Set ("ne", "%al");
+            Set ("ne", Registers.rax);
             Sal1 rax;
             Or1 rax;
             Mov (rax, y);
           ])
   | "!!" ->
-      without_extra (fun x y ->
+      without_extra (fun () ->
           [
             Mov (y, rax);
             Sar1 rax;
             Sar1 x;
             Binop (op, x, rax);
             Mov (L 0, rax);
-            Set ("ne", "%al");
+            Set ("ne", Registers.rax);
             Sal1 rax;
             Or1 rax;
             Mov (rax, y);
           ])
   | "+" ->
-      without_extra (fun x y ->
+      without_extra (fun () ->
           if in_memory x && in_memory y then
             [ Mov (x, rax); Dec rax; Binop ("+", rax, y) ]
           else [ Binop (op, x, y); Dec y ])
   | "-" ->
-      without_extra (fun x y ->
+      without_extra (fun () ->
           if in_memory x && in_memory y then
             [ Mov (x, rax); Binop (op, rax, y); Or1 y ]
           else [ Binop (op, x, y); Or1 y ])
@@ -350,9 +381,9 @@ let compile cmd env imports code =
      flush stdout; *)
   let box n = (n lsl 1) lor 1 in
   let rec compile' env scode =
-    let on_stack = function S _ -> true | _ -> false in
+    let in_memory = function M _ | S _ | I _ -> true | R _ | L _ -> false in
     let mov x s =
-      if on_stack x && on_stack s then [ Mov (x, rax); Mov (rax, s) ]
+      if in_memory x && in_memory s then [ Mov (x, rax); Mov (rax, s) ]
       else [ Mov (x, s) ]
     in
     let callc env n tail =
@@ -382,7 +413,7 @@ let compile cmd env imports code =
         in
         let closure, env = env#pop in
         let call_closure =
-          if on_stack closure then
+          if in_memory closure then
             [ Mov (closure, r15); Mov (r15, rax); CallI rax ]
           else [ Mov (closure, r15); CallI closure ]
         in
@@ -495,7 +526,7 @@ let compile cmd env imports code =
                   List.fold_left
                     (fun (env, code) c ->
                       let cr, env = env#allocate in
-                      (env, Mov (env#loc c, cr) :: code))
+                      (env, mov (env#loc c) cr @ code))
                     (env, []) closure
                 in
                 let env, call_code =
@@ -829,7 +860,7 @@ module SymbolicStack : sig
   val peek : t -> opnd
   val peek2 : t -> opnd * opnd
 end = struct
-  type t = { state : register AbstractSymbolicStack.t; nlocals : int }
+  type t = { state : Register.t AbstractSymbolicStack.t; nlocals : int }
 
   (* romanv: add free args registers? *)
   let empty _nargs nlocals =
@@ -920,7 +951,7 @@ class env prg =
       if stack_slots > max_locals_size then {<max_locals_size = stack_slots>}
       else self
 
-    method show_stack = GT.show opnd (SymbolicStack.peek stack)
+    method show_stack = show_opnd (SymbolicStack.peek stack)
 
     method print_locals =
       Printf.printf "LOCALS: size = %d\n" static_size;
