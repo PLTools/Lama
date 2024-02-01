@@ -157,8 +157,10 @@ type instr =
   | Label of string
   (* a conditional jump                                    *)
   | CJmp of string * string
-  (* a non-conditional jump                                *)
+  (* a non-conditional jump by a name                      *)
   | Jmp of string
+  (* a non-conditional jump by indirect address            *)
+  | JmpI of opnd
   (* directive                                             *)
   | Meta of string
   (* arithmetic correction: decrement                      *)
@@ -187,13 +189,13 @@ let show instr =
     | I (n, x) -> Printf.sprintf "%d(%s)" n (opnd x)
   in
   let binop = function
-    | "+" -> "add"
-    | "-" -> "sub"
-    | "*" -> "imul"
-    | "&&" -> "and"
-    | "!!" -> "or"
-    | "^" -> "xor"
-    | "cmp" -> "cmp"
+    | "+" -> "addq"
+    | "-" -> "subq"
+    | "*" -> "imulq"
+    | "&&" -> "andq"
+    | "!!" -> "orq"
+    | "^" -> "xorq"
+    | "cmp" -> "cmpq"
     | "test" -> "test"
     | _ -> failwith "unknown binary operator"
   in
@@ -213,16 +215,26 @@ let show instr =
   | CallI o -> Printf.sprintf "\tcall\t*(%s)" (opnd o)
   | Label l -> Printf.sprintf "%s:\n" l
   | Jmp l -> Printf.sprintf "\tjmp\t%s" l
+  | JmpI o -> Printf.sprintf "\tjmp\t*(%s)" (opnd o)
   | CJmp (s, l) -> Printf.sprintf "\tj%s\t%s" s l
   | Meta s -> Printf.sprintf "%s\n" s
-  | Dec s -> Printf.sprintf "\tdec\t%s" (opnd s)
-  | Or1 s -> Printf.sprintf "\tor\t$0x0001,\t%s" (opnd s)
-  | Sal1 s -> Printf.sprintf "\tsal\t%s" (opnd s)
-  | Sar1 s -> Printf.sprintf "\tsar\t%s" (opnd s)
+  | Dec s -> Printf.sprintf "\tdecq\t%s" (opnd s)
+  | Or1 s -> Printf.sprintf "\torq\t$0x0001,\t%s" (opnd s)
+  | Sal1 s -> Printf.sprintf "\tsalq\t%s" (opnd s)
+  | Sar1 s -> Printf.sprintf "\tsarq\t%s" (opnd s)
   | Repmovsl -> Printf.sprintf "\trep movsq\t"
 
 (* Opening stack machine to use instructions without fully qualified names *)
 open SM
+
+let in_memory = function M _ | S _ | I _ -> true | R _ | L _ -> false
+
+let mov x s =
+  if x = s then []
+  else if in_memory x && in_memory s then [ Mov (x, rax); Mov (rax, s) ]
+  else [ Mov (x, s) ]
+
+let box n = (n lsl 1) lor 1
 
 (*
   Compile binary operation
@@ -239,7 +251,6 @@ let compile_binop env op =
     | ">" -> "g"
     | _ -> failwith "unknown operator"
   in
-  let in_memory = function M _ | S _ | I _ -> true | R _ | L _ -> false in
   let x, y = env#peek2 in
   let without_extra op =
     let _x, env = env#pop in
@@ -369,6 +380,146 @@ let compile_binop env op =
   | _ ->
       failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
 
+let compile_call env ?fname nargs tail =
+  let is_vararg fname =
+    match fname with
+    | Some fname -> (
+        (* TODO: there are more *)
+        match fname with
+        | "Lprintf" -> true
+        | "Lfprintf" -> true
+        | "Lsprintf" -> true
+        | _ -> false)
+    | None -> false
+  in
+  let tail_call_optimization_applicable =
+    let allowed_function =
+      match fname with Some fname -> not (fname.[0] = '.') | None -> true
+    in
+    let same_arguments_count = env#nargs = nargs in
+    tail && allowed_function && same_arguments_count && not (is_vararg fname)
+  in
+  let compile_tail_call env fname nargs =
+    let _assert_valid_arguments_count =
+      if nargs != env#nargs then
+        failwith
+          (Printf.sprintf
+             "Tail call with different amount of arguments.\n\
+              Expected: %d, actual %d, %s\n"
+             env#nargs nargs
+             (match fname with Some fname -> fname | None -> "closure"))
+    in
+    let _assert_allowed_function =
+      match fname with
+      | Some fname ->
+          if fname.[0] = '.' then
+            failwith
+              (Printf.sprintf "Tail call to a build-in function: %s\n" fname)
+      | None -> ()
+    in
+    let rec push_args env acc = function
+      | 0 -> (env, acc)
+      | n ->
+          let x, env = env#pop in
+          push_args env (mov x (env#loc (Value.Arg (n - 1))) @ acc) (n - 1)
+    in
+    let env, pushs = push_args env [] nargs in
+    let env, jump =
+      match fname with
+      | Some fname -> (env, [ Jmp fname ])
+      | None ->
+          let closure, env = env#pop in
+          (env, [ Mov (closure, r15); JmpI r15 ])
+    in
+    let _, env = env#allocate in
+    (env, pushs @ [ Mov (rbp, rsp); Pop rbp ] @ jump)
+  in
+  let compile_common_call env fname nargs =
+    let adjust_builtin_function_name fname =
+      match fname with
+      | Some fname ->
+          Some
+            (match fname.[0] with
+            | '.' -> "B" ^ String.sub fname 1 (String.length fname - 1)
+            | _ -> fname)
+      | None -> None
+    in
+    let fix_arguments fname args =
+      match fname with
+      | Some "Bsta" -> List.rev args
+      | Some "Barray" -> L (box (List.length args)) :: args
+      | Some "Bsexp" -> L (box (List.length args)) :: args
+      | Some "Bclosure" -> L (box (List.length args - 1)) :: args
+      | _ -> args
+    in
+    let setup_arguments env fname nargs vararg =
+      let rec pop_arguments env acc = function
+        | 0 -> (env, acc)
+        | n ->
+            let x, env = env#pop in
+            pop_arguments env (x :: acc) (n - 1)
+      in
+      let move_arguments vararg args arg_locs =
+        List.fold_left2
+          (fun acc arg arg_loc ->
+            match arg_loc with
+            | Register r when vararg -> Mov (arg, r) :: Push arg :: acc
+            | Register r -> Mov (arg, r) :: acc
+            | Stack -> Push arg :: acc)
+          [] args arg_locs
+      in
+      let env, args = pop_arguments env [] nargs in
+      let args = fix_arguments fname args in
+      let arg_locs, stack_slots = env#arguments_locations (List.length args) in
+      let setup_args_code = move_arguments vararg args arg_locs in
+      if not vararg then (stack_slots, env, setup_args_code)
+      else (nargs, env, setup_args_code @ [ Mov (L 0, rax) ])
+    in
+    let protect_registers env =
+      let pushr, popr =
+        List.split @@ List.map (fun r -> (Push r, Pop r)) env#live_registers
+      in
+      if env#has_closure then (Push r15 :: pushr, Pop r15 :: popr)
+      else (pushr, popr)
+    in
+    let align_stack saved_registers stack_arguments =
+      let aligned = (saved_registers + stack_arguments) mod 2 == 0 in
+      if aligned && stack_arguments = 0 then ([], [])
+      else if aligned then
+        ([], [ Binop ("+", L (word_size * stack_arguments), rsp) ])
+      else
+        ( [ Push (M "$filler") ],
+          [ Binop ("+", L (word_size * (1 + stack_arguments)), rsp) ] )
+    in
+    let call env fname =
+      match fname with
+      | Some fname -> (env, [ Call fname ])
+      | None ->
+          let closure, env = env#pop in
+          (env, [ Mov (closure, r15); CallI r15 ])
+    in
+    let move_result env =
+      let y, env = env#allocate in
+      (env, [ Mov (rax, y) ])
+    in
+    let fname = adjust_builtin_function_name fname in
+    let vararg = is_vararg fname in
+    let stack_slots, env, setup_args_code =
+      setup_arguments env fname nargs vararg
+    in
+    let push_registers, pop_registers = protect_registers env in
+    let align_prologue, align_epilogue =
+      align_stack (List.length push_registers) stack_slots
+    in
+    let env, call = call env fname in
+    let env, move_result = move_result env in
+    ( env,
+      push_registers @ align_prologue @ setup_args_code @ call @ align_epilogue
+      @ List.rev pop_registers @ move_result )
+  in
+  if tail_call_optimization_applicable then compile_tail_call env fname nargs
+  else compile_common_call env fname nargs
+
 (* Symbolic stack machine evaluator
 
      compile : env -> prg -> env * instr list
@@ -379,127 +530,7 @@ let compile_binop env op =
 let compile cmd env imports code =
   (* SM.print_prg code;
      flush stdout; *)
-  let box n = (n lsl 1) lor 1 in
   let rec compile' env scode =
-    let in_memory = function M _ | S _ | I _ -> true | R _ | L _ -> false in
-    let mov x s =
-      if in_memory x && in_memory s then [ Mov (x, rax); Mov (rax, s) ]
-      else [ Mov (x, s) ]
-    in
-    let callc env n tail =
-      (* romanv: let tail = tail && env#nargs = n && f.[0] <> '.' in *)
-      let env, code =
-        let stack_slots, env, setup_args_code =
-          let rec pop_args env acc = function
-            | 0 -> (env, acc)
-            | n ->
-                let x, env = env#pop in
-                pop_args env (x :: acc) (n - 1)
-          in
-          let move_args args arg_locs =
-            List.fold_left2
-              (fun acc arg arg_loc ->
-                match arg_loc with
-                | Register r -> Mov (arg, r) :: acc
-                | Stack -> Push arg :: acc)
-              [] args arg_locs
-          in
-          let env, args = pop_args env [] n in
-          let arg_locs, stack_slots =
-            env#arguments_locations (List.length args)
-          in
-          let setup_args_code = move_args args arg_locs in
-          (stack_slots, env, setup_args_code)
-        in
-        let closure, env = env#pop in
-        let call_closure =
-          if in_memory closure then
-            [ Mov (closure, r15); Mov (r15, rax); CallI rax ]
-          else [ Mov (closure, r15); CallI closure ]
-        in
-        let pushr, popr =
-          List.split @@ List.map (fun r -> (Push r, Pop r)) env#live_registers
-        in
-        let pushr, popr = (env#save_closure @ pushr, env#rest_closure @ popr) in
-        let aligned, align_prologue, align_epilogue =
-          ( (stack_slots + List.length pushr) mod 2 == 0,
-            [ Binop ("-", L 8, rsp) ],
-            [ Binop ("+", L 8, rsp) ] )
-        in
-        ( env,
-          pushr
-          @ (if not aligned then align_prologue else [])
-          @ setup_args_code @ call_closure
-          @ (if not aligned then align_epilogue else [])
-          @ (if stack_slots != 0 then
-               [ Binop ("+", L (word_size * stack_slots), rsp) ]
-             else [])
-          @ List.rev popr )
-      in
-      let y, env = env#allocate in
-      (env, code @ [ Mov (rax, y) ])
-    in
-    let call env f n tail =
-      (* romanv: let tail = tail && env#nargs = n && f.[0] <> '.' in *)
-      let f =
-        match f.[0] with
-        | '.' -> "B" ^ String.sub f 1 (String.length f - 1)
-        | _ -> f
-      in
-      let env, code =
-        let stack_slots, env, setup_args_code =
-          let rec pop_args env acc = function
-            | 0 -> (env, acc)
-            | n ->
-                let x, env = env#pop in
-                pop_args env (x :: acc) (n - 1)
-          in
-          let fix_args args =
-            match f with
-            | "Bsta" -> List.rev args
-            | "Barray" -> L (box n) :: args
-            | "Bsexp" -> L (box n) :: args
-            | "Bclosure" -> L (box (n - 1)) :: args
-            | _ -> args
-          in
-          let move_args args arg_locs =
-            List.fold_left2
-              (fun acc arg arg_loc ->
-                match arg_loc with
-                | Register r -> Mov (arg, r) :: acc
-                | Stack -> Push arg :: acc)
-              [] args arg_locs
-          in
-          let env, args = pop_args env [] n in
-          let args = fix_args args in
-          let arg_locs, stack_slots =
-            env#arguments_locations (List.length args)
-          in
-          let setup_args_code = move_args args arg_locs in
-          (stack_slots, env, setup_args_code)
-        in
-        let pushr, popr =
-          List.split @@ List.map (fun r -> (Push r, Pop r)) env#live_registers
-        in
-        let pushr, popr = (env#save_closure @ pushr, env#rest_closure @ popr) in
-        let aligned, align_prologue, align_epilogue =
-          ( (stack_slots + List.length pushr) mod 2 == 0,
-            [ Binop ("-", L 8, rsp) ],
-            [ Binop ("+", L 8, rsp) ] )
-        in
-        ( env,
-          pushr
-          @ (if not aligned then align_prologue else [])
-          @ setup_args_code @ [ Call f ]
-          @ (if not aligned then align_epilogue else [])
-          @ (if stack_slots != 0 then
-               [ Binop ("+", L (word_size * stack_slots), rsp) ]
-             else [])
-          @ List.rev popr )
-      in
-      let y, env = env#allocate in
-      (env, code @ [ Mov (rax, y) ])
-    in
     match scode with
     | [] -> (env, [])
     | instr :: scode' ->
@@ -530,7 +561,9 @@ let compile cmd env imports code =
                     (env, []) closure
                 in
                 let env, call_code =
-                  call env ".closure" (1 + List.length closure) false
+                  compile_call env ~fname:".closure"
+                    (1 + List.length closure)
+                    false
                 in
                 (env, push_closure_code @ (Mov (M ("$" ^ name), l) :: call_code))
             | CONST n ->
@@ -539,7 +572,7 @@ let compile cmd env imports code =
             | STRING s ->
                 let s, env = env#string s in
                 let l, env = env#allocate in
-                let env, call = call env ".string" 1 false in
+                let env, call = compile_call env ~fname:".string" 1 false in
                 (env, Mov (M ("$" ^ s), l) :: call)
             | LDA x ->
                 let s, env' = (env#variable x)#allocate in
@@ -558,7 +591,7 @@ let compile cmd env imports code =
                   match s with
                   | S _ | M _ -> [ Mov (s, rax); Mov (rax, env'#loc x) ]
                   | _ -> [ Mov (s, env'#loc x) ] ))
-            | STA -> call env ".sta" 3 false
+            | STA -> compile_call env ~fname:".sta" 3 false
             | STI -> (
                 let v, env = env#pop in
                 let x = env#peek in
@@ -711,12 +744,12 @@ let compile cmd env imports code =
             | RET ->
                 let x = env#peek in
                 (env, [ Mov (x, rax); Jmp env#epilogue ])
-            | ELEM -> call env ".elem" 2 false
-            | CALL (f, n, tail) -> call env f n tail
-            | CALLC (n, tail) -> callc env n tail
+            | ELEM -> compile_call env ~fname:".elem" 2 false
+            | CALL (fname, n, tail) -> compile_call env ~fname n tail
+            | CALLC (n, tail) -> compile_call env n tail
             | SEXP (t, n) ->
                 let s, env = env#allocate in
-                let env, code = call env ".sexp" (n + 1) false in
+                let env, code = compile_call env ~fname:".sexp" (n + 1) false in
                 (env, [ Mov (L (box (env#hash t)), s) ] @ code)
             | DROP -> (snd env#pop, [])
             | DUP ->
@@ -729,28 +762,29 @@ let compile cmd env imports code =
             | TAG (t, n) ->
                 let s1, env = env#allocate in
                 let s2, env = env#allocate in
-                let env, code = call env ".tag" 3 false in
+                let env, code = compile_call env ~fname:".tag" 3 false in
                 ( env,
                   [ Mov (L (box (env#hash t)), s1); Mov (L (box n), s2) ] @ code
                 )
             | ARRAY n ->
                 let s, env = env#allocate in
-                let env, code = call env ".array_patt" 2 false in
+                let env, code = compile_call env ~fname:".array_patt" 2 false in
                 (env, [ Mov (L (box n), s) ] @ code)
-            | PATT StrCmp -> call env ".string_patt" 2 false
+            | PATT StrCmp -> compile_call env ~fname:".string_patt" 2 false
             | PATT patt ->
-                call env
-                  (match patt with
-                  | Boxed -> ".boxed_patt"
-                  | UnBoxed -> ".unboxed_patt"
-                  | Array -> ".array_tag_patt"
-                  | String -> ".string_tag_patt"
-                  | Sexp -> ".sexp_tag_patt"
-                  | Closure -> ".closure_tag_patt"
-                  | StrCmp ->
-                      failwith
-                        (Printf.sprintf "Unexpected pattern: StrCmp %s: %d"
-                           __FILE__ __LINE__))
+                compile_call env
+                  ~fname:
+                    (match patt with
+                    | Boxed -> ".boxed_patt"
+                    | UnBoxed -> ".unboxed_patt"
+                    | Array -> ".array_tag_patt"
+                    | String -> ".string_tag_patt"
+                    | Sexp -> ".sexp_tag_patt"
+                    | Closure -> ".closure_tag_patt"
+                    | StrCmp ->
+                        failwith
+                          (Printf.sprintf "Unexpected pattern: StrCmp %s: %d"
+                             __FILE__ __LINE__))
                   1 false
             | LINE line -> env#gen_line line
             | FAIL ((line, col), value) ->
@@ -760,7 +794,9 @@ let compile cmd env imports code =
                 let sr, env = env#allocate in
                 let liner, env = env#allocate in
                 let colr, env = env#allocate in
-                let env, code = call env ".match_failure" 4 false in
+                let env, code =
+                  compile_call env ~fname:".match_failure" 4 false
+                in
                 let _, env = env#pop in
                 ( env,
                   [
@@ -943,8 +979,6 @@ class env prg =
     method register_extern name = {<externs = S.add name externs>}
     method max_locals_size = max_locals_size
     method has_closure = has_closure
-    method save_closure = if has_closure then [ Push r15 ] else []
-    method rest_closure = if has_closure then [ Pop r15 ] else []
     method fname = fname
 
     method leave =
