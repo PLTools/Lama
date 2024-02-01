@@ -1,39 +1,66 @@
 #ifndef __LAMA_RUNTIME_COMMON__
 #define __LAMA_RUNTIME_COMMON__
 #include <stddef.h>
+#include <inttypes.h>
+#include <limits.h>
 
 // this flag makes GC behavior a bit different for testing purposes.
 //#define DEBUG_VERSION
 //#define FULL_INVARIANT_CHECKS
+
+#if defined(__x86_64__) || defined(__ppc64__)
+#define X86_64
+#else
+#endif
+
+typedef size_t ptrt;  // pointer type, because can hold a pointer on a corresponding platform
+
+typedef
+#ifdef X86_64
+int64_t
+#else
+int32_t
+#endif
+aint;  // adaptive int
+
+typedef
+#ifdef X86_64
+uint64_t
+#else
+uint32_t
+#endif
+auint;  // adaptive unsigned int
+
 
 #define STRING_TAG 0x00000001
 #define ARRAY_TAG 0x00000003
 #define SEXP_TAG 0x00000005
 #define CLOSURE_TAG 0x00000007
 #define UNBOXED_TAG 0x00000009   // Not actually a data_header; used to return from LkindOf
-
-#define LEN(x) (long)(((int)x & 0xFFFFFFF8) >> 3)
-#define TAG(x) (x & 0x00000007)
-
-#define SEXP_ONLY_HEADER_SZ (sizeof(int))
+#ifdef X86_64
+#define LEN_MASK (UINT64_MAX-7)
+#else
+#define LEN_MASK (UINT32_MAX-7)
+#endif
+#define LEN(x) (ptrt)(((ptrt)x & LEN_MASK) >> 3)
+#define TAG(x) (x & 7)
 
 #ifndef DEBUG_VERSION
-// #  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(int))
-#  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(long))
+#  define DATA_HEADER_SZ (sizeof(auint) + sizeof(ptrt))
 #else
-#  define DATA_HEADER_SZ (sizeof(size_t) + sizeof(size_t) + sizeof(int))
+#  define DATA_HEADER_SZ (sizeof(auint) + sizeof(ptrt) + sizeof(auint))
 #endif
 
-#define MEMBER_SIZE sizeof(long)
+#define MEMBER_SIZE sizeof(ptrt)
 
 #define TO_DATA(x) ((data *)((char *)(x)-DATA_HEADER_SZ))
 #define TO_SEXP(x) ((sexp *)((char *)(x)-DATA_HEADER_SZ))
 
-#define UNBOXED(x) (((long)(x)) & 0x0001)
-#define UNBOX(x) (((long)(x)) >> 1)
-#define BOX(x) ((((long)(x)) << 1) | 0x0001)
+#define UNBOXED(x) (((aint)(x)) & 1)
+#define UNBOX(x) (((aint)(x)) >> 1)
+#define BOX(x) ((((aint)(x)) << 1) | 1)
 
-#define BYTES_TO_WORDS(bytes) (((bytes)-1) / sizeof(size_t) + 1)
+#define BYTES_TO_WORDS(bytes) (((bytes) - 1) / sizeof(size_t) + 1)
 #define WORDS_TO_BYTES(words) ((words) * sizeof(size_t))
 
 // CAREFUL WITH DOUBLE EVALUATION!
@@ -43,7 +70,7 @@
 typedef struct {
   // store tag in the last three bits to understand what structure this is, other bits are filled with
   // other utility info (i.e., size for array, number of fields for s-expression)
-  long data_header;
+  auint data_header;
 
 #ifdef DEBUG_VERSION
   size_t id;
@@ -51,14 +78,14 @@ typedef struct {
 
   // last bit is used as MARK-BIT, the rest are used to store address where object should move
   // last bit can be used because due to alignment we can assume that last two bits are always 0's
-  size_t forward_address;
+  ptrt forward_address;
   char   contents[0];
 } data;
 
 typedef struct {
   // store tag in the last three bits to understand what structure this is, other bits are filled with
   // other utility info (i.e., size for array, number of fields for s-expression)
-  long data_header;
+  auint data_header;
 
 #ifdef DEBUG_VERSION
   size_t id;
@@ -66,9 +93,9 @@ typedef struct {
 
   // last bit is used as MARK-BIT, the rest are used to store address where object should move
   // last bit can be used because due to alignment we can assume that last two bits are always 0's
-  size_t forward_address;
-  int    tag;
-  long    contents[0];
+  ptrt forward_address;
+  auint   tag;
+  char   contents[0];
 } sexp;
 
 #endif

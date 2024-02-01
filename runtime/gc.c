@@ -560,7 +560,7 @@ extern void gc_test_and_mark_root (size_t **root) {
 }
 
 void __gc_init (void) {
-  __gc_stack_bottom = (size_t)__builtin_frame_address(1) + 4;
+  __gc_stack_bottom = (size_t)__builtin_frame_address(1) + sizeof(size_t);
   __init();
 }
 
@@ -734,7 +734,7 @@ lama_type get_type_row_ptr (void *ptr) {
 }
 
 lama_type get_type_header_ptr (void *ptr) {
-  int *header = (int *)ptr;
+  auint *header = (auint *)ptr;
   switch (TAG(*header)) {
     case ARRAY_TAG: return ARRAY;
     case STRING_TAG: return STRING;
@@ -773,7 +773,7 @@ size_t obj_size_row_ptr (void *ptr) {
 }
 
 size_t obj_size_header_ptr (void *ptr) {
-  int len = LEN(*(int *)ptr);
+  ptrt len = LEN(*(ptrt *)ptr);
   switch (get_type_header_ptr(ptr)) {
     case ARRAY: return array_size(len);
     case STRING: return string_size(len);
@@ -867,7 +867,7 @@ size_t get_header_size (lama_type type) {
   }
 }
 
-void *alloc_string (int len) {
+void *alloc_string (auint len) {
   data *obj        = alloc(string_size(len));
   obj->data_header = STRING_TAG | (len << 3);
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
@@ -880,7 +880,7 @@ void *alloc_string (int len) {
   return obj;
 }
 
-void *alloc_array (int len) {
+void *alloc_array (auint len) {
   data *obj        = alloc(array_size(len));
   obj->data_header = ARRAY_TAG | (len << 3);
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
@@ -893,7 +893,7 @@ void *alloc_array (int len) {
   return obj;
 }
 
-void *alloc_sexp (int members) {
+void *alloc_sexp (auint members) {
   sexp *obj        = alloc(sexp_size(members));
   obj->data_header = SEXP_TAG | (members << 3);
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
@@ -907,7 +907,7 @@ void *alloc_sexp (int members) {
   return obj;
 }
 
-void *alloc_closure (int captured) {
+void *alloc_closure (auint captured) {
 
   data *obj        = alloc(closure_size(captured));
   obj->data_header = CLOSURE_TAG | (captured << 3);

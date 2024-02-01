@@ -23,18 +23,18 @@
 
 #include "runtime_common.h"
 
-#define GET_MARK_BIT(x) (((int)(x)) & 1)
-#define SET_MARK_BIT(x) (x = (((int)(x)) | 1))
-#define IS_ENQUEUED(x) (((int)(x)) & 2)
-#define MAKE_ENQUEUED(x) (x = (((int)(x)) | 2))
-#define MAKE_DEQUEUED(x) (x = (((int)(x)) & (~2)))
-#define RESET_MARK_BIT(x) (x = (((int)(x)) & (~1)))
+#define GET_MARK_BIT(x) (((ptrt)(x)) & 1)
+#define SET_MARK_BIT(x) (x = (((ptrt)(x)) | 1))
+#define IS_ENQUEUED(x) (((ptrt)(x)) & 2)
+#define MAKE_ENQUEUED(x) (x = (((ptrt)(x)) | 2))
+#define MAKE_DEQUEUED(x) (x = (((ptrt)(x)) & (~2)))
+#define RESET_MARK_BIT(x) (x = (((ptrt)(x)) & (~1)))
 // since last 2 bits are used for mark-bit and enqueued-bit and due to correct
 // alignment we can expect that last 2 bits don't influence address (they
 // should always be zero)
-#define GET_FORWARD_ADDRESS(x) (((size_t)(x)) & (~3))
+#define GET_FORWARD_ADDRESS(x) (((ptrt)(x)) & (~3))
 // take the last two bits as they are and make all others zero
-#define SET_FORWARD_ADDRESS(x, addr) (x = ((x & 3) | ((int)(addr))))
+#define SET_FORWARD_ADDRESS(x, addr) (x = ((x & 3) | ((ptrt)(addr))))
 // if heap is full after gc shows in how many times it has to be extended
 #define EXTRA_ROOM_HEAP_COEFFICIENT 2
 // #ifdef DEBUG_VERSION
@@ -237,9 +237,9 @@ void *get_obj_header_ptr (void *ptr);
 void *get_object_content_ptr (void *header_ptr);
 void *get_end_of_obj (void *header_ptr);
 
-void *alloc_string (int len);
-void *alloc_array (int len);
-void *alloc_sexp (int members);
-void *alloc_closure (int captured);
+void *alloc_string (auint len);
+void *alloc_array (auint len);
+void *alloc_sexp (auint members);
+void *alloc_closure (auint captured);
 
 #endif

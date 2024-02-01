@@ -9,6 +9,9 @@ INVARIANTS_CHECK_FLAGS=$(TEST_FLAGS) -DFULL_INVARIANT_CHECKS
 all: gc.o runtime.o
 	ar rc runtime.a runtime.o gc.o
 
+all64: gc64.o runtime64.o
+	ar rc runtime.a runtime64.o gc64.o
+
 NEGATIVE_TESTS=$(sort $(basename $(notdir $(wildcard negative_scenarios/*_neg.c))))
 
 $(NEGATIVE_TESTS): %: negative_scenarios/%.c
@@ -35,10 +38,16 @@ virt_stack.o: virt_stack.h virt_stack.c
 	$(CC) $(PROD_FLAGS) -c virt_stack.c
 
 gc.o: gc.c gc.h
-	$(CC) -rdynamic $(PROD_FLAGS) -c gc.c
+	$(CC) -rdynamic -m32 $(PROD_FLAGS) -c gc.c
+
+gc64.o: gc.c gc.h
+	$(CC) -rdynamic $(PROD_FLAGS) -c gc.c -o gc64.o
 
 runtime.o: runtime.c runtime.h
-	$(CC) $(PROD_FLAGS) -c runtime.c
+	$(CC) -m32 $(PROD_FLAGS) -c runtime.c
+
+runtime64.o: runtime.c runtime.h
+	$(CC) $(PROD_FLAGS) -c runtime.c -o runtime64.o
 
 clean:
 	$(RM) *.a *.o *~ negative_scenarios/*.err
