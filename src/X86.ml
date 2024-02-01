@@ -224,6 +224,21 @@ let show instr =
   | Sar1 s -> Printf.sprintf "\tsarq\t%s" (opnd s)
   | Repmovsl -> Printf.sprintf "\trep movsq\t"
 
+let vararg_functions =
+  [
+    "Lprintf";
+    "Lfprintf";
+    "Lsprintf";
+    "Lassert";
+    "Bsexp";
+    "Blosure";
+    "Barray";
+    "Bsexp";
+    "Lfailure";
+  ]
+
+let is_vararg fname = List.mem fname vararg_functions
+
 (* Opening stack machine to use instructions without fully qualified names *)
 open SM
 
@@ -382,15 +397,7 @@ let compile_binop env op =
 
 let compile_call env ?fname nargs tail =
   let is_vararg fname =
-    match fname with
-    | Some fname -> (
-        (* TODO: there are more *)
-        match fname with
-        | "Lprintf" -> true
-        | "Lfprintf" -> true
-        | "Lsprintf" -> true
-        | _ -> false)
-    | None -> false
+    match fname with Some fname -> is_vararg fname | None -> false
   in
   let tail_call_optimization_applicable =
     let allowed_function =
@@ -553,6 +560,11 @@ let compile cmd env imports code =
             | IMPORT _ -> (env, [])
             | CLOSURE (name, closure) ->
                 let l, env = env#allocate in
+                if is_vararg name then
+                  Printf.eprintf
+                    "Warning: closure for vararg function %s is not fully \
+                     supported. Do it on your own risk.\n"
+                    name;
                 let env, push_closure_code =
                   List.fold_left
                     (fun (env, code) c ->
@@ -1072,7 +1084,7 @@ class env prg =
     (* tag hash: gets a hash for a string tag *)
     method hash tag =
       let h = Stdlib.ref 0 in
-      for i = 0 to min (String.length tag - 1) 4 do
+      for i = 0 to min (String.length tag - 1) 9 do
         h := (!h lsl 6) lor String.index chars tag.[i]
       done;
       !h
