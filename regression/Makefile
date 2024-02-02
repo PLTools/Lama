@@ -6,7 +6,7 @@ LAMAC=../src/lamac
 .PHONY: check $(TESTS)
 
 
-check: ctest111 $(TESTS)
+check: $(TESTS) ctest111
 
 $(TESTS): %: %.lama
 	@echo "regression/$@"

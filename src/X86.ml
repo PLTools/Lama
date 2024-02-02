@@ -224,21 +224,6 @@ let show instr =
   | Sar1 s -> Printf.sprintf "\tsarq\t%s" (opnd s)
   | Repmovsl -> Printf.sprintf "\trep movsq\t"
 
-let vararg_functions =
-  [
-    "Lprintf";
-    "Lfprintf";
-    "Lsprintf";
-    "Lassert";
-    "Bsexp";
-    "Blosure";
-    "Barray";
-    "Bsexp";
-    "Lfailure";
-  ]
-
-let is_vararg fname = List.mem fname vararg_functions
-
 (* Opening stack machine to use instructions without fully qualified names *)
 open SM
 
@@ -396,15 +381,12 @@ let compile_binop env op =
       failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
 
 let compile_call env ?fname nargs tail =
-  let is_vararg fname =
-    match fname with Some fname -> is_vararg fname | None -> false
-  in
   let tail_call_optimization_applicable =
     let allowed_function =
       match fname with Some fname -> not (fname.[0] = '.') | None -> true
     in
     let same_arguments_count = env#nargs = nargs in
-    tail && allowed_function && same_arguments_count && not (is_vararg fname)
+    tail && allowed_function && same_arguments_count
   in
   let compile_tail_call env fname nargs =
     let _assert_valid_arguments_count =
@@ -459,18 +441,17 @@ let compile_call env ?fname nargs tail =
       | Some "Bclosure" -> L (box (List.length args - 1)) :: args
       | _ -> args
     in
-    let setup_arguments env fname nargs vararg =
+    let setup_arguments env fname nargs =
       let rec pop_arguments env acc = function
         | 0 -> (env, acc)
         | n ->
             let x, env = env#pop in
             pop_arguments env (x :: acc) (n - 1)
       in
-      let move_arguments vararg args arg_locs =
+      let move_arguments args arg_locs =
         List.fold_left2
           (fun acc arg arg_loc ->
             match arg_loc with
-            | Register r when vararg -> Mov (arg, r) :: Push arg :: acc
             | Register r -> Mov (arg, r) :: acc
             | Stack -> Push arg :: acc)
           [] args arg_locs
@@ -478,9 +459,8 @@ let compile_call env ?fname nargs tail =
       let env, args = pop_arguments env [] nargs in
       let args = fix_arguments fname args in
       let arg_locs, stack_slots = env#arguments_locations (List.length args) in
-      let setup_args_code = move_arguments vararg args arg_locs in
-      if not vararg then (stack_slots, env, setup_args_code)
-      else (nargs, env, setup_args_code @ [ Mov (L 0, rax) ])
+      let setup_args_code = move_arguments args arg_locs in
+      (stack_slots, env, setup_args_code)
     in
     let protect_registers env =
       let pushr, popr =
@@ -510,10 +490,7 @@ let compile_call env ?fname nargs tail =
       (env, [ Mov (rax, y) ])
     in
     let fname = adjust_builtin_function_name fname in
-    let vararg = is_vararg fname in
-    let stack_slots, env, setup_args_code =
-      setup_arguments env fname nargs vararg
-    in
+    let stack_slots, env, setup_args_code = setup_arguments env fname nargs in
     let push_registers, pop_registers = protect_registers env in
     let align_prologue, align_epilogue =
       align_stack (List.length push_registers) stack_slots
@@ -560,11 +537,6 @@ let compile cmd env imports code =
             | IMPORT _ -> (env, [])
             | CLOSURE (name, closure) ->
                 let l, env = env#allocate in
-                if is_vararg name then
-                  Printf.eprintf
-                    "Warning: closure for vararg function %s is not fully \
-                     supported. Do it on your own risk.\n"
-                    name;
                 let env, push_closure_code =
                   List.fold_left
                     (fun (env, code) c ->
@@ -692,12 +664,13 @@ let compile cmd env imports code =
                      else [])
                   @ [
                       Push rbp;
-                      (* romanv: incorrect *)
                       Meta "\t.cfi_def_cfa_offset\t8";
                       Meta "\t.cfi_offset 5, -8";
                       Mov (rsp, rbp);
                       Meta "\t.cfi_def_cfa_register\t5";
                       Binop ("-", M ("$" ^ env#lsize), rsp);
+                      Mov (M "$0xFFFFFFFFFFFFFFF0", rax);
+                      Binop ("&&", rax, rsp);
                       Mov (rdi, r12);
                       Mov (rsi, r13);
                       Mov (rcx, r14);
@@ -744,10 +717,12 @@ let compile cmd env imports code =
                       Ret;
                       Meta "\t.cfi_endproc";
                       Meta
+                        (* Allocate space for the symbolic stack
+                           Add extra word if needed to preserve alignment *)
                         (Printf.sprintf "\t.set\t%s,\t%d" env#lsize
-                           (if env#allocated * word_size mod 16 == 0 then
+                           (if env#allocated mod 2 == 0 then
                               env#allocated * word_size
-                            else 8 + (env#allocated * word_size)));
+                            else (env#allocated + 1) * word_size));
                       Meta
                         (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size
                            env#allocated);
@@ -969,18 +944,21 @@ class env prg =
      in *)
   object (self)
     inherit SM.indexer prg
-    val globals = S.empty (* a set of global variables         *)
-    val stringm = M.empty (* a string map                      *)
-    val scount = 0 (* string count                      *)
+    val globals = S.empty (* a set of global variables *)
+    val stringm = M.empty (* a string map *)
+    val scount = 0 (* string count *)
     val stack_slots = 0 (* maximal number of stack positions *)
-    val static_size = 0 (* static data size                  *)
-    val stack = SymbolicStack.empty 0 0 (* symbolic stack                    *)
-    val nargs = 0 (* number of function arguments      *)
-    val locals = [] (* function local variables          *)
-    val fname = "" (* function name                     *)
-    val stackmap = M.empty (* labels to stack map               *)
-    val barrier = false (* barrier condition                 *)
-    val max_locals_size = 0
+    val static_size = 0 (* static data size *)
+    val stack = SymbolicStack.empty 0 0 (* symbolic stack *)
+    val nargs = 0 (* number of function arguments *)
+    val locals = [] (* function local variables *)
+    val fname = "" (* function name *)
+    val stackmap = M.empty (* labels to stack map *)
+    val barrier = false (* barrier condition *)
+
+    val max_locals_size =
+      0 (* maximal number of stack position in all functions *)
+
     val has_closure = false
     val publics = S.empty
     val externs = S.empty

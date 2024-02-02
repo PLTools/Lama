@@ -870,8 +870,6 @@ extern void *Bsexp (aint bn, ...) {
   va_end(args);
 
   POST_GC();
-  // printf("bsexp: %s", de_hash(((sexp *)r)->tag));
-  // fflush(stdout);
   return (void *)((data *)r)->contents;
 }
 
