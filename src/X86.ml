@@ -669,8 +669,6 @@ let compile cmd env imports code =
                       Mov (rsp, rbp);
                       Meta "\t.cfi_def_cfa_register\t5";
                       Binop ("-", M ("$" ^ env#lsize), rsp);
-                      Mov (M "$0xFFFFFFFFFFFFFFF0", rax);
-                      Binop ("&&", rax, rsp);
                       Mov (rdi, r12);
                       Mov (rsi, r13);
                       Mov (rcx, r14);
@@ -684,6 +682,13 @@ let compile cmd env imports code =
                     ]
                   @ (if f = "main" then
                        [
+                         (* Align stack as main function is the only function that could be called without alignment *)
+                         Mov (M "$0xF", rax);
+                         Binop ("test", rsp, rax);
+                         CJmp ("z", "_ALIGNED");
+                         Push (M "$filler");
+                         Label "_ALIGNED";
+                         (* Initialize gc and arguments *)
                          Push (R Registers.rdi);
                          Push (R Registers.rsi);
                          Call "__gc_init";
