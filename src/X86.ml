@@ -287,7 +287,7 @@ let compile_binop env op =
     let _extra, env = env#pop in
     let _x, env = env#pop in
     if in_memory extra then
-      (env, [ Mov (rdx, extra) ] @ op extra @ [ Mov (extra, rdx) ])
+      (env, [ Mov (rdx, extra) ] @ op rdx @ [ Mov (extra, rdx) ])
     else (env, op extra)
   in
   match op with
