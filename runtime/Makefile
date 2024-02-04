@@ -5,12 +5,12 @@ TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
 INVARIANTS_CHECK_FLAGS=$(TEST_FLAGS) -DFULL_INVARIANT_CHECKS
 
-# this target is the most important one, its' artefacts should be used as a runtime of Lama
-all: gc.o runtime.o
-	ar rc runtime.a runtime.o gc.o
-
-all64: gc64.o runtime64.o
+all: gc64.o runtime64.o
 	ar rc runtime.a runtime64.o gc64.o
+
+# this target is the most important one, its' artefacts should be used as a runtime of Lama
+all32: gc.o runtime.o
+	ar rc runtime.a runtime.o gc.o
 
 NEGATIVE_TESTS=$(sort $(basename $(notdir $(wildcard negative_scenarios/*_neg.c))))
 

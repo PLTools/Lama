@@ -14,6 +14,7 @@ extern size_t __gc_stack_top, __gc_stack_bottom;
   flag      = __gc_stack_top == 0;                                                                 \
   if (flag) { __gc_stack_top = (size_t)__builtin_frame_address(0); }                               \
   assert(__gc_stack_top != 0);                                                                     \
+  assert(__gc_stack_top & 0xF == 0);                                                               \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);
 
 #define POST_GC()                                                                                  \
@@ -238,15 +239,15 @@ extern aint LtagHash (char *s) {
     p++;
   }
 
-  if (strncmp(s, de_hash(h), 5) != 0) { failure("%s <-> %s\n", s, de_hash(h)); }
+  if (strncmp(s, de_hash(h), MAX_SEXP_TAG_LEN) != 0) { failure("%s <-> %s\n", s, de_hash(h)); }
 
   return BOX(h);
 }
 
 char *de_hash (aint n) {
-  static char buf[6] = {0, 0, 0, 0, 0, 0};
+  static char buf[MAX_SEXP_TAG_LEN + 1] = {0, 0, 0, 0, 0, 0};
   char       *p      = (char *)BOX(NULL);
-  p                  = &buf[5];
+  p                  = &buf[MAX_SEXP_TAG_LEN];
 
   *p-- = 0;
 
