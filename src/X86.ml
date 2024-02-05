@@ -386,8 +386,9 @@ let compile_call env ?fname nargs tail =
   let tail_call_optimization_applicable =
     let allowed_function =
       match fname with
-      Some "Lprintf" -> false
-      | Some fname -> not (fname.[0] = '.') | None -> true
+      | Some "Lprintf" -> false
+      | Some fname -> not (fname.[0] = '.')
+      | None -> true
     in
     let same_arguments_count = env#nargs = nargs in
     tail && allowed_function && same_arguments_count
@@ -494,7 +495,9 @@ let compile_call env ?fname nargs tail =
       (env, [ Mov (rax, y) ])
     in
     let add_printf_count =
-      match fname with Some "Lprintf" -> [ Mov (L (nargs - 1), r11) ] | _ -> []
+      match fname with
+      | Some "Lprintf" -> [ Mov (L (nargs - 1), r11) ]
+      | _ -> []
     in
     let fname = adjust_builtin_function_name fname in
     let stack_slots, env, setup_args_code = setup_arguments env fname nargs in
@@ -749,7 +752,7 @@ let compile cmd env imports code =
             | SEXP (t, n) ->
                 let s, env = env#allocate in
                 let env, code = compile_call env ~fname:".sexp" (n + 1) false in
-                (env, (mov L (box (env#hash t))) s @ code)
+                (env, mov (L (box (env#hash t))) s @ code)
             | DROP -> (snd env#pop, [])
             | DUP ->
                 let x = env#peek in
@@ -762,9 +765,7 @@ let compile cmd env imports code =
                 let s1, env = env#allocate in
                 let s2, env = env#allocate in
                 let env, code = compile_call env ~fname:".tag" 3 false in
-                ( env,
-                  [ Mov (L (box (env#hash t)), s1); Mov (L (box n), s2) ] @ code
-                )
+                (env, mov (L (box (env#hash t))) s1 @ mov (L (box n)) s2 @ code)
             | ARRAY n ->
                 let s, env = env#allocate in
                 let env, code = compile_call env ~fname:".array_patt" 2 false in
