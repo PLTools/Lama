@@ -14,7 +14,7 @@ extern size_t __gc_stack_top, __gc_stack_bottom;
   flag      = __gc_stack_top == 0;                                                                 \
   if (flag) { __gc_stack_top = (size_t)__builtin_frame_address(0); }                               \
   assert(__gc_stack_top != 0);                                                                     \
-  assert(__gc_stack_top & 0xF == 0);                                                               \
+  assert((__gc_stack_top & 0xF) == 0);                                                             \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);
 
 #define POST_GC()                                                                                  \
@@ -547,15 +547,15 @@ void *Lclone (void *p) {
 
 #define HASH_DEPTH 3
 #define HASH_APPEND(acc, x)                                                                        \
-  (((acc + (unsigned)x) << (WORD_SIZE / 2)) | ((acc + (unsigned)x) >> (WORD_SIZE / 2)))
+  (((acc + (auint)x) << (WORD_SIZE / 2)) | ((acc + (auint)x) >> (WORD_SIZE / 2)))
 
-int inner_hash (int depth, unsigned acc, void *p) {
+aint inner_hash (aint depth, auint acc, void *p) {
   if (depth > HASH_DEPTH) return acc;
 
   if (UNBOXED(p)) return HASH_APPEND(acc, UNBOX(p));
   else if (is_valid_heap_pointer(p)) {
     data *a = TO_DATA(p);
-    int   t = TAG(a->data_header), l = LEN(a->data_header), i;
+    aint  t = TAG(a->data_header), l = LEN(a->data_header), i;
 
     acc = HASH_APPEND(acc, t);
     acc = HASH_APPEND(acc, l);
@@ -565,11 +565,11 @@ int inner_hash (int depth, unsigned acc, void *p) {
         char *p = a->contents;
 
         while (*p) {
-          int n = (int)*p++;
+          aint n = (int)*p++;
           acc   = HASH_APPEND(acc, n);
         }
 
-        return acc;
+        return (aint)acc;
       }
 
       case CLOSURE_TAG:
@@ -592,7 +592,7 @@ int inner_hash (int depth, unsigned acc, void *p) {
 
     for (; i < l; i++) acc = inner_hash(depth + 1, acc, ((void **)a->contents)[i]);
 
-    return acc;
+    return (aint)acc;
   } else return HASH_APPEND(acc, p);
 }
 
@@ -602,9 +602,9 @@ extern void *LstringInt (char *b) {
   return (void *)BOX(n);
 }
 
-extern int Lhash (void *p) { return BOX(0x3fffff & inner_hash(0, 0, p)); }
+extern aint Lhash (void *p) { return BOX(0x3fffff & inner_hash(0, 0, p)); }
 
-extern int LflatCompare (void *p, void *q) {
+extern aint LflatCompare (void *p, void *q) {
   if (UNBOXED(p)) {
     if (UNBOXED(q)) { return BOX(UNBOX(p) - UNBOX(q)); }
     return -1;
@@ -1031,32 +1031,6 @@ extern void * /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
   return d->contents;
 }
 
-extern void *Lsprintf (char *fmt, ...) {
-  va_list args;
-  void   *s;
-
-  ASSERT_STRING("sprintf:1", fmt);
-
-  va_start(args, fmt);
-  fix_unboxed(fmt, args);
-
-  createStringBuf();
-
-  vprintStringBuf(fmt, args);
-
-  PRE_GC();
-
-  push_extra_root((void **)&fmt);
-  s = Bstring(stringBuf.contents);
-  pop_extra_root((void **)&fmt);
-
-  POST_GC();
-
-  deleteStringBuf();
-
-  return s;
-}
-
 extern void *LgetEnv (char *var) {
   char *e = getenv(var);
   void *s;
@@ -1072,31 +1046,74 @@ extern void *LgetEnv (char *var) {
   return s;
 }
 
+#ifdef X86_64
+auint cnt_percentage_sign (char *s) {
+    auint cnt = 0;
+    while (*s) {
+        cnt += (*s == '%');
+        ++s;
+        if (*s == '%') {
+            ++s;
+            --cnt;
+        }
+    }
+    return cnt;
+}
+#endif
+
 extern int Lsystem (char *cmd) { return BOX(system(cmd)); }
 
-extern void Lfprintf (FILE *f, char *s, ...) {
-  va_list args;   // = (va_list)BOX(NULL);
+#ifndef X86_64
+extern void Lprintf (char *s, ...) {
+    va_list args;   // = (va_list)BOX(NULL);
 
-  ASSERT_BOXED("fprintf:1", f);
-  ASSERT_STRING("fprintf:2", s);
+    ASSERT_STRING("printf:1", s);
 
-  va_start(args, s);
-  fix_unboxed(s, args);
+    va_start(args, s);
+    fix_unboxed(s, args);
 
-  if (vfprintf(f, s, args) < 0) { failure("fprintf (...): %s\n", strerror(errno)); }
+    if (vprintf(s, args) < 0) { failure("fprintf (...): %s\n", strerror(errno)); }
+
+    fflush(stdout);
+}
+#endif
+
+extern void *Lsprintf (char *fmt, ...) {
+    va_list args;
+    void   *s;
+
+    ASSERT_STRING("sprintf:1", fmt);
+
+    va_start(args, fmt);
+    fix_unboxed(fmt, args);
+
+    createStringBuf();
+
+    vprintStringBuf(fmt, args);
+
+    PRE_GC();
+
+    push_extra_root((void **)&fmt);
+    s = Bstring(stringBuf.contents);
+    pop_extra_root((void **)&fmt);
+
+    POST_GC();
+
+    deleteStringBuf();
+
+    return s;
 }
 
-extern void Lprintf (char *s, ...) {
-  va_list args;   // = (va_list)BOX(NULL);
+extern void Lfprintf (FILE *f, char *s, ...) {
+    va_list args;   // = (va_list)BOX(NULL);
 
-  ASSERT_STRING("printf:1", s);
+    ASSERT_BOXED("fprintf:1", f);
+    ASSERT_STRING("fprintf:2", s);
 
-  va_start(args, s);
-  fix_unboxed(s, args);
+    va_start(args, s);
+    fix_unboxed(s, args);
 
-  if (vprintf(s, args) < 0) { failure("fprintf (...): %s\n", strerror(errno)); }
-
-  fflush(stdout);
+    if (vfprintf(f, s, args) < 0) { failure("fprintf (...): %s\n", strerror(errno)); }
 }
 
 extern FILE *Lfopen (char *f, char *m) {

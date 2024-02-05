@@ -5,10 +5,11 @@ TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
 INVARIANTS_CHECK_FLAGS=$(TEST_FLAGS) -DFULL_INVARIANT_CHECKS
 
-all: gc64.o runtime64.o
-	ar rc runtime.a runtime64.o gc64.o
+# this target is the most important one, its' artefacts should be used as a runtime of x86-64 version of Lama
+all: gc64.o runtime64.o printf.o
+	ar rc runtime.a runtime64.o gc64.o printf.o
 
-# this target is the most important one, its' artefacts should be used as a runtime of Lama
+# this target is the most important one, its' artefacts should be used as a runtime of x86 (32-bits) version Lama
 all32: gc.o runtime.o
 	ar rc runtime.a runtime.o gc.o
 
@@ -48,6 +49,9 @@ runtime.o: runtime.c runtime.h
 
 runtime64.o: runtime.c runtime.h
 	$(CC) $(PROD_FLAGS) -c runtime.c -o runtime64.o
+
+printf.o: printf.s
+	$(CC) $(PROD_FLAGS) -c printf.s -o printf.o
 
 clean:
 	$(RM) *.a *.o *~ negative_scenarios/*.err
