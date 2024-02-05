@@ -383,7 +383,9 @@ let compile_binop env op =
 let compile_call env ?fname nargs tail =
   let tail_call_optimization_applicable =
     let allowed_function =
-      match fname with Some fname -> not (fname.[0] = '.') | None -> true
+      match fname with
+      Some "Lprintf" -> false
+      | Some fname -> not (fname.[0] = '.') | None -> true
     in
     let same_arguments_count = env#nargs = nargs in
     tail && allowed_function && same_arguments_count
@@ -489,6 +491,9 @@ let compile_call env ?fname nargs tail =
       let y, env = env#allocate in
       (env, [ Mov (rax, y) ])
     in
+    let add_printf_count =
+      match fname with Some "Lprintf" -> [ Mov (L (nargs - 1), r11) ] | _ -> []
+    in
     let fname = adjust_builtin_function_name fname in
     let stack_slots, env, setup_args_code = setup_arguments env fname nargs in
     let push_registers, pop_registers = protect_registers env in
@@ -498,8 +503,8 @@ let compile_call env ?fname nargs tail =
     let env, call = call env fname in
     let env, move_result = move_result env in
     ( env,
-      push_registers @ align_prologue @ setup_args_code @ call @ align_epilogue
-      @ List.rev pop_registers @ move_result )
+      push_registers @ align_prologue @ setup_args_code @ add_printf_count
+      @ call @ align_epilogue @ List.rev pop_registers @ move_result )
   in
   if tail_call_optimization_applicable then compile_tail_call env fname nargs
   else compile_common_call env fname nargs
@@ -1250,6 +1255,6 @@ let build cmd prog =
       Sys.command gcc_cmdline
   | `Compile ->
       Sys.command
-        (Printf.sprintf "%s %s %s -c %s.s" compiler flags cmd#get_debug
+        (Printf.sprintf "%s %s %s -c -g %s.s" compiler flags cmd#get_debug
            cmd#basename)
   | _ -> invalid_arg "must not happen"
