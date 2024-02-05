@@ -51,7 +51,7 @@ runtime64.o: runtime.c runtime.h
 	$(CC) $(PROD_FLAGS) -c runtime.c -o runtime64.o
 
 printf.o: printf.s
-	$(CC) $(PROD_FLAGS) -c printf.s -o printf.o
+	$(CC) $(PROD_FLAGS) -c -g printf.s -o printf.o
 
 clean:
 	$(RM) *.a *.o *~ negative_scenarios/*.err
