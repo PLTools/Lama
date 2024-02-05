@@ -228,10 +228,12 @@ let show instr =
 open SM
 
 let in_memory = function M _ | S _ | I _ -> true | R _ | L _ -> false
+let big_numeric_literal = function L num -> num > 0xFFFFFFFF | _ -> false
 
 let mov x s =
   if x = s then []
-  else if in_memory x && in_memory s then [ Mov (x, rax); Mov (rax, s) ]
+  else if (in_memory x && in_memory s) || big_numeric_literal x then
+    [ Mov (x, rax); Mov (rax, s) ]
   else [ Mov (x, s) ]
 
 let box n = (n lsl 1) lor 1
@@ -747,7 +749,7 @@ let compile cmd env imports code =
             | SEXP (t, n) ->
                 let s, env = env#allocate in
                 let env, code = compile_call env ~fname:".sexp" (n + 1) false in
-                (env, [ Mov (L (box (env#hash t)), s) ] @ code)
+                (env, (mov L (box (env#hash t))) s @ code)
             | DROP -> (snd env#pop, [])
             | DUP ->
                 let x = env#peek in
