@@ -497,6 +497,9 @@ let compile_call env ?fname nargs tail =
     let add_printf_count =
       match fname with
       | Some "Lprintf" -> [ Mov (L (nargs - 1), r11) ]
+      | Some "Lsprintf" -> [ Mov (L (nargs - 1), r11) ]
+      | Some "Lfprintf" -> [ Mov (L (nargs - 2), r11) ]
+      | Some "Lfailure" -> [ Mov (L (nargs - 1), r11) ]
       | _ -> []
     in
     let fname = adjust_builtin_function_name fname in

@@ -968,28 +968,6 @@ extern void *Bsta (void *v, aint i, void *x) {
   return v;
 }
 
-static void fix_unboxed (char *s, va_list va) {
-  aint *p = (aint *)va;
-  aint     i = 0;
-
-  while (*s) {
-    if (*s == '%') {
-      aint n = p[i];
-      if (UNBOXED(n)) { p[i] = UNBOX(n); }
-      i++;
-    }
-    s++;
-  }
-}
-
-extern void Lfailure (char *s, ...) {
-  va_list args;
-
-  va_start(args, s);
-  fix_unboxed(s, args);
-  vfailure(s, args);
-}
-
 extern void Bmatch_failure (void *v, char *fname, aint line, aint col) {
   createStringBuf();
   printValue(v);
@@ -1046,24 +1024,38 @@ extern void *LgetEnv (char *var) {
   return s;
 }
 
-#ifdef X86_64
-auint cnt_percentage_sign (char *s) {
-    auint cnt = 0;
-    while (*s) {
-        cnt += (*s == '%');
-        ++s;
-        if (*s == '%') {
-            ++s;
-            --cnt;
-        }
-    }
-    return cnt;
-}
-#endif
-
 extern aint Lsystem (char *cmd) { return BOX(system(cmd)); }
 
+extern void Lfailure (char *s, ...);
+extern void Lprintf (char *s, ...);
+extern void *Lsprintf (char *fmt, ...);
+extern void Lfprintf (FILE *f, char *s, ...);
+
 #ifndef X86_64
+// In X86_64 we are not able to modify va_arg
+
+static void fix_unboxed (char *s, va_list va) {
+  aint *p = (aint *)va;
+  aint     i = 0;
+
+  while (*s) {
+    if (*s == '%') {
+      aint n = p[i];
+      if (UNBOXED(n)) { p[i] = UNBOX(n); }
+      i++;
+    }
+    s++;
+  }
+}
+
+extern void Lfailure (char *s, ...) {
+  va_list args;
+
+  va_start(args, s);
+  fix_unboxed(s, args);
+  vfailure(s, args);
+}
+
 extern void Lprintf (char *s, ...) {
     va_list args;   // = (va_list)BOX(NULL);
 
@@ -1076,18 +1068,15 @@ extern void Lprintf (char *s, ...) {
 
     fflush(stdout);
 }
-#endif
 
-// TODO: fix
 extern void *Lsprintf (char *fmt, ...) {
-    // exit (255);
     va_list args;
     void   *s;
 
     ASSERT_STRING("sprintf:1", fmt);
 
     va_start(args, fmt);
-    // fix_unboxed(fmt, args);
+    fix_unboxed(fmt, args);
 
     createStringBuf();
 
@@ -1107,7 +1096,6 @@ extern void *Lsprintf (char *fmt, ...) {
 }
 
 extern void Lfprintf (FILE *f, char *s, ...) {
-    exit (255);
     va_list args;   // = (va_list)BOX(NULL);
 
     ASSERT_BOXED("fprintf:1", f);
@@ -1118,6 +1106,34 @@ extern void Lfprintf (FILE *f, char *s, ...) {
 
     if (vfprintf(f, s, args) < 0) { failure("fprintf (...): %s\n", strerror(errno)); }
 }
+#else
+
+extern void *Bsprintf (char *fmt, ...) {
+    va_list args;
+    void   *s;
+
+    ASSERT_STRING("sprintf:1", fmt);
+
+    va_start(args, fmt);
+
+    createStringBuf();
+
+    vprintStringBuf(fmt, args);
+
+    PRE_GC();
+
+    push_extra_root((void **)&fmt);
+    s = Bstring(stringBuf.contents);
+    pop_extra_root((void **)&fmt);
+
+    POST_GC();
+
+    deleteStringBuf();
+
+    return s;
+}
+
+#endif
 
 extern FILE *Lfopen (char *f, char *m) {
   FILE *h;
