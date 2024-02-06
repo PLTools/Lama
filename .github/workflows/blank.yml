@@ -13,7 +13,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest-xl
+          - macos-latest
         ocaml-compiler:
           - 4.13.1
 
@@ -33,4 +33,4 @@ jobs:
       - run: opam install . --deps-only --with-test
       - run: eval $(opam env)
       - run: opam exec -- make
-      - run: opam exec -- make regression-all
+      - run: opam exec -- make regression
