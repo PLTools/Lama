@@ -266,8 +266,9 @@ void compact_phase (size_t additional_size) {
   size_t next_heap_pseudo_size = MAX(next_heap_size, heap.size);
 
   memory_chunk old_heap = heap;
-  heap.begin            = mremap(
-      heap.begin, WORDS_TO_BYTES(heap.size), WORDS_TO_BYTES(next_heap_pseudo_size), MREMAP_MAYMOVE);
+  heap.begin            = NULL;
+  // mremap(
+  //     heap.begin, WORDS_TO_BYTES(heap.size), WORDS_TO_BYTES(next_heap_pseudo_size), MREMAP_MAYMOVE);
   if (heap.begin == MAP_FAILED) {
     perror("ERROR: compact_phase: mremap failed\n");
     exit(1);
