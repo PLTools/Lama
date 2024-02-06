@@ -1,6 +1,7 @@
 EXECUTABLE = src/lamac
 INSTALL ?= install -v
 MKDIR ?= mkdir
+BUILDDIR = build
 
 .PHONY: all regression
 
@@ -8,12 +9,21 @@ all:
 	$(MAKE) -C src
 	$(MAKE) -C runtime
 	# $(MAKE) -C byterun
-	# $(MAKE) -C stdlib
+	$(MAKE) -C stdlib
 	# $(MAKE) -C runtime unit_tests.o
 	# $(MAKE) -C runtime invariants_check.o
 	# $(MAKE) -C runtime invariants_check_debug_print.o
 
 STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.lama runtime/runtime.a runtime/Std.i)
+
+remake_runtime:
+	$(MAKE) -C runtime clean
+	$(MAKE) -C runtime all
+
+copy_to_build: all
+	mkdir -p $(BUILDDIR)
+	cp runtime/Std.i runtime/runtime.a stdlib/* $(BUILDDIR)
+
 
 install: all
 	$(INSTALL) $(EXECUTABLE) `opam var bin`
@@ -49,3 +59,4 @@ clean:
 	$(MAKE) clean -C regression
 	$(MAKE) clean -C byterun
 	$(MAKE) clean -C bench
+	rm -rf $(BUILDDIR)
