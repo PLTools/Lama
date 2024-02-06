@@ -59,8 +59,10 @@ void *alloc (size_t size) {
 #endif
   void *p = gc_alloc_on_existing_heap(size);
   if (!p) {
+    fprintf(stderr, "Garbage collection is not implemented yet.\n");
+    exit(149);
     // not enough place in the heap, need to perform GC cycle
-    p = gc_alloc(size);
+    // p = gc_alloc(size);
   }
   return p;
 }
@@ -223,7 +225,7 @@ void *gc_alloc (size_t size) {
 }
 
 static void gc_root_scan_stack () {
-  for (size_t *p = (size_t *)(__gc_stack_top + 4); p < (size_t *)__gc_stack_bottom; ++p) {
+  for (size_t *p = (size_t *)(__gc_stack_top + sizeof(size_t)); p < (size_t *)__gc_stack_bottom; ++p) {
     gc_test_and_mark_root((size_t **)p);
   }
 }
@@ -438,7 +440,7 @@ void update_references (memory_chunk *old_heap) {
     heap_next_obj_iterator(&it);
   }
   // fix pointers from stack
-  scan_and_fix_region(old_heap, (void *)__gc_stack_top + 4, (void *)__gc_stack_bottom + 4);
+  scan_and_fix_region(old_heap, (void *)__gc_stack_top + sizeof(size_t), (void *)__gc_stack_bottom + sizeof(size_t));
 
   // fix pointers from extra_roots
   scan_and_fix_region_roots(old_heap);
@@ -571,7 +573,7 @@ void __init (void) {
   srandom(time(NULL));
 
   heap.begin = mmap(
-      NULL, space_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
+      NULL, space_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (heap.begin == MAP_FAILED) {
     perror("ERROR: __init: mmap failed\n");
     exit(1);
@@ -684,7 +686,7 @@ void set_forward_address (void *obj, size_t addr) {
 
 bool is_marked (void *obj) {
   data *d        = TO_DATA(obj);
-  int   mark_bit = GET_MARK_BIT(d->forward_address);
+  aint   mark_bit = GET_MARK_BIT(d->forward_address);
   return mark_bit;
 }
 

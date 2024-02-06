@@ -387,6 +387,9 @@ let compile_call env ?fname nargs tail =
     let allowed_function =
       match fname with
       | Some "Lprintf" -> false
+      | Some "Lsprintf" -> false
+      | Some "Lfprintf" -> false
+      | Some "Lfailure" -> false
       | Some fname -> not (fname.[0] = '.')
       | None -> true
     in

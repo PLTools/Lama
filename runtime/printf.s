@@ -1,10 +1,10 @@
 .section .text
 
 .global Lprintf
-.extern printf
+.extern Bprintf
 
 .global Lfprintf
-.extern fprintf
+.extern Bfprintf
 
 .global Lsprintf
 .extern Bsprintf
@@ -26,22 +26,22 @@ Lprintf:
         movq    %rsp, %rax
 # rdi --- format string
 # r11 --- number of arguments except format string 
-loop:
+Lprintf_loop:
         movq    $0, %r12
         cmpq    %r11, %r12
-        jz    continue
+        jz    Lprintf_continue
 
         decq    %r11
         movq    (%rax), %r10
         testq   $1, %r10
-        jz    jmpCont
+        jz    Lprintf_loop_end
 # unbox value
         sarq    %r10
         movq    %r10, (%rax)
-jmpCont:
+Lprintf_loop_end:
         addq    $8, %rax
-        jmp     loop
-continue:
+        jmp     Lprintf_loop
+Lprintf_continue:
         popq    %rsi
         popq    %rdx
         popq    %rcx
@@ -49,7 +49,7 @@ continue:
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     printf
+        jmp     Bprintf
 
 Lfprintf:
 # save return address
@@ -85,7 +85,7 @@ Lfprintf_continue:
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     fprintf
+        jmp     Bfprintf
 
 Lsprintf:
 # save return address

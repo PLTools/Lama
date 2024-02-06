@@ -82,7 +82,7 @@ extern aint LcompareTags (void *p, void *q) {
   if (TAG(pd->data_header) == SEXP_TAG && TAG(qd->data_header) == SEXP_TAG) {
     return BOX((TO_SEXP(p)->tag) - (TO_SEXP(q)->tag));
   } else {
-    failure("not a sexpr in compareTags: %d, %d\n", TAG(pd->data_header), TAG(qd->data_header));
+    failure("not a sexpr in compareTags: %ld, %ld\n", TAG(pd->data_header), TAG(qd->data_header));
   }
   // dead code
   return 0;
@@ -319,7 +319,7 @@ static void printValue (void *p) {
   data *a = (data *)BOX(NULL);
   aint   i = BOX(0);
   if (UNBOXED(p)) {
-    printStringBuf("%d", UNBOX(p));
+    printStringBuf("%ld", UNBOX(p));
   } else {
     if (!is_valid_heap_pointer(p)) {
       printStringBuf("0x%x", p);
@@ -468,7 +468,7 @@ extern void *Lsubstring (void *subj, aint p, aint l) {
     return r->contents;
   }
 
-  failure("substring: index out of bounds (position=%d, length=%d, subject length=%d)",
+  failure("substring: index out of bounds (position=%ld, length=%ld, subject length=%ld)",
           pp,
           ll,
           LEN(d->data_header));
@@ -497,7 +497,7 @@ extern aint LregexpMatch (struct re_pattern_buffer *b, char *s, aint pos) {
 
   res = re_match(b, s, LEN(TO_DATA(s)->data_header), UNBOX(pos), 0);
 
-  /* printf ("regexpMatch %x: %s, res=%d\n", b, s+UNBOX(pos), res); */
+  /* printf ("regexpMatch %x: %s, res=%ld\n", b, s+UNBOX(pos), res); */
 
   if (res) { return BOX(res); }
 
@@ -537,7 +537,7 @@ void *Lclone (void *p) {
       res = (void *)obj->contents;
       break;
 
-    default: failure("invalid data_header %d in clone *****\n", t);
+    default: failure("invalid data_header %ld in clone *****\n", t);
   }
   pop_extra_root(&p);
 
@@ -587,7 +587,7 @@ aint inner_hash (aint depth, auint acc, void *p) {
         break;
       }
 
-      default: failure("invalid data_header %d in hash *****\n", t);
+      default: failure("invalid data_header %ld in hash *****\n", t);
     }
 
     for (; i < l; i++) acc = inner_hash(depth + 1, acc, ((void **)a->contents)[i]);
@@ -598,7 +598,7 @@ aint inner_hash (aint depth, auint acc, void *p) {
 
 extern void *LstringInt (char *b) {
   aint n;
-  sscanf(b, "%d", &n);
+  sscanf(b, "%ld", &n);
   return (void *)BOX(n);
 }
 
@@ -659,7 +659,7 @@ extern aint Lcompare (void *p, void *q) {
             break;
           }
 
-          default: failure("invalid data_header %d in compare *****\n", ta);
+          default: failure("invalid data_header %ld in compare *****\n", ta);
         }
 
         for (; i < la; i++) {
@@ -971,7 +971,7 @@ extern void *Bsta (void *v, aint i, void *x) {
 extern void Bmatch_failure (void *v, char *fname, aint line, aint col) {
   createStringBuf();
   printValue(v);
-  failure("match failure at %s:%d:%d, value '%s'\n",
+  failure("match failure at %s:%ld:%ld, value '%s'\n",
           fname,
           UNBOX(line),
           UNBOX(col),
@@ -1025,11 +1025,6 @@ extern void *LgetEnv (char *var) {
 }
 
 extern aint Lsystem (char *cmd) { return BOX(system(cmd)); }
-
-extern void Lfailure (char *s, ...);
-extern void Lprintf (char *s, ...);
-extern void *Lsprintf (char *fmt, ...);
-extern void Lfprintf (FILE *f, char *s, ...);
 
 #ifndef X86_64
 // In X86_64 we are not able to modify va_arg
@@ -1106,6 +1101,7 @@ extern void Lfprintf (FILE *f, char *s, ...) {
 
     if (vfprintf(f, s, args) < 0) { failure("fprintf (...): %s\n", strerror(errno)); }
 }
+
 #else
 
 extern void *Bsprintf (char *fmt, ...) {
@@ -1131,6 +1127,29 @@ extern void *Bsprintf (char *fmt, ...) {
     deleteStringBuf();
 
     return s;
+}
+
+extern void Bprintf (char *s, ...) {
+    va_list args;   // = (va_list)BOX(NULL);
+
+    ASSERT_STRING("printf:1", s);
+
+    va_start(args, s);
+
+    if (vprintf(s, args) < 0) { failure("fprintf (...): %s\n", strerror(errno)); }
+
+    fflush(stdout);
+}
+
+extern void Bfprintf (FILE *f, char *s, ...) {
+    va_list args;   // = (va_list)BOX(NULL);
+
+    ASSERT_BOXED("fprintf:1", f);
+    ASSERT_STRING("fprintf:2", s);
+
+    va_start(args, s);
+
+    if (vfprintf(f, s, args) < 0) { failure("fprintf (...): %s\n", strerror(errno)); }
 }
 
 #endif
@@ -1261,7 +1280,7 @@ extern aint Lwrite (aint n) {
 extern aint Lrandom (aint n) {
   ASSERT_UNBOXED("Lrandom, 0", n);
 
-  if (UNBOX(n) <= 0) { failure("invalid range in random: %d\n", UNBOX(n)); }
+  if (UNBOX(n) <= 0) { failure("invalid range in random: %ld\n", UNBOX(n)); }
 
   return BOX(random() % UNBOX(n));
 }
