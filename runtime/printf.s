@@ -1,18 +1,20 @@
-.section .text
+        .data
 
-.global Lprintf
-.extern Bprintf
+        .global Lprintf
+        .extern Bprintf
 
-.global Lfprintf
-.extern Bfprintf
+        .global Lfprintf
+        .extern Bfprintf
 
-.global Lsprintf
-.extern Bsprintf
+        .global Lsprintf
+        .extern Bsprintf
 
-.global Lfailure
-.extern failure
+        .global Lfailure
+        .extern failure
 
-.extern cnt_percentage_sign
+        .extern cnt_percentage_sign
+
+        .text
 
 Lprintf:
 # save return address

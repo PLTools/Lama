@@ -3,6 +3,7 @@
 #define _GNU_SOURCE 1
 
 #include "runtime.h"
+#include <regex.h>
 
 #include "gc.h"
 #include "runtime_common.h"
