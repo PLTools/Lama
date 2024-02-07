@@ -3,7 +3,7 @@
 #define _GNU_SOURCE 1
 
 #include "runtime.h"
-#include "regex.h"
+
 #include "gc.h"
 #include "runtime_common.h"
 
@@ -472,7 +472,13 @@ extern void *Lsubstring (void *subj, aint p, aint l) {
           pp,
           ll,
           LEN(d->data_header));
+  exit(1);
+  return NULL;
 }
+
+extern const char *re_compile_pattern (const char *__pattern, size_t __length,
+				       struct re_pattern_buffer *__buffer)
+    _Attr_access_ ((__read_only__, 1, 2));
 
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
   regex_t *b = (regex_t *)malloc(sizeof(regex_t));
@@ -487,6 +493,11 @@ extern struct re_pattern_buffer *Lregexp (char *regexp) {
 
   return b;
 }
+
+extern regoff_t re_match (struct re_pattern_buffer *__buffer,
+			  const char *__String, regoff_t __length,
+			  regoff_t __start, struct re_registers *__regs)
+    _Attr_access_ ((__read_only__, 2, 3));
 
 extern aint LregexpMatch (struct re_pattern_buffer *b, char *s, aint pos) {
   aint res;
@@ -610,7 +621,7 @@ extern aint LflatCompare (void *p, void *q) {
     return -1;
   } else if (~UNBOXED(q)) {
     return BOX(p - q);
-  } else BOX(1);
+  } else return BOX(1);
 }
 
 extern aint Lcompare (void *p, void *q) {
@@ -623,7 +634,7 @@ extern aint Lcompare (void *p, void *q) {
 
   if (UNBOXED(p)) {
     if (UNBOXED(q)) return BOX(UNBOX(p) - UNBOX(q));
-    else return BOX(-1);
+    else return BOX(-1u);
   } else if (UNBOXED(q)) return BOX(1);
   else {
     if (is_valid_heap_pointer(p)) {
@@ -667,7 +678,7 @@ extern aint Lcompare (void *p, void *q) {
           if (c != BOX(0)) return c;
         }
         return BOX(0);
-      } else return BOX(-1);
+      } else return BOX(-1u);
     } else if (is_valid_heap_pointer(q)) return BOX(1);
     else return BOX(p - q);
   }
@@ -1165,6 +1176,8 @@ extern FILE *Lfopen (char *f, char *m) {
   if (h) return h;
 
   failure("fopen (\"%s\", \"%s\"): %s, %s, %s\n", f, m, strerror(errno));
+  exit(1);
+  return NULL;
 }
 
 extern void Lfclose (FILE *f) {
@@ -1210,6 +1223,8 @@ extern void *Lfread (char *fname) {
   }
 
   failure("fread (\"%s\"): %s\n", fname, strerror(errno));
+  exit(1);
+  return NULL;
 }
 
 extern void Lfwrite (char *fname, char *contents) {
