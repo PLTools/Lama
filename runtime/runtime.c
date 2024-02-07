@@ -476,10 +476,6 @@ extern void *Lsubstring (void *subj, aint p, aint l) {
   return NULL;
 }
 
-extern const char *re_compile_pattern (const char *__pattern, size_t __length,
-				       struct re_pattern_buffer *__buffer)
-    _Attr_access_ ((__read_only__, 1, 2));
-
 extern struct re_pattern_buffer *Lregexp (char *regexp) {
   regex_t *b = (regex_t *)malloc(sizeof(regex_t));
 
@@ -493,11 +489,6 @@ extern struct re_pattern_buffer *Lregexp (char *regexp) {
 
   return b;
 }
-
-extern regoff_t re_match (struct re_pattern_buffer *__buffer,
-			  const char *__String, regoff_t __length,
-			  regoff_t __start, struct re_registers *__regs)
-    _Attr_access_ ((__read_only__, 2, 3));
 
 extern aint LregexpMatch (struct re_pattern_buffer *b, char *s, aint pos) {
   aint res;
