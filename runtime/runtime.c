@@ -946,7 +946,7 @@ extern aint Bsexp_tag_patt (void *x) {
   return BOX(TAG(TO_DATA(x)->data_header) == SEXP_TAG);
 }
 
-extern void *Bsta (void *v, aint i, void *x) {
+extern void *Bsta (void *x, aint i, void *v) {
   if (UNBOXED(i)) {
     ASSERT_BOXED(".sta:3", x);
     data *d = TO_DATA(x);

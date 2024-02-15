@@ -382,38 +382,42 @@ let compile_binop env op =
   | _ ->
       failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
 
+let safepoint_functions =
+  [
+    "Ls__Infix_58";
+    "Lsubstring";
+    "Lclone";
+    "Bstring";
+    "Lstringcat";
+    "Lstring";
+    "Bclosure";
+    "Barray";
+    "Bsexp";
+    "Li__Infix_4343"
+    (* "LmakeArray"; not required as do not have ptr arguments *)
+    (* "LmakeString"; not required as do not have ptr arguments *)
+    (* "LgetEnv", not required as do not have ptr arguments *)
+    (* "set_args", not required as do not have ptr arguments *);
+    (* Lsprintf, or Bsprintf is an extra dirty hack that works? *)
+  ]
+
 let compile_call env ?fname nargs tail =
+  let fname =
+    Option.map
+      (fun fname ->
+        match fname.[0] with
+        | '.' -> "B" ^ String.sub fname 1 (String.length fname - 1)
+        | _ -> fname)
+      fname
+  in
   let tail_call_optimization_applicable =
     let allowed_function =
-      match fname with
-      | Some "Lprintf" -> false
-      | Some "Lsprintf" -> false
-      | Some "Lfprintf" -> false
-      | Some "Lfailure" -> false
-      | Some fname -> not (fname.[0] = '.')
-      | None -> true
+      match fname with Some fname -> not (fname.[0] = 'B') | None -> true
     in
     let same_arguments_count = env#nargs = nargs in
     tail && allowed_function && same_arguments_count
   in
   let compile_tail_call env fname nargs =
-    let _assert_valid_arguments_count =
-      if nargs != env#nargs then
-        failwith
-          (Printf.sprintf
-             "Tail call with different amount of arguments.\n\
-              Expected: %d, actual %d, %s\n"
-             env#nargs nargs
-             (match fname with Some fname -> fname | None -> "closure"))
-    in
-    let _assert_allowed_function =
-      match fname with
-      | Some fname ->
-          if fname.[0] = '.' then
-            failwith
-              (Printf.sprintf "Tail call to a build-in function: %s\n" fname)
-      | None -> ()
-    in
     let rec push_args env acc = function
       | 0 -> (env, acc)
       | n ->
@@ -432,24 +436,7 @@ let compile_call env ?fname nargs tail =
     (env, pushs @ [ Mov (rbp, rsp); Pop rbp ] @ jump)
   in
   let compile_common_call env fname nargs =
-    let adjust_builtin_function_name fname =
-      match fname with
-      | Some fname ->
-          Some
-            (match fname.[0] with
-            | '.' -> "B" ^ String.sub fname 1 (String.length fname - 1)
-            | _ -> fname)
-      | None -> None
-    in
-    let fix_arguments fname args =
-      match fname with
-      | Some "Bsta" -> List.rev args
-      | Some "Barray" -> L (box (List.length args)) :: args
-      | Some "Bsexp" -> L (box (List.length args)) :: args
-      | Some "Bclosure" -> L (box (List.length args - 1)) :: args
-      | _ -> args
-    in
-    let setup_arguments env fname nargs =
+    let setup_arguments env nargs =
       let rec pop_arguments env acc = function
         | 0 -> (env, acc)
         | n ->
@@ -465,7 +452,6 @@ let compile_call env ?fname nargs tail =
           [] args arg_locs
       in
       let env, args = pop_arguments env [] nargs in
-      let args = fix_arguments fname args in
       let arg_locs, stack_slots = env#arguments_locations (List.length args) in
       let setup_args_code = move_arguments args arg_locs in
       (stack_slots, env, setup_args_code)
@@ -499,14 +485,12 @@ let compile_call env ?fname nargs tail =
     in
     let add_printf_count =
       match fname with
-      | Some "Lprintf" -> [ Mov (L (nargs - 1), r11) ]
-      | Some "Lsprintf" -> [ Mov (L (nargs - 1), r11) ]
+      | Some "Lprintf" | Some "Lsprintf" | Some "Lfailure" ->
+          [ Mov (L (nargs - 1), r11) ]
       | Some "Lfprintf" -> [ Mov (L (nargs - 2), r11) ]
-      | Some "Lfailure" -> [ Mov (L (nargs - 1), r11) ]
       | _ -> []
     in
-    let fname = adjust_builtin_function_name fname in
-    let stack_slots, env, setup_args_code = setup_arguments env fname nargs in
+    let stack_slots, env, setup_args_code = setup_arguments env nargs in
     let push_registers, pop_registers = protect_registers env in
     let align_prologue, align_epilogue =
       align_stack (List.length push_registers) stack_slots
@@ -517,7 +501,68 @@ let compile_call env ?fname nargs tail =
       push_registers @ align_prologue @ setup_args_code @ add_printf_count
       @ call @ align_epilogue @ List.rev pop_registers @ move_result )
   in
-  if tail_call_optimization_applicable then compile_tail_call env fname nargs
+  let safepoint_call =
+    match fname with
+    | Some fname -> List.mem fname safepoint_functions
+    | None -> false
+  in
+  let compile_safe_point_call env fname nargs =
+    let setup_arguments env nargs =
+      let rec pop_arguments env acc = function
+        | 0 -> (env, acc)
+        | n ->
+            let x, env = env#pop in
+            pop_arguments env (x :: acc) (n - 1)
+      in
+      let env, args = pop_arguments env [] nargs in
+      let setup_args_code = List.map (fun arg -> Push arg) args in
+      let setup_args_code =
+        setup_args_code @ [ Lea (I (word_size, rsp), rdi) ]
+      in
+      let setup_args_code =
+        match fname with
+        | "Barray" | "Bsexp" ->
+            setup_args_code @ [ Mov (L (box (nargs - 1)), rsi) ]
+        | "Bclosure" -> setup_args_code @ [ Mov (L (box (nargs - 2)), rsi) ]
+        | _ -> setup_args_code
+      in
+      (nargs, env, setup_args_code)
+    in
+    let protect_registers env =
+      let pushr, popr =
+        List.split @@ List.map (fun r -> (Push r, Pop r)) env#live_registers
+      in
+      if env#has_closure then (Push r15 :: pushr, Pop r15 :: popr)
+      else (pushr, popr)
+    in
+    let align_stack saved_registers stack_arguments =
+      let aligned = (saved_registers + stack_arguments) mod 2 == 0 in
+      if aligned && stack_arguments = 0 then ([], [])
+      else if aligned then
+        ([], [ Binop ("+", L (word_size * stack_arguments), rsp) ])
+      else
+        ( [ Push (M "$filler") ],
+          [ Binop ("+", L (word_size * (1 + stack_arguments)), rsp) ] )
+    in
+    let call env fname = (env, [ Call fname ]) in
+    let move_result env =
+      let y, env = env#allocate in
+      (env, [ Mov (rax, y) ])
+    in
+    let stack_slots, env, setup_args_code = setup_arguments env nargs in
+    let push_registers, pop_registers = protect_registers env in
+    let align_prologue, align_epilogue =
+      align_stack (List.length push_registers) stack_slots
+    in
+    let env, call = call env fname in
+    let env, move_result = move_result env in
+    ( env,
+      push_registers @ align_prologue @ setup_args_code @ call @ align_epilogue
+      @ List.rev pop_registers @ move_result )
+  in
+  if safepoint_call then compile_safe_point_call env (Option.get fname) nargs
+  else if tail_call_optimization_applicable then
+    compile_tail_call env fname nargs
   else compile_common_call env fname nargs
 
 (* Symbolic stack machine evaluator
