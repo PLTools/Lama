@@ -388,12 +388,12 @@ let safepoint_functions =
     label "s__Infix_58";
     label "substring";
     label "clone";
-    "Bstring";
+    builtin_label "string";
     label "stringcat";
     label "string";
-    "Bclosure";
-    "Barray";
-    "Bsexp";
+    builtin_label "closure";
+    builtin_label "array";
+    builtin_label "sexp";
     label "i__Infix_4343"
     (* "makeArray"; not required as do not have ptr arguments *)
     (* "makeString"; not required as do not have ptr arguments *)
@@ -415,7 +415,7 @@ let compile_call env ?fname nargs tail =
     Option.map
       (fun fname ->
         match fname.[0] with
-        | '.' -> "B" ^ String.sub fname 1 (String.length fname - 1)
+        | '.' -> builtin_label (String.sub fname 1 (String.length fname - 1))
         | _ -> fname)
       fname
   in
@@ -530,11 +530,11 @@ let compile_call env ?fname nargs tail =
         setup_args_code @ [ Lea (I (word_size, rsp), rdi) ]
       in
       let setup_args_code =
-        match fname with
-        | "Barray" | "Bsexp" ->
-            setup_args_code @ [ Mov (L (box (nargs - 1)), rsi) ]
-        | "Bclosure" -> setup_args_code @ [ Mov (L (box (nargs - 2)), rsi) ]
-        | _ -> setup_args_code
+        if fname = builtin_label "closure" then
+          setup_args_code @ [ Mov (L (box (nargs - 2)), rsi) ]
+        else if fname = builtin_label "sexp" || fname = builtin_label "array"
+        then setup_args_code @ [ Mov (L (box (nargs - 1)), rsi) ]
+        else setup_args_code
       in
       (nargs, env, setup_args_code)
     in
