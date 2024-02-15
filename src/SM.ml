@@ -14,6 +14,8 @@ type scope = {
 }
 [@@deriving gt ~options:{ show }]
 
+let label s = "L" ^ s
+let scope_label i s = label s ^ "_" ^ string_of_int i
 let show_scope = show scope
 
 (* The type for the stack machine instructions *)
@@ -265,13 +267,13 @@ module ByteCode = struct
           add_fixup s;
           add_ints [ 0 ]
       (* 0x70                 *)
-      | CALL ("Lread", _, _) -> add_bytes [ (7 * 16) + 0 ]
+      | CALL (f, _, _) when f = label "read" -> add_bytes [ (7 * 16) + 0 ]
       (* 0x71                 *)
-      | CALL ("Lwrite", _, _) -> add_bytes [ (7 * 16) + 1 ]
+      | CALL (f, _, _) when f = label "write" -> add_bytes [ (7 * 16) + 1 ]
       (* 0x72                 *)
-      | CALL ("Llength", _, _) -> add_bytes [ (7 * 16) + 2 ]
+      | CALL (f, _, _) when f = label "length" -> add_bytes [ (7 * 16) + 2 ]
       (* 0x73                 *)
-      | CALL ("Lstring", _, _) -> add_bytes [ (7 * 16) + 3 ]
+      | CALL (f, _, _) when f = label "string" -> add_bytes [ (7 * 16) + 3 ]
       (* 0x74                 *)
       | CALL (".array", n, _) ->
           add_bytes [ (7 * 16) + 4 ];
@@ -534,9 +536,10 @@ let[@ocaml.warning "-8-20"] rec eval env
           eval env
             (cstack, stack', glob, loc, i, o)
             (if
-             (c = "z" && Value.to_int x = 0) || (c = "nz" && Value.to_int x <> 0)
-            then env#labeled l
-            else prg')
+               (c = "z" && Value.to_int x = 0)
+               || (c = "nz" && Value.to_int x <> 0)
+             then env#labeled l
+             else prg')
       | CLOSURE (name, dgs) ->
           let closure =
             Array.of_list
@@ -802,8 +805,6 @@ let run p i =
    Takes a program in the source language and returns an equivalent program for the
    stack machine
 *)
-let label s = "L" ^ s
-let scope_label i s = label s ^ "_" ^ string_of_int i
 
 let check_name_and_add names name mut =
   if List.exists (fun (n, _) -> n = name) names then

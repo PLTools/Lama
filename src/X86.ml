@@ -1,5 +1,6 @@
 open GT
 open Language
+open SM
 
 (* X86 codegeneration interface *)
 
@@ -384,21 +385,29 @@ let compile_binop env op =
 
 let safepoint_functions =
   [
-    "Ls__Infix_58";
-    "Lsubstring";
-    "Lclone";
+    label "s__Infix_58";
+    label "substring";
+    label "clone";
     "Bstring";
-    "Lstringcat";
-    "Lstring";
+    label "stringcat";
+    label "string";
     "Bclosure";
     "Barray";
     "Bsexp";
-    "Li__Infix_4343"
-    (* "LmakeArray"; not required as do not have ptr arguments *)
-    (* "LmakeString"; not required as do not have ptr arguments *)
-    (* "LgetEnv", not required as do not have ptr arguments *)
+    label "i__Infix_4343"
+    (* "makeArray"; not required as do not have ptr arguments *)
+    (* "makeString"; not required as do not have ptr arguments *)
+    (* "getEnv", not required as do not have ptr arguments *)
     (* "set_args", not required as do not have ptr arguments *);
     (* Lsprintf, or Bsprintf is an extra dirty hack that works? *)
+  ]
+
+let vararg_functions =
+  [
+    (label "printf", 1);
+    (label "fprintf", 2);
+    (label "sprintf", 1);
+    (label "failure", 1);
   ]
 
 let compile_call env ?fname nargs tail =
@@ -485,9 +494,10 @@ let compile_call env ?fname nargs tail =
     in
     let add_printf_count =
       match fname with
-      | Some "Lprintf" | Some "Lsprintf" | Some "Lfailure" ->
-          [ Mov (L (nargs - 1), r11) ]
-      | Some "Lfprintf" -> [ Mov (L (nargs - 2), r11) ]
+      | Some fname -> (
+          match List.assoc_opt fname vararg_functions with
+          | Some n -> [ Mov (L (nargs - n), r11) ]
+          | None -> [])
       | _ -> []
     in
     let stack_slots, env, setup_args_code = setup_arguments env nargs in
@@ -714,10 +724,10 @@ let compile cmd env imports code =
                          CJmp ("z", "_continue");
                          Ret;
                          Label "_ERROR";
-                         Call "Lbinoperror";
+                         Call (label "binoperror");
                          Ret;
                          Label "_ERROR2";
-                         Call "Lbinoperror2";
+                         Call (label "binoperror2");
                          Ret;
                          Label "_continue";
                          Mov (L 1, M "_init");
@@ -1172,7 +1182,7 @@ class env prg =
 
     (* gets a number of stack positions allocated *)
     method allocated = stack_slots
-    method allocated_size = Printf.sprintf "LS%s_SIZE" fname
+    method allocated_size = label (Printf.sprintf "S%s_SIZE" fname)
 
     (* enters a function *)
     method enter f nargs nlocals has_closure =
@@ -1185,10 +1195,10 @@ class env prg =
        ; first_line = true>}
 
     (* returns a label for the epilogue *)
-    method epilogue = Printf.sprintf "L%s_epilogue" fname
+    method epilogue = label (Printf.sprintf "%s_epilogue" fname)
 
     (* returns a name for local size meta-symbol *)
-    method lsize = Printf.sprintf "L%s_SIZE" fname
+    method lsize = label (Printf.sprintf "%s_SIZE" fname)
 
     (* returns a list of live registers *)
     method live_registers =
