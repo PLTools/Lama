@@ -525,15 +525,15 @@ let compile_call env ?fname nargs tail =
             pop_arguments env (x :: acc) (n - 1)
       in
       let env, args = pop_arguments env [] nargs in
-      let setup_args_code = List.map (fun arg -> Push arg) args in
+      let setup_args_code = List.map (fun arg -> Push arg) @@ List.rev args in
       let setup_args_code =
-        setup_args_code @ [ Lea (I (word_size, rsp), rdi) ]
+        setup_args_code @ [ Mov (rsp, rdi) ]
       in
       let setup_args_code =
         if fname = builtin_label "closure" then
-          setup_args_code @ [ Mov (L (box (nargs - 2)), rsi) ]
+          setup_args_code @ [ Mov (L (box (nargs - 1)), rsi) ]
         else if fname = builtin_label "sexp" || fname = builtin_label "array"
-        then setup_args_code @ [ Mov (L (box (nargs - 1)), rsi) ]
+        then setup_args_code @ [ Mov (L (box nargs), rsi) ]
         else setup_args_code
       in
       (nargs, env, setup_args_code)
