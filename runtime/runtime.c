@@ -58,7 +58,7 @@ void Lassert (void *f, char *s, ...) {
       failure("string value expected in %s\n", memo);                                              \
   while (0)
 
-extern void *Bsexp (aint n, ...);
+extern void *Bsexp (aint* args, aint bn);
 extern aint   LtagHash (char *);
 
 void *global_sysargs;
@@ -90,16 +90,13 @@ extern aint LcompareTags (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator ":";
-void *Ls__Infix_58 (void *p, void *q) {
+void *Ls__Infix_58 (void** args) {
   void *res;
 
   PRE_GC();
 
-  push_extra_root(&p);
-  push_extra_root(&q);
-  res = Bsexp(BOX(3), p, q, LtagHash("cons"));   //BOX(848787));
-  pop_extra_root(&q);
-  pop_extra_root(&p);
+  aint bsexp_args[] = {(aint)args[0], (aint)args[1], LtagHash("cons")};
+  res = Bsexp(bsexp_args, BOX(3));
 
   POST_GC();
 
@@ -445,24 +442,24 @@ extern aint LmatchSubString (char *subj, char *patt, aint pos) {
   return BOX(strncmp(subj + UNBOX(pos), patt, n) == 0);
 }
 
-extern void *Lsubstring (void *subj, aint p, aint l) {
-  data *d  = TO_DATA(subj);
-  aint   pp = UNBOX(p), ll = UNBOX(l);
+extern void *Lsubstring (aint* args /*void *subj, aint p, aint l*/) {
+  data *d  = TO_DATA(args[0]);
+  aint   pp = UNBOX(args[1]), ll = UNBOX(args[2]);
 
-  ASSERT_STRING("substring:1", subj);
-  ASSERT_UNBOXED("substring:2", p);
-  ASSERT_UNBOXED("substring:3", l);
+  ASSERT_STRING("substring:1", args[0]);
+  ASSERT_UNBOXED("substring:2", args[1]);
+  ASSERT_UNBOXED("substring:3", args[2]);
 
   if (pp + ll <= LEN(d->data_header)) {
     data *r;
 
     PRE_GC();
 
-    push_extra_root(&subj);
+    push_extra_root((void**)&args[0]);
     r = (data *)alloc_string(ll);
-    pop_extra_root(&subj);
+    pop_extra_root((void**)&args[0]);
 
-    strncpy(r->contents, (char *)subj + pp, ll);
+    strncpy(r->contents, (char *)args[0] + pp, ll);
 
     POST_GC();
 
@@ -507,42 +504,46 @@ extern aint LregexpMatch (struct re_pattern_buffer *b, char *s, aint pos) {
   return BOX(res);
 }
 
-extern void *Bstring (void *);
+extern void *Bstring (aint* args);
 
-void *Lclone (void *p) {
+void *Lclone (aint* args /*void *p*/) {
   data *obj;
   void *res;
-  if (UNBOXED(p)) return p;
+  if (UNBOXED(args[0])) return (void*)args[0];
 
   PRE_GC();
 
-  data *a = TO_DATA(p);
+  data *a = TO_DATA(args[0]);
   aint  t = TAG(a->data_header), l = LEN(a->data_header);
 
-  push_extra_root(&p);
+  push_extra_root((void**)&args[0]);
   switch (t) {
-    case STRING_TAG: res = Bstring(TO_DATA(p)->contents); break;
+    case STRING_TAG: {
+      void* p = TO_DATA(args[0])->contents;
+      res = Bstring((aint*)&p);
+      break;
+    }
 
     case ARRAY_TAG:
       obj = (data *)alloc_array(l);
-      memcpy(obj, TO_DATA(p), array_size(l));
+      memcpy(obj, TO_DATA(args[0]), array_size(l));
       res = (void *)obj->contents;
       break;
     case CLOSURE_TAG:
       obj = (data *)alloc_closure(l);
-      memcpy(obj, TO_DATA(p), closure_size(l));
+      memcpy(obj, TO_DATA(args[0]), closure_size(l));
       res = (void *)(obj->contents);
       break;
 
     case SEXP_TAG:
       obj = (data *)alloc_sexp(l);
-      memcpy(obj, TO_DATA(p), sexp_size(l));
+      memcpy(obj, TO_DATA(args[0]), sexp_size(l));
       res = (void *)obj->contents;
       break;
 
     default: failure("invalid data_header %ld in clone *****\n", t);
   }
-  pop_extra_root(&p);
+  pop_extra_root((void**)&args[0]);
 
   POST_GC();
   return res;
@@ -726,23 +727,23 @@ extern void *LmakeString (aint length) {
   return r->contents;
 }
 
-extern void *Bstring (void *p) {
-  size_t   n = strlen(p);
+extern void *Bstring (aint* args/*void *p*/) {
+  size_t   n = strlen((char*)args[0]);
   void *s = NULL;
 
   PRE_GC();
 
-  push_extra_root(&p);
+  push_extra_root((void**)&args[0]);
   s = LmakeString(BOX(n));
-  pop_extra_root(&p);
-  strncpy((char *)&TO_DATA(s)->contents, p, n + 1);   // +1 because of '\0' in the end of C-strings
+  pop_extra_root((void**)&args[0]);
+  strncpy((char *)&TO_DATA(s)->contents, (char*)args[0], n + 1);   // +1 because of '\0' in the end of C-strings
 
   POST_GC();
 
   return s;
 }
 
-extern void *Lstringcat (void *p) {
+extern void *Lstringcat (aint *args /* void* p */) {
   void *s;
 
   /* ASSERT_BOXED("stringcat", p); */
@@ -750,11 +751,12 @@ extern void *Lstringcat (void *p) {
   PRE_GC();
 
   createStringBuf();
-  stringcat(p);
+  stringcat((void*)args[0]);
 
-  push_extra_root(&p);
-  s = Bstring(stringBuf.contents);
-  pop_extra_root(&p);
+  push_extra_root((void**)&args[0]);
+  void* content = stringBuf.contents;
+  s = Bstring((aint*) &content);
+  pop_extra_root((void**)&args[0]);
 
   deleteStringBuf();
 
@@ -763,17 +765,18 @@ extern void *Lstringcat (void *p) {
   return s;
 }
 
-extern void *Lstring (void *p) {
+extern void *Lstring (aint* args /* void *p */) {
   void *s = (void *)BOX(NULL);
 
   PRE_GC();
 
   createStringBuf();
-  printValue(p);
+  printValue((void*)args[0]);
 
-  push_extra_root(&p);
-  s = Bstring(stringBuf.contents);
-  pop_extra_root(&p);
+  push_extra_root((void**)&args[0]);
+  void* content = stringBuf.contents;
+  s = Bstring((aint*)&content);
+  pop_extra_root((void**)&args[0]);
 
   deleteStringBuf();
 
@@ -782,62 +785,51 @@ extern void *Lstring (void *p) {
   return s;
 }
 
-extern void *Bclosure (aint bn, void *entry, ...) {
-  va_list       args;
-  aint           i, ai;
-#ifdef X86_64
-  register size_t *stack_frame asm("rbp");
-#else
-  register size_t *stack_frame asm("ebp");
-#endif
-  size_t       *argss;
+extern void *Bclosure (aint* args, aint bn) {
   data         *r;
   aint           n = UNBOX(bn);
 
   PRE_GC();
 
-  argss = (stack_frame + sizeof(size_t) * 3);
-  for (i = 0; i < n; i++, argss++) { push_extra_root((void **)argss); }
-
-  r = (data *)alloc_closure(n + 1);
-  push_extra_root((void **)&r);
-  ((void **)r->contents)[0] = entry;
-
-  va_start(args, entry);
-
-  for (i = 0; i < n; i++) {
-    ai                           = va_arg(args, aint);
-    ((aint *)r->contents)[i + 1] = ai;
+  for (aint i = 0; i < n; ++i) {
+    push_extra_root((void**)&args[i + 1]);
   }
 
-  va_end(args);
+  r = (data *)alloc_closure(n + 1);
+  ((void **)r->contents)[0] = (void*) args[0];
+
+  for (int i = 0; i < n; i++) {
+    ((aint *)r->contents)[i + 1] = args[i + 1];
+  }
+
+  for (aint i = n - 1; i >= 0; --i) {
+    pop_extra_root((void**)&args[i + 1]);
+  }
 
   POST_GC();
 
-  pop_extra_root((void **)&r);
-  argss--;
-  for (i = 0; i < n; i++, argss--) { pop_extra_root((void **)argss); }
   return r->contents;
 }
 
-extern void *Barray (aint bn, ...) {
-  va_list args;
-  aint     i, ai;
+extern void *Barray (aint* args, aint bn) {
   data   *r;
   aint     n = UNBOX(bn);
 
   PRE_GC();
 
-  r = (data *)alloc_array(n);
-
-  va_start(args, bn);
-
-  for (i = 0; i < n; i++) {
-    ai                       = va_arg(args, aint);
-    ((aint *)r->contents)[i] = ai;
+  for (aint i = 0; i < n; i++) {
+    push_extra_root((void**)&args[i]);
   }
 
-  va_end(args);
+  r = (data *)alloc_array(n);
+
+  for (int i = 0; i < n; i++) {
+    ((aint *)r->contents)[i] = args[i];
+  }
+
+  for (aint i = n - 1; i >= 0; --i) {
+    pop_extra_root((void**)&args[i]);
+  }
 
   POST_GC();
   return r->contents;
@@ -847,31 +839,30 @@ extern void *Barray (aint bn, ...) {
 extern memory_chunk heap;
 #endif
 
-extern void *Bsexp (aint bn, ...) {
-  va_list args;
-  aint     i;
-  aint     ai;
-  size_t *p;
+extern void *Bsexp (aint* args, aint bn) {
   sexp   *r;
   aint     n = UNBOX(bn);
 
   PRE_GC();
 
   aint fields_cnt = n - 1;
+
+  for (aint i = 0; i < fields_cnt; i++) {
+    push_extra_root((void**)&args[i]);
+  }
+
   r              = alloc_sexp(fields_cnt);
   r->tag         = 0;
 
-  va_start(args, bn);
-
-  for (i = 0; i < fields_cnt; i++) {
-    ai                       = va_arg(args, aint);
-    p                        = (auint *)ai;
-    ((auint *)r->contents)[i] = ai;
+  for (int i = 0; i < fields_cnt; i++) {
+    ((auint *)r->contents)[i] = args[i];
   }
 
-  r->tag = UNBOX(va_arg(args, auint));
+  r->tag = args[fields_cnt];
 
-  va_end(args);
+  for (aint i = fields_cnt - 1; i >= 0; --i) {
+    pop_extra_root((void**)&args[i]);
+  }
 
   POST_GC();
   return (void *)((data *)r)->contents;
@@ -981,27 +972,27 @@ extern void Bmatch_failure (void *v, char *fname, aint line, aint col) {
           stringBuf.contents);
 }
 
-extern void * /*Lstrcat*/ Li__Infix_4343 (void *a, void *b) {
+extern void * /*Lstrcat*/ Li__Infix_4343 (aint* args /* void *a, void *b */) {
   data *da = (data *)BOX(NULL);
   data *db = (data *)BOX(NULL);
   data *d  = (data *)BOX(NULL);
 
-  ASSERT_STRING("++:1", a);
-  ASSERT_STRING("++:2", b);
+  ASSERT_STRING("++:1", args[0]);
+  ASSERT_STRING("++:2", args[1]);
 
-  da = TO_DATA(a);
-  db = TO_DATA(b);
+  da = TO_DATA(args[0]);
+  db = TO_DATA(args[1]);
 
   PRE_GC();
 
-  push_extra_root(&a);
-  push_extra_root(&b);
+  push_extra_root((void**)&args[0]);
+  push_extra_root((void**)&args[1]);
   d = alloc_string(LEN(da->data_header) + LEN(db->data_header));
-  pop_extra_root(&b);
-  pop_extra_root(&a);
+  pop_extra_root((void**)&args[1]);
+  pop_extra_root((void**)&args[0]);
 
-  da = TO_DATA(a);
-  db = TO_DATA(b);
+  da = TO_DATA(args[0]);
+  db = TO_DATA(args[1]);
 
   strncpy(d->contents, da->contents, LEN(da->data_header));
   strncpy(d->contents + LEN(da->data_header), db->contents, LEN(db->data_header));
@@ -1020,7 +1011,7 @@ extern void *LgetEnv (char *var) {
 
   PRE_GC();
 
-  s = Bstring(e);
+  s = Bstring((aint*)&e);
 
   POST_GC();
 
@@ -1083,7 +1074,8 @@ extern void *Lsprintf (char *fmt, ...) {
     PRE_GC();
 
     push_extra_root((void **)&fmt);
-    s = Bstring(stringBuf.contents);
+    void* content = stringBuf.contents;
+    s = Bstring((aint*)&content);
     pop_extra_root((void **)&fmt);
 
     POST_GC();
@@ -1122,7 +1114,8 @@ extern void *Bsprintf (char *fmt, ...) {
     PRE_GC();
 
     push_extra_root((void **)&fmt);
-    s = Bstring(stringBuf.contents);
+    void* content = stringBuf.contents;
+    s = Bstring((aint*)&content);
     pop_extra_root((void **)&fmt);
 
     POST_GC();
@@ -1182,7 +1175,7 @@ extern void *LreadLine () {
   char *buf;
 
   if (scanf("%m[^\n]", &buf) == 1) {
-    void *s = Bstring(buf);
+    void *s = Bstring((aint*)&buf);
 
     getchar();
 
@@ -1301,7 +1294,6 @@ extern aint Ltime () {
 }
 
 extern void set_args (aint argc, char *argv[]) {
-  data *a;
   aint   n = argc;
   aint  *p = NULL;
   aint   i;
@@ -1311,7 +1303,9 @@ extern void set_args (aint argc, char *argv[]) {
   p = LmakeArray(BOX(n));
   push_extra_root((void **)&p);
 
-  for (i = 0; i < n; i++) { ((aint *)p)[i] = (aint)Bstring(argv[i]); }
+  for (i = 0; i < n; i++) {
+    ((aint *)p)[i] = (aint)Bstring((aint*)&argv[i]);
+  }
 
   pop_extra_root((void **)&p);
   POST_GC();
