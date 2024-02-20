@@ -786,9 +786,9 @@ extern void *Bclosure (aint bn, void *entry, ...) {
   va_list       args;
   aint           i, ai;
 #ifdef X86_64
-  register size_t *stack_frame asm("ebp");
-#else
   register size_t *stack_frame asm("rbp");
+#else
+  register size_t *stack_frame asm("ebp");
 #endif
   size_t       *argss;
   data         *r;
@@ -877,13 +877,13 @@ extern void *Bsexp (aint bn, ...) {
   return (void *)((data *)r)->contents;
 }
 
-extern long Btag (void *d, aint t, aint n) {
+extern aint Btag (void *d, aint t, aint n) {
   data *r;
 
   if (UNBOXED(d)) return BOX(0);
   else {
     r = TO_DATA(d);
-    return (long)BOX(TAG(r->data_header) == SEXP_TAG && TO_SEXP(d)->tag == UNBOX(t)
+    return (aint)BOX(TAG(r->data_header) == SEXP_TAG && TO_SEXP(d)->tag == UNBOX(t)
                      && LEN(r->data_header) == UNBOX(n));
   }
 }
@@ -1255,9 +1255,9 @@ extern void *Lhd (void *v) { return Belem(v, BOX(0)); }
 extern void *Ltl (void *v) { return Belem(v, BOX(1)); }
 
 /* Lread is an implementation of the "read" construct */
-extern long Lread () {
+extern aint Lread () {
   // int result = BOX(0);
-  int64_t result = BOX(0);
+  aint result = BOX(0);
 
   printf("> ");
   fflush(stdout);

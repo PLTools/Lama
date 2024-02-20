@@ -41,7 +41,9 @@
 // #  define MINIMUM_HEAP_CAPACITY (8)
 // #else
 // #  define MINIMUM_HEAP_CAPACITY (1 << 2)
-#define MINIMUM_HEAP_CAPACITY (1 << 30)
+//#define MINIMUM_HEAP_CAPACITY (1 << 30)
+//#define MINIMUM_HEAP_CAPACITY (30)
+#define MINIMUM_HEAP_CAPACITY (30)
 // #endif
 
 #include <stdbool.h>

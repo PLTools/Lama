@@ -52,18 +52,21 @@ void *alloc (size_t size) {
 #ifdef DEBUG_VERSION
   ++cur_id;
 #endif
-  size_t bytes_sz = size;
+  size_t obj_size = size;
   size            = BYTES_TO_WORDS(size);
+  size_t padding  = size * sizeof(size_t) - obj_size;
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "allocation of size %zu words (%zu bytes): ", size, bytes_sz);
 #endif
   void *p = gc_alloc_on_existing_heap(size);
   if (!p) {
-    fprintf(stderr, "Garbage collection is not implemented yet.\n");
-    exit(149);
+//    fprintf(stderr, "Garbage collection is not implemented yet.\n");
+//    exit(149);
     // not enough place in the heap, need to perform GC cycle
-    // p = gc_alloc(size);
+     p = gc_alloc(size);
   }
+  printf("Object allocated: content [%p, %p) padding [%p, %p)\n", p, p + obj_size, p + obj_size, p + size * sizeof(size_t));
+  fflush(stdout);
   return p;
 }
 
@@ -185,6 +188,8 @@ void *gc_alloc_on_existing_heap (size_t size) {
 }
 
 void *gc_alloc (size_t size) {
+  printf("Reallocation!\n");
+  fflush(stdout);
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "===============================GC cycle has started\n");
 #endif
@@ -880,6 +885,7 @@ void *alloc_string (auint len) {
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
+  printf("Allocated string\n");
   return obj;
 }
 
@@ -893,6 +899,7 @@ void *alloc_array (auint len) {
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
+  printf("Allocated array\n");
   return obj;
 }
 
@@ -907,6 +914,7 @@ void *alloc_sexp (auint members) {
 #endif
   obj->forward_address = 0;
   obj->tag             = 0;
+  printf("Allocated sexp\n");
   return obj;
 }
 
@@ -921,5 +929,6 @@ void *alloc_closure (auint captured) {
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
+  printf("Allocated closure\n");
   return obj;
 }
