@@ -38,9 +38,9 @@ auint;  // adaptive unsigned int
 #define CLOSURE_TAG 0x00000007
 #define UNBOXED_TAG 0x00000009   // Not actually a data_header; used to return from LkindOf
 #ifdef X86_64
-#define LEN_MASK (UINT64_MAX-7)
+#define LEN_MASK (UINT64_MAX^7)
 #else
-#define LEN_MASK (UINT32_MAX-7)
+#define LEN_MASK (UINT32_MAX^7)
 #endif
 #define LEN(x) (ptrt)(((ptrt)x & LEN_MASK) >> 3)
 #define TAG(x) (x & 7)

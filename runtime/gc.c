@@ -1,5 +1,7 @@
 #define _GNU_SOURCE 1
 
+// #define DEBUG_PRINT
+
 #include "gc.h"
 
 #include "runtime_common.h"
@@ -65,8 +67,10 @@ void *alloc (size_t size) {
     // not enough place in the heap, need to perform GC cycle
      p = gc_alloc(size);
   }
+#ifdef DEBUG_PRINT
   printf("Object allocated: content [%p, %p) padding [%p, %p)\n", p, p + obj_size, p + obj_size, p + size * sizeof(size_t));
   fflush(stdout);
+#endif
   return p;
 }
 
@@ -188,7 +192,9 @@ void *gc_alloc_on_existing_heap (size_t size) {
 }
 
 void *gc_alloc (size_t size) {
+#ifdef DEBUG_PRINT
   printf("Reallocation!\n");
+#endif
   fflush(stdout);
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "===============================GC cycle has started\n");
@@ -271,9 +277,7 @@ void compact_phase (size_t additional_size) {
   size_t next_heap_pseudo_size = MAX(next_heap_size, heap.size);
 
   memory_chunk old_heap = heap;
-  heap.begin            = NULL;
-  // mremap(
-  //     heap.begin, WORDS_TO_BYTES(heap.size), WORDS_TO_BYTES(next_heap_pseudo_size), MREMAP_MAYMOVE);
+  heap.begin            = mremap(heap.begin, WORDS_TO_BYTES(heap.size), WORDS_TO_BYTES(next_heap_pseudo_size), MREMAP_MAYMOVE);
   if (heap.begin == MAP_FAILED) {
     perror("ERROR: compact_phase: mremap failed\n");
     exit(1);
@@ -885,7 +889,9 @@ void *alloc_string (auint len) {
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
+#ifdef DEBUG_PRINT
   printf("Allocated string\n");
+#endif
   return obj;
 }
 
@@ -899,7 +905,9 @@ void *alloc_array (auint len) {
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
+#ifdef DEBUG_PRINT
   printf("Allocated array\n");
+#endif
   return obj;
 }
 
@@ -914,7 +922,9 @@ void *alloc_sexp (auint members) {
 #endif
   obj->forward_address = 0;
   obj->tag             = 0;
+#ifdef DEBUG_PRINT
   printf("Allocated sexp\n");
+#endif
   return obj;
 }
 
@@ -929,6 +939,8 @@ void *alloc_closure (auint captured) {
   obj->id = cur_id;
 #endif
   obj->forward_address = 0;
+#ifdef DEBUG_PRINT
   printf("Allocated closure\n");
+#endif
   return obj;
 }
