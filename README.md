@@ -41,7 +41,7 @@ The language specification can be found [here](lama-spec.pdf).
 
 Supported target: GNU/Linux x86_32 (x86_64 by running 32-bit mode)
 
-***Mac*** users should use either a virtual machine or docker with a Linux distributive inside.
+***Mac*** users should connect by ssh to the docker container docker with a Linux distributive inside.
 
 ***Windows*** users should get Windows Subsystem for Linux a.k.a WSL (recommended) or cygwin.
 Ubuntu-based variant of WSL is recommended.
@@ -52,7 +52,7 @@ Ubuntu-based variant of WSL is recommended.
 
     For example, (for Debian-based GNU/Linux):
     ```bash
-    $ sudo apt install gcc-multilib
+    sudo apt install gcc-multilib
     ```
 
      On some versions, you need to install the additional package `lib32gcc-V-dev` (where `V` is output of `gcc --version`, e. g. `sudo apt install lib32gcc-9-dev`) in case of errors like
@@ -70,35 +70,36 @@ Ubuntu-based variant of WSL is recommended.
 
 1. Install the right [switch](https://opam.ocaml.org/doc/Manual.html#Switches) for the OCaml compiler
 
+    for fresh opam
     ```bash
-    # for fresh opam
-    $ opam switch create lama --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda
-    # for old opam
-    $ opam switch create lama ocaml-variants.4.13.1+flambda
+    opam switch create lama --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda
+    ```
+    for old opam
+    ```bash
+    opam switch create lama ocaml-variants.4.13.1+flambda
     ```
 
     * In the above command:
 
       - `opam switch create` is a subcommand to create a new switch
-      - `ocaml-variants.4.10.1+flambda` is the name of a standard template for the switch
+      - `ocaml-variants.4.14.0+flambda` is the name of a standard template for the switch
       - `lama` is an alias for the switch being created; on success a directory `$(HOME)/.opam/lama` should be created
 
 2. Update PATH variable for the fresh switch. (You can add these commands to your `~/.bashrc` for convenience but they should be added by `opam`)
     ```bash
-    $ export OPAMSWITCH=lama
-    $ eval $(opam env)
+    eval $(opam env --switch=lama)
     ```
 
      * Check that the OCaml compiler is now available in PATH by running `which ocamlc`; it should answer with `/home/user/.opam/lama/bin/ocamlc` (or similar) and `ocamlc -v` should answer with
     ```
-    The OCaml compiler, version 4.10.1
+    The OCaml compiler, version 4.14.0
     Standard library directory: /home/user/.opam/lama/lib/ocaml
     ```
 
 3. Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
 
     ```bash
-    $ opam pin add Lama https://github.com/PLTools/Lama.git\#v1.2 --no-action
+    opam pin add Lama https://github.com/PLTools/Lama.git\#v1.2 --no-action
     ```
 
     The extra '#' sign is added because in various Shells it is the start of a comment
@@ -106,8 +107,10 @@ Ubuntu-based variant of WSL is recommended.
 4. Install *dep*endencies on system-wide *ext*ernal packages and `lama` itself after that.
 
     ```bash
-    $ opam depext Lama --yes
-    $ opam install Lama --yes
+    opam depext Lama --yes
+    ```
+    ```bash
+    opam install Lama --yes
     ```
 
 5. Check that `lamac` executable was installed: `which lamac` should answer with
@@ -125,6 +128,6 @@ It should build a local compiler `src/lamac` and a few tutorial executables in `
 
 * [Plugin for VS Code](https://marketplace.visualstudio.com/items?itemName=mrartemsav.lama-lsp)
 
-### Changes in Lama 1.2
+### Changes in Lama 1.20
 
 * New garbage collector: single-threaded stop-the-world `LISP2` (see GC Handbook for details: [1st edition](https://www.cs.kent.ac.uk/people/staff/rej/gcbook/), [2nd edition](http://gchandbook.org/)) [mark-compact](https://www.memorymanagement.org/glossary/m.html#term-mark-compact).
