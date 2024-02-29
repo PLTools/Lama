@@ -23,6 +23,7 @@ F,regexpMatch;
 F,sprintf;
 F,makeString;
 F,printf;
+F,printfPerror;
 F,fprintf;
 F,fopen;
 F,fclose;

@@ -987,6 +987,19 @@ extern void Lfailure (char *s, ...) {
   vfailure(s, args);
 }
 
+extern void LprintfPerror (char *s, ...) {
+  va_list args = (va_list)BOX(NULL);
+
+  ASSERT_STRING("printfPerror:1", s);
+
+  va_start(args, s);
+  fix_unboxed(s, args);
+
+  if (vfprintf(stderr, s, args) < 0) { failure("printfPerror (...): %s\n", strerror(errno)); }
+
+  fflush(stderr);
+}
+
 extern void Bmatch_failure (void *v, char *fname, int line, int col) {
   createStringBuf();
   printValue(v);
@@ -1251,8 +1264,8 @@ extern void set_args (int argc, char *argv[]) {
   POST_GC();
 
   global_sysargs = p;
-  global_stdout = stdout;
-  global_stderr = stderr;
+  global_stdout  = stdout;
+  global_stderr  = stderr;
 
   push_extra_root((void **)&global_sysargs);
 }
