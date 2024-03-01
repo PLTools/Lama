@@ -655,7 +655,12 @@ module Expr =
     let [@ocaml.warning "-26"] makeParser, makeBasicParser, makeScopeParser =
       let [@ocaml.warning "-20"] def s   = let [@ocaml.warning "-8"] Some def = Obj.magic !defCell in def s in
       let ostap (
-      parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)} | basic[infix][atr];
+      (* parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)} | basic[infix][atr]; *)
+      parse[infix][atr]: 
+      %"let" l:$ pat:(!(Pattern.parse) -"=") e:parse[infix][Val] %"in" body:parse[infix][atr] {Case (e, [(pat, body)], l#coord, atr )}
+      | h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)} 
+      | basic[infix][atr];
+
       scope[infix][atr]: <(d, infix')> : def[infix] expr:parse[infix'][atr] {Scope (d, expr)} | {isVoid atr} => <(d, infix')> : def[infix] => {d <> []} => {Scope (d, materialize atr Skip)};
       basic[infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary infix) atr);
       primary[infix][atr]:
@@ -782,6 +787,10 @@ module Expr =
                Scope (defs, DoWhile (s, e))
             | _  -> DoWhile (s, e)
       }
+      (* Let-in as expression doesn't work due to lack of greed; In case of expressions we need closing "ni" *)
+      (* | %"let" l:$ pat:!(Pattern.parse) %"be" e:parse[infix][Val] %"in" body:scope[infix][atr] %"ni" {Case (e, [(pat, body)], l#coord, atr)} *)
+      (* | %"let" l:$ pat:(!(Pattern.parse) -"=") e:parse[infix][Val] %"in" body:scope[infix][atr] {Case (e, [(pat, body)], l#coord, Val )} *)
+      (* | %"let" l:$ pat:(!(Pattern.parse) -"=") e:parse[infix][Val] %"in" body:parse[infix][atr] {Case (e, [(pat, body)], l#coord, Val )} *)
       | %"case" l:$ e:parse[infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[infix][atr])] %"esac"{Case (e, bs, l#coord, atr)}
       | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {env#add_import "Lazy"; ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
       | l:$ %"eta"  e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {let name = env#get_tmp in ignore atr (Lambda ([name], Call (e, [Var name])))}
@@ -936,11 +945,11 @@ module Infix =
       [|
         `Righta, [":="];
         `Righta, [":"];
-	`Lefta , ["!!"];
-	`Lefta , ["&&"];
-	`Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
-	`Lefta , ["+" ; "-"];
-	`Lefta , ["*" ; "/"; "%"];
+        `Lefta , ["!!"];
+        `Lefta , ["&&"];
+        `Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
+        `Lefta , ["+" ; "-"];
+        `Lefta , ["*" ; "/"; "%"];
       |]
 
     exception Break of [`Ok of t | `Fail of string]
