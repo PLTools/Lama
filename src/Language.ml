@@ -604,6 +604,7 @@ module Expr =
       match s with
       | ":"  -> Sexp   ("cons", [x; y])
       | ":=" -> Assign (x, y)
+      | "=" -> Binop ("==", Call (Var ("compare"), [x; y]), Const (0))
       | _    -> Binop  (s, x, y)
     in
     match x with
@@ -921,7 +922,7 @@ module Infix =
       in List.rev exports
 
     let is_predefined op =
-      List.exists (fun x -> op = x) [":"; "!!"; "&&"; "=="; "!="; "<="; "<"; ">="; ">"; "+"; "-"; "*" ; "/"; "%"; ":="]
+      List.exists (fun x -> op = x) [":"; "!!"; "&&"; "="; "=="; "!="; "<="; "<"; ">="; ">"; "+"; "-"; "*" ; "/"; "%"; ":="]
 
     (*
     List.iter (fun op ->
@@ -947,7 +948,7 @@ module Infix =
         `Righta, [":"];
         `Lefta , ["!!"];
         `Lefta , ["&&"];
-        `Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
+        `Nona  , ["=";"=="; "!="; "<="; "<"; ">="; ">"];
         `Lefta , ["+" ; "-"];
         `Lefta , ["*" ; "/"; "%"];
       |]
@@ -1272,6 +1273,7 @@ let run_parser cmd =
   let kws = [
     "skip";
     "if"; "then"; "else"; "elif"; "fi";
+    "let"; "in";
     "while"; "do"; "od";
     "for";
     "fun"; "var"; "public"; "external"; "import";
