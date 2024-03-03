@@ -1,0 +1,8 @@
+var s = A (1,2);
+
+fun f (a, b) {
+    a + b
+}
+
+-- write (s + 2)
+f(2)

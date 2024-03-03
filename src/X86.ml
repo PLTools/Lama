@@ -342,8 +342,10 @@ let compile cmd env imports code =
             | BINOP op -> (
                 let x, y, env' = env#pop2 in
                 ( env'#push y,
-                  (* (match op with
-                     |"<" | "<=" | "==" | "!=" | ">=" | ">" ->
+                  (* Dynamic check that cmp operators has correct argument types (numbers or pointers) *)
+                  (match op with
+                     | "==" | "!=" -> [ ]
+                      |"<" | "<=" | ">=" | ">" -> 
                       [Push (eax);
                       Push (edx);
                       Mov (y, eax);
@@ -355,7 +357,7 @@ let compile cmd env imports code =
                       Pop (edx);
                       Pop (eax)]
                      (* | "+" | "-" | "*" | "/" -> *)
-                     | _ ->
+                     | _ -> (* Forbid pointer arithmetics *)
                      [Mov (y, eax);
                       Binop("&&", L(1), eax);
                       Binop("cmp", L(0), eax);
@@ -364,7 +366,9 @@ let compile cmd env imports code =
                       Binop("&&", L(1), eax);
                       Binop("cmp", L(0), eax);
                       CJmp ("z", "_ERROR")]
-                      | _ -> []) @ *)
+                      )
+                      (* END: dynamic check *) 
+                      @
                   match op with
                   | "/" ->
                       [
@@ -536,6 +540,7 @@ let compile cmd env imports code =
                       @@ List.map stabs_scope scopes)
                   @ [ Meta "\t.cfi_startproc" ]
                   @ (if has_closure then [ Push edx ] else [])
+                  (* TODO: WTF ?!? *)
                   @ (if f = cmd#topname then
                      [
                        Mov (M "_init", eax);

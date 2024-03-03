@@ -1,0 +1,16 @@
+var x = "trololo", y ="trololo", z = "TR";
+var s1 = A(1,2), s2 = A(1,2), s3 = A(3,4), s4 = A(1,2,3), s5 = B(1,2);
+
+if x = y then write (0) else write (1) fi;
+if x = z then write (0) else write (1) fi;
+
+if s1 = s2 then write (0) else write (1) fi;
+if s1 = s3 then write (0) else write (1) fi;
+if s1 = s4 then write (0) else write (1) fi;
+if s1 = s5 then write (0) else write (1) fi;
+
+(
+    let q = x = y in let w = y = z in
+        if q then write (0) else write (1) fi;
+        if w then write (0) else write (1) fi
+)
