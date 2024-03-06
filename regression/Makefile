@@ -18,3 +18,4 @@ clean:
 	$(RM) test*.log *.s *.sm *~ $(TESTS) *.i $(DEBUG_FILES)
 	$(MAKE) clean -C expressions
 	$(MAKE) clean -C deep-expressions
+	$(MAKE) clean -C compilation-only
