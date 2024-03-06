@@ -344,31 +344,35 @@ let compile cmd env imports code =
                 ( env'#push y,
                   (* Dynamic check that cmp operators has correct argument types (numbers or pointers) *)
                   (match op with
-                     | "==" | "!=" -> [ ]
-                      |"<" | "<=" | ">=" | ">" -> 
-                      [Push (eax);
-                      Push (edx);
-                      Mov (y, eax);
-                      Binop("&&", L(1), eax);
-                      Mov (x, edx);
-                      Binop("&&", L(1), edx);
-                      Binop("cmp", eax, edx);
-                      CJmp ("nz", "_ERROR2");
-                      Pop (edx);
-                      Pop (eax)]
-                     (* | "+" | "-" | "*" | "/" -> *)
-                     | _ -> (* Forbid pointer arithmetics *)
-                     [Mov (y, eax);
-                      Binop("&&", L(1), eax);
-                      Binop("cmp", L(0), eax);
-                      CJmp ("z", "_ERROR");
-                      Mov (x, eax);
-                      Binop("&&", L(1), eax);
-                      Binop("cmp", L(0), eax);
-                      CJmp ("z", "_ERROR")]
-                      )
-                      (* END: dynamic check *) 
-                      @
+                  | "==" | "!=" -> []
+                  | "<" | "<=" | ">=" | ">" ->
+                      [
+                        Push eax;
+                        Push edx;
+                        Mov (y, eax);
+                        Binop ("&&", L 1, eax);
+                        Mov (x, edx);
+                        Binop ("&&", L 1, edx);
+                        Binop ("cmp", eax, edx);
+                        (* CJmp ("nz", "_ERROR2"); *)
+                        Pop edx;
+                        Pop eax;
+                      ]
+                  (* | "+" | "-" | "*" | "/" -> *)
+                  | _ ->
+                      (* Forbid pointer arithmetics *)
+                      [
+                        Mov (y, eax);
+                        Binop ("&&", L 1, eax);
+                        Binop ("cmp", L 0, eax);
+                        CJmp ("z", "_ERROR");
+                        Mov (x, eax);
+                        Binop ("&&", L 1, eax);
+                        Binop ("cmp", L 0, eax);
+                        CJmp ("z", "_ERROR");
+                      ])
+                  (* END: dynamic check *)
+                  @
                   match op with
                   | "/" ->
                       [
@@ -501,11 +505,11 @@ let compile cmd env imports code =
                   in
                   names
                   @ (if names = [] then []
-                    else
-                      [
-                        Meta
-                          (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f);
-                      ])
+                     else
+                       [
+                         Meta
+                           (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f);
+                       ])
                   @ (List.flatten @@ List.map stabs_scope scope.subs)
                   @
                   if names = [] then []
@@ -525,38 +529,38 @@ let compile cmd env imports code =
                 ( env,
                   [ Meta (Printf.sprintf "\t.type %s, @function" name) ]
                   @ (if f = "main" then []
-                    else
-                      [
-                        Meta
-                          (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f);
-                      ]
-                      @ List.mapi
-                          (fun i a ->
-                            Meta
-                              (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a
-                                 ((i * 4) + 8)))
-                          args
-                      @ List.flatten
-                      @@ List.map stabs_scope scopes)
+                     else
+                       [
+                         Meta
+                           (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f);
+                       ]
+                       @ List.mapi
+                           (fun i a ->
+                             Meta
+                               (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a
+                                  ((i * 4) + 8)))
+                           args
+                       @ List.flatten
+                       @@ List.map stabs_scope scopes)
                   @ [ Meta "\t.cfi_startproc" ]
                   @ (if has_closure then [ Push edx ] else [])
                   (* TODO: WTF ?!? *)
                   @ (if f = cmd#topname then
-                     [
-                       Mov (M "_init", eax);
-                       Binop ("test", eax, eax);
-                       CJmp ("z", "_continue");
-                       Ret;
-                       Label "_ERROR";
-                       Call "Lbinoperror";
-                       Ret;
-                       Label "_ERROR2";
-                       Call "Lbinoperror2";
-                       Ret;
-                       Label "_continue";
-                       Mov (L 1, M "_init");
-                     ]
-                    else [])
+                       [
+                         Mov (M "_init", eax);
+                         Binop ("test", eax, eax);
+                         CJmp ("z", "_continue");
+                         Ret;
+                         Label "_ERROR";
+                         Call "Lbinoperror";
+                         Ret;
+                         Label "_ERROR2";
+                         Call "Lbinoperror2";
+                         Ret;
+                         Label "_continue";
+                         Mov (L 1, M "_init");
+                       ]
+                     else [])
                   @ [
                       Push ebp;
                       Meta
@@ -574,14 +578,14 @@ let compile cmd env imports code =
                       Repmovsl;
                     ]
                   @ (if f = "main" then
-                     [
-                       Call "__gc_init";
-                       Push (I (12, ebp));
-                       Push (I (8, ebp));
-                       Call "set_args";
-                       Binop ("+", L 8, esp);
-                     ]
-                    else [])
+                       [
+                         Call "__gc_init";
+                         Push (I (12, ebp));
+                         Push (I (8, ebp));
+                         Call "set_args";
+                         Binop ("+", L 8, esp);
+                       ]
+                     else [])
                   @
                   if f = cmd#topname then
                     List.map
@@ -904,8 +908,8 @@ class env prg =
           [ Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab); Label lab ]
         else
           (if first_line then
-           [ Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line) ]
-          else [])
+             [ Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line) ]
+           else [])
           @ [
               Meta (Printf.sprintf "\t.stabn 68,0,%d,%s-%s" line lab fname);
               Label lab;
