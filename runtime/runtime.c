@@ -1219,8 +1219,8 @@ extern int Lbinoperror (void) {
 }
 
 extern int Lbinoperror2 (void) {
-  fprintf(stderr, "ERROR: Comparing BOXED and UNBOXED value ; EXIT\n");
-  exit(1);
+  fprintf(stderr, "Warning: Comparing BOXED and UNBOXED value\n");
+  // exit(1);
 }
 
 /* Lwrite is an implementation of the "write" construct */
