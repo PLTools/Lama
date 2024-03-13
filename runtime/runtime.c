@@ -858,7 +858,7 @@ extern void *Bsexp (aint* args, aint bn) {
     ((auint *)r->contents)[i] = args[i];
   }
 
-  r->tag = args[fields_cnt];
+  r->tag = UNBOX(args[fields_cnt]);
 
   for (aint i = fields_cnt - 1; i >= 0; --i) {
     pop_extra_root((void**)&args[i]);
