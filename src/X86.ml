@@ -421,7 +421,11 @@ let compile_call env ?fname nargs tail =
   in
   let tail_call_optimization_applicable =
     let allowed_function =
-      match fname with Some fname -> not (fname.[0] = 'B') | None -> true
+      match fname with
+      | Some fname ->
+          let is_vararg = Option.is_some @@ List.assoc_opt fname vararg_functions in
+          not (fname.[0] = 'B') && not is_vararg
+      | None -> true
     in
     let same_arguments_count = env#nargs = nargs in
     tail && allowed_function && same_arguments_count
@@ -526,9 +530,7 @@ let compile_call env ?fname nargs tail =
       in
       let env, args = pop_arguments env [] nargs in
       let setup_args_code = List.map (fun arg -> Push arg) @@ List.rev args in
-      let setup_args_code =
-        setup_args_code @ [ Mov (rsp, rdi) ]
-      in
+      let setup_args_code = setup_args_code @ [ Mov (rsp, rdi) ] in
       let setup_args_code =
         if fname = builtin_label "closure" then
           setup_args_code @ [ Mov (L (box (nargs - 1)), rsi) ]
