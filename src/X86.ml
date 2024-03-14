@@ -88,11 +88,21 @@ end
 (* We need to know the word size to calculate offsets correctly *)
 let word_size = 8
 
+type externality = I  (**Internal*) | E  (**External*)
+type data_kind = F  (**Function*) | D  (**Data*)
+type addressed = A  (**Address*) | V  (**Value*)
+
 (* We need to distinguish the following operand types: *)
 type opnd =
   | R of Register.t (* hard register                    *)
   | S of int (* a position on the hardware stack *)
-  | M of string (* a named memory location          *)
+  | M of
+      (* a named memory location          *)
+      data_kind
+      * externality
+      * addressed
+      * string
+  | C of string (* a named constant                  *)
   | L of int (* an immediate operand             *)
   | I of int * opnd (* an indirect operand with offset  *)
 
@@ -104,9 +114,15 @@ type argument_location = Register of opnd | Stack
 let rec show_opnd = function
   | R r -> Printf.sprintf "R %s" (Register.show r)
   | S i -> Printf.sprintf "S %d" i
-  | M s -> Printf.sprintf "M %s" s
   | L i -> Printf.sprintf "L %d" i
   | I (i, o) -> Printf.sprintf "I %d %s" i (show_opnd o)
+  | C s -> Printf.sprintf "C %s" s
+  | M (e, d, a, s) ->
+      Printf.sprintf "M %s %s %s %s"
+        (match e with F -> "Function" | D -> "Data")
+        (match d with I -> "Internal" | E -> "External")
+        (match a with A -> "Address" | V -> "Value")
+        s
 
 (* We need to know the word size to calculate offsets correctly *)
 
@@ -127,15 +143,18 @@ let r13 = R Registers.r13
 let r14 = R Registers.r14
 let r15 = R Registers.r15
 
+(* Value that could be used to fill unused stack locations *)
+let filler = M (D, I, A, "filler")
+
 (* Now x86 instruction (we do not need all of them): *)
 type instr =
   (* copies a value from the first to the second operand   *)
   | Mov of opnd * opnd
   (* loads an address of the first operand into the second *)
   | Lea of opnd * opnd
-  (* makes a binary operation; note, the first operand     *)
+  (* makes a binary operation; note, the first operand
+     designates x86 operator, not the source language one *)
   | Binop of string * opnd * opnd
-  (* designates x86 operator, not the source language one  *)
   (* x86 integer division, see instruction set reference   *)
   | IDiv of opnd
   (* see instruction set reference                         *)
@@ -184,7 +203,10 @@ let show instr =
     | S i ->
         if i >= 0 then Printf.sprintf "-%d(%%rbp)" (stack_offset i)
         else Printf.sprintf "%d(%%rbp)" (stack_offset i)
-    | M x -> x
+    | M (_, I, _, s) -> Printf.sprintf "%s(%%rip)" s
+    | M (F, E, _, s) -> Printf.sprintf "%s@plt(%%rip)" s
+    | M (D, E, _, s) -> Printf.sprintf "%s@GOTPCREL(%%rip)" s
+    | C s -> Printf.sprintf "$%s" s
     | L i -> Printf.sprintf "$%d" i
     | I (0, x) -> Printf.sprintf "(%s)" (opnd x)
     | I (n, x) -> Printf.sprintf "%d(%s)" n (opnd x)
@@ -207,8 +229,11 @@ let show instr =
   | IDiv s1 -> Printf.sprintf "\tidivq\t%s" (opnd s1)
   | Binop (op, s1, s2) ->
       Printf.sprintf "\t%s\t%s,\t%s" (binop op) (opnd s1) (opnd s2)
+  | Mov ((M (_, _, A, _) as x), y) | Lea (x, y) ->
+      (* TODO: It looks like a bad design.
+         Maybe we should introduce eopnd with the boolean if we referenceing an address but not a value *)
+      Printf.sprintf "\tleaq\t%s,\t%s" (opnd x) (opnd y)
   | Mov (s1, s2) -> Printf.sprintf "\tmovq\t%s,\t%s" (opnd s1) (opnd s2)
-  | Lea (x, y) -> Printf.sprintf "\tlea\t%s,\t%s" (opnd x) (opnd y)
   | Push s -> Printf.sprintf "\tpushq\t%s" (opnd s)
   | Pop s -> Printf.sprintf "\tpopq\t%s" (opnd s)
   | Ret -> "\tret"
@@ -225,7 +250,7 @@ let show instr =
   | Sar1 s -> Printf.sprintf "\tsarq\t%s" (opnd s)
   | Repmovsl -> Printf.sprintf "\trep movsq\t"
 
-let in_memory = function M _ | S _ | I _ -> true | R _ | L _ -> false
+let in_memory = function M _ | S _ | I _ -> true | C _ | R _ | L _ -> false
 let big_numeric_literal = function L num -> num > 0xFFFFFFFF | _ -> false
 
 let mov x s =
@@ -482,7 +507,7 @@ let compile_call env ?fname nargs tail =
       else if aligned then
         ([], [ Binop ("+", L (word_size * stack_arguments), rsp) ])
       else
-        ( [ Push (M "$filler") ],
+        ( [ Push filler ],
           [ Binop ("+", L (word_size * (1 + stack_arguments)), rsp) ] )
     in
     let call env fname =
@@ -553,7 +578,7 @@ let compile_call env ?fname nargs tail =
       else if aligned then
         ([], [ Binop ("+", L (word_size * stack_arguments), rsp) ])
       else
-        ( [ Push (M "$filler") ],
+        ( [ Push filler ],
           [ Binop ("+", L (word_size * (1 + stack_arguments)), rsp) ] )
     in
     let call env fname = (env, [ Call fname ]) in
@@ -609,6 +634,8 @@ let compile cmd env imports code =
             | EXTERN name -> (env#register_extern name, [])
             | IMPORT _ -> (env, [])
             | CLOSURE (name, closure) ->
+                let ext = if env#is_external name then E else I in
+                let address = M (F, ext, A, name) in
                 let l, env = env#allocate in
                 let env, push_closure_code =
                   List.fold_left
@@ -622,15 +649,15 @@ let compile cmd env imports code =
                     (1 + List.length closure)
                     false
                 in
-                (env, push_closure_code @ (Mov (M ("$" ^ name), l) :: call_code))
+                (env, push_closure_code @ mov address l @ call_code)
             | CONST n ->
                 let s, env' = env#allocate in
                 (env', [ Mov (L (box n), s) ])
             | STRING s ->
-                let s, env = env#string s in
+                let addr, env = env#string s in
                 let l, env = env#allocate in
                 let env, call = compile_call env ~fname:".string" 1 false in
-                (env, Mov (M ("$" ^ s), l) :: call)
+                (env, mov addr l @ call)
             | LDA x ->
                 let s, env' = (env#variable x)#allocate in
                 let s', env'' = env'#allocate in
@@ -732,7 +759,7 @@ let compile cmd env imports code =
                   @ [ Meta "\t.cfi_startproc" ]
                   @ (if f = cmd#topname then
                        [
-                         Mov (M "_init", rax);
+                         Mov (M (D, I, V, "_init"), rax);
                          Binop ("test", rax, rax);
                          CJmp ("z", "_continue");
                          Ret;
@@ -743,7 +770,7 @@ let compile cmd env imports code =
                          Call (label "binoperror2");
                          Ret;
                          Label "_continue";
-                         Mov (L 1, M "_init");
+                         Mov (L 1, M (D, I, V, "_init"));
                        ]
                      else [])
                   @ [
@@ -752,13 +779,13 @@ let compile cmd env imports code =
                       Meta "\t.cfi_offset 5, -8";
                       Mov (rsp, rbp);
                       Meta "\t.cfi_def_cfa_register\t5";
-                      Binop ("-", M ("$" ^ env#lsize), rsp);
+                      Binop ("-", C env#lsize, rsp);
                       Mov (rdi, r12);
                       Mov (rsi, r13);
                       Mov (rcx, r14);
                       Mov (rsp, rdi);
-                      Mov (M "$filler", rsi);
-                      Mov (M ("$" ^ env#allocated_size), rcx);
+                      Mov (filler, rsi);
+                      Mov (C env#allocated_size, rcx);
                       Repmovsl;
                       Mov (r12, rdi);
                       Mov (r13, rsi);
@@ -766,11 +793,11 @@ let compile cmd env imports code =
                     ]
                   @ (if f = "main" then
                        [
-                         (* Align stack as main function is the only function that could be called without alignment *)
-                         Mov (M "$0xF", rax);
+                         (* Align stack as main function is the only function that could be called without alignment. TODO *)
+                         Mov (L 0xF, rax);
                          Binop ("test", rsp, rax);
                          CJmp ("z", "_ALIGNED");
-                         Push (M "$filler");
+                         Push filler;
                          Label "_ALIGNED";
                          (* Initialize gc and arguments *)
                          Push (R Registers.rdi);
@@ -863,7 +890,7 @@ let compile cmd env imports code =
             | LINE line -> env#gen_line line
             | FAIL ((line, col), value) ->
                 let v, env = if value then (env#peek, env) else env#pop in
-                let s, env = env#string cmd#get_infile in
+                let msg_addr, env = env#string cmd#get_infile in
                 let vr, env = env#allocate in
                 let sr, env = env#allocate in
                 let liner, env = env#allocate in
@@ -876,7 +903,7 @@ let compile cmd env imports code =
                   [
                     Mov (L col, colr);
                     Mov (L line, liner);
-                    Mov (M ("$" ^ s), sr);
+                    Mov (msg_addr, sr);
                     Mov (v, vr);
                   ]
                   @ code )
@@ -1032,7 +1059,7 @@ class env prg =
   object (self)
     inherit SM.indexer prg
     val globals = S.empty (* a set of global variables *)
-    val stringm = M.empty (* a string map *)
+    val stringm : string M.t = M.empty (* a string map *)
     val scount = 0 (* string count *)
     val stack_slots = 0 (* maximal number of stack positions *)
     val static_size = 0 (* static data size *)
@@ -1104,11 +1131,18 @@ class env prg =
       (*Printf.printf "Retrieving stack for %s\n" l;*)
       M.mem l stackmap
 
+    method is_external name = S.mem name externs
+
     (* gets a name for a global variable *)
     method loc x =
       match x with
-      | Value.Global name -> M ("global_" ^ name)
-      | Value.Fun name -> M ("$" ^ name)
+      | Value.Global name ->
+          let loc_name = "global_" ^ name in
+          let ext = if self#is_external name then E else I in
+          M (D, ext, V, loc_name)
+      | Value.Fun name ->
+          let ext = if self#is_external name then E else I in
+          M (F, ext, A, name)
       | Value.Local i -> S i
       | Value.Arg i when i < num_of_argument_registers -> argument_registers.(i)
       | Value.Arg i -> S (-(i - num_of_argument_registers) - 1)
@@ -1178,11 +1212,13 @@ class env prg =
         Buffer.contents buf
       in
       let x = escape x in
-      try (M.find x stringm, self)
-      with Not_found ->
-        let y = Printf.sprintf "string_%d" scount in
-        let m = M.add x y stringm in
-        (y, {<scount = scount + 1; stringm = m>})
+      let name = M.find_opt x stringm in
+      match name with
+      | Some name -> (M (D, I, A, name), self)
+      | None ->
+          let name = Printf.sprintf "string_%d" scount in
+          let m = M.add x name stringm in
+          (M (D, I, A, name), {<scount = scount + 1; stringm = m>})
 
     (* gets number of arguments in the current function *)
     method nargs = nargs
@@ -1314,7 +1350,7 @@ let build cmd prog =
   cmd#dump_file "i" (Interface.gen prog);
   let inc = get_std_path () in
   let compiler = "gcc" in
-  let flags = "-no-pie" in
+  let flags = "-pie" in
   match cmd#get_mode with
   | `Default ->
       let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in

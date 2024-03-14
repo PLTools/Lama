@@ -22,7 +22,7 @@ remake_runtime:
 
 copy_to_build: all remake_runtime
 	mkdir -p $(BUILDDIR)
-	cp runtime/Std.i runtime/runtime.a stdlib/* $(BUILDDIR)
+	cp runtime/Std.i runtime/runtime.a stdlib/* src/lamac $(BUILDDIR)
 
 
 install: all
