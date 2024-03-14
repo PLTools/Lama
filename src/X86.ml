@@ -225,9 +225,6 @@ let show instr =
   | Sar1 s -> Printf.sprintf "\tsarq\t%s" (opnd s)
   | Repmovsl -> Printf.sprintf "\trep movsq\t"
 
-(* Opening stack machine to use instructions without fully qualified names *)
-open SM
-
 let in_memory = function M _ | S _ | I _ -> true | R _ | L _ -> false
 let big_numeric_literal = function L num -> num > 0xFFFFFFFF | _ -> false
 
@@ -423,8 +420,11 @@ let compile_call env ?fname nargs tail =
     let allowed_function =
       match fname with
       | Some fname ->
-          let is_vararg = Option.is_some @@ List.assoc_opt fname vararg_functions in
-          not (fname.[0] = 'B') && not is_vararg
+          let is_vararg =
+            Option.is_some @@ List.assoc_opt fname vararg_functions
+          in
+          let is_internal = fname.[0] = 'B' in
+          (not is_internal) && not is_vararg
       | None -> true
     in
     let same_arguments_count = env#nargs = nargs in
@@ -670,6 +670,17 @@ let compile cmd env imports code =
                 ( env#set_stack l,
                   [ Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp (s, l) ] )
             | BEGIN (f, nargs, nlocals, closure, args, scopes) ->
+                let _ =
+                  let is_safepoint = List.mem f safepoint_functions in
+                  let is_vararg =
+                    Option.is_some @@ List.assoc_opt f vararg_functions
+                  in
+                  if is_safepoint || is_vararg then
+                    raise
+                      (Failure
+                         (Printf.sprintf
+                            "Function name %s is reserved for built-in" f))
+                in
                 let rec stabs_scope scope =
                   let names =
                     List.map
