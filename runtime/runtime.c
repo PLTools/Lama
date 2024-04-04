@@ -435,6 +435,10 @@ extern aint LmatchSubString (char *subj, char *patt, aint pos) {
   ASSERT_STRING("matchSubString:2", patt);
   ASSERT_UNBOXED("matchSubString:3", pos);
 
+#ifdef DEBUG_PRINT
+  printf("substring: %s, pattern: %s\n", subj + UNBOX(pos), patt);
+#endif
+
   n = LEN(p->data_header);
 
   if (n + UNBOX(pos) > LEN(s->data_header)) return BOX(0);
@@ -474,34 +478,45 @@ extern void *Lsubstring (aint* args /*void *subj, aint p, aint l*/) {
   return NULL;
 }
 
-extern struct re_pattern_buffer *Lregexp (char *regexp) {
+extern regex_t *Lregexp (char *regexp) {
   regex_t *b = (regex_t *)malloc(sizeof(regex_t));
 
   /* printf ("regexp: %s,\t%x\n", regexp, b); */
 
   memset(b, 0, sizeof(regex_t));
 
-  aint n = (aint)re_compile_pattern(regexp, strlen(regexp), b);
+//  aint n = (aint)re_compile_pattern(regexp, strlen(regexp), b);
+  aint n = (aint)regcomp(b, regexp, REG_EXTENDED);
+
+#ifdef DEBUG_PRINT
+  printf("Lregexp: got compiled regexp %p, for string %s\n", b, regexp);
+#endif
 
   if (n != 0) { failure("%", strerror(n)); };
 
   return b;
 }
 
-extern aint LregexpMatch (struct re_pattern_buffer *b, char *s, aint pos) {
+extern aint LregexpMatch (regex_t *b, char *s, aint pos) {
   aint res;
+  regmatch_t match;
 
   ASSERT_BOXED("regexpMatch:1", b);
   ASSERT_STRING("regexpMatch:2", s);
   ASSERT_UNBOXED("regexpMatch:3", pos);
 
-  res = re_match(b, s, LEN(TO_DATA(s)->data_header), UNBOX(pos), 0);
+//  res = re_match(b, s, LEN(TO_DATA(s)->data_header), UNBOX(pos), 0);
+  res = regexec(b, s + UNBOX(pos), (size_t) 1, &match, 0);
 
-  /* printf ("regexpMatch %x: %s, res=%ld\n", b, s+UNBOX(pos), res); */
-
-  if (res) { return BOX(res); }
-
-  return BOX(res);
+  if (res == 0 && match.rm_so == 0) {
+#ifdef DEBUG_PRINT
+      printf("Matched!\n");
+      printf ("regexpMatch %p: %s, res=%d\n", b, s+UNBOX(pos), match.rm_eo);
+#endif
+      return BOX(match.rm_eo);
+  } else {
+      return BOX(-1);
+  }
 }
 
 extern void *Bstring (aint* args);
