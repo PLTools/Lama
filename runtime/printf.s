@@ -1,22 +1,22 @@
         .data
 
-        .global Lprintf
+        .global _Lprintf
         .extern Bprintf
 
-        .global Lfprintf
+        .global _Lfprintf
         .extern Bfprintf
 
-        .global Lsprintf
+        .global _Lsprintf
         .extern Bsprintf
 
-        .global Lfailure
+        .global _Lfailure
         .extern failure
 
         .extern cnt_percentage_sign
 
         .text
 
-Lprintf:
+_Lprintf:
 # save return address
         popq    %r14
 
@@ -28,22 +28,22 @@ Lprintf:
         movq    %rsp, %rax
 # rdi --- format string
 # r11 --- number of arguments except format string 
-Lprintf_loop:
+_Lprintf_loop:
         movq    $0, %r12
         cmpq    %r11, %r12
-        jz    Lprintf_continue
+        jz    _Lprintf_continue
 
         decq    %r11
         movq    (%rax), %r10
         testq   $1, %r10
-        jz    Lprintf_loop_end
+        jz    _Lprintf_loop_end
 # unbox value
         sarq    %r10
         movq    %r10, (%rax)
-Lprintf_loop_end:
+_Lprintf_loop_end:
         addq    $8, %rax
-        jmp     Lprintf_loop
-Lprintf_continue:
+        jmp     _Lprintf_loop
+_Lprintf_continue:
         popq    %rsi
         popq    %rdx
         popq    %rcx
@@ -53,7 +53,7 @@ Lprintf_continue:
         pushq   %r14
         jmp     Bprintf
 
-Lfprintf:
+_Lfprintf:
 # save return address
         popq    %r14
 
@@ -65,22 +65,22 @@ Lfprintf:
 # rdi --- FILE*
 # rsi --- format string
 # r11 --- number of arguments except format string 
-Lfprintf_loop:
+_Lfprintf_loop:
         movq    $0, %r12
         cmpq    %r11, %r12
-        jz    Lfprintf_continue
+        jz    _Lfprintf_continue
 
         decq    %r11
         movq    (%rax), %r10
         testq   $1, %r10
-        jz    Lfprintf_loop_end
+        jz    _Lfprintf_loop_end
 # unbox value
         sarq    %r10
         movq    %r10, (%rax)
-Lfprintf_loop_end:
+_Lfprintf_loop_end:
         addq    $8, %rax
-        jmp     Lfprintf_loop
-Lfprintf_continue:
+        jmp     _Lfprintf_loop
+_Lfprintf_continue:
         popq    %rdx
         popq    %rcx
         popq    %r8
@@ -89,7 +89,7 @@ Lfprintf_continue:
         pushq   %r14
         jmp     Bfprintf
 
-Lsprintf:
+_Lsprintf:
 # save return address
         popq    %r14
 
@@ -101,22 +101,22 @@ Lsprintf:
         movq    %rsp, %rax
 # rdi --- format string
 # r11 --- number of arguments except format string 
-Lsprintf_loop:
+_Lsprintf_loop:
         movq    $0, %r12
         cmpq    %r11, %r12
-        jz    Lsprintf_continue
+        jz    _Lsprintf_continue
 
         decq    %r11
         movq    (%rax), %r10
         testq   $1, %r10
-        jz    Lsprintf_loop_end
+        jz    _Lsprintf_loop_end
 # unbox value
         sarq    %r10
         movq    %r10, (%rax)
-Lsprintf_loop_end:
+_Lsprintf_loop_end:
         addq    $8, %rax
-        jmp     Lsprintf_loop
-Lsprintf_continue:
+        jmp     _Lsprintf_loop
+_Lsprintf_continue:
         popq    %rsi
         popq    %rdx
         popq    %rcx
@@ -126,7 +126,7 @@ Lsprintf_continue:
         pushq   %r14
         jmp     Bsprintf
 
-Lfailure:
+_Lfailure:
 # save return address
         popq    %r14
 
@@ -138,22 +138,22 @@ Lfailure:
         movq    %rsp, %rax
 # rdi --- format string
 # r11 --- number of arguments except format string 
-Lfailure_loop:
+_Lfailure_loop:
         movq    $0, %r12
         cmpq    %r11, %r12
-        jz    Lfailure_continue
+        jz    _Lfailure_continue
 
         decq    %r11
         movq    (%rax), %r10
         testq   $1, %r10
-        jz    Lfailure_loop_end
+        jz    _Lfailure_loop_end
 # unbox value
         sarq    %r10
         movq    %r10, (%rax)
-Lfailure_loop_end:
+_Lfailure_loop_end:
         addq    $8, %rax
-        jmp     Lfailure_loop
-Lfailure_continue:
+        jmp     _Lfailure_loop
+_Lfailure_continue:
         popq    %rsi
         popq    %rdx
         popq    %rcx
