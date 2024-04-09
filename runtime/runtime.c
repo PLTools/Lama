@@ -35,7 +35,7 @@ void failure (char *s, ...) {
   vfailure(s, args);
 }
 
-void Lassert (void *f, char *s, ...) {
+void _Lassert (void *f, char *s, ...) {
   if (!UNBOX(f)) {
     va_list args;
 
@@ -59,19 +59,19 @@ void Lassert (void *f, char *s, ...) {
   while (0)
 
 extern void *Bsexp (aint* args, aint bn);
-extern aint   LtagHash (char *);
+extern aint   _LtagHash (char *);
 
 void *global_sysargs;
 
 // Gets a raw data_header
-extern aint LkindOf (void *p) {
+extern aint _LkindOf (void *p) {
   if (UNBOXED(p)) return UNBOXED_TAG;
 
   return TAG(TO_DATA(p)->data_header);
 }
 
 // Compare s-exprs tags
-extern aint LcompareTags (void *p, void *q) {
+extern aint _LcompareTags (void *p, void *q) {
   data *pd, *qd;
 
   ASSERT_BOXED("compareTags, 0", p);
@@ -90,12 +90,12 @@ extern aint LcompareTags (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator ":";
-void *Ls__Infix_58 (void** args) {
+void *_Ls__Infix_58 (void** args) {
   void *res;
 
   PRE_GC();
 
-  aint bsexp_args[] = {(aint)args[0], (aint)args[1], LtagHash("cons")};
+  aint bsexp_args[] = {(aint)args[0], (aint)args[1], _LtagHash("cons")};
   res = Bsexp(bsexp_args, BOX(3));
 
   POST_GC();
@@ -104,7 +104,7 @@ void *Ls__Infix_58 (void** args) {
 }
 
 // Functional synonym for built-in operator "!!";
-aint Ls__Infix_3333 (void *p, void *q) {
+aint _Ls__Infix_3333 (void *p, void *q) {
   ASSERT_UNBOXED("captured !!:1", p);
   ASSERT_UNBOXED("captured !!:2", q);
 
@@ -112,7 +112,7 @@ aint Ls__Infix_3333 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator "&&";
-aint Ls__Infix_3838 (void *p, void *q) {
+aint _Ls__Infix_3838 (void *p, void *q) {
   ASSERT_UNBOXED("captured &&:1", p);
   ASSERT_UNBOXED("captured &&:2", q);
 
@@ -120,10 +120,10 @@ aint Ls__Infix_3838 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator "==";
-aint Ls__Infix_6161 (void *p, void *q) { return BOX(p == q); }
+aint _Ls__Infix_6161 (void *p, void *q) { return BOX(p == q); }
 
 // Functional synonym for built-in operator "!=";
-aint Ls__Infix_3361 (void *p, void *q) {
+aint _Ls__Infix_3361 (void *p, void *q) {
   ASSERT_UNBOXED("captured !=:1", p);
   ASSERT_UNBOXED("captured !=:2", q);
 
@@ -131,7 +131,7 @@ aint Ls__Infix_3361 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator "<=";
-aint Ls__Infix_6061 (void *p, void *q) {
+aint _Ls__Infix_6061 (void *p, void *q) {
   ASSERT_UNBOXED("captured <=:1", p);
   ASSERT_UNBOXED("captured <=:2", q);
 
@@ -139,7 +139,7 @@ aint Ls__Infix_6061 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator "<";
-aint Ls__Infix_60 (void *p, void *q) {
+aint _Ls__Infix_60 (void *p, void *q) {
   ASSERT_UNBOXED("captured <:1", p);
   ASSERT_UNBOXED("captured <:2", q);
 
@@ -147,7 +147,7 @@ aint Ls__Infix_60 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator ">=";
-aint Ls__Infix_6261 (void *p, void *q) {
+aint _Ls__Infix_6261 (void *p, void *q) {
   ASSERT_UNBOXED("captured >=:1", p);
   ASSERT_UNBOXED("captured >=:2", q);
 
@@ -155,7 +155,7 @@ aint Ls__Infix_6261 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator ">";
-aint Ls__Infix_62 (void *p, void *q) {
+aint _Ls__Infix_62 (void *p, void *q) {
   ASSERT_UNBOXED("captured >:1", p);
   ASSERT_UNBOXED("captured >:2", q);
 
@@ -163,7 +163,7 @@ aint Ls__Infix_62 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator "+";
-aint Ls__Infix_43 (void *p, void *q) {
+aint _Ls__Infix_43 (void *p, void *q) {
   ASSERT_UNBOXED("captured +:1", p);
   ASSERT_UNBOXED("captured +:2", q);
 
@@ -171,7 +171,7 @@ aint Ls__Infix_43 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator "-";
-aint Ls__Infix_45 (void *p, void *q) {
+aint _Ls__Infix_45 (void *p, void *q) {
   if (UNBOXED(p)) {
     ASSERT_UNBOXED("captured -:2", q);
     return BOX(UNBOX(p) - UNBOX(q));
@@ -182,7 +182,7 @@ aint Ls__Infix_45 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator "*";
-aint Ls__Infix_42 (void *p, void *q) {
+aint _Ls__Infix_42 (void *p, void *q) {
   ASSERT_UNBOXED("captured *:1", p);
   ASSERT_UNBOXED("captured *:2", q);
 
@@ -190,7 +190,7 @@ aint Ls__Infix_42 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator "/";
-aint Ls__Infix_47 (void *p, void *q) {
+aint _Ls__Infix_47 (void *p, void *q) {
   ASSERT_UNBOXED("captured /:1", p);
   ASSERT_UNBOXED("captured /:2", q);
 
@@ -198,14 +198,14 @@ aint Ls__Infix_47 (void *p, void *q) {
 }
 
 // Functional synonym for built-in operator "%";
-aint Ls__Infix_37 (void *p, void *q) {
+aint _Ls__Infix_37 (void *p, void *q) {
   ASSERT_UNBOXED("captured %:1", p);
   ASSERT_UNBOXED("captured %:2", q);
 
   return BOX(UNBOX(p) % UNBOX(q));
 }
 
-extern aint Llength (void *p) {
+extern aint _Llength (void *p) {
   ASSERT_BOXED(".length", p);
   return BOX(LEN(TO_DATA(p)->data_header));
 }
@@ -219,7 +219,7 @@ static char *chars = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234
 
 extern char *de_hash (aint);
 
-extern aint LtagHash (char *s) {
+extern aint _LtagHash (char *s) {
   char *p;
   aint   h = 0, limit = 0;
 
@@ -417,17 +417,17 @@ static void stringcat (void *p) {
   }
 }
 
-extern aint Luppercase (void *v) {
+extern aint _Luppercase (void *v) {
   ASSERT_UNBOXED("Luppercase:1", v);
   return BOX(toupper((int)UNBOX(v)));
 }
 
-extern aint Llowercase (void *v) {
+extern aint _Llowercase (void *v) {
   ASSERT_UNBOXED("Llowercase:1", v);
   return BOX(tolower((int)UNBOX(v)));
 }
 
-extern aint LmatchSubString (char *subj, char *patt, aint pos) {
+extern aint _LmatchSubString (char *subj, char *patt, aint pos) {
   data *p = TO_DATA(patt), *s = TO_DATA(subj);
   aint  n;
 
@@ -446,7 +446,7 @@ extern aint LmatchSubString (char *subj, char *patt, aint pos) {
   return BOX(strncmp(subj + UNBOX(pos), patt, n) == 0);
 }
 
-extern void *Lsubstring (aint* args /*void *subj, aint p, aint l*/) {
+extern void *_Lsubstring (aint* args /*void *subj, aint p, aint l*/) {
   data *d  = TO_DATA(args[0]);
   aint   pp = UNBOX(args[1]), ll = UNBOX(args[2]);
 
@@ -478,7 +478,7 @@ extern void *Lsubstring (aint* args /*void *subj, aint p, aint l*/) {
   return NULL;
 }
 
-extern regex_t *Lregexp (char *regexp) {
+extern regex_t *_Lregexp (char *regexp) {
   regex_t *b = (regex_t *)malloc(sizeof(regex_t));
 
   /* printf ("regexp: %s,\t%x\n", regexp, b); */
@@ -497,7 +497,7 @@ extern regex_t *Lregexp (char *regexp) {
   return b;
 }
 
-extern aint LregexpMatch (regex_t *b, char *s, aint pos) {
+extern aint _LregexpMatch (regex_t *b, char *s, aint pos) {
   aint res;
   regmatch_t match;
 
@@ -521,7 +521,7 @@ extern aint LregexpMatch (regex_t *b, char *s, aint pos) {
 
 extern void *Bstring (aint* args);
 
-void *Lclone (aint* args /*void *p*/) {
+void *_Lclone (aint* args /*void *p*/) {
   data *obj;
   void *res;
   if (UNBOXED(args[0])) return (void*)args[0];
@@ -621,9 +621,9 @@ extern void *LstringInt (char *b) {
   return (void *)BOX(n);
 }
 
-extern aint Lhash (void *p) { return BOX(0x3fffff & inner_hash(0, 0, p)); }
+extern aint _Lhash (void *p) { return BOX(0x3fffff & inner_hash(0, 0, p)); }
 
-extern aint LflatCompare (void *p, void *q) {
+extern aint _LflatCompare (void *p, void *q) {
   if (UNBOXED(p)) {
     if (UNBOXED(q)) { return BOX(UNBOX(p) - UNBOX(q)); }
     return -1;
@@ -632,7 +632,7 @@ extern aint LflatCompare (void *p, void *q) {
   } else return BOX(1);
 }
 
-extern aint Lcompare (void *p, void *q) {
+extern aint _Lcompare (void *p, void *q) {
 #define COMPARE_AND_RETURN(x, y)                                                                   \
   do                                                                                               \
     if (x != y) return BOX(x - y);                                                                 \
@@ -682,7 +682,7 @@ extern aint Lcompare (void *p, void *q) {
         }
 
         for (; i < la; i++) {
-          aint c = Lcompare(((void **)a->contents)[i + shift], ((void **)b->contents)[i + shift]);
+          aint c = _Lcompare(((void **)a->contents)[i + shift], ((void **)b->contents)[i + shift]);
           if (c != BOX(0)) return c;
         }
         return BOX(0);
@@ -708,7 +708,7 @@ extern void *Belem (void *p, aint i) {
   }
 }
 
-extern void *LmakeArray (aint length) {
+extern void *_LmakeArray (aint length) {
   data *r;
   aint   n, *p;
 
@@ -758,7 +758,7 @@ extern void *Bstring (aint* args/*void *p*/) {
   return s;
 }
 
-extern void *Lstringcat (aint *args /* void* p */) {
+extern void *_Lstringcat (aint *args /* void* p */) {
   void *s;
 
   /* ASSERT_BOXED("stringcat", p); */
@@ -780,7 +780,7 @@ extern void *Lstringcat (aint *args /* void* p */) {
   return s;
 }
 
-extern void *Lstring (aint* args /* void *p */) {
+extern void *_Lstring (aint* args /* void *p */) {
   void *s = (void *)BOX(NULL);
 
   PRE_GC();
@@ -987,7 +987,7 @@ extern void Bmatch_failure (void *v, char *fname, aint line, aint col) {
           stringBuf.contents);
 }
 
-extern void * /*Lstrcat*/ Li__Infix_4343 (aint* args /* void *a, void *b */) {
+extern void * /*Lstrcat*/ _Li__Infix_4343 (aint* args /* void *a, void *b */) {
   data *da = (data *)BOX(NULL);
   data *db = (data *)BOX(NULL);
   data *d  = (data *)BOX(NULL);
@@ -1033,7 +1033,7 @@ extern void *LgetEnv (char *var) {
   return s;
 }
 
-extern aint Lsystem (char *cmd) { return BOX(system(cmd)); }
+extern aint _Lsystem (char *cmd) { return BOX(system(cmd)); }
 
 #ifndef X86_64
 // In X86_64 we are not able to modify va_arg
@@ -1052,7 +1052,7 @@ static void fix_unboxed (char *s, va_list va) {
   }
 }
 
-extern void Lfailure (char *s, ...) {
+extern void _Lfailure (char *s, ...) {
   va_list args;
 
   va_start(args, s);
@@ -1060,7 +1060,7 @@ extern void Lfailure (char *s, ...) {
   vfailure(s, args);
 }
 
-extern void Lprintf (char *s, ...) {
+extern void _Lprintf (char *s, ...) {
     va_list args;   // = (va_list)BOX(NULL);
 
     ASSERT_STRING("printf:1", s);
@@ -1073,7 +1073,7 @@ extern void Lprintf (char *s, ...) {
     fflush(stdout);
 }
 
-extern void *Lsprintf (char *fmt, ...) {
+extern void *_Lsprintf (char *fmt, ...) {
     va_list args;
     void   *s;
 
@@ -1100,7 +1100,7 @@ extern void *Lsprintf (char *fmt, ...) {
     return s;
 }
 
-extern void Lfprintf (FILE *f, char *s, ...) {
+extern void _Lfprintf (FILE *f, char *s, ...) {
     va_list args;   // = (va_list)BOX(NULL);
 
     ASSERT_BOXED("fprintf:1", f);
@@ -1165,7 +1165,7 @@ extern void Bfprintf (FILE *f, char *s, ...) {
 
 #endif
 
-extern FILE *Lfopen (char *f, char *m) {
+extern FILE *_Lfopen (char *f, char *m) {
   FILE *h;
 
   ASSERT_STRING("fopen:1", f);
@@ -1180,13 +1180,13 @@ extern FILE *Lfopen (char *f, char *m) {
   return NULL;
 }
 
-extern void Lfclose (FILE *f) {
+extern void _Lfclose (FILE *f) {
   ASSERT_BOXED("fclose", f);
 
   fclose(f);
 }
 
-extern void *LreadLine () {
+extern void *_LreadLine () {
   char *buf;
 
   if (scanf("%m[^\n]", &buf) == 1) {
@@ -1203,7 +1203,7 @@ extern void *LreadLine () {
   return (void *)BOX(0);
 }
 
-extern void *Lfread (char *fname) {
+extern void *_Lfread (char *fname) {
   FILE *f;
 
   ASSERT_STRING("fread", fname);
@@ -1227,7 +1227,7 @@ extern void *Lfread (char *fname) {
   return NULL;
 }
 
-extern void Lfwrite (char *fname, char *contents) {
+extern void _Lfwrite (char *fname, char *contents) {
   FILE *f;
 
   ASSERT_STRING("fwrite:1", fname);
@@ -1242,7 +1242,7 @@ extern void Lfwrite (char *fname, char *contents) {
   }
 }
 
-extern void *Lfexists (char *fname) {
+extern void *_Lfexists (char *fname) {
   FILE *f;
 
   ASSERT_STRING("fexists", fname);
@@ -1254,16 +1254,16 @@ extern void *Lfexists (char *fname) {
   return (void *)BOX(0);
 }
 
-extern void *Lfst (void *v) { return Belem(v, BOX(0)); }
+extern void *_Lfst (void *v) { return Belem(v, BOX(0)); }
 
-extern void *Lsnd (void *v) { return Belem(v, BOX(1)); }
+extern void *_Lsnd (void *v) { return Belem(v, BOX(1)); }
 
-extern void *Lhd (void *v) { return Belem(v, BOX(0)); }
+extern void *_Lhd (void *v) { return Belem(v, BOX(0)); }
 
-extern void *Ltl (void *v) { return Belem(v, BOX(1)); }
+extern void *_Ltl (void *v) { return Belem(v, BOX(1)); }
 
 /* Lread is an implementation of the "read" construct */
-extern aint Lread () {
+extern aint _Lread () {
   // int result = BOX(0);
   aint result = BOX(0);
 
@@ -1274,25 +1274,25 @@ extern aint Lread () {
   return BOX(result);
 }
 
-extern int Lbinoperror (void) {
+extern int _Lbinoperror (void) {
   fprintf(stderr, "ERROR: POINTER ARITHMETICS is forbidden; EXIT\n");
   exit(1);
 }
 
-extern int Lbinoperror2 (void) {
+extern int _Lbinoperror2 (void) {
   fprintf(stderr, "ERROR: Comparing BOXED and UNBOXED value ; EXIT\n");
   exit(1);
 }
 
 /* Lwrite is an implementation of the "write" construct */
-extern aint Lwrite (aint n) {
+extern aint _Lwrite (aint n) {
   printf("%ld\n", UNBOX(n));
   fflush(stdout);
 
   return 0;
 }
 
-extern aint Lrandom (aint n) {
+extern aint _Lrandom (aint n) {
   ASSERT_UNBOXED("Lrandom, 0", n);
 
   if (UNBOX(n) <= 0) { failure("invalid range in random: %ld\n", UNBOX(n)); }
@@ -1300,7 +1300,7 @@ extern aint Lrandom (aint n) {
   return BOX(random() % UNBOX(n));
 }
 
-extern aint Ltime () {
+extern aint _Ltime () {
   struct timespec t;
 
   clock_gettime(CLOCK_MONOTONIC_RAW, &t);
@@ -1315,7 +1315,7 @@ extern void set_args (aint argc, char *argv[]) {
 
   PRE_GC();
 
-  p = LmakeArray(BOX(n));
+  p = _LmakeArray(BOX(n));
   push_extra_root((void **)&p);
 
   for (i = 0; i < n; i++) {
