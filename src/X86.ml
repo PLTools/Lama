@@ -887,7 +887,7 @@ let compile cmd env imports code =
                           (Printf.sprintf "Unexpected pattern: StrCmp %s: %d"
                              __FILE__ __LINE__))
                   1 false
-            | LINE line -> env#gen_line line
+            | LINE line -> env#gen_line
             | FAIL ((line, col), value) ->
                 let v, env = if value then (env#peek, env) else env#pop in
                 let msg_addr, env = env#string cmd#get_infile in
@@ -1257,7 +1257,7 @@ class env prg =
       @ SymbolicStack.live_registers stack
 
     (* generate a line number information for current function *)
-    method gen_line line =
+    method gen_line =
       let lab = Printf.sprintf ".L%d" nlabels in
       ( {<nlabels = nlabels + 1; first_line = false>},
         if fname = "main" then
