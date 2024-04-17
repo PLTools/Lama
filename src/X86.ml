@@ -709,28 +709,28 @@ let compile cmd env imports code =
                             "Function name %s is reserved for built-in" f))
                 in
                 let rec stabs_scope scope =
-                  let names =
-                    List.map
+                  let names = []
+(*                    List.map
                       (fun (name, index) ->
                         Meta
                           (Printf.sprintf "\t.stabs \"%s:1\",128,0,0,-%d" name
                              (stack_offset index)))
-                      scope.names
+                      scope.names *)
                   in
                   names
                   @ (if names = [] then []
                      else
                        [
-                         Meta
-                           (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f);
+                         (* Meta
+                           (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f); *)
                        ])
                   @ (List.flatten @@ List.map stabs_scope scope.subs)
                   @
                   if names = [] then []
                   else
                     [
-                      Meta
-                        (Printf.sprintf "\t.stabn 224,0,0,%s-%s" scope.elab f);
+                      (* Meta
+                        (Printf.sprintf "\t.stabn 224,0,0,%s-%s" scope.elab f); *)
                     ]
                 in
                 let name =
@@ -741,19 +741,19 @@ let compile cmd env imports code =
                 let has_closure = closure <> [] in
                 let env = env#enter f nargs nlocals has_closure in
                 ( env,
-                  [ Meta (Printf.sprintf "\t.type %s, @function" name) ]
+                  [ (* Meta (Printf.sprintf "\t.type %s, @function" name) *) ]
                   @ (if f = "main" then []
                      else
                        [
-                         Meta
-                           (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f);
+                         (* Meta
+                           (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f); *)
                        ]
-                       @ List.mapi
+                       (* @ List.mapi
                            (fun i a ->
                              Meta
                                (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a
                                   ((i * 4) + 8)))
-                           args
+                           args *)
                        @ List.flatten
                        @@ List.map stabs_scope scopes)
                   @ [ Meta "\t.cfi_startproc" ]
@@ -842,7 +842,7 @@ let compile cmd env imports code =
                       Meta
                         (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size
                            env#allocated);
-                      Meta (Printf.sprintf "\t.size %s, .-%s" name name);
+                      (* Meta (Printf.sprintf "\t.size %s, .-%s" name name); *)
                     ] )
             | RET ->
                 let x = env#peek in
@@ -1261,13 +1261,13 @@ class env prg =
       let lab = Printf.sprintf ".L%d" nlabels in
       ( {<nlabels = nlabels + 1; first_line = false>},
         if fname = "main" then
-          [ Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab); Label lab ]
+          [ (* Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab); *) Label lab ]
         else
           (if first_line then
-             [ Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line) ]
+             [ (* Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line) *) ]
            else [])
           @ [
-              Meta (Printf.sprintf "\t.stabn 68,0,%d,%s-%s" line lab fname);
+              (* Meta (Printf.sprintf "\t.stabn 68,0,%d,%s-%s" line lab fname); *)
               Label lab;
             ] )
   end
@@ -1288,18 +1288,18 @@ let genasm cmd prog =
         env#strings
     @ [
         Meta "_init:\t.quad 0";
-        Meta "\t.section custom_data,\"aw\",@progbits";
+        Meta "\t.section __DATA, custom_data, regular, no_dead_strip";
         Meta (Printf.sprintf "filler:\t.fill\t%d, 8, 1" env#max_locals_size);
       ]
     @ List.concat
     @@ List.map
          (fun s ->
            [
-             Meta
-               (Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s"
+             (* For mach-o STABS format is not supported: Meta
+               ( Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s"
                   (String.sub s (String.length "global_")
                      (String.length s - String.length "global_"))
-                  s);
+                  s); *)
              Meta (Printf.sprintf "%s:\t.quad\t1" s);
            ])
          env#globals
@@ -1309,15 +1309,15 @@ let genasm cmd prog =
     (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show i))
     ([
        Meta (Printf.sprintf "\t.file \"%s\"" cmd#get_absolute_infile);
-       Meta
-         (Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext"
-            cmd#get_absolute_infile);
+       (* For mach-o STABS format is not supported: Meta
+         ( Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext"
+            cmd#get_absolute_infile); *)
      ]
     @ globals @ data
     @ [
         Meta "\t.text";
         Label ".Ltext";
-        Meta "\t.stabs \"data:t1=r1;0;4294967295;\",128,0,0,0";
+        (* For mach-o STABS format is not supported: Meta "\t.stabs \"data:t1=r1;0;4294967295;\",128,0,0,0"; *)
       ]
     @ code);
   Buffer.contents asm
