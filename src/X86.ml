@@ -237,7 +237,7 @@ let show instr =
   | Push s -> Printf.sprintf "\tpushq\t%s" (opnd s)
   | Pop s -> Printf.sprintf "\tpopq\t%s" (opnd s)
   | Ret -> "\tret"
-  | Call p -> Printf.sprintf "\tcall\t%s" p
+  | Call p -> Printf.sprintf "\tcall\t%s@plt" p
   | CallI o -> Printf.sprintf "\tcall\t*(%s)" (opnd o)
   | Label l -> Printf.sprintf "%s:\n" l
   | Jmp l -> Printf.sprintf "\tjmp\t%s" l
