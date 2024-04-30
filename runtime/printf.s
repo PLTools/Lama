@@ -51,7 +51,7 @@ _Lprintf_continue:
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     Bprintf
+        jmp     _Bprintf
 
 _Lfprintf:
 # save return address
@@ -87,7 +87,7 @@ _Lfprintf_continue:
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     Bfprintf
+        jmp     _Bfprintf
 
 _Lsprintf:
 # save return address
@@ -124,7 +124,7 @@ _Lsprintf_continue:
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     Bsprintf
+        jmp     _Bsprintf
 
 _Lfailure:
 # save return address
@@ -161,4 +161,4 @@ _Lfailure_continue:
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     failure
+        jmp     _failure
