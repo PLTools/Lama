@@ -15,7 +15,7 @@ type scope = {
 [@@deriving gt ~options:{ show }]
 
 let label s = "_L" ^ s
-let builtin_label s = "B" ^ s
+let builtin_label s = "_B" ^ s
 let scope_label i s = label s ^ "_" ^ string_of_int i
 let show_scope = show scope
 

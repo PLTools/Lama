@@ -1,16 +1,16 @@
         .data
 
         .global _Lprintf
-        .extern Bprintf
+        .extern _Bprintf
 
         .global _Lfprintf
-        .extern Bfprintf
+        .extern _Bfprintf
 
         .global _Lsprintf
-        .extern Bsprintf
+        .extern _Bsprintf
 
         .global _Lfailure
-        .extern failure
+        .extern _failure
 
         .extern cnt_percentage_sign
 
