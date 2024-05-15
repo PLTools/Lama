@@ -204,7 +204,7 @@ let show instr =
         if i >= 0 then Printf.sprintf "-%d(%%rbp)" (stack_offset i)
         else Printf.sprintf "%d(%%rbp)" (stack_offset i)
     | M (_, I, _, s) -> Printf.sprintf "%s(%%rip)" s
-    | M (F, E, _, s) -> Printf.sprintf "%s@plt(%%rip)" s
+    | M (F, E, _, s) -> Printf.sprintf "%s(%%rip)" s
     | M (D, E, _, s) -> Printf.sprintf "%s@GOTPCREL(%%rip)" s
     | C s -> Printf.sprintf "$%s" s
     | L i -> Printf.sprintf "$%d" i
