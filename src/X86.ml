@@ -237,7 +237,7 @@ let show instr =
   | Push s -> Printf.sprintf "\tpushq\t%s" (opnd s)
   | Pop s -> Printf.sprintf "\tpopq\t%s" (opnd s)
   | Ret -> "\tret"
-  | Call p -> Printf.sprintf "\tcall\t%s@plt" p
+  | Call p -> Printf.sprintf "\tcall\t%s" p
   | CallI o -> Printf.sprintf "\tcall\t*(%s)" (opnd o)
   | Label l -> Printf.sprintf "%s:\n" l
   | Jmp l -> Printf.sprintf "\tjmp\t%s" l
@@ -1349,8 +1349,8 @@ let build cmd prog =
   cmd#dump_file "s" (genasm cmd prog);
   cmd#dump_file "i" (Interface.gen prog);
   let inc = get_std_path () in
-  let compiler = "gcc" in
-  let flags = "-pie" in
+  let compiler = "clang" in
+  let flags = "-pie -target X86_64-apple-macho" in
   match cmd#get_mode with
   | `Default ->
       let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
