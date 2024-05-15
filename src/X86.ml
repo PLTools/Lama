@@ -1350,7 +1350,7 @@ let build cmd prog =
   cmd#dump_file "i" (Interface.gen prog);
   let inc = get_std_path () in
   let compiler = "clang" in
-  let flags = "-pie -target X86_64-apple-macho" in
+  let flags = "-pie -arch X86_64" in
   match cmd#get_mode with
   | `Default ->
       let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
