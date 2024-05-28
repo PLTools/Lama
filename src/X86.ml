@@ -802,10 +802,10 @@ let compile cmd env imports code =
                          (* Initialize gc and arguments *)
                          Push (R Registers.rdi);
                          Push (R Registers.rsi);
-                         Call "__gc_init";
+                         Call "___gc_init";
                          Pop (R Registers.rsi);
                          Pop (R Registers.rdi);
-                         Call "set_args";
+                         Call "_set_args";
                        ]
                      else [])
                   @
