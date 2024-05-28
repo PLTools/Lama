@@ -14,8 +14,10 @@ type scope = {
 }
 [@@deriving gt ~options:{ show }]
 
-let label s = "_L" ^ s
-let builtin_label s = "_B" ^ s
+let normal_prefix = "_L"
+let builtin_prefix = "_B"
+let label s = normal_prefix ^ s
+let builtin_label s = builtin_prefix ^ s
 let scope_label i s = label s ^ "_" ^ string_of_int i
 let show_scope = show scope
 

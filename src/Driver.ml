@@ -143,7 +143,7 @@ class options args =
       Filename.chop_suffix (Filename.basename self#get_infile) ".lama"
 
     method topname =
-      match !mode with `Compile -> "init" ^ self#basename | _ -> "main"
+      match !mode with `Compile -> "init" ^ self#basename | _ -> "_main"
 
     method dump_file ext contents =
       let name = self#basename in
