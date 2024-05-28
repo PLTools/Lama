@@ -742,7 +742,7 @@ let compile cmd env imports code =
                 let env = env#enter f nargs nlocals has_closure in
                 ( env,
                   [ (* Meta (Printf.sprintf "\t.type %s, @function" name) *) ]
-                  @ (if f = "main" then []
+                  @ (if f = "_main" then []
                      else
                        [
                          (* Meta
@@ -791,7 +791,7 @@ let compile cmd env imports code =
                       Mov (r13, rsi);
                       Mov (r14, rcx);
                     ]
-                  @ (if f = "main" then
+                  @ (if f = "_main" then
                        [
                          (* Align stack as main function is the only function that could be called without alignment. TODO *)
                          Mov (L 0xF, rax);
@@ -826,7 +826,7 @@ let compile cmd env imports code =
                     Mov (rbp, rsp);
                     Pop rbp;
                   ]
-                  @ (if name = "main" then [ Binop ("^", rax, rax) ] else [])
+                  @ (if name = "_main" then [ Binop ("^", rax, rax) ] else [])
                   @ [
                       Meta "\t.cfi_restore\t5";
                       Meta "\t.cfi_def_cfa\t4, 4";
@@ -1260,7 +1260,7 @@ class env prg =
     method gen_line =
       let lab = Printf.sprintf ".L%d" nlabels in
       ( {<nlabels = nlabels + 1; first_line = false>},
-        if fname = "main" then
+        if fname = "_main" then
           [ (* Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab); *) Label lab ]
         else
           (if first_line then

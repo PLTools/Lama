@@ -1014,7 +1014,7 @@ class env cmd imports =
       {<funinfo = funinfo#register_closure f self#closure>}
 
     method current_function =
-      match fundefs with Top _ -> "main" | Item (fd, _, _) -> fd.name
+      match fundefs with Top _ -> "_main" | Item (fd, _, _) -> fd.name
 
     method private import_imports =
       let paths = cmd#get_include_paths in
@@ -1649,7 +1649,7 @@ let compile cmd ((imports, _), p) =
           LABEL topname;
           BEGIN
             ( topname,
-              (if topname = "main" then 2 else 0),
+              (if topname = "_main" then 2 else 0),
               env#nlocals,
               [],
               [],
