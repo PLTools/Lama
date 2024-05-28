@@ -1,5 +1,5 @@
 CC=clang
-COMMON_FLAGS=-g2 -std=gnu99 -fstack-protector-all -Wno-error=implicit-function-declaration -arch x86_64
+COMMON_FLAGS=-g2 -fstack-protector-all -Wno-error=implicit-function-declaration -arch x86_64
 PROD_FLAGS=$(COMMON_FLAGS) -DLAMA_ENV
 TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
