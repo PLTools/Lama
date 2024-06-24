@@ -696,7 +696,7 @@ let compile cmd env imports code =
                 let x, env = env#pop in
                 ( env#set_stack l,
                   [ Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp (s, l) ] )
-            | BEGIN (f, nargs, nlocals, closure, args, scopes) ->
+            | BEGIN (f, nargs, nlocals, closure, _args, _scopes) ->
                 let _ =
                   let is_safepoint = List.mem f safepoint_functions in
                   let is_vararg =
@@ -708,55 +708,11 @@ let compile cmd env imports code =
                          (Printf.sprintf
                             "Function name %s is reserved for built-in" f))
                 in
-                let rec stabs_scope scope =
-                  let names = []
-(*                    List.map
-                      (fun (name, index) ->
-                        Meta
-                          (Printf.sprintf "\t.stabs \"%s:1\",128,0,0,-%d" name
-                             (stack_offset index)))
-                      scope.names *)
-                  in
-                  names
-                  @ (if names = [] then []
-                     else
-                       [
-                         (* Meta
-                           (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f); *)
-                       ])
-                  @ (List.flatten @@ List.map stabs_scope scope.subs)
-                  @
-                  if names = [] then []
-                  else
-                    [
-                      (* Meta
-                        (Printf.sprintf "\t.stabn 224,0,0,%s-%s" scope.elab f); *)
-                    ]
-                in
-                let name =
-                  if f.[0] = 'L' then String.sub f 1 (String.length f - 1)
-                  else f
-                in
                 env#assert_empty_stack;
                 let has_closure = closure <> [] in
                 let env = env#enter f nargs nlocals has_closure in
                 ( env,
-                  [ (* Meta (Printf.sprintf "\t.type %s, @function" name) *) ]
-                  @ (if f = "_main" then []
-                     else
-                       [
-                         (* Meta
-                           (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f); *)
-                       ]
-                       (* @ List.mapi
-                           (fun i a ->
-                             Meta
-                               (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a
-                                  ((i * 4) + 8)))
-                           args *)
-                       @ List.flatten
-                       @@ List.map stabs_scope scopes)
-                  @ [ Meta "\t.cfi_startproc" ]
+                  [ Meta "\t.cfi_startproc" ]
                   @ (if f = cmd#topname then
                        [
                          Mov (M (D, I, V, "_init"), rax);
@@ -842,7 +798,6 @@ let compile cmd env imports code =
                       Meta
                         (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size
                            env#allocated);
-                      (* Meta (Printf.sprintf "\t.size %s, .-%s" name name); *)
                     ] )
             | RET ->
                 let x = env#peek in
@@ -887,7 +842,7 @@ let compile cmd env imports code =
                           (Printf.sprintf "Unexpected pattern: StrCmp %s: %d"
                              __FILE__ __LINE__))
                   1 false
-            | LINE line -> env#gen_line
+            | LINE _line -> env#gen_line
             | FAIL ((line, col), value) ->
                 let v, env = if value then (env#peek, env) else env#pop in
                 let msg_addr, env = env#string cmd#get_infile in
@@ -1350,7 +1305,7 @@ let build cmd prog =
   cmd#dump_file "i" (Interface.gen prog);
   let inc = get_std_path () in
   let compiler = "clang" in
-  let flags = "-pie -arch x86_64" in
+  let flags = "-arch x86_64" in
   match cmd#get_mode with
   | `Default ->
       let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
