@@ -1092,7 +1092,7 @@ class env prg =
     method loc x =
       match x with
       | Value.Global name ->
-          let loc_name = "global_" ^ name in
+          let loc_name = "_global_" ^ name in
           let ext = if self#is_external name then E else I in
           M (D, ext, V, loc_name)
       | Value.Fun name ->
@@ -1146,7 +1146,7 @@ class env prg =
     (* registers a variable in the environment *)
     method variable x =
       match x with
-      | Value.Global name -> {<globals = S.add ("global_" ^ name) globals>}
+      | Value.Global name -> {<globals = S.add ("_global_" ^ name) globals>}
       | _ -> self
 
     (* registers a string constant *)
