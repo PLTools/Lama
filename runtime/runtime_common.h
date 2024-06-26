@@ -79,7 +79,7 @@ typedef struct {
   // last bit is used as MARK-BIT, the rest are used to store address where object should move
   // last bit can be used because due to alignment we can assume that last two bits are always 0's
   ptrt forward_address;
-  char   contents[0];
+  char   contents[];
 } data;
 
 typedef struct {
@@ -95,7 +95,7 @@ typedef struct {
   // last bit can be used because due to alignment we can assume that last two bits are always 0's
   ptrt forward_address;
   auint   tag;
-  char   contents[0];
+  char   contents[];
 } sexp;
 
 #endif

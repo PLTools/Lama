@@ -463,7 +463,8 @@ extern void *Lsubstring (aint* args /*void *subj, aint p, aint l*/) {
     r = (data *)alloc_string(ll);
     pop_extra_root((void**)&args[0]);
 
-    strncpy(r->contents, (char *)args[0] + pp, ll);
+    char *r_contents = r->contents;
+    strncpy(r_contents, (char *)args[0] + pp, ll);
 
     POST_GC();
 
@@ -751,7 +752,8 @@ extern void *Bstring (aint* args/*void *p*/) {
   push_extra_root((void**)&args[0]);
   s = LmakeString(BOX(n));
   pop_extra_root((void**)&args[0]);
-  strncpy((char *)&TO_DATA(s)->contents, (char*)args[0], n + 1);   // +1 because of '\0' in the end of C-strings
+  char *s_contents = (char *)&TO_DATA(s)->contents;
+  strncpy(s_contents, (char*)args[0], n + 1);   // +1 because of '\0' in the end of C-strings
 
   POST_GC();
 
