@@ -1011,8 +1011,11 @@ extern void * /*Lstrcat*/ Li__Infix_4343 (aint* args /* void *a, void *b */) {
   da = TO_DATA(args[0]);
   db = TO_DATA(args[1]);
 
-  strncpy(d->contents, da->contents, LEN(da->data_header));
-  strncpy(d->contents + LEN(da->data_header), db->contents, LEN(db->data_header));
+  char *d_contents = d->contents;
+  const char *da_contents = da->contents;
+  const char *db_contents = db->contents;
+  strncpy(d_contents, da_contents, LEN(da->data_header));
+  strncpy(d_contents + LEN(da->data_header), db_contents, LEN(db->data_header));
   d->contents[LEN(da->data_header) + LEN(db->data_header)] = 0;
 
   POST_GC();
