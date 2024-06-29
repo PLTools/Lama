@@ -1306,7 +1306,7 @@ let build cmd prog =
   cmd#dump_file "i" (Interface.gen prog);
   let inc = get_std_path () in
   let compiler = "clang" in
-  let flags = "-arch x86_64" in
+  let flags = "-arch x86_64 -ld_classic" in
   match cmd#get_mode with
   | `Default ->
       let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
