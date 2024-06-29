@@ -1048,7 +1048,7 @@ class env cmd imports =
     method nlocals = scope.nlocals
 
     method get_decls =
-      let opt_label = function true -> label | _ -> fun x -> "global_" ^ x in
+      let opt_label = function true -> label | _ -> fun x -> "_global_" ^ x in
       List.flatten
       @@ List.map (function
            | name, `Extern, f -> [ EXTERN (opt_label f name) ]
