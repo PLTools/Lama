@@ -1156,12 +1156,9 @@ class env prg =
         let buf = Buffer.create (n * 2) in
         let rec iterate i =
           if i < n then (
-            match x.[i] with
-            | '"'  -> Buffer.add_string buf "\\\""
-            | '\n' -> Buffer.add_string buf "\\n"
-            | '\t' -> Buffer.add_string buf "\\t"
-            | '\\' -> Buffer.add_string buf "\\\\"
-            | c -> Buffer.add_char buf c;
+            (match x.[i] with
+            | '"'  -> (Buffer.add_char buf '\\'; Buffer.add_char buf '"')
+            | c -> Buffer.add_char buf c);
             iterate (i + 1))
         in
         iterate 0;
