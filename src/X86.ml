@@ -1303,7 +1303,7 @@ let build cmd prog =
   cmd#dump_file "i" (Interface.gen prog);
   let inc = get_std_path () in
   let compiler = "clang" in
-  let flags = "-arch x86_64 -ld_classic" in
+  let flags = "-arch x86_64" in
   match cmd#get_mode with
   | `Default ->
       let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
@@ -1314,7 +1314,7 @@ let build cmd prog =
           Buffer.add_string buf " ")
         objs;
       let gcc_cmdline =
-        Printf.sprintf "%s %s %s %s %s.s %s %s/runtime.a" compiler flags
+        Printf.sprintf "%s -ld_classic %s %s %s %s.s %s %s/runtime.a" compiler flags
           cmd#get_debug cmd#get_output_option cmd#basename (Buffer.contents buf)
           inc
       in
