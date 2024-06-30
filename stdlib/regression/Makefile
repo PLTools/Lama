@@ -1,4 +1,4 @@
-TESTS=$(sort $(filter-out test02 test03 test07 test30, $(basename $(wildcard test*.lama))))
+TESTS=$(sort $(filter-out test02 test30, $(basename $(wildcard test*.lama))))
 
 LAMAC=../../src/lamac
 

@@ -1,5 +1,5 @@
-HashTab internal structure: [0, 0, {[{1, 2, 3}, 100]}, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-HashTab internal structure: [0, 0, {[{1, 2, 3}, 200], [{1, 2, 3}, 100]}, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+HashTab internal structure: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {[{1, 2, 3}, 100]}, 0, 0, 0]
+HashTab internal structure: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {[{1, 2, 3}, 200], [{1, 2, 3}, 100]}, 0, 0, 0]
 Searching: Some (200)
 Searching: Some (200)
 Replaced: Some (800)
