@@ -16,6 +16,6 @@
 
 #define WORD_SIZE (CHAR_BIT * sizeof(ptrt))
 
-void failure (char *s, ...);
+_Noreturn void failure (char *s, ...);
 
 #endif
