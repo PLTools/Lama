@@ -1,5 +1,6 @@
 CC=clang
-COMMON_FLAGS=-g2 -fstack-protector-all -Wno-error=implicit-function-declaration -arch x86_64
+DISABLE_ERRORS=-Wno-error=implicit-function-declaration -Wno-shift-negative-value
+COMMON_FLAGS=$(DISABLE_ERRORS) -g2 -fstack-protector-all -arch x86_64 --std=c11
 PROD_FLAGS=$(COMMON_FLAGS) -DLAMA_ENV
 TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
@@ -39,10 +40,10 @@ virt_stack.o: virt_stack.h virt_stack.c
 	$(CC) $(PROD_FLAGS) -c virt_stack.c
 
 gc.o: gc.c gc.h
-	$(CC) -rdynamic -m32 $(PROD_FLAGS) -c gc.c
+	$(CC) -m32 $(PROD_FLAGS) -c gc.c
 
 gc64.o: gc.c gc.h
-	$(CC) -rdynamic $(PROD_FLAGS) -c gc.c -o gc64.o
+	$(CC) $(PROD_FLAGS) -c gc.c -o gc64.o
 
 runtime.o: runtime.c runtime.h
 	$(CC) -m32 $(PROD_FLAGS) -c runtime.c
