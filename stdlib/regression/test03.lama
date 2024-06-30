@@ -1,3 +1,7 @@
+fun normalize (x) {
+  if x < 0 then -1 else if x > 0 then 1 else 0 fi fi
+}
+
 fun f (x) {
   fun (y) {x + y}
 }
@@ -8,8 +12,8 @@ write (compare (3, 3));
 write (compare (2, "abc")); 
 write (compare ("abc", 2)); 
 write (compare ("abc", "abc"));
-write (compare ("ab", "abc"));
-write (compare ("abc", "ab"));
+write (normalize (compare ("ab", "abc")));
+write (normalize (compare ("abc", "ab")));
 write (compare ([], []));
 write (compare (A, A));
 write (compare (A, B));
