@@ -643,7 +643,7 @@ extern aint Lcompare (void *p, void *q) {
 
   if (UNBOXED(p)) {
     if (UNBOXED(q)) return BOX(UNBOX(p) - UNBOX(q));
-    else return BOX(-1u);
+    else return BOX(-1);
   } else if (UNBOXED(q)) return BOX(1);
   else {
     if (is_valid_heap_pointer(p)) {
@@ -687,7 +687,7 @@ extern aint Lcompare (void *p, void *q) {
           if (c != BOX(0)) return c;
         }
         return BOX(0);
-      } else return BOX(-1u);
+      } else return BOX(-1);
     } else if (is_valid_heap_pointer(q)) return BOX(1);
     else return BOX(p - q);
   }
