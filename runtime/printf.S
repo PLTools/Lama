@@ -1,22 +1,27 @@
+#ifdef __linux__
+#define PREFIXED(name) name
+#elif defined(__APPLE__)
+#define PREFIXED(name) _##name
+#endif
         .data
 
-        .global _Lprintf
-        .extern _Bprintf
+        .global PREFIXED(Lprintf)
+        .extern PREFIXED(Bprintf)
 
-        .global _Lfprintf
-        .extern _Bfprintf
+        .global PREFIXED(Lfprintf)
+        .extern PREFIXED(Bfprintf)
 
-        .global _Lsprintf
-        .extern _Bsprintf
+        .global PREFIXED(Lsprintf)
+        .extern PREFIXED(Bsprintf)
 
-        .global _Lfailure
-        .extern _failure
+        .global PREFIXED(Lfailure)
+        .extern PREFIXED(failure)
 
         .extern cnt_percentage_sign
 
         .text
 
-_Lprintf:
+PREFIXED(Lprintf):
 # save return address
         popq    %r14
 
@@ -28,22 +33,22 @@ _Lprintf:
         movq    %rsp, %rax
 # rdi --- format string
 # r11 --- number of arguments except format string 
-_Lprintf_loop:
+PREFIXED(Lprintf_loop):
         movq    $0, %r12
         cmpq    %r11, %r12
-        jz    _Lprintf_continue
+        jz    PREFIXED(Lprintf_continue)
 
         decq    %r11
         movq    (%rax), %r10
         testq   $1, %r10
-        jz    _Lprintf_loop_end
+        jz    PREFIXED(Lprintf_loop_end)
 # unbox value
         sarq    %r10
         movq    %r10, (%rax)
-_Lprintf_loop_end:
+PREFIXED(Lprintf_loop_end):
         addq    $8, %rax
-        jmp     _Lprintf_loop
-_Lprintf_continue:
+        jmp     PREFIXED(Lprintf_loop)
+PREFIXED(Lprintf_continue):
         popq    %rsi
         popq    %rdx
         popq    %rcx
@@ -51,9 +56,9 @@ _Lprintf_continue:
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     _Bprintf
+        jmp     PREFIXED(Bprintf)
 
-_Lfprintf:
+PREFIXED(Lfprintf):
 # save return address
         popq    %r14
 
@@ -65,31 +70,31 @@ _Lfprintf:
 # rdi --- FILE*
 # rsi --- format string
 # r11 --- number of arguments except format string 
-_Lfprintf_loop:
+PREFIXED(Lfprintf_loop):
         movq    $0, %r12
         cmpq    %r11, %r12
-        jz    _Lfprintf_continue
+        jz    PREFIXED(Lfprintf_continue)
 
         decq    %r11
         movq    (%rax), %r10
         testq   $1, %r10
-        jz    _Lfprintf_loop_end
+        jz    PREFIXED(Lfprintf_loop_end)
 # unbox value
         sarq    %r10
         movq    %r10, (%rax)
-_Lfprintf_loop_end:
+PREFIXED(Lfprintf_loop_end):
         addq    $8, %rax
-        jmp     _Lfprintf_loop
-_Lfprintf_continue:
+        jmp     PREFIXED(Lfprintf_loop)
+PREFIXED(Lfprintf_continue):
         popq    %rdx
         popq    %rcx
         popq    %r8
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     _Bfprintf
+        jmp     PREFIXED(Bfprintf)
 
-_Lsprintf:
+PREFIXED(Lsprintf):
 # save return address
         popq    %r14
 
@@ -101,22 +106,22 @@ _Lsprintf:
         movq    %rsp, %rax
 # rdi --- format string
 # r11 --- number of arguments except format string 
-_Lsprintf_loop:
+PREFIXED(Lsprintf_loop):
         movq    $0, %r12
         cmpq    %r11, %r12
-        jz    _Lsprintf_continue
+        jz    PREFIXED(Lsprintf_continue)
 
         decq    %r11
         movq    (%rax), %r10
         testq   $1, %r10
-        jz    _Lsprintf_loop_end
+        jz    PREFIXED(Lsprintf_loop_end)
 # unbox value
         sarq    %r10
         movq    %r10, (%rax)
-_Lsprintf_loop_end:
+PREFIXED(Lsprintf_loop_end):
         addq    $8, %rax
-        jmp     _Lsprintf_loop
-_Lsprintf_continue:
+        jmp     PREFIXED(Lsprintf_loop)
+PREFIXED(Lsprintf_continue):
         popq    %rsi
         popq    %rdx
         popq    %rcx
@@ -124,9 +129,9 @@ _Lsprintf_continue:
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     _Bsprintf
+        jmp     PREFIXED(Bsprintf)
 
-_Lfailure:
+PREFIXED(Lfailure):
 # save return address
         popq    %r14
 
@@ -138,22 +143,22 @@ _Lfailure:
         movq    %rsp, %rax
 # rdi --- format string
 # r11 --- number of arguments except format string 
-_Lfailure_loop:
+PREFIXED(Lfailure_loop):
         movq    $0, %r12
         cmpq    %r11, %r12
-        jz    _Lfailure_continue
+        jz    PREFIXED(Lfailure_continue)
 
         decq    %r11
         movq    (%rax), %r10
         testq   $1, %r10
-        jz    _Lfailure_loop_end
+        jz    PREFIXED(Lfailure_loop_end)
 # unbox value
         sarq    %r10
         movq    %r10, (%rax)
-_Lfailure_loop_end:
+PREFIXED(Lfailure_loop_end):
         addq    $8, %rax
-        jmp     _Lfailure_loop
-_Lfailure_continue:
+        jmp     PREFIXED(Lfailure_loop)
+PREFIXED(Lfailure_continue):
         popq    %rsi
         popq    %rdx
         popq    %rcx
@@ -161,4 +166,4 @@ _Lfailure_continue:
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     _failure
+        jmp     PREFIXED(failure)

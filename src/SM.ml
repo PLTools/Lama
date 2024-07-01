@@ -14,11 +14,13 @@ type scope = {
 }
 [@@deriving gt ~options:{ show }]
 
-let normal_prefix = "_L"
-let builtin_prefix = "_B"
-let label s = normal_prefix ^ s
-let builtin_label s = builtin_prefix ^ s
-let scope_label i s = label s ^ "_" ^ string_of_int i
+let normal_label = "L"
+let builtin_label = "B"
+let global_label = "global_"
+let labeled s = normal_label ^ s
+let labeled_builtin s = builtin_label ^ s
+let labeled_global s = global_label ^ s
+let labeled_scoped i s = labeled s ^ "_" ^ string_of_int i
 let show_scope = show scope
 
 (* The type for the stack machine instructions *)
@@ -270,13 +272,13 @@ module ByteCode = struct
           add_fixup s;
           add_ints [ 0 ]
       (* 0x70                 *)
-      | CALL (f, _, _) when f = label "read" -> add_bytes [ (7 * 16) + 0 ]
+      | CALL (f, _, _) when f = labeled "read" -> add_bytes [ (7 * 16) + 0 ]
       (* 0x71                 *)
-      | CALL (f, _, _) when f = label "write" -> add_bytes [ (7 * 16) + 1 ]
+      | CALL (f, _, _) when f = labeled "write" -> add_bytes [ (7 * 16) + 1 ]
       (* 0x72                 *)
-      | CALL (f, _, _) when f = label "length" -> add_bytes [ (7 * 16) + 2 ]
+      | CALL (f, _, _) when f = labeled "length" -> add_bytes [ (7 * 16) + 2 ]
       (* 0x73                 *)
-      | CALL (f, _, _) when f = label "string" -> add_bytes [ (7 * 16) + 3 ]
+      | CALL (f, _, _) when f = labeled "string" -> add_bytes [ (7 * 16) + 3 ]
       (* 0x74                 *)
       | CALL (".array", n, _) ->
           add_bytes [ (7 * 16) + 4 ];
@@ -1016,7 +1018,7 @@ class env cmd imports =
       {<funinfo = funinfo#register_closure f self#closure>}
 
     method current_function =
-      match fundefs with Top _ -> "_main" | Item (fd, _, _) -> fd.name
+      match fundefs with Top _ -> "main" | Item (fd, _, _) -> fd.name
 
     method private import_imports =
       let paths = cmd#get_include_paths in
@@ -1037,10 +1039,10 @@ class env cmd imports =
     method global_scope = scope_index = 0
 
     method get_label =
-      (label @@ string_of_int label_index, {<label_index = label_index + 1>})
+      (labeled @@ string_of_int label_index, {<label_index = label_index + 1>})
 
     method get_end_label =
-      let lab = label @@ string_of_int label_index in
+      let lab = labeled @@ string_of_int label_index in
       (lab, {<end_label = lab; label_index = label_index + 1>})
 
     method end_label = end_label
@@ -1048,7 +1050,10 @@ class env cmd imports =
     method nlocals = scope.nlocals
 
     method get_decls =
-      let opt_label = function true -> label | _ -> fun x -> "_global_" ^ x in
+      let opt_label = function
+        | true -> labeled
+        | _ -> labeled_global
+      in
       List.flatten
       @@ List.map (function
            | name, `Extern, f -> [ EXTERN (opt_label f name) ]
@@ -1196,7 +1201,9 @@ class env cmd imports =
                  }>}
 
     method fun_internal_name (name : string) =
-      (match scope.st with State.G _ -> label | _ -> scope_label scope_index)
+      (match scope.st with
+      | State.G _ -> labeled
+      | _ -> labeled_scoped scope_index)
         name
 
     method add_fun_name (name : string)
@@ -1651,7 +1658,7 @@ let compile cmd ((imports, _), p) =
           LABEL topname;
           BEGIN
             ( topname,
-              (if topname = "_main" then 2 else 0),
+              (if topname = "main" then 2 else 0),
               env#nlocals,
               [],
               [],

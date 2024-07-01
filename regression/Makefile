@@ -3,6 +3,13 @@ TESTS=$(sort $(filter-out test111, $(basename $(wildcard test*.lama))))
 
 LAMAC=../src/lamac
 
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Linux)
+else ifeq ($(UNAME_S),Darwin)
+    ARCH = arch -x86_64
+endif
+
 .PHONY: check $(TESTS)
 
 
@@ -12,11 +19,11 @@ $(TESTS): %: %.lama
 	@echo "regression/$@"
 # @cat $@.input | LAMA=../runtime $(LAMAC) -i $< > $@.log && diff $@.log orig/$@.log
 # @cat $@.input | LAMA=../runtime $(LAMAC) -ds -s $< > $@.log && diff $@.log orig/$@.log
-	@LAMA=../runtime $(LAMAC) $< && cat $@.input | arch -x86_64 ./$@ > $@.log && diff $@.log orig/$@.log
+	@LAMA=../runtime $(LAMAC) $< && cat $@.input | $(ARCH) ./$@ > $@.log && diff $@.log orig/$@.log
 
 ctest111:
 	@echo "regression/test111"
-	@LAMA=../runtime $(LAMAC) test111.lama && cat test111.input | arch -x86_64 ./test111 > test111.log && diff test111.log orig/test111.log
+	@LAMA=../runtime $(LAMAC) test111.lama && cat test111.input | $(ARCH) ./test111 > test111.log && diff test111.log orig/test111.log
 
 clean:
 	$(RM) test*.log *.s *.sm *~ $(TESTS) *.i $(DEBUG_FILES) test111

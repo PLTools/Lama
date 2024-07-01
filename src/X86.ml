@@ -4,6 +4,18 @@ open SM
 
 (* X86 codegeneration interface *)
 
+type os_t = Linux | Darwin
+
+let os =
+  let uname = Posix_uname.uname () in
+  match uname.sysname with
+  | "Darwin" -> Darwin
+  | "Linux" -> Linux
+  | _ -> failwith "Unsupported OS"
+
+let prefix = match os with Linux -> "" | Darwin -> "_"
+let prefixed name = prefix ^ name
+
 module Register : sig
   type t
 
@@ -203,10 +215,10 @@ let show instr =
     | S i ->
         if i >= 0 then Printf.sprintf "-%d(%%rbp)" (stack_offset i)
         else Printf.sprintf "%d(%%rbp)" (stack_offset i)
-    | M (_, I, _, s) -> Printf.sprintf "%s(%%rip)" s
-    | M (F, E, _, s) -> Printf.sprintf "%s(%%rip)" s
-    | M (D, E, _, s) -> Printf.sprintf "%s@GOTPCREL(%%rip)" s
-    | C s -> Printf.sprintf "$%s" s
+    | M (_, I, _, s) -> Printf.sprintf "%s(%%rip)" (prefixed s)
+    | M (F, E, _, s) -> Printf.sprintf "%s(%%rip)" (prefixed s)
+    | M (D, E, _, s) -> Printf.sprintf "%s@GOTPCREL(%%rip)" (prefixed s)
+    | C s -> Printf.sprintf "$%s" (prefixed s)
     | L i -> Printf.sprintf "$%d" i
     | I (0, x) -> Printf.sprintf "(%s)" (opnd x)
     | I (n, x) -> Printf.sprintf "%d(%s)" n (opnd x)
@@ -237,12 +249,12 @@ let show instr =
   | Push s -> Printf.sprintf "\tpushq\t%s" (opnd s)
   | Pop s -> Printf.sprintf "\tpopq\t%s" (opnd s)
   | Ret -> "\tret"
-  | Call p -> Printf.sprintf "\tcall\t%s" p
+  | Call p -> Printf.sprintf "\tcall\t%s" (prefixed p)
   | CallI o -> Printf.sprintf "\tcall\t*(%s)" (opnd o)
-  | Label l -> Printf.sprintf "%s:\n" l
-  | Jmp l -> Printf.sprintf "\tjmp\t%s" l
+  | Label l -> Printf.sprintf "%s:\n" (prefixed l)
+  | Jmp l -> Printf.sprintf "\tjmp\t%s" (prefixed l)
   | JmpI o -> Printf.sprintf "\tjmp\t*(%s)" (opnd o)
-  | CJmp (s, l) -> Printf.sprintf "\tj%s\t%s" s l
+  | CJmp (s, l) -> Printf.sprintf "\tj%s\t%s" s (prefixed l)
   | Meta s -> Printf.sprintf "%s\n" s
   | Dec s -> Printf.sprintf "\tdecq\t%s" (opnd s)
   | Or1 s -> Printf.sprintf "\torq\t$0x0001,\t%s" (opnd s)
@@ -407,29 +419,29 @@ let compile_binop env op =
 
 let safepoint_functions =
   [
-    label "s__Infix_58";
-    label "substring";
-    label "clone";
-    builtin_label "string";
-    label "stringcat";
-    label "string";
-    builtin_label "closure";
-    builtin_label "array";
-    builtin_label "sexp";
-    label "i__Infix_4343"
+    labeled "s__Infix_58";
+    labeled "substring";
+    labeled "clone";
+    labeled_builtin "string";
+    labeled "stringcat";
+    labeled "string";
+    labeled_builtin "closure";
+    labeled_builtin "array";
+    labeled_builtin "sexp";
+    labeled "i__Infix_4343"
     (* "makeArray"; not required as do not have ptr arguments *)
     (* "makeString"; not required as do not have ptr arguments *)
     (* "getEnv", not required as do not have ptr arguments *)
     (* "set_args", not required as do not have ptr arguments *);
-    (* Lsprintf, or Bsprintf is an extra dirty hack that works? *)
+    (* Lsprintf, or Bsprintf is an extra dirty hack that probably works *)
   ]
 
 let vararg_functions =
   [
-    (label "printf", 1);
-    (label "fprintf", 2);
-    (label "sprintf", 1);
-    (label "failure", 1);
+    (labeled "printf", 1);
+    (labeled "fprintf", 2);
+    (labeled "sprintf", 1);
+    (labeled "failure", 1);
   ]
 
 let compile_call env ?fname nargs tail =
@@ -437,7 +449,7 @@ let compile_call env ?fname nargs tail =
     Option.map
       (fun fname ->
         match fname.[0] with
-        | '.' -> builtin_label (String.sub fname 1 (String.length fname - 1))
+        | '.' -> labeled_builtin (String.sub fname 1 (String.length fname - 1))
         | _ -> fname)
       fname
   in
@@ -557,9 +569,10 @@ let compile_call env ?fname nargs tail =
       let setup_args_code = List.map (fun arg -> Push arg) @@ List.rev args in
       let setup_args_code = setup_args_code @ [ Mov (rsp, rdi) ] in
       let setup_args_code =
-        if fname = builtin_label "closure" then
+        if fname = labeled_builtin "closure" then
           setup_args_code @ [ Mov (L (box (nargs - 1)), rsi) ]
-        else if fname = builtin_label "sexp" || fname = builtin_label "array"
+        else if
+          fname = labeled_builtin "sexp" || fname = labeled_builtin "array"
         then setup_args_code @ [ Mov (L (box nargs), rsi) ]
         else setup_args_code
       in
@@ -715,18 +728,18 @@ let compile cmd env imports code =
                   [ Meta "\t.cfi_startproc" ]
                   @ (if f = cmd#topname then
                        [
-                         Mov (M (D, I, V, "_init"), rax);
+                         Mov (M (D, I, V, "init"), rax);
                          Binop ("test", rax, rax);
-                         CJmp ("z", "_continue");
+                         CJmp ("z", "continue");
                          Ret;
                          Label "_ERROR";
-                         Call (label "binoperror");
+                         Call (labeled "binoperror");
                          Ret;
                          Label "_ERROR2";
-                         Call (label "binoperror2");
+                         Call (labeled "binoperror2");
                          Ret;
-                         Label "_continue";
-                         Mov (L 1, M (D, I, V, "_init"));
+                         Label "continue";
+                         Mov (L 1, M (D, I, V, "init"));
                        ]
                      else [])
                   @ [
@@ -747,21 +760,21 @@ let compile cmd env imports code =
                       Mov (r13, rsi);
                       Mov (r14, rcx);
                     ]
-                  @ (if f = "_main" then
+                  @ (if f = "main" then
                        [
                          (* Align stack as main function is the only function that could be called without alignment. TODO *)
                          Mov (L 0xF, rax);
                          Binop ("test", rsp, rax);
-                         CJmp ("z", "_ALIGNED");
+                         CJmp ("z", "ALIGNED");
                          Push filler;
-                         Label "_ALIGNED";
+                         Label "ALIGNED";
                          (* Initialize gc and arguments *)
                          Push (R Registers.rdi);
                          Push (R Registers.rsi);
-                         Call "___gc_init";
+                         Call "__gc_init";
                          Pop (R Registers.rsi);
                          Pop (R Registers.rdi);
-                         Call "_set_args";
+                         Call "set_args";
                        ]
                      else [])
                   @
@@ -782,7 +795,7 @@ let compile cmd env imports code =
                     Mov (rbp, rsp);
                     Pop rbp;
                   ]
-                  @ (if name = "_main" then [ Binop ("^", rax, rax) ] else [])
+                  @ (if name = "main" then [ Binop ("^", rax, rax) ] else [])
                   @ [
                       Meta "\t.cfi_restore\t5";
                       Meta "\t.cfi_def_cfa\t4, 4";
@@ -791,12 +804,13 @@ let compile cmd env imports code =
                       Meta
                         (* Allocate space for the symbolic stack
                            Add extra word if needed to preserve alignment *)
-                        (Printf.sprintf "\t.set\t%s,\t%d" env#lsize
+                        (Printf.sprintf "\t.set\t%s,\t%d" (prefixed env#lsize)
                            (if env#allocated mod 2 == 0 then
                               env#allocated * word_size
                             else (env#allocated + 1) * word_size));
                       Meta
-                        (Printf.sprintf "\t.set\t%s,\t%d" env#allocated_size
+                        (Printf.sprintf "\t.set\t%s,\t%d"
+                           (prefixed env#allocated_size)
                            env#allocated);
                     ] )
             | RET ->
@@ -1092,7 +1106,7 @@ class env prg =
     method loc x =
       match x with
       | Value.Global name ->
-          let loc_name = "_global_" ^ name in
+          let loc_name = labeled_global name in
           let ext = if self#is_external name then E else I in
           M (D, ext, V, loc_name)
       | Value.Fun name ->
@@ -1146,7 +1160,7 @@ class env prg =
     (* registers a variable in the environment *)
     method variable x =
       match x with
-      | Value.Global name -> {<globals = S.add ("_global_" ^ name) globals>}
+      | Value.Global name -> {<globals = S.add (labeled_global name) globals>}
       | _ -> self
 
     (* registers a string constant *)
@@ -1157,7 +1171,9 @@ class env prg =
         let rec iterate i =
           if i < n then (
             (match x.[i] with
-            | '"'  -> (Buffer.add_char buf '\\'; Buffer.add_char buf '"')
+            | '"' ->
+                Buffer.add_char buf '\\';
+                Buffer.add_char buf '"'
             | c -> Buffer.add_char buf c);
             iterate (i + 1))
         in
@@ -1184,7 +1200,7 @@ class env prg =
 
     (* gets a number of stack positions allocated *)
     method allocated = stack_slots
-    method allocated_size = label (Printf.sprintf "S%s_SIZE" fname)
+    method allocated_size = labeled (Printf.sprintf "S%s_SIZE" fname)
 
     (* enters a function *)
     method enter f nargs nlocals has_closure =
@@ -1197,10 +1213,10 @@ class env prg =
        ; first_line = true>}
 
     (* returns a label for the epilogue *)
-    method epilogue = label (Printf.sprintf "%s_epilogue" fname)
+    method epilogue = labeled (Printf.sprintf "%s_epilogue" fname)
 
     (* returns a name for local size meta-symbol *)
-    method lsize = label (Printf.sprintf "%s_SIZE" fname)
+    method lsize = labeled (Printf.sprintf "%s_SIZE" fname)
 
     (* returns a list of live registers *)
     method live_registers =
@@ -1213,8 +1229,11 @@ class env prg =
     method gen_line =
       let lab = Printf.sprintf ".L%d" nlabels in
       ( {<nlabels = nlabels + 1; first_line = false>},
-        if fname = "_main" then
-          [ (* Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab); *) Label lab ]
+        if fname = "main" then
+          [
+            (* Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab); *)
+            Label lab;
+          ]
         else
           (if first_line then
              [ (* Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line) *) ]
@@ -1232,28 +1251,36 @@ let genasm cmd prog =
   let sm = SM.compile cmd prog in
   let env, code = compile cmd (new env sm) (fst (fst prog)) sm in
   let globals =
-    List.map (fun s -> Meta (Printf.sprintf "\t.globl\t%s" s)) env#publics
+    List.map
+      (fun s -> Meta (Printf.sprintf "\t.globl\t%s" (prefixed s)))
+      env#publics
   in
   let data =
     [ Meta "\t.data" ]
     @ List.map
-        (fun (s, v) -> Meta (Printf.sprintf "%s:\t.string\t\"%s\"" v s))
+        (fun (s, v) ->
+          Meta (Printf.sprintf "%s:\t.string\t\"%s\"" (prefixed v) s))
         env#strings
     @ [
-        Meta "_init:\t.quad 0";
-        Meta "\t.section __DATA, custom_data, regular, no_dead_strip";
-        Meta (Printf.sprintf "filler:\t.fill\t%d, 8, 1" env#max_locals_size);
+        Meta (prefixed "init" ^ ":\t.quad 0");
+        (match os with
+        | Darwin ->
+            Meta "\t.section __DATA, custom_data, regular, no_dead_strip"
+        | Linux -> Meta "\t.section custom_data,\"aw\",@progbits");
+        Meta
+          (Printf.sprintf "%s:\t.fill\t%d, 8, 1" (prefixed "filler")
+             env#max_locals_size);
       ]
     @ List.concat
     @@ List.map
          (fun s ->
            [
              (* For mach-o STABS format is not supported: Meta
-               ( Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s"
-                  (String.sub s (String.length "global_")
-                     (String.length s - String.length "global_"))
-                  s); *)
-             Meta (Printf.sprintf "%s:\t.quad\t1" s);
+                ( Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s"
+                   (String.sub s (String.length "global_")
+                      (String.length s - String.length "global_"))
+                   s); *)
+             Meta (Printf.sprintf "%s:\t.quad\t1" (prefixed s));
            ])
          env#globals
   in
@@ -1263,8 +1290,8 @@ let genasm cmd prog =
     ([
        Meta (Printf.sprintf "\t.file \"%s\"" cmd#get_absolute_infile);
        (* For mach-o STABS format is not supported: Meta
-         ( Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext"
-            cmd#get_absolute_infile); *)
+          ( Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext"
+             cmd#get_absolute_infile); *)
      ]
     @ globals @ data
     @ [
@@ -1303,7 +1330,9 @@ let build cmd prog =
   cmd#dump_file "i" (Interface.gen prog);
   let inc = get_std_path () in
   let compiler = "clang" in
-  let flags = "-arch x86_64" in
+  let compiler_flags, linker_flags =
+    match os with Darwin -> ("-arch x86_64", "-ld_classic") | Linux -> ("", "")
+  in
   match cmd#get_mode with
   | `Default ->
       let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
@@ -1314,13 +1343,13 @@ let build cmd prog =
           Buffer.add_string buf " ")
         objs;
       let gcc_cmdline =
-        Printf.sprintf "%s -ld_classic %s %s %s %s.s %s %s/runtime.a" compiler flags
-          cmd#get_debug cmd#get_output_option cmd#basename (Buffer.contents buf)
-          inc
+        Printf.sprintf "%s %s %s %s %s %s.s %s %s/runtime.a" compiler
+          compiler_flags linker_flags cmd#get_debug cmd#get_output_option
+          cmd#basename (Buffer.contents buf) inc
       in
       Sys.command gcc_cmdline
   | `Compile ->
       Sys.command
-        (Printf.sprintf "%s %s %s -c -g %s.s" compiler flags cmd#get_debug
-           cmd#basename)
+        (Printf.sprintf "%s %s %s -c -g %s.s" compiler compiler_flags
+           cmd#get_debug cmd#basename)
   | _ -> invalid_arg "must not happen"

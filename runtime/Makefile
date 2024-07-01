@@ -51,8 +51,8 @@ runtime.o: runtime.c runtime.h
 runtime64.o: runtime.c runtime.h
 	$(CC) $(PROD_FLAGS) -c runtime.c -o runtime64.o
 
-printf.o: printf.s
-	$(CC) $(PROD_FLAGS) -c -g printf.s -o printf.o
+printf.o: printf.S
+	$(CC) $(PROD_FLAGS) -x assembler-with-cpp -c -g printf.S -o printf.o
 
 clean:
 	$(RM) *.a *.o *~ negative_scenarios/*.err

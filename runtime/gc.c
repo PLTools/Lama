@@ -26,8 +26,12 @@ static extra_roots_pool extra_roots;
 
 size_t __gc_stack_top = 0, __gc_stack_bottom = 0;
 #ifdef LAMA_ENV
+#ifdef __linux__
+extern const size_t __start_custom_data, __stop_custom_data;
+#elif defined(__APPLE__)
 extern const size_t __start_custom_data __asm("section$start$__DATA$custom_data");
 extern const size_t __stop_custom_data __asm("section$end$__DATA$custom_data");
+#endif
 #endif
 
 #ifdef DEBUG_VERSION

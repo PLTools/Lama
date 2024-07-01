@@ -17,6 +17,7 @@ depends: [
   "camlp5"      { >= "8.00.05" }
   "ostap"       { >= "0.5"}
   "GT"          { >= "0.5.1" }
+  "posix-uname" {  = "2.0.2" }
 ]
 
 build: [
