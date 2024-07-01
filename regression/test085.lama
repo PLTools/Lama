@@ -1,3 +1,5 @@
+var n;
+
 fun sum (l) {
   case l of
     {}    ->  0
@@ -21,6 +23,7 @@ fun array_to_list (a) {
    l
 }
 
+n := read ();
 write (sum ({}));
 write (sum ({1, 2, 3, 4, 5}));
 write (sum (1:2:3:4:5:{}));
