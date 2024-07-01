@@ -10,27 +10,21 @@
 
 #if defined(__x86_64__) || defined(__ppc64__)
 #define X86_64
-#else
 #endif
 
 typedef size_t ptrt;  // pointer type, because can hold a pointer on a corresponding platform
 
-typedef
 #ifdef X86_64
-int64_t
+typedef int64_t aint;  // adaptive int
+typedef uint64_t auint;  // adaptive unsigned int
+#define PRIdAI PRId64
+#define SCNdAI SCNd64
 #else
-int32_t
+typedef int32_t aint;  // adaptive int
+typedef uint32_t auint;  // adaptive unsigned int
+#define PRIdAI PRId32
+#define SCNdAI SCNd32
 #endif
-aint;  // adaptive int
-
-typedef
-#ifdef X86_64
-uint64_t
-#else
-uint32_t
-#endif
-auint;  // adaptive unsigned int
-
 
 #define STRING_TAG 0x00000001
 #define ARRAY_TAG 0x00000003

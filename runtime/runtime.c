@@ -618,7 +618,7 @@ aint inner_hash (aint depth, auint acc, void *p) {
 
 extern void *LstringInt (char *b) {
   aint n;
-  sscanf(b, "%lld", &n);
+  sscanf(b, "%" SCNdAI, &n);
   return (void *)BOX(n);
 }
 
@@ -1274,7 +1274,7 @@ extern aint Lread () {
 
   printf("> ");
   fflush(stdout);
-  scanf("%lli", &result);
+  scanf("%" SCNdAI, &result);
 
   return BOX(result);
 }
@@ -1291,7 +1291,7 @@ extern int Lbinoperror2 (void) {
 
 /* Lwrite is an implementation of the "write" construct */
 extern aint Lwrite (aint n) {
-  printf("%lld\n", UNBOX(n));
+  printf("%" PRIdAI "\n", UNBOX(n));
   fflush(stdout);
 
   return 0;
