@@ -7,7 +7,7 @@ UNAME_S := $(shell uname -s)
 
 ifeq ($(UNAME_S),Linux)
 else ifeq ($(UNAME_S),Darwin)
-    ARCH = arch -x86_64
+    ARCH = -arch x86_64
 endif
 
 .PHONY: check $(TESTS)

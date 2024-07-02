@@ -1,6 +1,13 @@
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Linux)
+else ifeq ($(UNAME_S),Darwin)
+    ARCH = -arch x86_64
+endif
+
 CC=clang
-DISABLE_ERRORS=-Wno-error=implicit-function-declaration -Wno-shift-negative-value
-COMMON_FLAGS=$(DISABLE_ERRORS) -g2 -fstack-protector-all -arch x86_64 --std=c11
+DISABLE_WARNINGS=-Wno-shift-negative-value
+COMMON_FLAGS=$(DISABLE_WARNINGS) -g -fstack-protector-all $(ARCH) --std=c11
 PROD_FLAGS=$(COMMON_FLAGS) -DLAMA_ENV
 TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
