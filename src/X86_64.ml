@@ -210,11 +210,11 @@ type instr =
   | Sar1 of opnd
   | Repmovsl
 
+let stack_offset i =
+  if i >= 0 then (i + 1) * word_size else (-i + 1) * word_size
+
 (* Instruction printer *)
 let show instr =
-  let stack_offset i =
-    if i >= 0 then (i + 1) * word_size else (-i + 1) * word_size
-  in
   let rec opnd = function
     | R r -> Register.show r
     | S i ->
@@ -724,7 +724,7 @@ let compile cmd env imports code =
                 let x, env = env#pop in
                 ( env#set_stack l,
                   [ Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp (s, l) ] )
-            | BEGIN (f, nargs, nlocals, closure, _args, _scopes) ->
+            | BEGIN (f, nargs, nlocals, closure, _args, scopes) ->
                 let _ =
                   let is_safepoint = List.mem f safepoint_functions in
                   let is_vararg =
@@ -736,11 +736,64 @@ let compile cmd env imports code =
                          (Printf.sprintf
                             "Function name %s is reserved for built-in" f))
                 in
+                let rec stabs_scope scope =
+                  let names =
+                    List.map
+                      (fun (name, index) ->
+                        Meta
+                          (Printf.sprintf "\t.stabs \"%s:1\",128,0,0,-%d" name
+                             (stack_offset index)))
+                      scope.names
+                  in
+                  let sub_stabs =
+                    List.flatten @@ List.map stabs_scope scope.subs
+                  in
+                  if names = [] then sub_stabs
+                  else
+                    names
+                    @ [
+                        Meta
+                          (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f);
+                      ]
+                    @ sub_stabs
+                    @ [
+                        Meta
+                          (Printf.sprintf "\t.stabn 224,0,0,%s-%s" scope.elab f);
+                      ]
+                in
+                let name =
+                  if f.[0] = 'L' then String.sub f 1 (String.length f - 1)
+                  else f
+                in
+                let stabs =
+                  match os with
+                  | Darwin -> []
+                  | Linux ->
+                      if f = "main" then
+                        [ Meta (Printf.sprintf "\t.type main, @function") ]
+                      else
+                        let func =
+                          [
+                            Meta (Printf.sprintf "\t.type %s, @function" name);
+                            Meta
+                              (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s"
+                                 name f);
+                          ]
+                        in
+                        let arguments =
+                          [] (* TODO: stabs for function arguments *)
+                        in
+                        let variables =
+                          List.flatten @@ List.map stabs_scope scopes
+                        in
+                        func @ arguments @ variables
+                in
                 env#assert_empty_stack;
                 let has_closure = closure <> [] in
                 let env = env#enter f nargs nlocals has_closure in
                 ( env,
-                  [ Meta "\t.cfi_startproc" ]
+                  stabs
+                  @ [ Meta "\t.cfi_startproc" ]
                   @ (if f = cmd#topname then
                        [
                          Mov (M (D, I, V, "init"), rax);
@@ -802,6 +855,12 @@ let compile cmd env imports code =
                 let x, env = env#pop in
                 env#assert_empty_stack;
                 let name = env#fname in
+                let stabs =
+                  match os with
+                  | Darwin -> []
+                  | Linux ->
+                      [ Meta (Printf.sprintf "\t.size %s, .-%s" name name) ]
+                in
                 ( env#leave,
                   [
                     Mov (x, rax);
@@ -827,7 +886,8 @@ let compile cmd env imports code =
                         (Printf.sprintf "\t.set\t%s,\t%d"
                            (prefixed env#allocated_size)
                            env#allocated);
-                    ] )
+                    ]
+                  @ stabs )
             | RET ->
                 let x = env#peek in
                 (env, [ Mov (x, rax); Jmp env#epilogue ])
@@ -1269,10 +1329,10 @@ let genasm cmd prog =
         env#strings
     @ [
         Meta (prefixed "init" ^ ":\t.quad 0");
-        (match os with
-        | Darwin ->
-            Meta "\t.section __DATA, custom_data, regular, no_dead_strip"
-        | Linux -> Meta "\t.section custom_data,\"aw\",@progbits");
+        Meta
+          (match os with
+          | Darwin -> "\t.section __DATA, custom_data, regular, no_dead_strip"
+          | Linux -> "\t.section custom_data,\"aw\",@progbits");
         Meta
           (Printf.sprintf "%s:\t.fill\t%d, 8, 1" (prefixed "filler")
              env#max_locals_size);
@@ -1280,31 +1340,38 @@ let genasm cmd prog =
     @ List.concat
     @@ List.map
          (fun s ->
-           [
-             (* For mach-o STABS format is not supported: Meta
-                ( Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s"
-                   (String.sub s (String.length "global_")
-                      (String.length s - String.length "global_"))
-                   s); *)
-             Meta (Printf.sprintf "%s:\t.quad\t1" (prefixed s));
-           ])
+           let unlabled_s =
+             String.sub s
+               (String.length global_label)
+               (String.length s - String.length global_label)
+           in
+           (match os with
+           | Darwin -> []
+           | Linux ->
+               [
+                 Meta
+                   (Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s" unlabled_s s);
+               ])
+           @ [ Meta (Printf.sprintf "%s:\t.quad\t1" (prefixed s)) ])
          env#globals
   in
   let asm = Buffer.create 1024 in
   List.iter
     (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show i))
-    ([
-       Meta (Printf.sprintf "\t.file \"%s\"" cmd#get_absolute_infile);
-       (* For mach-o STABS format is not supported: Meta
-          ( Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext"
-             cmd#get_absolute_infile); *)
-     ]
+    ([ Meta (Printf.sprintf "\t.file \"%s\"" cmd#get_absolute_infile) ]
+    @ (match os with
+      | Darwin -> []
+      | Linux ->
+          [
+            Meta
+              (Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext"
+                 cmd#get_absolute_infile);
+          ])
     @ globals @ data
-    @ [
-        Meta "\t.text";
-        Label ".Ltext";
-        (* For mach-o STABS format is not supported: Meta "\t.stabs \"data:t1=r1;0;4294967295;\",128,0,0,0"; *)
-      ]
+    @ [ Meta "\t.text"; Label ".Ltext" ]
+    @ (match os with
+      | Darwin -> []
+      | Linux -> [ Meta "\t.stabs \"data:t1=r1;0;4294967295;\",128,0,0,0" ])
     @ code);
   Buffer.contents asm
 
@@ -1331,7 +1398,7 @@ let build cmd prog =
   in
   cmd#dump_file "s" (genasm cmd prog);
   cmd#dump_file "i" (Interface.gen prog);
-  let compiler = "clang" in
+  let compiler = match os with Darwin -> "clang" | Linux -> "gcc" in
   let compiler_flags, linker_flags =
     match os with Darwin -> ("-arch x86_64", "-ld_classic") | Linux -> ("", "")
   in
