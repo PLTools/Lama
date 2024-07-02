@@ -972,7 +972,7 @@ end
 module SymbolicStack : sig
   type t
 
-  val empty : int -> int -> t
+  val empty : int -> t
   val is_empty : t -> bool
   val live_registers : t -> opnd list
   val stack_size : t -> int
@@ -983,8 +983,11 @@ module SymbolicStack : sig
 end = struct
   type t = { state : Register.t AbstractSymbolicStack.t; nlocals : int }
 
-  (* TODO: romanv: add free args registers? *)
-  let empty _nargs nlocals =
+  (* To use free argument registers we have to rewrite function call compilation.
+     Otherwise we will result with the following code in arguments setup:
+     movq    %rcx,   %rdx
+     movq    %rdx,   %rsi *)
+  let empty nlocals =
     {
       state = AbstractSymbolicStack.empty Registers.extra_caller_saved_registers;
       nlocals;
@@ -1040,7 +1043,7 @@ class env prg =
     val scount = 0 (* string count *)
     val stack_slots = 0 (* maximal number of stack positions *)
     val static_size = 0 (* static data size *)
-    val stack = SymbolicStack.empty 0 0 (* symbolic stack *)
+    val stack = SymbolicStack.empty 0 (* symbolic stack *)
     val nargs = 0 (* number of function arguments *)
     val locals = [] (* function local variables *)
     val fname = "" (* function name *)
@@ -1091,7 +1094,7 @@ class env prg =
     method drop_barrier = {<barrier = false>}
 
     (* drop stack *)
-    method drop_stack = {<stack = SymbolicStack.empty nargs static_size>}
+    method drop_stack = {<stack = SymbolicStack.empty static_size>}
 
     (* associates a stack to a label *)
     method set_stack l = {<stackmap = M.add l stack stackmap>}
@@ -1209,7 +1212,7 @@ class env prg =
       {<nargs
        ; static_size = nlocals
        ; stack_slots = nlocals
-       ; stack = SymbolicStack.empty nargs nlocals
+       ; stack = SymbolicStack.empty nlocals
        ; fname = f
        ; has_closure
        ; first_line = true>}
