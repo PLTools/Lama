@@ -97,31 +97,37 @@ end = struct
   let extra_caller_saved_registers = [| r10; r11; r12; r13; r14 |]
 end
 
-(* We need to know the word size to calculate offsets correctly *)
-let word_size = 8
+(* Attributes of the named memory location addressing *)
 
-type externality = I  (**Internal*) | E  (**External*)
-type data_kind = F  (**Function*) | D  (**Data*)
-type addressed = A  (**Address*) | V  (**Value*)
+(* External symbols have to be acessed through plt or GOTPCREL.
+   While internal just using rip-based addressing. *)
+type externality = I  (** Internal *) | E  (** External *)
+
+(* External functions have to pe acessed through plt.
+   While data through GOTPCREL. *)
+type data_kind = F  (** Function *) | D  (** Data *)
+
+(* For functions and string their value is their address.
+   While for numbers is the value on this address. *)
+type addressed = A  (** Address *) | V  (** Value *)
 
 (* We need to distinguish the following operand types: *)
 type opnd =
-  | R of Register.t (* hard register                    *)
-  | S of int (* a position on the hardware stack *)
-  | M of
-      (* a named memory location          *)
-      data_kind
-      * externality
-      * addressed
-      * string
-  | C of string (* a named constant                  *)
-  | L of int (* an immediate operand             *)
-  | I of int * opnd (* an indirect operand with offset  *)
+  | R of Register.t (* Hard register *)
+  | S of int (* Position on the hardware stack *)
+  | M of data_kind * externality * addressed * string
+    (* Named memory location *)
+  | C of string (* Named constant *)
+  | L of int (* Immediate operand *)
+  | I of int * opnd (* Indirect operand with offset *)
+
+type argument_location = Register of opnd | Stack
+
+(* We need to know the word size to calculate offsets correctly *)
+let word_size = 8
 
 let as_register opnd =
   match opnd with R r -> r | _ -> failwith "as_register: not a register"
-
-type argument_location = Register of opnd | Stack
 
 let rec show_opnd = function
   | R r -> Printf.sprintf "R %s" (Register.show r)
@@ -135,8 +141,6 @@ let rec show_opnd = function
         (match d with I -> "Internal" | E -> "External")
         (match a with A -> "Address" | V -> "Value")
         s
-
-(* We need to know the word size to calculate offsets correctly *)
 
 (* For convenience we define the following synonyms for the registers: *)
 let rax = R Registers.rax
@@ -155,8 +159,9 @@ let r13 = R Registers.r13
 let r14 = R Registers.r14
 let r15 = R Registers.r15
 
-(* Value that could be used to fill unused stack locations *)
-let filler = M (D, I, A, "filler")
+(* Value that could be used to fill unused stack locations.
+   Garbage is not allowed as it will affect GC. *)
+let filler = M (D, I, V, "filler")
 
 (* Now x86 instruction (we do not need all of them): *)
 type instr =
@@ -206,10 +211,10 @@ type instr =
   | Repmovsl
 
 (* Instruction printer *)
-let stack_offset i =
-  if i >= 0 then (i + 1) * word_size else (-i + 1) * word_size
-
 let show instr =
+  let stack_offset i =
+    if i >= 0 then (i + 1) * word_size else (-i + 1) * word_size
+  in
   let rec opnd = function
     | R r -> Register.show r
     | S i ->
@@ -242,8 +247,6 @@ let show instr =
   | Binop (op, s1, s2) ->
       Printf.sprintf "\t%s\t%s,\t%s" (binop op) (opnd s1) (opnd s2)
   | Mov ((M (_, _, A, _) as x), y) | Lea (x, y) ->
-      (* TODO: It looks like a bad design.
-         Maybe we should introduce eopnd with the boolean if we referenceing an address but not a value *)
       Printf.sprintf "\tleaq\t%s,\t%s" (opnd x) (opnd y)
   | Mov (s1, s2) -> Printf.sprintf "\tmovq\t%s,\t%s" (opnd s1) (opnd s2)
   | Push s -> Printf.sprintf "\tpushq\t%s" (opnd s)
@@ -262,15 +265,18 @@ let show instr =
   | Sar1 s -> Printf.sprintf "\tsarq\t%s" (opnd s)
   | Repmovsl -> Printf.sprintf "\trep movsq\t"
 
+(* Most of instructions have constraints on memory operands *)
 let in_memory = function M _ | S _ | I _ -> true | C _ | R _ | L _ -> false
-let big_numeric_literal = function L num -> num > 0xFFFFFFFF | _ -> false
 
 let mov x s =
+  (* Numeric literals with more than 32 bits cannot ne directly moved to memory location *)
+  let big_numeric_literal = function L num -> num > 0xFFFFFFFF | _ -> false in
   if x = s then []
   else if (in_memory x && in_memory s) || big_numeric_literal x then
     [ Mov (x, rax); Mov (rax, s) ]
   else [ Mov (x, s) ]
 
+(* Boxing for numeric values *)
 let box n = (n lsl 1) lor 1
 
 (*
@@ -289,10 +295,12 @@ let compile_binop env op =
     | _ -> failwith "unknown operator"
   in
   let x, y = env#peek2 in
+  (* For binary operations requiring no extra register *)
   let without_extra op =
     let _x, env = env#pop in
     (env, op ())
   in
+  (* For binary operations requiring rdx *)
   let with_rdx op =
     if not env#rdx_in_use then
       let _x, env = env#pop in
@@ -304,6 +312,7 @@ let compile_binop env op =
       let code = op rdx in
       (env, [ Mov (rdx, extra) ] @ code @ [ Mov (extra, rdx) ])
   in
+  (* For binary operations requiring any extra register *)
   let with_extra op =
     let extra, env = env#allocate in
     let _extra, env = env#pop in
@@ -417,6 +426,10 @@ let compile_binop env op =
   | _ ->
       failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
 
+(* For pointers to be marked by GC as alive they have to be located on the stack.
+   As we do not have control where does the C compiler locate them in the moment of GC,
+   we have to explicitly locate them on the stack.
+   And to the runtime function we are passing a reference to their location. *)
 let safepoint_functions =
   [
     labeled "s__Infix_58";
@@ -428,14 +441,18 @@ let safepoint_functions =
     labeled_builtin "closure";
     labeled_builtin "array";
     labeled_builtin "sexp";
-    labeled "i__Infix_4343"
+    labeled "i__Infix_4343";
     (* "makeArray"; not required as do not have ptr arguments *)
     (* "makeString"; not required as do not have ptr arguments *)
     (* "getEnv", not required as do not have ptr arguments *)
-    (* "set_args", not required as do not have ptr arguments *);
+    (* "set_args", not required as do not have ptr arguments *)
     (* Lsprintf, or Bsprintf is an extra dirty hack that probably works *)
   ]
 
+(* For vararg functions where we pass them in the stdlib function using va_list,
+   we have to unbox values to print them correctly.
+   For this we have special assemply functions in `printf.S`.
+   We additionally pass them amount of arguments to unbox using register r11. *)
 let vararg_functions =
   [
     (labeled "printf", 1);
@@ -452,6 +469,11 @@ let compile_call env ?fname nargs tail =
         | '.' -> labeled_builtin (String.sub fname 1 (String.length fname - 1))
         | _ -> fname)
       fname
+  in
+  let safepoint_call =
+    match fname with
+    | Some fname -> List.mem fname safepoint_functions
+    | None -> false
   in
   let tail_call_optimization_applicable =
     let allowed_function =
@@ -552,11 +574,6 @@ let compile_call env ?fname nargs tail =
       push_registers @ align_prologue @ setup_args_code @ add_printf_count
       @ call @ align_epilogue @ List.rev pop_registers @ move_result )
   in
-  let safepoint_call =
-    match fname with
-    | Some fname -> List.mem fname safepoint_functions
-    | None -> false
-  in
   let compile_safe_point_call env fname nargs =
     let setup_arguments env nargs =
       let rec pop_arguments env acc = function
@@ -623,14 +640,12 @@ let compile_call env ?fname nargs tail =
    the updated environment and the list of x86 instructions
 *)
 let compile cmd env imports code =
-  (* SM.print_prg code;
-     flush stdout; *)
   let rec compile' env scode =
     match scode with
     | [] -> (env, [])
     | instr :: scode' ->
+        (* Stack state for comment in generated code. TODO: add debug flag *)
         let stack = "" (* env#show_stack*) in
-        (* Printf.printf "insn=%s, stack=%s\n%!" (GT.show(insn) instr) (env#show_stack);   *)
         let env', code' =
           if env#is_barrier then
             match instr with
@@ -753,7 +768,7 @@ let compile cmd env imports code =
                       Mov (rsi, r13);
                       Mov (rcx, r14);
                       Mov (rsp, rdi);
-                      Mov (filler, rsi);
+                      Lea (filler, rsi);
                       Mov (C env#allocated_size, rcx);
                       Repmovsl;
                       Mov (r12, rdi);
@@ -762,18 +777,18 @@ let compile cmd env imports code =
                     ]
                   @ (if f = "main" then
                        [
-                         (* Align stack as main function is the only function that could be called without alignment. TODO *)
+                         (* Align stack as `main` function could be called misaligned *)
                          Mov (L 0xF, rax);
                          Binop ("test", rsp, rax);
                          CJmp ("z", "ALIGNED");
                          Push filler;
                          Label "ALIGNED";
                          (* Initialize gc and arguments *)
-                         Push (R Registers.rdi);
-                         Push (R Registers.rsi);
+                         Push rdi;
+                         Push rsi;
                          Call "__gc_init";
-                         Pop (R Registers.rsi);
-                         Pop (R Registers.rdi);
+                         Pop rsi;
+                         Pop rdi;
                          Call "set_args";
                        ]
                      else [])
@@ -968,7 +983,7 @@ module SymbolicStack : sig
 end = struct
   type t = { state : Register.t AbstractSymbolicStack.t; nlocals : int }
 
-  (* romanv: add free args registers? *)
+  (* TODO: romanv: add free args registers? *)
   let empty _nargs nlocals =
     {
       state = AbstractSymbolicStack.empty Registers.extra_caller_saved_registers;
@@ -1017,14 +1032,7 @@ class env prg =
   let argument_registers =
     Array.map (fun r -> R r) Registers.argument_registers
   in
-  let num_of_argument_registers = Array.length argument_registers in
-  (* let make_assoc l i =
-       List.combine l (List.init (List.length l) (fun x -> x + i))
-     in *)
-  (* let rec assoc x = function
-       | [] -> raise Not_found
-       | l :: ls -> ( try List.assoc x l with Not_found -> assoc x ls)
-     in *)
+  let argument_registers_size = Array.length argument_registers in
   object (self)
     inherit SM.indexer prg
     val globals = S.empty (* a set of global variables *)
@@ -1086,23 +1094,17 @@ class env prg =
     method drop_stack = {<stack = SymbolicStack.empty nargs static_size>}
 
     (* associates a stack to a label *)
-    method set_stack l =
-      (*Printf.printf "Setting stack for %s\n" l;*)
-      {<stackmap = M.add l stack stackmap>}
+    method set_stack l = {<stackmap = M.add l stack stackmap>}
 
     (* retrieves a stack for a label *)
     method retrieve_stack l =
-      (*Printf.printf "Retrieving stack for %s\n" l;*)
       try {<stack = M.find l stackmap>} with Not_found -> self
 
     (* checks if there is a stack for a label *)
-    method has_stack l =
-      (*Printf.printf "Retrieving stack for %s\n" l;*)
-      M.mem l stackmap
-
+    method has_stack l = M.mem l stackmap
     method is_external name = S.mem name externs
 
-    (* gets a name for a global variable *)
+    (* gets a location for a variable *)
     method loc x =
       match x with
       | Value.Global name ->
@@ -1113,8 +1115,8 @@ class env prg =
           let ext = if self#is_external name then E else I in
           M (F, ext, A, name)
       | Value.Local i -> S i
-      | Value.Arg i when i < num_of_argument_registers -> argument_registers.(i)
-      | Value.Arg i -> S (-(i - num_of_argument_registers) - 1)
+      | Value.Arg i when i < argument_registers_size -> argument_registers.(i)
+      | Value.Arg i -> S (-(i - argument_registers_size) - 1)
       | Value.Access i -> I (word_size * (i + 1), r15)
 
     (* allocates a fresh position on a symbolic stack *)
@@ -1134,14 +1136,14 @@ class env prg =
     method rdx_in_use = nargs > 2
 
     method arguments_locations n =
-      if n < num_of_argument_registers then
+      if n < argument_registers_size then
         ( Array.to_list (Array.sub argument_registers 0 n)
           |> List.map (fun r -> Register r),
           0 )
       else
         ( (Array.to_list argument_registers |> List.map (fun r -> Register r))
-          @ List.init (n - num_of_argument_registers) (fun _ -> Stack),
-          n - num_of_argument_registers )
+          @ List.init (n - argument_registers_size) (fun _ -> Stack),
+          n - argument_registers_size )
 
     (* peeks the top of the stack (the stack does not change) *)
     method peek = SymbolicStack.peek stack
@@ -1244,9 +1246,10 @@ class env prg =
             ] )
   end
 
-(* Generates an assembler text for a program: first compiles the program into
-   the stack code, then generates x86 assember code, then prints the assembler file
-*)
+(* Generates an assembler text for a program:
+   first compiles the program into the stack code,
+   then generates x86 assember code,
+   then prints the assembler file *)
 let genasm cmd prog =
   let sm = SM.compile cmd prog in
   let env, code = compile cmd (new env sm) (fst (fst prog)) sm in
@@ -1302,10 +1305,7 @@ let genasm cmd prog =
     @ code);
   Buffer.contents asm
 
-let get_std_path () =
-  match Sys.getenv_opt "LAMA" with Some s -> s | None -> Stdpath.path
-
-(* Builds a program: generates the assembler file and compiles it with the gcc toolchain *)
+(* Builds a program: generates the assembler file and compiles it with the clang toolchain *)
 let build cmd prog =
   let find_objects imports paths =
     let module S = Set.Make (String) in
@@ -1328,7 +1328,6 @@ let build cmd prog =
   in
   cmd#dump_file "s" (genasm cmd prog);
   cmd#dump_file "i" (Interface.gen prog);
-  let inc = get_std_path () in
   let compiler = "clang" in
   let compiler_flags, linker_flags =
     match os with Darwin -> ("-arch x86_64", "-ld_classic") | Linux -> ("", "")
@@ -1345,7 +1344,7 @@ let build cmd prog =
       let gcc_cmdline =
         Printf.sprintf "%s %s %s %s %s %s.s %s %s/runtime.a" compiler
           compiler_flags linker_flags cmd#get_debug cmd#get_output_option
-          cmd#basename (Buffer.contents buf) inc
+          cmd#basename (Buffer.contents buf) cmd#get_runtime_path
       in
       Sys.command gcc_cmdline
   | `Compile ->

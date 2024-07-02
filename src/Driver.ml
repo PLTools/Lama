@@ -6,6 +6,9 @@ class options args =
   let dump_sm = 0b010 in
   let dump_source = 0b100 in
   (* Kakadu: binary masks are cool for C code, but for OCaml I don't see any reason to save memory like this *)
+  let runtime_path_ =
+    match Sys.getenv_opt "LAMA" with Some s -> s | None -> Stdpath.path
+  in
   let help_string =
     "Lama compiler. (C) JetBrains Reserach, 2017-2020.\n"
     ^ "Usage: lamac <options> <input file>\n\n"
@@ -30,7 +33,8 @@ class options args =
     val i = ref 1
     val infile = ref (None : string option)
     val outfile = ref (None : string option)
-    val paths = ref [ X86_64.get_std_path () ]
+    val runtime_path = runtime_path_
+    val paths = ref [ runtime_path_ ]
     val mode = ref (`Default : [ `Default | `Eval | `SM | `Compile | `BC ])
     val curdir = Unix.getcwd ()
     val debug = ref false
@@ -42,44 +46,47 @@ class options args =
     val dump = ref 0
 
     initializer
-    let rec loop () =
-      match self#peek with
-      | Some opt ->
-          (match opt with
-          (* Workaround until Ostap starts to memoize properly *)
-          | "-w" -> self#set_workaround
-          (* end of the workaround *)
-          | "-c" -> self#set_mode `Compile
-          | "-o" -> (
-              match self#peek with
-              | None ->
+      let rec loop () =
+        match self#peek with
+        | Some opt ->
+            (match opt with
+            (* Workaround until Ostap starts to memoize properly *)
+            | "-w" -> self#set_workaround
+            (* end of the workaround *)
+            | "-c" -> self#set_mode `Compile
+            | "-o" -> (
+                match self#peek with
+                | None ->
+                    raise
+                      (Commandline_error
+                         "File name expected after '-o' specifier")
+                | Some fname -> self#set_outfile fname)
+            | "-I" -> (
+                match self#peek with
+                | None ->
+                    raise
+                      (Commandline_error "Path expected after '-I' specifier")
+                | Some path -> self#add_include_path path)
+            | "-s" -> self#set_mode `SM
+            | "-b" -> self#set_mode `BC
+            | "-i" -> self#set_mode `Eval
+            | "-ds" -> self#set_dump dump_sm
+            | "-dsrc" -> self#set_dump dump_source
+            | "-dp" -> self#set_dump dump_ast
+            | "-h" -> self#set_help
+            | "-v" -> self#set_version
+            | "-g" -> self#set_debug
+            | _ ->
+                if opt.[0] = '-' then
                   raise
-                    (Commandline_error "File name expected after '-o' specifier")
-              | Some fname -> self#set_outfile fname)
-          | "-I" -> (
-              match self#peek with
-              | None ->
-                  raise (Commandline_error "Path expected after '-I' specifier")
-              | Some path -> self#add_include_path path)
-          | "-s" -> self#set_mode `SM
-          | "-b" -> self#set_mode `BC
-          | "-i" -> self#set_mode `Eval
-          | "-ds" -> self#set_dump dump_sm
-          | "-dsrc" -> self#set_dump dump_source
-          | "-dp" -> self#set_dump dump_ast
-          | "-h" -> self#set_help
-          | "-v" -> self#set_version
-          | "-g" -> self#set_debug
-          | _ ->
-              if opt.[0] = '-' then
-                raise
-                  (Commandline_error
-                     (Printf.sprintf "Invalid command line specifier ('%s')" opt))
-              else self#set_infile opt);
-          loop ()
-      | None -> ()
-    in
-    loop ()
+                    (Commandline_error
+                       (Printf.sprintf "Invalid command line specifier ('%s')"
+                          opt))
+                else self#set_infile opt);
+            loop ()
+        | None -> ()
+      in
+      loop ()
 
     (* Workaround until Ostap starts to memoize properly *)
     method is_workaround = !const
@@ -138,6 +145,7 @@ class options args =
 
     method get_help = !help
     method get_include_paths = !paths
+    method get_runtime_path = runtime_path
 
     method basename =
       Filename.chop_suffix (Filename.basename self#get_infile) ".lama"
