@@ -1,6 +1,5 @@
 exception Commandline_error of string
 
-type arch_t = X86_64 | X86
 type os_t = Linux | Darwin
 
 class options args =
@@ -29,7 +28,6 @@ class options args =
     ^ "  -i        --- interpret on a source-level interpreter\n"
     ^ "  -s        --- compile into stack machine code and interpret on the \
        stack machine initerpreter\n"
-    ^ "  -m32      --- compile into x86 architecture\n"
     ^ "  -g        --- add more debug info and runtime checks\n"
     ^ "  -dp       --- dump AST (the output will be written into .ast file)\n"
     ^ "  -dsrc     --- dump pretty-printed source code\n"
@@ -50,7 +48,6 @@ class options args =
     val mode = ref (`Default : [ `Default | `Eval | `SM | `Compile | `BC ])
     val curdir = Unix.getcwd ()
     val debug = ref false
-    val arch = ref X86_64
     val target_os = host_os
 
     (* Workaround until Ostap starts to memoize properly *)
@@ -61,7 +58,6 @@ class options args =
 
     initializer
       let set_debug () = debug := true in
-      let set_x86 () = arch := X86 in
       let rec loop () =
         match self#peek with
         | Some opt ->
@@ -92,7 +88,6 @@ class options args =
             | "-h" -> self#set_help
             | "-v" -> self#set_version
             | "-g" -> set_debug ()
-            | "-m32" -> set_x86 ()
             | _ ->
                 if opt.[0] = '-' then
                   raise
@@ -206,6 +201,5 @@ class options args =
       if !help then Printf.printf "%s" help_string
 
     method is_debug = !debug
-    method arch = !arch
     method target_os = target_os
   end
