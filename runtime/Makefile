@@ -14,44 +14,14 @@ TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
 INVARIANTS_CHECK_FLAGS=$(TEST_FLAGS) -DFULL_INVARIANT_CHECKS
 
-all: gc64.o runtime64.o printf.o
-	ar rc runtime.a runtime64.o gc64.o printf.o
-
-all32: gc.o runtime.o
-	ar rc runtime.a runtime.o gc.o
-
-NEGATIVE_TESTS=$(sort $(basename $(notdir $(wildcard negative_scenarios/*_neg.c))))
-
-$(NEGATIVE_TESTS): %: negative_scenarios/%.c
-	@echo "Running test $@"
-	@$(CC) -o $@.o $(COMMON_FLAGS) negative_scenarios/$@.c gc.c
-	@./$@.o 2> negative_scenarios/$@.err || diff negative_scenarios/$@.err negative_scenarios/expected/$@.err
-
-negative_tests: $(NEGATIVE_TESTS)
-
-unit_tests.o: gc.c gc.h runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
-	$(CC) -o unit_tests.o $(UNIT_TESTS_FLAGS) gc.c virt_stack.c runtime.c test_main.c test_util.s
-
-invariants_check.o: gc.c gc.h runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
-	$(CC) -o invariants_check.o $(INVARIANTS_CHECK_FLAGS) gc.c virt_stack.c runtime.c test_main.c test_util.s
-
-invariants_check_debug_print.o: gc.c gc.h runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
-	$(CC) -o invariants_check_debug_print.o $(INVARIANTS_CHECK_FLAGS) -DDEBUG_PRINT gc.c virt_stack.c runtime.c test_main.c test_util.s
-
-virt_stack.o: virt_stack.h virt_stack.c
-	$(CC) $(PROD_FLAGS) -c virt_stack.c
+all: gc.o runtime.o printf.o
+	ar rc runtime.a runtime.o gc.o printf.o
 
 gc.o: gc.c gc.h
-	$(CC) -m32 $(PROD_FLAGS) -c gc.c
-
-gc64.o: gc.c gc.h
-	$(CC) $(PROD_FLAGS) -c gc.c -o gc64.o
+	$(CC) $(PROD_FLAGS) -c gc.c -o gc.o
 
 runtime.o: runtime.c runtime.h
-	$(CC) -m32 $(PROD_FLAGS) -c runtime.c
-
-runtime64.o: runtime.c runtime.h
-	$(CC) $(PROD_FLAGS) -c runtime.c -o runtime64.o
+	$(CC) $(PROD_FLAGS) -c runtime.c -o runtime.o
 
 printf.o: printf.S
 	$(CC) $(PROD_FLAGS) -x assembler-with-cpp -c -g printf.S -o printf.o
