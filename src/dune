@@ -45,7 +45,7 @@
 
 (library
  (name liba)
- (modules Language Pprinter stdpath version X86_64 SM)
+ (modules Language Pprinter stdpath version X86_64 SM Options)
  (libraries GT ostap posix-uname)
  (flags
   (:standard

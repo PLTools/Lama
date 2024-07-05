@@ -1,20 +1,11 @@
 open GT
 open Language
 open SM
+open Options
 
 (* X86 codegeneration interface *)
 
-type os_t = Linux | Darwin
-
-let os =
-  let uname = Posix_uname.uname () in
-  match uname.sysname with
-  | "Darwin" -> Darwin
-  | "Linux" -> Linux
-  | _ -> failwith "Unsupported OS"
-
-let prefix = match os with Linux -> "" | Darwin -> "_"
-let prefixed name = prefix ^ name
+type compilation_mode_t = { is_debug : bool; target_os : os_t }
 
 module Register : sig
   type t
@@ -214,16 +205,16 @@ let stack_offset i =
   if i >= 0 then (i + 1) * word_size else (-i + 1) * word_size
 
 (* Instruction printer *)
-let show instr =
+let show env instr =
   let rec opnd = function
     | R r -> Register.show r
     | S i ->
         if i >= 0 then Printf.sprintf "-%d(%%rbp)" (stack_offset i)
         else Printf.sprintf "%d(%%rbp)" (stack_offset i)
-    | M (_, I, _, s) -> Printf.sprintf "%s(%%rip)" (prefixed s)
-    | M (F, E, _, s) -> Printf.sprintf "%s(%%rip)" (prefixed s)
-    | M (D, E, _, s) -> Printf.sprintf "%s@GOTPCREL(%%rip)" (prefixed s)
-    | C s -> Printf.sprintf "$%s" (prefixed s)
+    | M (_, I, _, s) -> Printf.sprintf "%s(%%rip)" (env#prefixed s)
+    | M (F, E, _, s) -> Printf.sprintf "%s(%%rip)" (env#prefixed s)
+    | M (D, E, _, s) -> Printf.sprintf "%s@GOTPCREL(%%rip)" (env#prefixed s)
+    | C s -> Printf.sprintf "$%s" (env#prefixed s)
     | L i -> Printf.sprintf "$%d" i
     | I (0, x) -> Printf.sprintf "(%s)" (opnd x)
     | I (n, x) -> Printf.sprintf "%d(%s)" n (opnd x)
@@ -252,12 +243,12 @@ let show instr =
   | Push s -> Printf.sprintf "\tpushq\t%s" (opnd s)
   | Pop s -> Printf.sprintf "\tpopq\t%s" (opnd s)
   | Ret -> "\tret"
-  | Call p -> Printf.sprintf "\tcall\t%s" (prefixed p)
+  | Call p -> Printf.sprintf "\tcall\t%s" (env#prefixed p)
   | CallI o -> Printf.sprintf "\tcall\t*(%s)" (opnd o)
-  | Label l -> Printf.sprintf "%s:\n" (prefixed l)
-  | Jmp l -> Printf.sprintf "\tjmp\t%s" (prefixed l)
+  | Label l -> Printf.sprintf "%s:\n" (env#prefixed l)
+  | Jmp l -> Printf.sprintf "\tjmp\t%s" (env#prefixed l)
   | JmpI o -> Printf.sprintf "\tjmp\t*(%s)" (opnd o)
-  | CJmp (s, l) -> Printf.sprintf "\tj%s\t%s" s (prefixed l)
+  | CJmp (s, l) -> Printf.sprintf "\tj%s\t%s" s (env#prefixed l)
   | Meta s -> Printf.sprintf "%s\n" s
   | Dec s -> Printf.sprintf "\tdecq\t%s" (opnd s)
   | Or1 s -> Printf.sprintf "\torq\t$0x0001,\t%s" (opnd s)
@@ -632,6 +623,9 @@ let compile_call env ?fname nargs tail =
     compile_tail_call env fname nargs
   else compile_common_call env fname nargs
 
+let opt_stabs env stabs =
+  match env#mode.target_os with Darwin -> [] | Linux -> stabs
+
 (* Symbolic stack machine evaluator
 
      compile : env -> prg -> env * instr list
@@ -644,8 +638,7 @@ let compile cmd env imports code =
     match scode with
     | [] -> (env, [])
     | instr :: scode' ->
-        (* Stack state for comment in generated code. TODO: add debug flag *)
-        let stack = "" (* env#show_stack*) in
+        let stack_state = if env#mode.is_debug then env#show_stack else "" in
         let env', code' =
           if env#is_barrier then
             match instr with
@@ -766,27 +759,25 @@ let compile cmd env imports code =
                   else f
                 in
                 let stabs =
-                  match os with
-                  | Darwin -> []
-                  | Linux ->
-                      if f = "main" then
-                        [ Meta (Printf.sprintf "\t.type main, @function") ]
-                      else
-                        let func =
-                          [
-                            Meta (Printf.sprintf "\t.type %s, @function" name);
-                            Meta
-                              (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s"
-                                 name f);
-                          ]
-                        in
-                        let arguments =
-                          [] (* TODO: stabs for function arguments *)
-                        in
-                        let variables =
-                          List.flatten @@ List.map stabs_scope scopes
-                        in
-                        func @ arguments @ variables
+                  opt_stabs env
+                    (if f = "main" then
+                       [ Meta (Printf.sprintf "\t.type main, @function") ]
+                     else
+                       let func =
+                         [
+                           Meta (Printf.sprintf "\t.type %s, @function" name);
+                           Meta
+                             (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name
+                                f);
+                         ]
+                       in
+                       let arguments =
+                         [] (* TODO: stabs for function arguments *)
+                       in
+                       let variables =
+                         List.flatten @@ List.map stabs_scope scopes
+                       in
+                       func @ arguments @ variables)
                 in
                 env#assert_empty_stack;
                 let has_closure = closure <> [] in
@@ -856,10 +847,8 @@ let compile cmd env imports code =
                 env#assert_empty_stack;
                 let name = env#fname in
                 let stabs =
-                  match os with
-                  | Darwin -> []
-                  | Linux ->
-                      [ Meta (Printf.sprintf "\t.size %s, .-%s" name name) ]
+                  opt_stabs env
+                    [ Meta (Printf.sprintf "\t.size %s, .-%s" name name) ]
                 in
                 ( env#leave,
                   [
@@ -878,13 +867,14 @@ let compile cmd env imports code =
                       Meta
                         (* Allocate space for the symbolic stack
                            Add extra word if needed to preserve alignment *)
-                        (Printf.sprintf "\t.set\t%s,\t%d" (prefixed env#lsize)
+                        (Printf.sprintf "\t.set\t%s,\t%d"
+                           (env#prefixed env#lsize)
                            (if env#allocated mod 2 == 0 then
                               env#allocated * word_size
                             else (env#allocated + 1) * word_size));
                       Meta
                         (Printf.sprintf "\t.set\t%s,\t%d"
-                           (prefixed env#allocated_size)
+                           (env#prefixed env#allocated_size)
                            env#allocated);
                     ]
                   @ stabs )
@@ -931,7 +921,7 @@ let compile cmd env imports code =
                           (Printf.sprintf "Unexpected pattern: StrCmp %s: %d"
                              __FILE__ __LINE__))
                   1 false
-            | LINE _line -> env#gen_line
+            | LINE line -> env#gen_line line
             | FAIL ((line, col), value) ->
                 let v, env = if value then (env#peek, env) else env#pop in
                 let msg_addr, env = env#string cmd#get_infile in
@@ -956,9 +946,13 @@ let compile cmd env imports code =
                   (Printf.sprintf "invalid SM insn: %s\n" (GT.show insn i))
         in
         let env'', code'' = compile' env' scode' in
-        ( env'',
-          [ Meta (Printf.sprintf "# %s / %s" (GT.show SM.insn instr) stack) ]
-          @ code' @ code'' )
+        let debug_info =
+          let insn = GT.show SM.insn instr in
+          if env#mode.is_debug then
+            [ Meta ("# " ^ insn); Meta ("# " ^ stack_state) ]
+          else [ Meta ("# " ^ insn) ]
+        in
+        (env'', debug_info @ code' @ code'')
   in
   compile' env code
 
@@ -1079,8 +1073,6 @@ end = struct
     (opnd_from_loc v loc1, opnd_from_loc v loc2)
 end
 
-(* Environment for symbolic stack machine *)
-
 (* A set of strings *)
 module S = Set.Make (String)
 
@@ -1088,7 +1080,7 @@ module S = Set.Make (String)
 module M = Map.Make (String)
 
 (* Environment implementation *)
-class env prg =
+class env prg mode =
   let chars =
     "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'"
   in
@@ -1109,6 +1101,7 @@ class env prg =
     val fname = "" (* function name *)
     val stackmap = M.empty (* labels to stack map *)
     val barrier = false (* barrier condition *)
+    val mode = mode (* compilation mode *)
 
     val max_locals_size =
       0 (* maximal number of stack position in all functions *)
@@ -1118,6 +1111,7 @@ class env prg =
     val externs = S.empty
     val nlabels = 0
     val first_line = true
+    method mode = mode
     method publics = S.elements publics
     method register_public name = {<publics = S.add name publics>}
     method register_extern name = {<externs = S.add name externs>}
@@ -1129,7 +1123,14 @@ class env prg =
       if stack_slots > max_locals_size then {<max_locals_size = stack_slots>}
       else self
 
-    method show_stack = show_opnd (SymbolicStack.peek stack)
+    method show_stack =
+      let rec show stack acc =
+        if SymbolicStack.is_empty stack then acc
+        else
+          let stack, loc = SymbolicStack.pop stack in
+          show stack (show_opnd loc ^ " " ^ acc)
+      in
+      show stack ""
 
     method print_locals =
       Printf.printf "LOCALS: size = %d\n" static_size;
@@ -1291,50 +1292,52 @@ class env prg =
       @ SymbolicStack.live_registers stack
 
     (* generate a line number information for current function *)
-    method gen_line =
+    method gen_line line =
       let lab = Printf.sprintf ".L%d" nlabels in
       ( {<nlabels = nlabels + 1; first_line = false>},
         if fname = "main" then
-          [
-            (* Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab); *)
-            Label lab;
-          ]
+          opt_stabs self
+            [ Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab) ]
+          @ [ Label lab ]
         else
           (if first_line then
-             [ (* Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line) *) ]
+             opt_stabs self [ Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line) ]
            else [])
-          @ [
-              (* Meta (Printf.sprintf "\t.stabn 68,0,%d,%s-%s" line lab fname); *)
-              Label lab;
-            ] )
+          @ opt_stabs self
+              [ Meta (Printf.sprintf "\t.stabn 68,0,%d,%s-%s" line lab fname) ]
+          @ [ Label lab ] )
+
+    method prefixed label =
+      match mode.target_os with Darwin -> "_" ^ label | Linux -> label
   end
 
 (* Generates an assembler text for a program:
    first compiles the program into the stack code,
-   then generates x86 assember code,
+   then generates assember code,
    then prints the assembler file *)
 let genasm cmd prog =
+  let mode = { is_debug = cmd#is_debug; target_os = cmd#target_os } in
   let sm = SM.compile cmd prog in
-  let env, code = compile cmd (new env sm) (fst (fst prog)) sm in
+  let env, code = compile cmd (new env sm mode) (fst (fst prog)) sm in
   let globals =
     List.map
-      (fun s -> Meta (Printf.sprintf "\t.globl\t%s" (prefixed s)))
+      (fun s -> Meta (Printf.sprintf "\t.globl\t%s" (env#prefixed s)))
       env#publics
   in
   let data =
     [ Meta "\t.data" ]
     @ List.map
         (fun (s, v) ->
-          Meta (Printf.sprintf "%s:\t.string\t\"%s\"" (prefixed v) s))
+          Meta (Printf.sprintf "%s:\t.string\t\"%s\"" (env#prefixed v) s))
         env#strings
     @ [
-        Meta (prefixed "init" ^ ":\t.quad 0");
+        Meta (env#prefixed "init" ^ ":\t.quad 0");
         Meta
-          (match os with
+          (match env#mode.target_os with
           | Darwin -> "\t.section __DATA, custom_data, regular, no_dead_strip"
           | Linux -> "\t.section custom_data,\"aw\",@progbits");
         Meta
-          (Printf.sprintf "%s:\t.fill\t%d, 8, 1" (prefixed "filler")
+          (Printf.sprintf "%s:\t.fill\t%d, 8, 1" (env#prefixed "filler")
              env#max_locals_size);
       ]
     @ List.concat
@@ -1345,33 +1348,26 @@ let genasm cmd prog =
                (String.length global_label)
                (String.length s - String.length global_label)
            in
-           (match os with
-           | Darwin -> []
-           | Linux ->
-               [
-                 Meta
-                   (Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s" unlabled_s s);
-               ])
-           @ [ Meta (Printf.sprintf "%s:\t.quad\t1" (prefixed s)) ])
+           opt_stabs env
+             [
+               Meta (Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s" unlabled_s s);
+             ]
+           @ [ Meta (Printf.sprintf "%s:\t.quad\t1" (env#prefixed s)) ])
          env#globals
   in
   let asm = Buffer.create 1024 in
   List.iter
-    (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show i))
+    (fun i -> Buffer.add_string asm (Printf.sprintf "%s\n" @@ show env i))
     ([ Meta (Printf.sprintf "\t.file \"%s\"" cmd#get_absolute_infile) ]
-    @ (match os with
-      | Darwin -> []
-      | Linux ->
-          [
-            Meta
-              (Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext"
-                 cmd#get_absolute_infile);
-          ])
+    @ opt_stabs env
+        [
+          Meta
+            (Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext"
+               cmd#get_absolute_infile);
+        ]
     @ globals @ data
     @ [ Meta "\t.text"; Label ".Ltext" ]
-    @ (match os with
-      | Darwin -> []
-      | Linux -> [ Meta "\t.stabs \"data:t1=r1;0;4294967295;\",128,0,0,0" ])
+    @ opt_stabs env [ Meta "\t.stabs \"data:t1=r1;0;4294967295;\",128,0,0,0" ]
     @ code);
   Buffer.contents asm
 
@@ -1398,10 +1394,15 @@ let build cmd prog =
   in
   cmd#dump_file "s" (genasm cmd prog);
   cmd#dump_file "i" (Interface.gen prog);
-  let compiler = match os with Darwin -> "clang" | Linux -> "gcc" in
-  let compiler_flags, linker_flags =
-    match os with Darwin -> ("-arch x86_64", "-ld_classic") | Linux -> ("", "")
+  let compiler =
+    match cmd#target_os with Darwin -> "clang" | Linux -> "gcc"
   in
+  let compiler_flags, linker_flags =
+    match cmd#target_os with
+    | Darwin -> ("-arch x86_64", "-ld_classic")
+    | Linux -> ("", "")
+  in
+  let debug_flags = if cmd#is_debug then "-g" else "" in
   match cmd#get_mode with
   | `Default ->
       let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in
@@ -1413,12 +1414,12 @@ let build cmd prog =
         objs;
       let gcc_cmdline =
         Printf.sprintf "%s %s %s %s %s %s.s %s %s/runtime.a" compiler
-          compiler_flags linker_flags cmd#get_debug cmd#get_output_option
+          compiler_flags linker_flags debug_flags cmd#get_output_option
           cmd#basename (Buffer.contents buf) cmd#get_runtime_path
       in
       Sys.command gcc_cmdline
   | `Compile ->
       Sys.command
         (Printf.sprintf "%s %s %s -c -g %s.s" compiler compiler_flags
-           cmd#get_debug cmd#basename)
+           debug_flags cmd#basename)
   | _ -> invalid_arg "must not happen"

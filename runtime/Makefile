@@ -14,11 +14,9 @@ TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
 INVARIANTS_CHECK_FLAGS=$(TEST_FLAGS) -DFULL_INVARIANT_CHECKS
 
-# this target is the most important one, its' artefacts should be used as a runtime of x86-64 version of Lama
 all: gc64.o runtime64.o printf.o
 	ar rc runtime.a runtime64.o gc64.o printf.o
 
-# this target is the most important one, its' artefacts should be used as a runtime of x86 (32-bits) version Lama
 all32: gc.o runtime.o
 	ar rc runtime.a runtime.o gc.o
 
@@ -31,16 +29,12 @@ $(NEGATIVE_TESTS): %: negative_scenarios/%.c
 
 negative_tests: $(NEGATIVE_TESTS)
 
-# this is a target that runs unit tests, scenarios are written in a single file `test_main.c`
 unit_tests.o: gc.c gc.h runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
 	$(CC) -o unit_tests.o $(UNIT_TESTS_FLAGS) gc.c virt_stack.c runtime.c test_main.c test_util.s
 
-# this target also runs unit tests but with additional expensive checks of GC invariants which aren't used in production version
 invariants_check.o: gc.c gc.h runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
 	$(CC) -o invariants_check.o $(INVARIANTS_CHECK_FLAGS) gc.c virt_stack.c runtime.c test_main.c test_util.s
 
-# this target also runs unit tests but with additional expensive checks of GC invariants which aren't used in production version
-# additionally, it prints debug information
 invariants_check_debug_print.o: gc.c gc.h runtime.c runtime.h runtime_common.h virt_stack.c virt_stack.h test_main.c test_util.s
 	$(CC) -o invariants_check_debug_print.o $(INVARIANTS_CHECK_FLAGS) -DDEBUG_PRINT gc.c virt_stack.c runtime.c test_main.c test_util.s
 
