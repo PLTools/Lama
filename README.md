@@ -1,9 +1,9 @@
-| Lama         1.2    |
-| ------------------- |
-| [![Lama 1.2][1]][2] |
+| Lama         1.3    |
+|---------------------|
+| [![Lama 1.3][1]][2] |
 
-[1]:  https://github.com/PLTools/Lama/Lama/workflows/Build/badge.svg?branch=1.10
-[2]:  https://github.com/PLTools/Lama//Lama/actions
+[1]:  https://github.com/PLTools/Lama/Lama/workflows/Build/badge.svg?branch=1.30
+[2]:  https://github.com/PLTools/Lama/Lama/actions
 
 # Lama
 
@@ -27,8 +27,7 @@ The lack of a type system (a vital feature for a real-world language
 for software engineering) is an intensional decision that allows showing the unchained diversity of runtime behaviors, including those that a typical type system is called to prevent.
 On the other hand the language can be used in the future as a raw substrate to apply various ways of software verification (including type systems).
 
-The current implementation contains a native code compiler for **x86-32**, written in **OCaml**, a runtime library with garbage-collection support, written in **C**, and a small standard library, written in ![lama](lama.svg) itself.
-The native code compiler uses **gcc** as a toolchain.
+The current implementation contains a native code compiler for **x86-64**, written in **OCaml**, a runtime library with garbage-collection support, written in **C**, and a small standard library, written in ![lama](lama.svg) itself.
 
 In addition, a source-level reference interpreter is implemented as well as a compiler to a small stack machine.
 The stack machine code can in turn be either interpreted on a stack machine interpreter, or used as an intermediate representation by the native code compiler.
@@ -39,9 +38,7 @@ The language specification can be found [here](lama-spec.pdf).
 
 ## Installation
 
-Supported target: GNU/Linux x86_32 (x86_64 by running 32-bit mode)
-
-***Mac*** users should use either a virtual machine or docker with a Linux distributive inside.
+Supported target: GNU/Linux x86_64, MacOS x86_64 (arm using Rosetta).
 
 ***Windows*** users should get Windows Subsystem for Linux a.k.a WSL (recommended) or cygwin.
 Ubuntu-based variant of WSL is recommended.
@@ -52,14 +49,9 @@ Ubuntu-based variant of WSL is recommended.
 
     For example, (for Debian-based GNU/Linux):
     ```bash
-    $ sudo apt install gcc-multilib
+    sudo apt install gcc-multilib
     ```
 
-     On some versions, you need to install the additional package `lib32gcc-9-dev` in case of errors like
-       ```
-      /usr/bin/ld: cannot find -lgcc
-      /usr/bin/ld: skipping incompatible /usr/lib/gcc/x86_64-linux-gnu/9/libgcc.a when searching for -lgcc
-       ```
   - [opam](http://opam.ocaml.org) (>= 2.0.4)
   - [OCaml](http://ocaml.org) (>= 4.10.1). *Optional* because it can be easily installed through opam.
   Compiler variant with `flambda` switch is recommended.
@@ -71,10 +63,7 @@ Ubuntu-based variant of WSL is recommended.
 1. Install the right [switch](https://opam.ocaml.org/doc/Manual.html#Switches) for the OCaml compiler
 
     ```bash
-    # for fresh opam
-    $ opam switch create lama --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda
-    # for old opam
-    $ opam switch create lama ocaml-variants.4.13.1+flambda
+    opam switch create lama --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda
     ```
 
     * In the above command:
@@ -85,8 +74,7 @@ Ubuntu-based variant of WSL is recommended.
 
 2. Update PATH variable for the fresh switch. (You can add these commands to your `~/.bashrc` for convenience but they should be added by `opam`)
     ```bash
-    $ export OPAMSWITCH=lama
-    $ eval $(opam env)
+    eval $(opam env --switch=lama --set-switch)
     ```
 
      * Check that the OCaml compiler is now available in PATH by running `which ocamlc`; it should answer with `/home/user/.opam/lama/bin/ocamlc` (or similar) and `ocamlc -v` should answer with
@@ -98,16 +86,16 @@ Ubuntu-based variant of WSL is recommended.
 3. Pin Lama package using `opam` and right URL (remember of "#" being a comment character in various shells)
 
     ```bash
-    $ opam pin add Lama https://github.com/PLTools/Lama.git\#1.2 --no-action
+    opam pin add Lama https://github.com/PLTools/Lama.git\#1.30 --no-action
     ```
 
     The extra '#' sign is added because in various Shells it is the start of a comment
 
-4. Install *dep*endencies on system-wide *ext*ernal packages and `lama` itself after that.
+4. Install dependencies on system-wide external packages and `lama` itself after that.
 
     ```bash
-    $ opam depext Lama --yes
-    $ opam install Lama --yes
+    opam depext Lama --yes
+    opam install Lama --yes
     ```
 
 5. Check that `lamac` executable was installed: `which lamac` should answer with
@@ -124,6 +112,11 @@ It should build a local compiler `src/lamac` and a few tutorial executables in `
 ### Useful links
 
 * [Plugin for VS Code](https://marketplace.visualstudio.com/items?itemName=arsavelev.lsp-lama)
+
+### Changes in Lama 1.3
+
+* Migrated from x86-32 to x86-64 architecture.
+* Added `let ... in ...` construct.
 
 ### Changes in Lama 1.2
 

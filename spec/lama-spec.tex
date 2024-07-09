@@ -93,7 +93,7 @@
 \newcommand{\descr}[2]{\smallskip{#1}\begin{itemize}[noitemsep,topsep=0pt]\item[]{#2}\end{itemize}}
 
 \lstdefinelanguage{abslama}{
-keywords={skip,if,then,else,elif,fi,while,do,od,for,fun,public,import,
+keywords={skip,if,then,else,elif,fi,while,do,od,for,fun,public,import,let,in,
 box,val,var,case,of,esac,when,box,str,sexp,array,infix,infixl,infixr,at,before,after,true,false,eta,lazy,syntax,ref,ignore,elemRef},
 sensitive=true,
 basicstyle=\small,
@@ -109,8 +109,8 @@ morecomment=[l][\ttfamily]{--}
 }
 
 \lstdefinelanguage{lama}{
-keywords={skip,if,then,else,elif,fi,while,do,od,for,fun,public,import,
-box,val, var,case,of,esac,when,box,str,sexp,array,infix,infixl,infixr,at,before,after,true,false,eta,lazy,syntax},
+keywords={skip,if,then,else,elif,fi,while,do,od,for,fun,public,import,let,in,
+box,val,var,case,of,esac,when,box,str,sexp,array,infix,infixl,infixr,at,before,after,true,false,eta,lazy,syntax},
 sensitive=true,
 basicstyle=\small,
 %commentstyle=\scriptsize\rmfamily,
@@ -168,7 +168,7 @@ language=lama
 	
 	{\huge\bfseries \lama Language Specification}\\[0.4cm] % Title of your document
 
-        {\textsc{Version 1.10}}
+        {\textsc{Version 1.30}}
         
 	\HRule\\[1.5cm]
 	

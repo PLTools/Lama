@@ -4,7 +4,8 @@
 \chapter{Debugging Support}
 \label{sec:debugging}
 
-Current implementation supports a minimalistic debugging with \textsc{GDB}~\cite{gdb}. In order to include the debug information into object files/executable these files
+Current implementation supports a minimalistic debugging with \textsc{GDB}~\cite{gdb} for the Linux target only.
+In order to include the debug information into object files/executable these files
 have to be compiled with the command-line option "\texttt{-g}" (see Section~\ref{sec:driver}).
 
 The following debugging features are supported:
@@ -36,4 +37,5 @@ The following customized commands are available:
 \item "\texttt{pc }$i$", where "$i$" is an integer number. The commands prints a value of $i$-component of current closure.
 \end{itemize}
 
-
+For the MacOS target the debugging is supported with \textsc{LLDB}.
+But debugging features are not available.
