@@ -169,7 +169,6 @@ module ByteCode = struct
   *)
 
   let compile cmd insns =
-    (* let word_size          = 4                                                                                   in *)
     let code = Buffer.create 256 in
     let st = StringTab.create () in
     let lmap = Stdlib.ref M.empty in

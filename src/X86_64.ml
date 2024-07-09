@@ -488,15 +488,24 @@ let compile_call env ?fname nargs tail =
           push_args env (mov x (env#loc (Value.Arg (n - 1))) @ acc) (n - 1)
     in
     let env, pushs = push_args env [] nargs in
-    let env, jump =
+    let env, setup_closure =
       match fname with
-      | Some fname -> (env, [ Jmp fname ])
+      | Some _ -> (env, [])
       | None ->
           let closure, env = env#pop in
-          (env, [ Mov (closure, r15); JmpI r15 ])
+          (env, [ Mov (closure, r15) ])
+    in
+    let add_argc_counter =
+      if env#mode.is_debug then [ Mov (L nargs, r11) ] else []
+    in
+    let jump =
+      match fname with Some fname -> [ Jmp fname ] | None -> [ JmpI r15 ]
     in
     let _, env = env#allocate in
-    (env, pushs @ [ Mov (rbp, rsp); Pop rbp ] @ jump)
+    ( env,
+      pushs
+      @ [ Mov (rbp, rsp); Pop rbp ]
+      @ setup_closure @ add_argc_counter @ jump )
   in
   let compile_common_call env fname nargs =
     let setup_arguments env nargs =
@@ -535,35 +544,47 @@ let compile_call env ?fname nargs tail =
         ( [ Push filler ],
           [ Binop ("+", L (word_size * (1 + stack_arguments)), rsp) ] )
     in
+    let setup_closure env =
+      match fname with
+      | Some _ -> (env, [])
+      | None ->
+          let closure, env = env#pop in
+          (env, [ Mov (closure, r15) ])
+    in
     let call env fname =
       match fname with
       | Some fname -> (env, [ Call fname ])
-      | None ->
-          let closure, env = env#pop in
-          (env, [ Mov (closure, r15); CallI r15 ])
+      | None -> (env, [ CallI r15 ])
     in
     let move_result env =
       let y, env = env#allocate in
       (env, [ Mov (rax, y) ])
     in
-    let add_printf_count =
-      match fname with
-      | Some fname -> (
-          match List.assoc_opt fname vararg_functions with
-          | Some n -> [ Mov (L (nargs - n), r11) ]
-          | None -> [])
-      | _ -> []
+    let add_argc_counter =
+      let argc_before_vararg =
+        Option.map (fun fname -> List.assoc fname vararg_functions) fname
+      in
+      match argc_before_vararg with
+      (* For vararg functions we add counter of only vararg argumnets.
+         It is used in assembly to unbox them. *)
+      | Some argc -> [ Mov (L (nargs - argc), r11) ]
+      (* For all functions in debug mode we add arguments counter.
+         It is checked in the prologue of the function. *)
+      | None when env#mode.is_debug -> [ Mov (L nargs, r11) ]
+      | None -> []
     in
     let stack_slots, env, setup_args_code = setup_arguments env nargs in
     let push_registers, pop_registers = protect_registers env in
     let align_prologue, align_epilogue =
       align_stack (List.length push_registers) stack_slots
     in
+    let env, setup_closure = setup_closure env in
     let env, call = call env fname in
     let env, move_result = move_result env in
     ( env,
-      push_registers @ align_prologue @ setup_args_code @ add_printf_count
-      @ call @ align_epilogue @ List.rev pop_registers @ move_result )
+      push_registers @ align_prologue @ setup_args_code @ setup_closure
+      @ add_argc_counter @ call @ align_epilogue @ List.rev pop_registers
+      @ move_result )
   in
   let compile_safe_point_call env fname nargs =
     let setup_arguments env nargs =
@@ -779,6 +800,37 @@ let compile cmd env imports code =
                        in
                        func @ arguments @ variables)
                 in
+                let env, check_argc =
+                  if f = cmd#topname || not env#mode.is_debug then (env, [])
+                  else
+                    let argc_correct_label = f ^ "_argc_correct" in
+                    let pat_addr, env =
+                      env#string
+                        "Function %s called with incorrect arguments count. \
+                         Expected: %d. Actual: %d\\n"
+                    in
+                    let name_addr, env = env#string name in
+                    let pat_loc, env = env#allocate in
+                    let name_loc, env = env#allocate in
+                    let expected_loc, env = env#allocate in
+                    let actual_loc, env = env#allocate in
+                    let env, fail_call =
+                      compile_call env ~fname:"failure" 4 false
+                    in
+                    let _, env = env#pop in
+                    ( env,
+                      [
+                        Meta "# Check arguments count";
+                        Binop ("cmp", L nargs, r11);
+                        CJmp ("e", argc_correct_label);
+                        Mov (r11, actual_loc);
+                        Mov (L nargs, expected_loc);
+                        Mov (name_addr, name_loc);
+                        Mov (pat_addr, pat_loc);
+                      ]
+                      @ fail_call
+                      @ [ Label argc_correct_label ] )
+                in
                 env#assert_empty_stack;
                 let has_closure = closure <> [] in
                 let env = env#enter f nargs nlocals has_closure in
@@ -841,7 +893,7 @@ let compile cmd env imports code =
                     List.map
                       (fun i -> Call ("init" ^ i))
                       (List.filter (fun i -> i <> "Std") imports)
-                  else [] )
+                  else [] @ check_argc )
             | END ->
                 let x, env = env#pop in
                 env#assert_empty_stack;
