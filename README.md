@@ -111,7 +111,7 @@ It should build a local compiler `src/lamac` and a few tutorial executables in `
 
 ### Useful links
 
-* [Plugin for VS Code](https://marketplace.visualstudio.com/items?itemName=arsavelev.lsp-lama)
+* [Plugin for VS Code](https://marketplace.visualstudio.com/items?itemName=mrartemsav.lama-lsp)
 
 ### Changes in Lama 1.3
 
