@@ -495,9 +495,7 @@ let compile_call env ?fname nargs tail =
           let closure, env = env#pop in
           (env, [ Mov (closure, r15) ])
     in
-    let add_argc_counter =
-      if env#mode.is_debug then [ Mov (L nargs, r11) ] else []
-    in
+    let add_argc_counter = [ Mov (L nargs, r11) ] in
     let jump =
       match fname with Some fname -> [ Jmp fname ] | None -> [ JmpI r15 ]
     in
@@ -570,8 +568,7 @@ let compile_call env ?fname nargs tail =
       | Some argc -> [ Mov (L (nargs - argc), r11) ]
       (* For all functions in debug mode we add arguments counter.
          It is checked in the prologue of the function. *)
-      | None when env#mode.is_debug -> [ Mov (L nargs, r11) ]
-      | None -> []
+      | None -> [ Mov (L nargs, r11) ]
     in
     let stack_slots, env, setup_args_code = setup_arguments env nargs in
     let push_registers, pop_registers = protect_registers env in
@@ -801,7 +798,7 @@ let compile cmd env imports code =
                        func @ arguments @ variables)
                 in
                 let env, check_argc =
-                  if f = cmd#topname || not env#mode.is_debug then (env, [])
+                  if f = cmd#topname then (env, [])
                   else
                     let argc_correct_label = f ^ "_argc_correct" in
                     let pat_addr, env =
