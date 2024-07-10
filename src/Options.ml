@@ -19,7 +19,7 @@ class options args =
     | _ -> failwith "Unsupported OS"
   in
   let help_string =
-    "Lama compiler. (C) JetBrains Reserach, 2017-2020.\n"
+    "Lama compiler. (C) JetBrains Reserach, 2017-2024.\n"
     ^ "Usage: lamac <options> <input file>\n\n"
     ^ "When no options specified, builds the source file into executable.\n"
     ^ "Options:\n" ^ "  -c        --- compile into object file\n"
