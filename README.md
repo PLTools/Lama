@@ -45,12 +45,16 @@ Ubuntu-based variant of WSL is recommended.
 
 * System-wide prerequisites:
 
-  - `gcc-multilib`
+  - Linux: `gcc`
 
-    For example, (for Debian-based GNU/Linux):
+    For example, (for Debian-based Linux):
     ```bash
-    sudo apt install gcc-multilib
+    sudo apt install gcc
     ```
+
+  - MacOS: `clang` 
+    
+    Should be automatically installed with developer tools.
 
   - [opam](http://opam.ocaml.org) (>= 2.0.4)
   - [OCaml](http://ocaml.org) (>= 4.10.1). *Optional* because it can be easily installed through opam.
@@ -117,6 +121,8 @@ It should build a local compiler `src/lamac` and a few tutorial executables in `
 
 * Migrated from x86-32 to x86-64 architecture.
 * Added `let ... in ...` construct.
+* Added `-g` mode
+* Changed regex syntax ...
 
 ### Changes in Lama 1.2
 
