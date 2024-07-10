@@ -560,7 +560,7 @@ let compile_call env ?fname nargs tail =
     in
     let add_argc_counter =
       let argc_before_vararg =
-        Option.map (fun fname -> List.assoc fname vararg_functions) fname
+        Option.bind fname (fun fname -> List.assoc_opt fname vararg_functions)
       in
       match argc_before_vararg with
       (* For vararg functions we add counter of only vararg argumnets.
