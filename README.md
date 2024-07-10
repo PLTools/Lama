@@ -98,7 +98,6 @@ Ubuntu-based variant of WSL is recommended.
 4. Install dependencies on system-wide external packages and `lama` itself after that.
 
     ```bash
-    opam depext Lama --yes
     opam install Lama --yes
     ```
 
