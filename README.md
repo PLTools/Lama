@@ -73,7 +73,7 @@ Ubuntu-based variant of WSL is recommended.
     * In the above command:
 
       - `opam switch create` is a subcommand to create a new switch
-      - `ocaml-variants.4.10.1+flambda` is the name of a standard template for the switch
+      - `ocaml-variants.4.14.0+options` is the name of a standard template for the switch
       - `lama` is an alias for the switch being created; on success a directory `$(HOME)/.opam/lama` should be created
 
 2. Update PATH variable for the fresh switch. (You can add these commands to your `~/.bashrc` for convenience but they should be added by `opam`)
