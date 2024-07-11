@@ -1284,13 +1284,33 @@ class env prg mode =
         let n = String.length x in
         let buf = Buffer.create (n * 2) in
         let rec iterate i =
-          if i < n then (
-            (match x.[i] with
+          if i < n then
+            match x.[i] with
             | '"' ->
                 Buffer.add_char buf '\\';
-                Buffer.add_char buf '"'
-            | c -> Buffer.add_char buf c);
-            iterate (i + 1))
+                Buffer.add_char buf '"';
+                iterate (i + 1)
+            | '\\' -> (
+                if i + 1 >= n then (
+                  Buffer.add_char buf '\\';
+                  Buffer.add_char buf '\\')
+                else
+                  match x.[i + 1] with
+                  | 'n' ->
+                      Buffer.add_char buf '\\';
+                      Buffer.add_char buf 'n';
+                      iterate (i + 2)
+                  | 't' ->
+                      Buffer.add_char buf '\\';
+                      Buffer.add_char buf 't';
+                      iterate (i + 2)
+                  | _ ->
+                      Buffer.add_char buf '\\';
+                      Buffer.add_char buf '\\';
+                      iterate (i + 1))
+            | c ->
+                Buffer.add_char buf c;
+                iterate (i + 1)
         in
         iterate 0;
         Buffer.contents buf
