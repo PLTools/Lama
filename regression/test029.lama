@@ -14,7 +14,7 @@ fun fib (n) {
 
 n := read ();
 
-for i := n, i > 0, i := i-1 do
+for i := n, i >= 1, i := i-1 do
   fib (i);
   write (i);
   write (result)
