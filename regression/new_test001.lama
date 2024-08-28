@@ -1,0 +1,10 @@
+fun f (a, b, c, d, e) {
+    var i = d / b;
+    write (a);
+    write (b);
+    write (c);
+    write (d);
+    write (e)
+}
+
+f (1, 2, 3, 4, 5)

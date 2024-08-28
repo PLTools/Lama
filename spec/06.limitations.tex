@@ -4,11 +4,10 @@
 \chapter{Implementation-dependent Limitations}
 \label{sec:limitations}
 
-The following limitations are in effect for \textsc{x86-32} platform implementation:
+The following limitations are in effect for \textsc{x86-64} platform implementation:
 
 \begin{itemize}
-\item the range of representable integers is [-1073741824..1073741823] (31-bit signed in two-complement representation);
-\item the maximal length of array/string/number of S-expression parameters is 536870911 (29-bit unsigned integer);
-\item the minimal address space size is 2GB (garbage collector requirement);
-\item the maximal number of S-expression constructor name symbols taken into account is 5.
+\item the range of representable integers is \newline [-4611686018427387905..4611686018427387904] (63-bit signed in two-complement representation);
+\item the maximal length of array/string/number of S-expression parameters is 2305843009213693952 (61-bit unsigned integer);
+\item the maximal number of S-expression constructor name symbols taken into account is 9.
 \end{itemize}

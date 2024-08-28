@@ -3,6 +3,8 @@
 *)
 module OrigList = List
 
+[@@@ocaml.warning "-7-8-13-15-20-26-27-32"]
+
 open GT
 
 (* Opening a library for combinator-based syntax analysis *)
@@ -55,7 +57,7 @@ module Loc =
 
 let report_error ?(loc=None) str =
   raise (Semantic_error (str ^ match loc with None -> "" | Some (l, c) -> Printf.sprintf " at (%d, %d)" l c));;
-  
+
 @type k = Unmut | Mut | FVal with show, html, foldl
 
 (* Values *)
@@ -85,7 +87,7 @@ module Value =
     with show, html, foldl
 
     let is_int = function Int _ -> true | _ -> false
-                                             
+
     let to_int = function
     | Int n -> n
     | x -> failwith (Printf.sprintf "int value expected (%s)\n" (show(t) (fun _ -> "<not supported>") (fun _ -> "<not supported>") x))
@@ -114,6 +116,7 @@ module Value =
       match x with
       | Sexp (_, a) | Array a -> ignore (update_array a i v)
       | String a -> ignore (update_string a i (Char.chr @@ to_int v))
+      | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
 
     let string_val v =
       let buf      = Buffer.create 128 in
@@ -121,8 +124,7 @@ module Value =
       let rec inner = function
       | Int    n    -> append (string_of_int n)
       | String s    -> append "\""; append @@ Bytes.to_string s; append "\""
-      | Array  a    -> let n = Array.length a in
-                       append "["; Array.iteri (fun i a -> (if i > 0 then append ", "); inner a) a; append "]"
+      | Array  a    -> append "["; Array.iteri (fun i a -> (if i > 0 then append ", "); inner a) a; append "]"
       | Sexp (t, a) -> let n = Array.length a in
                        if t = "cons"
                        then (
@@ -131,6 +133,7 @@ module Value =
                          | [||]                    -> ()
                          | [|x; Int 0|]            -> inner x
                          | [|x; Sexp ("cons", a)|] -> inner x; append ", "; inner_list a
+                         | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
                          in inner_list a;
                          append "}"
                        )
@@ -139,6 +142,7 @@ module Value =
                          (if n > 0 then (append " ("; Array.iteri (fun i a -> (if i > 0 then append ", "); inner a) a;
                                          append ")"))
                        )
+      | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
       in
       inner v;
       Bytes.of_string @@ Buffer.contents buf
@@ -156,24 +160,27 @@ module Builtin =
     let eval (st, i, o, vs) args = function
     | "read"     -> (match i with z::i' -> (st, i', o, (Value.of_int z)::vs) | _ -> failwith "Unexpected end of input")
     | "write"    -> (st, i, o @ [Value.to_int @@ List.hd args], Value.Empty :: vs)
-    | ".elem"    -> let [b; j] = args in
-                    (st, i, o, let i = Value.to_int j in
-                               (match b with
-                                | Value.String   s  -> Value.of_int @@ Char.code (Bytes.get s i)
-                                | Value.Array    a  -> a.(i)
-                                | Value.Sexp (_, a) -> a.(i)
-                               ) :: vs
+    | ".elem"    -> (match args with
+                     | [b; j] -> (st, i, o, let i = Value.to_int j in
+                                  (match b with
+                                   | Value.String   s  -> Value.of_int @@ Char.code (Bytes.get s i)
+                                   | Value.Array    a  -> a.(i)
+                                   | Value.Sexp (_, a) -> a.(i)
+                                  | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
+                                  ) :: vs
+                                 )
+                     | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
                     )
-    | "length"     -> (st, i, o, (Value.of_int (match List.hd args with Value.Sexp (_, a) | Value.Array a -> Array.length a | Value.String s -> Bytes.length s))::vs)
+    | "length"     -> (st, i, o, (Value.of_int (match List.hd args with Value.Sexp (_, a) | Value.Array a -> Array.length a | Value.String s -> Bytes.length s | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)))::vs)
     | ".array"     -> (st, i, o, (Value.of_array @@ Array.of_list args)::vs)
-    | "string"     -> let [a] = args in (st, i, o, (Value.of_string @@ Value.string_val a)::vs)
-
+    | "string"     -> (match args with | [a] -> (st, i, o, (Value.of_string @@ Value.string_val a)::vs) | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__))
+    | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
   end
 
 (* States *)
 module State =
   struct
-                                 
+
     (* State: global state, local state, scope variables *)
     @type 'a t =
     | I
@@ -273,7 +280,7 @@ module State =
       | _ -> L (xs, s, st)
 
     (* Drop a local scope *)
-    let drop = function L (_, _, e) -> e | G _ -> I
+    let drop = function L (_, _, e) -> e | G _ -> I | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
 
     (* Observe a variable in a state and print it to stderr *)
     let observe st x =
@@ -440,19 +447,18 @@ module Expr =
 
     let seq x = function Skip -> x | y -> Seq (x, y)
 
-    let schedule_list h::tl =
-      List.fold_left seq h tl
+    let schedule_list = function h::tl -> List.fold_left seq h tl | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
 
     let rec take = function
     | 0 -> fun rest  -> [], rest
-    | n -> fun h::tl -> let tl', rest = take (n-1) tl in h :: tl', rest
+    | n -> function h::tl -> let tl', rest = take (n-1) tl in h :: tl', rest | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
 
     let rec eval ((st, i, o, vs) as conf) k expr =
-      let print_values vs =
+      (* let print_values vs =
         Printf.eprintf "Values:\n%!";
         List.iter (fun v -> Printf.eprintf "%s\n%!" @@ show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v) vs;
         Printf.eprintf "End Values\n%!"
-      in
+      in *)
       match expr with
       | Lambda (args, body) ->
          eval (st, i, o, Value.Closure (args, body, [|st|]) :: vs) Skip k
@@ -500,73 +506,78 @@ module Expr =
       | Sexp (t, xs) ->
          eval conf k (schedule_list (xs @ [Intrinsic (fun (st, i, o, vs) -> let es, vs' = take (List.length xs) vs in (st, i, o, Value.Sexp (t, Array.of_list (List.rev es)) :: vs'))]))
       | Binop (op, x, y) ->
-         eval conf k (schedule_list [x; y; Intrinsic (fun (st, i, o, y::x::vs) -> (st, i, o, (Value.of_int @@ to_func op (Value.to_int x) (Value.to_int y)) :: vs))])
+         eval conf k (schedule_list [x; y; Intrinsic (function (st, i, o, y::x::vs) -> (st, i, o, (Value.of_int @@ to_func op (Value.to_int x) (Value.to_int y)) :: vs) | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__))])
       | Elem (b, i) ->
-         eval conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> Builtin.eval (st, i, o, vs) [b; j] ".elem")])
+         eval conf k (schedule_list [b; i; Intrinsic (function (st, i, o, j::b::vs) -> Builtin.eval (st, i, o, vs) [b; j] ".elem" | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__))])
       | ElemRef (b, i) ->
-         eval conf k (schedule_list [b; i; Intrinsic (fun (st, i, o, j::b::vs) -> (st, i, o, (Value.Elem (b, Value.to_int j))::vs))])
+         eval conf k (schedule_list [b; i; Intrinsic (function (st, i, o, j::b::vs) -> (st, i, o, (Value.Elem (b, Value.to_int j))::vs) | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__))])
       | Call (f, args) ->
          eval conf k (schedule_list (f :: args @ [Intrinsic (fun (st, i, o, vs) ->
             let es, vs' = take (List.length args + 1) vs in
-            let f :: es = List.rev es in
-            (match f with
-             | Value.Builtin name ->
-                Builtin.eval (st, i, o, vs') es name
-             | Value.Closure (args, body, closure) ->
-                let st' = State.push (State.leave st closure.(0)) (State.from_list @@ List.combine args es) (List.map (fun x -> x, Mut) args) in
-                let st'', i', o', vs'' = eval (st', i, o, []) Skip body in
-                closure.(0) <- st'';
-                (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')
-             | _ -> report_error (Printf.sprintf "callee did not evaluate to a function: \"%s\"" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") f))
-            ))]))
+            match List.rev es with
+            | f :: es ->
+              (match f with
+              | Value.Builtin name ->
+                  Builtin.eval (st, i, o, vs') es name
+              | Value.Closure (args, body, closure) ->
+                  let st' = State.push (State.leave st closure.(0)) (State.from_list @@ List.combine args es) (List.map (fun x -> x, Mut) args) in
+                  let st'', i', o', vs'' = eval (st', i, o, []) Skip body in
+                  closure.(0) <- st'';
+                  (State.leave st'' st, i', o', match vs'' with [v] -> v::vs' | _ -> Value.Empty :: vs')
+              | _ -> report_error (Printf.sprintf "callee did not evaluate to a function: \"%s\"" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") f))
+              )
+            | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
+            )]))
 
       | Leave  -> eval (State.drop st, i, o, vs) Skip k
       | Assign (x, e)  ->
-         eval conf k (schedule_list [x; e; Intrinsic (fun (st, i, o, v::x::vs) -> (update st x v, i, o, v::vs))])
+         eval conf k (schedule_list [x; e; Intrinsic (function (st, i, o, v::x::vs) -> (update st x v, i, o, v::vs) | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__))])
       | Seq (s1, s2) ->
          eval conf (seq s2 k) s1
       | Skip ->
          (match k with Skip -> conf | _ -> eval conf Skip k)
       | If (e, s1, s2) ->
-         eval conf k (schedule_list [e; Control (fun (st, i, o, e::vs) -> (if Value.to_int e <> 0 then s1 else s2), (st, i, o, vs))])
+         eval conf k (schedule_list [e; Control (function (st, i, o, e::vs) -> (if Value.to_int e <> 0 then s1 else s2), (st, i, o, vs) | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__))])
       | While (e, s) ->
-         eval conf k (schedule_list [e; Control (fun (st, i, o, e::vs) -> (if Value.to_int e <> 0 then seq s expr else Skip), (st, i, o, vs))])
+         eval conf k (schedule_list [e; Control (function (st, i, o, e::vs) -> (if Value.to_int e <> 0 then seq s expr else Skip), (st, i, o, vs) | _ -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__))])
       | DoWhile (s, e) ->
          eval conf (seq (While (e, s)) k) s
       | Case (e, bs, _, _)->
-         let rec branch ((st, i, o, v::vs) as conf) = function
-         | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v))
-         | (patt, body)::tl ->
-             let rec match_patt patt v st =
-               let update x v = function
-               | None   -> None
-               | Some s -> Some (State.bind x v s)
-               in
-               match patt, v with
-               | Pattern.Named (x, p), v                                                                   -> update x v (match_patt p v st )
-               | Pattern.Wildcard    , _                                                                   -> st
-               | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' && List.length ps = Array.length vs -> match_list ps (Array.to_list vs) st
-               | Pattern.Array ps    , Value.Array vs when List.length ps = Array.length vs                -> match_list ps (Array.to_list vs) st
-               | Pattern.Const n     , Value.Int n'    when n = n'                                         -> st
-               | Pattern.String s    , Value.String s' when s = Bytes.to_string s'                         -> st
-               | Pattern.Boxed       , Value.String _
-               | Pattern.Boxed       , Value.Array  _
-               | Pattern.UnBoxed     , Value.Int    _
-               | Pattern.Boxed       , Value.Sexp  (_, _)
-               | Pattern.StringTag   , Value.String _
-               | Pattern.ArrayTag    , Value.Array  _
-               | Pattern.ClosureTag  , Value.Closure _
-               | Pattern.SexpTag     , Value.Sexp  (_, _)                                                  -> st
-               | _                                                                                         -> None
-             and match_list ps vs s =
-               match ps, vs with
-               | [], []       -> s
-               | p::ps, v::vs -> match_list ps vs (match_patt p v s)
-               | _            -> None
-             in
-             match match_patt patt v (Some State.undefined) with
-             | None     -> branch conf tl
-             | Some st' -> eval (State.push st st' (List.map (fun x -> x, Unmut) @@ Pattern.vars patt), i, o, vs) k (Seq (body, Leave))
+         let rec branch =
+          function (_,_,_,[]) -> failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
+          | ((st, i, o, v::vs) as conf) -> function
+            | [] -> failwith (Printf.sprintf "Pattern matching failed: no branch is selected while matching %s\n" (show(Value.t) (fun _ -> "<expr>") (fun _ -> "<state>") v))
+            | (patt, body)::tl ->
+                let rec match_patt patt v st =
+                  let update x v = function
+                  | None   -> None
+                  | Some s -> Some (State.bind x v s)
+                  in
+                  match patt, v with
+                  | Pattern.Named (x, p), v                                                                   -> update x v (match_patt p v st )
+                  | Pattern.Wildcard    , _                                                                   -> st
+                  | Pattern.Sexp (t, ps), Value.Sexp (t', vs) when t = t' && List.length ps = Array.length vs -> match_list ps (Array.to_list vs) st
+                  | Pattern.Array ps    , Value.Array vs when List.length ps = Array.length vs                -> match_list ps (Array.to_list vs) st
+                  | Pattern.Const n     , Value.Int n'    when n = n'                                         -> st
+                  | Pattern.String s    , Value.String s' when s = Bytes.to_string s'                         -> st
+                  | Pattern.Boxed       , Value.String _
+                  | Pattern.Boxed       , Value.Array  _
+                  | Pattern.UnBoxed     , Value.Int    _
+                  | Pattern.Boxed       , Value.Sexp  (_, _)
+                  | Pattern.StringTag   , Value.String _
+                  | Pattern.ArrayTag    , Value.Array  _
+                  | Pattern.ClosureTag  , Value.Closure _
+                  | Pattern.SexpTag     , Value.Sexp  (_, _)                                                  -> st
+                  | _                                                                                         -> None
+                and match_list ps vs s =
+                  match ps, vs with
+                  | [], []       -> s
+                  | p::ps, v::vs -> match_list ps vs (match_patt p v s)
+                  | _            -> None
+                in
+                match match_patt patt v (Some State.undefined) with
+                | None     -> branch conf tl
+                | Some st' -> eval (State.push st st' (List.map (fun x -> x, Unmut) @@ Pattern.vars patt), i, o, vs) k (Seq (body, Leave))
          in
          eval conf Skip (schedule_list [e; Intrinsic (fun conf -> branch conf bs)])
 
@@ -593,6 +604,7 @@ module Expr =
       match s with
       | ":"  -> Sexp   ("cons", [x; y])
       | ":=" -> Assign (x, y)
+      | "=" -> Binop ("==", Call (Var ("compare"), [x; y]), Const (0))
       | _    -> Binop  (s, x, y)
     in
     match x with
@@ -635,16 +647,21 @@ module Expr =
     let not_a_reference s = new Reason.t (Msg.make "not a reference" [||] (Msg.Locator.Point s#coord))
 
     (* UGLY! *)
-    let predefined_op : (Obj.t -> Obj.t -> Obj.t) ref = Pervasives.ref (fun _ _ -> invalid_arg "must not happen")
+    let predefined_op : (Obj.t -> Obj.t -> Obj.t) ref = Stdlib.ref (fun _ _ -> invalid_arg "must not happen")
 
-    let defCell = Pervasives.ref 0
+    let defCell = Stdlib.ref 0
 
     (* ======= *)
     let makeParsers env =
-    let makeParser, makeBasicParser, makeScopeParser =
-      let def s   = let Some def = Obj.magic !defCell in def s in
+    let [@ocaml.warning "-26"] makeParser, makeBasicParser, makeScopeParser =
+      let [@ocaml.warning "-20"] def s   = let [@ocaml.warning "-8"] Some def = Obj.magic !defCell in def s in
       let ostap (
-      parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)} | basic[infix][atr];
+      (* parse[infix][atr]: h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)} | basic[infix][atr]; *)
+      parse[infix][atr]: 
+      %"let" l:$ pat:(!(Pattern.parse) -"=") e:parse[infix][Val] %"in" body:parse[infix][atr] {Case (e, [(pat, body)], l#coord, atr )}
+      | h:basic[infix][Void] -";" t:parse[infix][atr] {Seq (h, t)} 
+      | basic[infix][atr];
+
       scope[infix][atr]: <(d, infix')> : def[infix] expr:parse[infix'][atr] {Scope (d, expr)} | {isVoid atr} => <(d, infix')> : def[infix] => {d <> []} => {Scope (d, materialize atr Skip)};
       basic[infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary infix) atr);
       primary[infix][atr]:
@@ -771,6 +788,10 @@ module Expr =
                Scope (defs, DoWhile (s, e))
             | _  -> DoWhile (s, e)
       }
+      (* Let-in as expression doesn't work due to lack of greed; In case of expressions we need closing "ni" *)
+      (* | %"let" l:$ pat:!(Pattern.parse) %"be" e:parse[infix][Val] %"in" body:scope[infix][atr] %"ni" {Case (e, [(pat, body)], l#coord, atr)} *)
+      (* | %"let" l:$ pat:(!(Pattern.parse) -"=") e:parse[infix][Val] %"in" body:scope[infix][atr] {Case (e, [(pat, body)], l#coord, Val )} *)
+      (* | %"let" l:$ pat:(!(Pattern.parse) -"=") e:parse[infix][Val] %"in" body:parse[infix][atr] {Case (e, [(pat, body)], l#coord, Val )} *)
       | %"case" l:$ e:parse[infix][Val] %"of" bs:!(Util.listBy)[ostap ("|")][ostap (!(Pattern.parse) -"->" scope[infix][atr])] %"esac"{Case (e, bs, l#coord, atr)}
       | l:$ %"lazy" e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {env#add_import "Lazy"; ignore atr (Call (Var "makeLazy", [Lambda ([], e)]))}
       | l:$ %"eta"  e:basic[infix][Val] => {notRef atr} :: (not_a_reference l) => {let name = env#get_tmp in ignore atr (Lambda ([name], Call (e, [Var name])))}
@@ -872,7 +893,7 @@ module Infix =
       show(showable) @@ Array.map (fun (ass, (_, l)) -> List.map (fun (str, kind, _) -> ass, str, kind) l) infix
 
     let extract_exports infix =
-      let ass_string = function `Lefta -> "L" | `Righta -> "R" | _ -> "I" in
+      (* let ass_string = function `Lefta -> "L" | `Righta -> "R" | _ -> "I" in *)
       let exported =
         Array.map
           (fun (ass, (_, ops)) ->
@@ -901,7 +922,7 @@ module Infix =
       in List.rev exports
 
     let is_predefined op =
-      List.exists (fun x -> op = x) [":"; "!!"; "&&"; "=="; "!="; "<="; "<"; ">="; ">"; "+"; "-"; "*" ; "/"; "%"; ":="]
+      List.exists (fun x -> op = x) [":"; "!!"; "&&"; "="; "=="; "!="; "<="; "<"; ">="; ">"; "+"; "-"; "*" ; "/"; "%"; ":="]
 
     (*
     List.iter (fun op ->
@@ -925,11 +946,11 @@ module Infix =
       [|
         `Righta, [":="];
         `Righta, [":"];
-	`Lefta , ["!!"];
-	`Lefta , ["&&"];
-	`Nona  , ["=="; "!="; "<="; "<"; ">="; ">"];
-	`Lefta , ["+" ; "-"];
-	`Lefta , ["*" ; "/"; "%"];
+        `Lefta , ["!!"];
+        `Lefta , ["&&"];
+        `Nona  , ["=";"=="; "!="; "<="; "<"; ">="; ">"];
+        `Lefta , ["+" ; "-"];
+        `Lefta , ["*" ; "/"; "%"];
       |]
 
     exception Break of [`Ok of t | `Fail of string]
@@ -1013,7 +1034,7 @@ module Definition =
       (* end of the workaround *)
     )
 
-    let makeParser env exprBasic exprScope =
+    let [@ocaml.warning "-26"] makeParser env exprBasic exprScope =
     let ostap (
       arg : l:$ x:LIDENT {Loc.attach x l#coord; x};
       position[pub][ass][coord][newp]:
@@ -1107,7 +1128,7 @@ module Interface =
       Buffer.contents buf
 
     (* Read an interface file *)
-    let read fname =
+    let [@ocaml.warning "-26"] read fname =
       let ostap (
               funspec: "F" "," i:IDENT ";" {`Fun i};
               varspec: "V" "," i:IDENT ";" {`Variable i};
@@ -1201,8 +1222,8 @@ ostap (
 let parse cmd =
   let env =
     object
-      val imports   = Pervasives.ref ([] : string list)
-      val tmp_index = Pervasives.ref 0
+      val imports   = Stdlib.ref ([] : string list)
+      val tmp_index = Stdlib.ref 0
 
       method add_import imp = imports := imp :: !imports
       method get_tmp        = let index = !tmp_index in incr tmp_index; Printf.sprintf "__tmp%d" index
@@ -1223,7 +1244,7 @@ let parse cmd =
     definitions
   in
 
-  let definitions = Pervasives.ref None in
+  let definitions = Stdlib.ref None in
 
   let (makeParser, makeBasicParser, makeScopeParser) = Expr.makeParsers env in
 
@@ -1233,7 +1254,7 @@ let parse cmd =
 
   definitions := Some (makeDefinitions env exprBasic exprScope);
 
-  let Some definitions = !definitions in
+  let [@ocaml.warning "-8-20"] Some definitions = !definitions in
 
   let ostap (
       parse[cmd]:
@@ -1252,10 +1273,11 @@ let run_parser cmd =
   let kws = [
     "skip";
     "if"; "then"; "else"; "elif"; "fi";
+    "let"; "in";
     "while"; "do"; "od";
     "for";
     "fun"; "var"; "public"; "external"; "import";
-    "case"; "of"; "esac"; 
+    "case"; "of"; "esac";
     "box"; "val"; "str"; "sexp"; "array";
     "infix"; "infixl"; "infixr"; "at"; "before"; "after";
     "true"; "false"; "lazy"; "eta"; "syntax"]

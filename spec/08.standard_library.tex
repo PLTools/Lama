@@ -95,7 +95,7 @@ is automatically created and closed within the call.}
 \descr{\lstinline|fun fprintf (file, fmt, ...)|}{Same as "\lstinline|printf|", but outputs to a given file. The file argument should be that acquired
   by \lstinline|fopen| function.}
 
-\descr{\lstinline|fun regexp (str)|}{Compiles a string representation of a regular expression (as per GNULib's regexp~\cite{GNULib}) into
+\descr{\lstinline|fun regexp (str)|}{Compiles a string representation of a regular expression (as per POSIX-Extended Regular Expressions syntax) into
   an internal representation. The return value is a external pointer to the internal representation.}
 
 \descr{\lstinline|fun regexpMatch (pattern, subj, pos)|}{Matches a string "\lstinline{subj}", starting from the position "\lstinline|pos|",

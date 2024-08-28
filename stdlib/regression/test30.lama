@@ -87,8 +87,6 @@ fun normalize (x) {
 
 fun not (x) {0 - x}
 
-disableGC ();
-
 for var i=0;, i<25, i:=i+1
 do
   case genCyclicArrays (1000, true, false) of

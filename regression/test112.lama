@@ -1,0 +1,16 @@
+-- let A (x,y) be A(5,6) in write(x); write(y) ni;
+-- case A(5,6) of A(x,y) -> write(x); write(y) esac;
+-- let A (x,y) be A(5,6) in ....
+-- let A (x,y) be A(5,6)    <-----  void then ;
+
+fun f (x) {
+    write(x)
+}
+
+f(let x = A(1,2) in x[0]);
+f(let x = A(1,2) in x[1]);
+
+let A (x,y) = A(5,6) in let B(z,e) = B(7,8) in write(x); write(y); write(z); write(e);
+let A (x,y) = A(5,6) in (let B(z,e) = B(7,8) in write(x); write(y); write(z); write(e));
+
+let x = (let x = C(1,2) in x[1]) + (let x = C(1,2) in x[0]) in write(x)
