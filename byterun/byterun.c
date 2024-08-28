@@ -89,7 +89,7 @@ void disassemble (FILE *f, bytefile *bf) {
          h = (x & 0xF0) >> 4,
          l = x & 0x0F;
 
-    fprintf (f, "0x%.8x:\t", ip-bf->code_ptr-1);
+    fprintf (f, "0x%.8x:\t%.2x %.2x\t", ip-bf->code_ptr-1, h, l);
     
     switch (h) {
     case 15:
@@ -294,8 +294,13 @@ void dump_file (FILE *f, bytefile *bf) {
   disassemble (f, bf);
 }
 
+extern void eval (void*);
+
 int main (int argc, char* argv[]) {
   bytefile *f = read_file (argv[1]);
   dump_file (stdout, f);
+  printf ("%x\n", *f->code_ptr);
+  printf ("%x\n", *(f->code_ptr+1));
+  eval (f->code_ptr);
   return 0;
 }
