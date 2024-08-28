@@ -40,7 +40,7 @@ property ``$e$ is a reference''. The result of assignment operator coincides wit
 assigns 3 to both "\lstinline|x|" and "\lstinline|y|".
 
 \begin{figure}[h]
-  \newcommand{\Ref}[1]{\mathcal{R}\,({#1})}
+  \renewcommand{\Ref}[1]{\mathcal{R}\,({#1})}
   \renewcommand{\arraystretch}{4}
   \[
     \begin{array}{cc}
@@ -108,7 +108,8 @@ designates an anonymous functional value in the form of a closure.
                                   &   & \nonterm{whileDoExpression}&\alt\\
                                   &   & \nonterm{doWhileExpression}&\alt\\
                                   &   & \nonterm{forExpression}&\alt\\
-                                  &   & \nonterm{caseExpression}&
+                                  &   & \nonterm{caseExpression}&\alt\\
+                                  &   & \nonterm{letExpression}&
     \end{array}
   \]
   \caption{Expression concrete syntax}
@@ -134,7 +135,15 @@ Expression \lstinline|skip| can be used to designate a no-value when no action i
   \label{composite_expressions}
 \end{figure}
 
-There are three forms of expressions to specify composite values: arrays, lists and S-expressions (see Fig.~\ref{composite_expressions}). 
+There are three forms of expressions to specify composite values: arrays, lists and S-expressions (see Fig.~\ref{composite_expressions}).
+
+\FloatBarrier
+
+\subsection{Let Expressions}
+
+TODO
+
+\FloatBarrier
 
 \subsection{Conditional Expressions}
 

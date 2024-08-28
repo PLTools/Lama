@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 FILES=$(wildcard *.lama)
 ALL=$(sort $(FILES:.lama=.o))
-LAMAC=../src/lamac -g
+LAMAC=../src/lamac
 
 all: $(ALL)
 
@@ -21,7 +21,7 @@ Buffer.o: List.o
 STM.o: List.o Fun.o
 
 %.o: %.lama
-	LAMA=../runtime $(LAMAC) -I . -c $<
+	LAMA=../runtime $(LAMAC) -g -I . -c $<
 
 clean:
 	rm -Rf *.s *.o *.i *~
