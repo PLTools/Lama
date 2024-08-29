@@ -1,0 +1,19 @@
+(rule
+ (targets Hello.exe)
+ (deps Hello.lama)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime32"
+   (run
+    %{project_root}/src/Driver.exe
+    %{deps}
+    -march=x86
+    -I
+    ../stdlib/x32
+    -I
+    ../runtime32
+    -o
+    %{targets}))))

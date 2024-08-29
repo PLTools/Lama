@@ -1,0 +1,7 @@
+(rule
+ (target runtime.a)
+ (mode
+  (promote (until-clean)))
+ (deps Makefile gc.c gc.h runtime_common.h runtime.c runtime.h printf.S)
+ (action
+  (run make)))

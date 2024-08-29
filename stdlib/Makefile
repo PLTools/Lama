@@ -1,10 +1,12 @@
-SHELL := /bin/bash
+.PHONY: all
 
+SHELL := /bin/bash
 FILES=$(wildcard *.lama)
 ALL=$(sort $(FILES:.lama=.o))
-LAMAC=../src/lamac
+LAMAC ?= ../src/lamac
+BDIR ?= .
 
-all: $(ALL)
+all: $(addprefix $(BDIR)/,$(ALL))
 
 Fun.o: Ref.o
 
@@ -12,18 +14,18 @@ Data.o: Ref.o Collection.o
 
 Collection.o: List.o Ref.o
 
-Array.o: List.o
+$(BDIR)/Array.o: $(BDIR)/List.o
 
 Ostap.o: List.o Collection.o Ref.o Fun.o Matcher.o
 
-Buffer.o: List.o
+$(BDIR)/Buffer.o: $(BDIR)/List.o
 
-STM.o: List.o Fun.o
+$(BDIR)/STM.o: $(BDIR)/List.o $(BDIR)/Fun.o
 
-%.o: %.lama
-	LAMA=../runtime $(LAMAC) -g -I . -c $<
+$(BDIR)/%.o: %.lama
+	LAMA=../runtime $(LAMAC) -g -I . -c $< -o $@
 
 clean:
-	rm -Rf *.s *.o *.i *~
+	$(RM) -r *.s *.o *.i *~
 	pushd regression && make clean && popd
 

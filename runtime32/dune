@@ -1,0 +1,7 @@
+(rule
+ (target runtime32.a)
+ (mode
+  (promote (until-clean)))
+ (deps Makefile gc_runtime.s runtime.c runtime.h)
+ (action
+  (run make)))

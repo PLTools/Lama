@@ -1,6 +1,9 @@
+RUNTIME=runtime32.a
 
-all: gc_runtime.o runtime.o
-	ar rc runtime.a gc_runtime.o runtime.o
+.DEFAULT  := $(RUNTIME)
+
+$(RUNTIME): gc_runtime.o runtime.o
+	ar rc $@ gc_runtime.o runtime.o
 
 gc_runtime.o: gc_runtime.s
 	$(CC) -g -fstack-protector-all -m32 -c gc_runtime.s

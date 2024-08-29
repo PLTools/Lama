@@ -1,0 +1,15 @@
+(rule
+ (deps ../List.lama ../Makefile ../../runtime/Std.i)
+ (targets List.i List.o)
+ (action
+  (progn
+   (setenv
+    BDIR
+    "amd64"
+    (setenv
+     LAMA
+     "../runtime"
+     (setenv
+      LAMAC
+      "../src/Driver.exe -I ../runtime"
+      (run make -C .. all)))))))

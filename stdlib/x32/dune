@@ -1,0 +1,38 @@
+(rule
+ (targets List.o List.i)
+ (deps
+  (:lama ../List.lama)
+  %{project_root}/runtime32/runtime32.a
+  %{project_root}/runtime32/Std.i)
+ (action
+  (setenv
+   LAMA
+   "../../runtime32"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86
+    -I
+    %{project_root}/runtime32
+    -c
+    %{lama}))))
+
+(rule
+ (targets Array.o Array.i)
+ (deps
+  (:lama ../Array.lama)
+  %{project_root}/runtime32/Std.i
+  List.i
+  List.o)
+ (action
+  (setenv
+   LAMA
+   "../../runtime32"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86
+    -I
+    .
+    -I
+    %{project_root}/runtime32
+    -c
+    %{lama}))))

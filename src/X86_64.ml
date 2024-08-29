@@ -1482,9 +1482,10 @@ let build cmd prog =
           Buffer.add_string buf " ")
         objs;
       let gcc_cmdline =
-        Printf.sprintf "%s %s %s %s %s %s.s %s %s/runtime.a" compiler
-          compiler_flags linker_flags debug_flags cmd#get_output_option
-          cmd#basename (Buffer.contents buf) cmd#get_runtime_path
+        Printf.sprintf "%s %s %s %s %s %s.s %s %s/%s.a" compiler compiler_flags
+          linker_flags debug_flags cmd#get_output_option cmd#basename
+          (Buffer.contents buf) cmd#get_runtime_path
+          (match cmd#march with `X86_32 -> "runtime32" | `AMD64 -> "runtime")
       in
       Sys.command gcc_cmdline
   | `Compile ->
