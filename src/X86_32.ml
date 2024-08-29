@@ -551,7 +551,7 @@ let compile cmd env imports code =
              invalid_arg (Printf.sprintf "invalid SM insn: %s\n" (GT.show(insn) i))
         in
         let env'', code'' = compile' env' scode' in
-	env'', [Meta (Printf.sprintf "# %s / % s" (GT.show(SM.insn) instr) stack)] @ code' @ code''
+	env'', [Meta (Printf.sprintf "# %s / %s" (GT.show(SM.insn) instr) stack)] @ code' @ code''
   in
   compile' env code
   
