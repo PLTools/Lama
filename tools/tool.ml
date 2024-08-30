@@ -17,6 +17,7 @@ type config =
   }
 
 let config = { filename= "file.ml"; pos="0,0"; line=0; col=0; mode = GoToDef }
+let _ = if false then config.pos <- "" else ignore config.pos
 let parse_loc loc =
   Scanf.sscanf loc "%d,%d" (fun l c -> config.line <- l; config.col <- c)
 
@@ -53,7 +54,7 @@ let do_find e =
     inherit [_,_] Language.Expr.foldl_t_t_stub (foldl_decl, fself) as super
     method! c_Var _inh _ name = on_name name _inh
     method! c_Ref _inh _ name = on_name name _inh
-    method c_Scope init e names r =
+    method! c_Scope init e names r =
       let map = ListLabels.fold_left ~init names ~f:(fun acc (fname,(_,info)) ->
         let acc = Introduced.extend fname (Loc.get_exn fname) acc in
         match info with
@@ -70,7 +71,7 @@ let do_find e =
   (* Format.printf "STUB. Ht size = %d\n%!" (Loc.H.length Loc.tab);
   Loc.H.iter (fun k (l,c) -> Format.printf "%s -> (%d,%d)\n%!" k l c) Loc.tab; *)
 
-  let (_,fold_t) = Expr.fix_decl Expr.foldl_decl_0 ooo in
+  let (_,fold_t) = Expr.fix_decl_t Expr.foldl_decl_0 ooo in
   match fold_t Introduced.empty e with
   | exception (DefinitionFound arg) -> Some arg
   | _ -> None
@@ -89,14 +90,14 @@ let find_usages root (def_name,(_,_)) =
       if in_scope then (on_name name acc, in_scope) else (acc, in_scope)
     method! c_Ref (acc,in_scope) _ name =
       self#c_Var (acc,in_scope) (Var name) name
-    method c_Scope init e names r =
+    method! c_Scope init e names r =
       ListLabels.fold_left ~init names ~f:(fun ((acc, in_scope) as inh) (name,info) ->
         match (in_scope, String.equal def_name name) with
         | (true, true) -> (acc, false)
         | (true, _) -> begin
             match snd info with
-            | `Fun (args, body) when List.mem def_name args ->  inh
-            | `Fun (args, body) -> fself inh body
+            | `Fun (args, _) when List.mem def_name args ->  inh
+            | `Fun (_, body) -> fself inh body
             | `Variable (Some rhs) -> fself inh rhs
             | `Variable None -> inh
         end
@@ -104,14 +105,14 @@ let find_usages root (def_name,(_,_)) =
         | false,false -> begin
             match snd info with
             | `Fun (args, body) when List.memq def_name args -> fself (acc,true) body
-            | `Fun (args, body) -> fself inh body
+            | `Fun (_, body) -> fself inh body
             | `Variable (Some rhs) -> fself inh rhs
             | `Variable None -> inh
         end
       ) |> (fun acc -> fself acc r)
   end in
 
-  let (_,fold_t) = Expr.fix_decl Expr.foldl_decl_0 ooo in
+  let (_,fold_t) = Expr.fix_decl_t Expr.foldl_decl_0 ooo in
   fold_t ([],false) root
 
 
