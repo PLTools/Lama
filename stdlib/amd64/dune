@@ -1,15 +1,52 @@
 (rule
- (deps ../List.lama ../Makefile ../../runtime/Std.i)
- (targets List.i List.o)
+ (deps
+  ../Makefile
+  ../../runtime/Std.i
+  ../List.lama
+  %{project_root}/src/Driver.exe)
+ (targets
+  List.i
+  List.o
+  Buffer.i
+  Buffer.o
+  Collection.i
+  Collection.o
+  Data.i
+  Data.o
+  Fun.i
+  Fun.o
+  Lazy.i
+  Lazy.o
+  List.i
+  List.o
+  Matcher.i
+  Matcher.o
+  Ostap.i
+  Ostap.o
+  Random.i
+  Random.o
+  Ref.i
+  Ref.o
+  STM.i
+  STM.o
+  Timer.i
+  Timer.o)
+ (mode
+  (promote (until-clean)))
  (action
   (progn
    (setenv
-    BDIR
-    "amd64"
+    SRCDIR
+    ".."
+    ; (setenv
+    ;  FILES
+    ;  "List.lama Buffer.lama Collection.lama Data.lama Fun.lama"
     (setenv
      LAMA
-     "../runtime"
+     "../../runtime"
      (setenv
       LAMAC
-      "../src/Driver.exe -I ../runtime"
-      (run make -C .. all)))))))
+      "../../src/Driver.exe -march=amd64 -I ../runtime32"
+      (run make -j2 -f ../Makefile all)))))))
+
+;)

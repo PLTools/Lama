@@ -1,38 +1,52 @@
 (rule
- (targets List.o List.i)
  (deps
-  (:lama ../List.lama)
-  %{project_root}/runtime32/runtime32.a
-  %{project_root}/runtime32/Std.i)
- (action
-  (setenv
-   LAMA
-   "../../runtime32"
-   (run
-    %{project_root}/src/Driver.exe
-    -march=x86
-    -I
-    %{project_root}/runtime32
-    -c
-    %{lama}))))
-
-(rule
- (targets Array.o Array.i)
- (deps
-  (:lama ../Array.lama)
-  %{project_root}/runtime32/Std.i
+  ../Makefile
+  ../../runtime/Std.i
+  ../List.lama
+  %{project_root}/src/Driver.exe)
+ (targets
   List.i
-  List.o)
+  List.o
+  Buffer.i
+  Buffer.o
+  Collection.i
+  Collection.o
+  Data.i
+  Data.o
+  Fun.i
+  Fun.o
+  Lazy.i
+  Lazy.o
+  List.i
+  List.o
+  Matcher.i
+  Matcher.o
+  Ostap.i
+  Ostap.o
+  Random.i
+  Random.o
+  Ref.i
+  Ref.o
+  STM.i
+  STM.o
+  Timer.i
+  Timer.o)
+ (mode
+  (promote (until-clean)))
  (action
-  (setenv
-   LAMA
-   "../../runtime32"
-   (run
-    %{project_root}/src/Driver.exe
-    -march=x86
-    -I
-    .
-    -I
-    %{project_root}/runtime32
-    -c
-    %{lama}))))
+  (progn
+   (setenv
+    SRCDIR
+    ".."
+    ; (setenv
+    ;  FILES
+    ;  "List.lama Buffer.lama Collection.lama Data.lama Fun.lama"
+    (setenv
+     LAMA
+     "../../runtime32"
+     (setenv
+      LAMAC
+      "../../src/Driver.exe -march=x86 -I ../runtime32"
+      (run make -j2 -f ../Makefile all)))))))
+
+;)
