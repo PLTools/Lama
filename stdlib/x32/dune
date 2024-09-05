@@ -1,4 +1,6 @@
 (rule
+ (enabled_if
+  (<> %{ocaml-config:os_type} "Darwin"))
  (deps
   ../Makefile
   ../../runtime32/Std.i
@@ -51,9 +53,6 @@
    (setenv
     SRCDIR
     ".."
-    ; (setenv
-    ;  FILES
-    ;  "List.lama Buffer.lama Collection.lama Data.lama Fun.lama"
     (setenv
      LAMA
      "../../runtime32"

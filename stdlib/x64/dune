@@ -50,15 +50,10 @@
    (setenv
     SRCDIR
     ".."
-    ; (setenv
-    ;  FILES
-    ;  "List.lama Buffer.lama Collection.lama Data.lama Fun.lama"
     (setenv
      LAMA
      "../../runtime"
      (setenv
       LAMAC
-      "../../src/Driver.exe -march=amd64 -I ../runtime32"
+      "../../src/Driver.exe -march=amd64 -I ../runtime"
       (run make -j2 -f ../Makefile all)))))))
-
-;)

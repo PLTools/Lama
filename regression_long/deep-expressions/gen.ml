@@ -32,11 +32,3 @@ let () =
         )
   done
   )
-(*
-let () =
-
-    for i=0 to count do
-      if Sys.file_exists (Printf.sprintf "generated%05d.lama" i) then
-        (Printf.fprintf ch "(cram (applies_to r%05d)\n" i;
-        Printf.fprintf ch "  (deps generated%05d.lama))\n%!" i;)
-    done *)
