@@ -3,6 +3,8 @@ name: Main workflow
 on:
   pull_request:
   push:
+    - "1.30"
+    - "more-dune"
 
 permissions: read-all
 
