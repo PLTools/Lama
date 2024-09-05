@@ -3,6 +3,19 @@
   ../Makefile
   ../../runtime/Std.i
   ../List.lama
+  ../Array.lama
+  ../Buffer.lama
+  ../Collection.lama
+  ../Data.lama
+  ../Fun.lama
+  ../Lazy.lama
+  ../List.lama
+  ../Matcher.lama
+  ../Ostap.lama
+  ../Random.lama
+  ../Ref.lama
+  ../STM.lama
+  ../Timer.lama
   %{project_root}/src/Driver.exe)
  (targets
   List.i

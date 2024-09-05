@@ -1,5 +1,5 @@
 (rule
- (target runtime32.a)
+ (target runtime.a)
  (mode
   (promote (until-clean)))
  (deps Makefile gc_runtime.s runtime.c runtime.h)

@@ -3,6 +3,19 @@
   ../Makefile
   ../../runtime/Std.i
   ../List.lama
+  ../Array.lama
+  ../Buffer.lama
+  ../Collection.lama
+  ../Data.lama
+  ../Fun.lama
+  ../Lazy.lama
+  ../List.lama
+  ../Matcher.lama
+  ../Ostap.lama
+  ../Random.lama
+  ../Ref.lama
+  ../STM.lama
+  ../Timer.lama
   %{project_root}/src/Driver.exe)
  (targets
   List.i
@@ -48,5 +61,3 @@
       LAMAC
       "../../src/Driver.exe -march=x86 -I ../runtime32"
       (run make -j2 -f ../Makefile all)))))))
-
-;)

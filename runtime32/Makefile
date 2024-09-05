@@ -1,4 +1,4 @@
-RUNTIME=runtime32.a
+RUNTIME=runtime.a
 
 .DEFAULT  := $(RUNTIME)
 

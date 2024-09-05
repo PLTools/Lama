@@ -2,7 +2,9 @@
 
 SHELL := /bin/bash
 SRCDIR ?= .
+$(info SRCDIR = $(SRCDIR))
 FILES ?= $(wildcard $(SRCDIR)/*.lama)
+$(info FILES = $(FILES))
 OFILES = $(FILES:$(SRCDIR)/%=%)
 OFILES := $(OFILES:.lama=.o)
 $(info OFILES = $(OFILES))
@@ -11,7 +13,7 @@ LAMAC ?= ../src/lamac
 BDIR ?= .
 
 all: $(addprefix $(BDIR)/,$(ALL))
-$(info ALL = $(ALL))
+$(info ALL = $(ALL), SRCDIR = $(SRCDIR))
 $(BDIR)/Fun.o: $(BDIR)/Ref.o
 
 $(BDIR)/Data.o: $(BDIR)/Ref.o $(BDIR)/Collection.o

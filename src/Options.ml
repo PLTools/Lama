@@ -80,7 +80,7 @@ class options args =
                     raise
                       (Commandline_error "Path expected after '-I' specifier")
                 | Some path -> self#add_include_path path)
-            | "-march=amd64" -> march := `AMD64
+            | "-march=x86_64" | "-march=amd64" -> march := `AMD64
             | "-march=x86" -> march := `X86_32
             | "-s" -> self#set_mode `SM
             | "-b" -> self#set_mode `BC

@@ -22,8 +22,8 @@ let[@ocaml.warning "-32"] main =
               try
                 let r = read_int () in
                 Printf.printf "> ";
-                read (acc @ [ r ])
-              with End_of_file -> acc
+                read (r :: acc)
+              with End_of_file -> List.rev acc
             in
             let input = read [] in
             let output =
