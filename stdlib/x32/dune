@@ -1,6 +1,6 @@
 (rule
  (enabled_if
-  (<> %{ocaml-config:os_type} "Darwin"))
+  (= %{system} "linux"))
  (deps
   ../Makefile
   ../../runtime32/Std.i

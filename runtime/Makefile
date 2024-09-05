@@ -28,3 +28,4 @@ printf.o: printf.S
 
 clean:
 	$(RM) *.a *.o *~ negative_scenarios/*.err
+

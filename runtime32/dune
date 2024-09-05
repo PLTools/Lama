@@ -1,7 +1,7 @@
 (rule
  (target runtime.a)
  (enabled_if
-  (<> %{ocaml-config:os_type} "Darwin"))
+  (= %{system} "linux"))
  (mode
   (promote (until-clean)))
  (deps Makefile gc_runtime.s runtime.c runtime.h)

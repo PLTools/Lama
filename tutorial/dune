@@ -1,7 +1,7 @@
 
 (rule
  (targets Expressions.x32.exe)
- (enabled_if (<> %{ocaml-config:os_type} "Darwin"))
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
  (deps (:lama Expressions.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
@@ -43,7 +43,7 @@
 
 (rule
  (targets Functions.x32.exe)
- (enabled_if (<> %{ocaml-config:os_type} "Darwin"))
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
  (deps (:lama Functions.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
@@ -85,7 +85,7 @@
 
 (rule
  (targets Hello.x32.exe)
- (enabled_if (<> %{ocaml-config:os_type} "Darwin"))
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
  (deps (:lama Hello.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
@@ -127,7 +127,7 @@
 
 (rule
  (targets PatternMatching.x32.exe)
- (enabled_if (<> %{ocaml-config:os_type} "Darwin"))
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
  (deps (:lama PatternMatching.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
@@ -169,7 +169,7 @@
 
 (rule
  (targets Values.x32.exe)
- (enabled_if (<> %{ocaml-config:os_type} "Darwin"))
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
  (deps (:lama Values.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
