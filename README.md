@@ -7,7 +7,7 @@
 
 # Lama
 
-![lama](lama.svg) is a programming language developed by JetBrains Research for educational purposes as an exemplary language to introduce the domain of programming languages, compilers, and tools.
+![lama](lama.svg) is a programming language (initualy developed by JetBrains Research) for educational purposes as an exemplary language to introduce the domain of programming languages, compilers, and tools.
 Its general characteristics are:
 
 * procedural with first-class functions - functions can be passed as arguments, placed in data structures,
@@ -52,8 +52,8 @@ Ubuntu-based variant of WSL is recommended.
     sudo apt install gcc
     ```
 
-  - MacOS: `clang` 
-    
+  - MacOS: `clang`
+
     Should be automatically installed with developer tools.
 
   - [opam](http://opam.ocaml.org) (>= 2.0.4)
@@ -67,13 +67,13 @@ Ubuntu-based variant of WSL is recommended.
 1. Install the right [switch](https://opam.ocaml.org/doc/Manual.html#Switches) for the OCaml compiler
 
     ```bash
-    opam switch create lama --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda
+    opam switch create lama --packages=ocaml-variants.4.14.2+options,ocaml-option-flambda
     ```
 
     * In the above command:
 
       - `opam switch create` is a subcommand to create a new switch
-      - `ocaml-variants.4.14.0+options` is the name of a standard template for the switch
+      - `ocaml-variants.4.14.2+options` is the name of a standard template for the switch
       - `lama` is an alias for the switch being created; on success a directory `$(HOME)/.opam/lama` should be created
 
 2. Update PATH variable for the fresh switch. (You can add these commands to your `~/.bashrc` for convenience but they should be added by `opam`)
@@ -83,7 +83,7 @@ Ubuntu-based variant of WSL is recommended.
 
      * Check that the OCaml compiler is now available in PATH by running `which ocamlc`; it should answer with `/home/user/.opam/lama/bin/ocamlc` (or similar) and `ocamlc -v` should answer with
     ```
-    The OCaml compiler, version 4.10.1
+    The OCaml compiler, version 4.14.2
     Standard library directory: /home/user/.opam/lama/lib/ocaml
     ```
 

@@ -2,7 +2,6 @@
  (deps
   ../Makefile
   ../../runtime/Std.i
-  ../List.lama
   ../Array.lama
   ../Buffer.lama
   ../Collection.lama
@@ -18,8 +17,8 @@
   ../Timer.lama
   %{project_root}/src/Driver.exe)
  (targets
-  List.i
-  List.o
+  Array.i
+  Array.o
   Buffer.i
   Buffer.o
   Collection.i

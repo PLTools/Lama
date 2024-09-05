@@ -76,11 +76,9 @@
 
 (executable
  (name Driver)
+ (public_name lamac)
  (flags
-  (:standard
-   -rectypes
-   ;-dsource
-   ))
+  (:standard -rectypes))
  (modules Driver)
  (libraries liba unix))
 

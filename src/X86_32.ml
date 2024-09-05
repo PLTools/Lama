@@ -1,6 +1,5 @@
 open GT
 open Language
-open SM
 
 (* X86 codegeneration interface *)
 
@@ -241,7 +240,7 @@ let compile cmd env imports code =
           match instr with
           | PUBLIC name -> env#register_public name, []
           | EXTERN name -> env#register_extern name, []
-          | IMPORT name -> env, []
+          | IMPORT _name -> env, []
 
           | CLOSURE (name, closure) ->
              let pushr, popr =
@@ -691,7 +690,7 @@ class env prg =
 
     (* tag hash: gets a hash for a string tag *)
     method hash tag =
-      let h = Pervasives.ref 0 in
+      let h = Stdlib.ref 0 in
       for i = 0 to min (String.length tag - 1) 4 do
         h := (!h lsl 6) lor (String.index chars tag.[i])
       done;

@@ -18,8 +18,8 @@
   ../Timer.lama
   %{project_root}/src/Driver.exe)
  (targets
-  List.i
-  List.o
+  Array.i
+  Array.o
   Buffer.i
   Buffer.o
   Collection.i

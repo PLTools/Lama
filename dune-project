@@ -6,8 +6,8 @@
 
 (package
  (name Lama)
- (allow_empty)
- (synopsis "TODO")
+ (synopsis
+  "A programming language (initualy developed by JetBrains Research) for educational purposes as an exemplary language to introduce the domain of programming languages, compilers, and tools.")
  (depends
   posix-uname
   GT
