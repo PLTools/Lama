@@ -1,7 +1,7 @@
 (rule
  (deps
   ../Makefile
-  ../../runtime/Std.i
+  ../../runtime32/Std.i
   ../List.lama
   ../Array.lama
   ../Buffer.lama

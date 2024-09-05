@@ -5,7 +5,7 @@ let demos = ["Expressions"; "Functions"; "Hello"; "PatternMatching"; "Values"]
 let template = {|
 (rule
  (targets %DEMO%.exe)
- (deps (:lama %DEMOSRC%.lama) %RUNTIME%/runtime.a)
+ (deps (:lama %DEMOSRC%.lama) %RUNTIME%/runtime.a %STDLIB%/Fun.i)
  (mode
   (promote (until-clean)))
  (action

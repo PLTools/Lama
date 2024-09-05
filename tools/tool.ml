@@ -14,9 +14,10 @@ type config =
   ; mutable line : int
   ; mutable col: int
   ; mutable mode: mode
+  ; mutable includes : string list
   }
 
-let config = { filename= "file.ml"; pos="0,0"; line=0; col=0; mode = GoToDef }
+let config = { filename= "file.ml"; pos="0,0"; line=0; col=0; mode = GoToDef; includes = ["."; "./runtime"] }
 let _ = if false then config.pos <- "" else ignore config.pos
 let parse_loc loc =
   Scanf.sscanf loc "%d,%d" (fun l c -> config.line <- l; config.col <- c)
@@ -26,6 +27,7 @@ let () =
     [ "-pos", String parse_loc, "L,C when L is line and C is column"
     ; "-def", Unit (fun () -> config.mode <- GoToDef), "go to definition"
     ; "-use", Unit (fun () -> config.mode <- Usages), "find usages"
+    ; "-I", String (fun s -> config.includes <- s :: config.includes), " Add include path"
     ]
     (fun name -> config.filename <- name)
     "Help"
@@ -118,7 +120,10 @@ let find_usages root (def_name,(_,_)) =
 
 let () =
   let cfg = object
-    method get_include_paths = ["."; "./runtime"] method get_infile = config.filename method is_workaround=false end
+    method get_include_paths = ["."; "./runtime"; "../runtime"]
+    method get_infile = config.filename
+    method is_workaround = false
+  end
   in
   match Language.run_parser cfg with
   | `Fail s -> failwith s

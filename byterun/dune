@@ -1,0 +1,9 @@
+(rule
+ (target byterun.exe)
+ (deps
+  (:main byterun.c)
+  (:runtime ../runtime/runtime.a))
+ (mode
+  (promote (until-clean)))
+ (action
+  (run gcc -g %{main} %{runtime} -o %{target})))

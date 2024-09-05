@@ -1,0 +1,9 @@
+(executable
+ (name tool)
+ (modules tool)
+ (flags
+  (:standard -rectypes))
+ (libraries liba))
+
+(cram
+ (deps ../runtime/runtime.a ../runtime/Std.i ./tool.exe demo1.lama))

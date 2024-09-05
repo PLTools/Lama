@@ -1,7 +1,7 @@
 
 (rule
  (targets Expressions.x32.exe)
- (deps (:lama Expressions.lama) ../runtime32/runtime.a)
+ (deps (:lama Expressions.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -21,7 +21,7 @@
 
 (rule
  (targets Expressions.x64.exe)
- (deps (:lama Expressions.lama) ../runtime/runtime.a)
+ (deps (:lama Expressions.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -41,7 +41,7 @@
 
 (rule
  (targets Functions.x32.exe)
- (deps (:lama Functions.lama) ../runtime32/runtime.a)
+ (deps (:lama Functions.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -61,7 +61,7 @@
 
 (rule
  (targets Functions.x64.exe)
- (deps (:lama Functions.lama) ../runtime/runtime.a)
+ (deps (:lama Functions.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -81,7 +81,7 @@
 
 (rule
  (targets Hello.x32.exe)
- (deps (:lama Hello.lama) ../runtime32/runtime.a)
+ (deps (:lama Hello.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -101,7 +101,7 @@
 
 (rule
  (targets Hello.x64.exe)
- (deps (:lama Hello.lama) ../runtime/runtime.a)
+ (deps (:lama Hello.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -121,7 +121,7 @@
 
 (rule
  (targets PatternMatching.x32.exe)
- (deps (:lama PatternMatching.lama) ../runtime32/runtime.a)
+ (deps (:lama PatternMatching.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -141,7 +141,7 @@
 
 (rule
  (targets PatternMatching.x64.exe)
- (deps (:lama PatternMatching.lama) ../runtime/runtime.a)
+ (deps (:lama PatternMatching.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -161,7 +161,7 @@
 
 (rule
  (targets Values.x32.exe)
- (deps (:lama Values.lama) ../runtime32/runtime.a)
+ (deps (:lama Values.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -181,7 +181,7 @@
 
 (rule
  (targets Values.x64.exe)
- (deps (:lama Values.lama) ../runtime/runtime.a)
+ (deps (:lama Values.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
  (mode
   (promote (until-clean)))
  (action

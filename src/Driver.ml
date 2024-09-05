@@ -21,7 +21,9 @@ let[@ocaml.warning "-32"] main =
             let rec read acc =
               try
                 let r = read_int () in
-                Printf.printf "> ";
+                Printf.printf " > ";
+                (* NOTE(Kakadu): This kind of ouput (leading >) will be in a conflict with dune's
+                   integration tests machinery *)
                 read (r :: acc)
               with End_of_file -> List.rev acc
             in
