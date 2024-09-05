@@ -6,5 +6,10 @@
 
 (package
  (name Lama)
+ (allow_empty)
  (synopsis "TODO")
- (depends posix-uname))
+ (depends
+  posix-uname
+  GT
+  (ostap
+   (>= 0.6))))
