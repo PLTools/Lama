@@ -5,11 +5,12 @@ INSTALL ?= install -v
 MKDIR ?= mkdir
 BUILDDIR = _build
 
+.DEFAULT_GOAL := build
 
+all: build test
 
-all: dune test regression
-
-build: dune b regression
+build:
+	dune b src runtime runtime32 stdlib
 
 install: all
 	dune b @install --profile=release
