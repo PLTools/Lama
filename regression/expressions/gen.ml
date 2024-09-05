@@ -2,10 +2,11 @@
 let count = 10000
 let () =
   Out_channel.with_open_text "dune" (fun dunech ->
-    Printf.fprintf dunech "(cram (deps ../../src/Driver.exe ../../runtime/Std.i))\n\n";
+    let dprintfn fmt = Format.kasprintf (Printf.fprintf dunech "%s\n") fmt in
+    dprintfn "(cram (deps ../../src/Driver.exe ../../runtime/Std.i))\n";
   for i=0 to count / 10 do
-    (* let dunebuf = Buffer.create 100 in *)
     let cram_buf = Buffer.create 100 in
+    let cram_printfn fmt = Format.kasprintf (Printf.bprintf cram_buf "%s\n") fmt in
     let cram_file = Printf.sprintf "r%04dx.t" i in
     let deps = ref [] in
     for j=0 to 9 do
@@ -19,12 +20,10 @@ let () =
         in
         (
         deps := lama_file :: !deps;
-        Printf.bprintf cram_buf "  $ cat > test.input <<EOF\n";
-        List.iter (Printf.bprintf cram_buf "  > %s\n") test;
-        Printf.bprintf cram_buf "  > EOF\n";
-        (* Printf.fprintf ch "  $ cat test.input\n";
-        Printf.fprintf ch "  $ ls -l\n"; *)
-        Printf.bprintf cram_buf "  $ LAMA=../../runtime ../../src/Driver.exe -i generated%05d.lama < test.input\n" k
+        cram_printfn "  $ cat > test.input <<EOF";
+        List.iter (cram_printfn "  > %s") test;
+        cram_printfn "  > EOF";
+        cram_printfn "  $ LAMA=../../runtime ../../src/Driver.exe -i generated%05d.lama < test.input" k
         )
     done;
     match !deps with
