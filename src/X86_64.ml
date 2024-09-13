@@ -1464,7 +1464,13 @@ let build cmd prog =
   cmd#dump_file "s" (genasm cmd prog);
   cmd#dump_file "i" (Interface.gen prog);
   let compiler =
-    match cmd#target_os with Darwin -> "clang" | Linux -> "gcc"
+    match (cmd#target_os, cmd#march) with
+    | Darwin, `AMD64 -> "clang"
+    | Darwin, `X86_32 ->
+        Printf.eprintf "X86_32 on darwin is not supported\n";
+        exit 1
+    | Linux, `AMD64 -> "gcc"
+    | Linux, `X86_32 -> "gcc -m32"
   in
   let compiler_flags, linker_flags =
     match cmd#target_os with
@@ -1482,13 +1488,16 @@ let build cmd prog =
           Buffer.add_string buf " ")
         objs;
       let gcc_cmdline =
-        Printf.sprintf "%s %s %s %s %s %s.s %s %s/runtime.a" compiler
-          compiler_flags linker_flags debug_flags cmd#get_output_option
-          cmd#basename (Buffer.contents buf) cmd#get_runtime_path
+        Printf.sprintf "%s %s %s %s %s %s.s %s %s/%s.a" compiler compiler_flags
+          linker_flags debug_flags cmd#get_output_option cmd#basename
+          (Buffer.contents buf) cmd#get_runtime_path
+          (match cmd#march with `X86_32 -> "runtime32" | `AMD64 -> "runtime")
       in
       Sys.command gcc_cmdline
   | `Compile ->
-      Sys.command
-        (Printf.sprintf "%s %s %s -c -g %s.s" compiler compiler_flags
-           debug_flags cmd#basename)
+      let cmd =
+        Printf.sprintf "%s %s %s -c -g %s.s" compiler compiler_flags debug_flags
+          cmd#basename
+      in
+      Sys.command cmd
   | _ -> invalid_arg "must not happen"

@@ -1,48 +1,43 @@
-EXECUTABLE = src/lamac
+.PHONY: all regression
+.PHONY: clean test regression regression-expressions regression-all uninstall install build
+
 INSTALL ?= install -v
 MKDIR ?= mkdir
-BUILDDIR = build
+BUILDDIR = _build
 
-.PHONY: all regression
+.DEFAULT_GOAL := build
 
-all:
-	$(MAKE) -C src
-	$(MAKE) -C runtime
-	$(MAKE) -C stdlib
+all: build test
 
-STD_FILES=$(shell ls stdlib/*.[oi] stdlib/*.lama runtime/runtime.a runtime/Std.i)
-
-build: all
-	mkdir -p $(BUILDDIR)
-	cp -r runtime/Std.i runtime/runtime.a stdlib/* src/lamac $(BUILDDIR)
+build:
+	dune b src runtime runtime32 stdlib tutorial
 
 install: all
-	$(INSTALL) $(EXECUTABLE) `opam var bin`
-	$(MKDIR) -p `opam var share`/Lama
-	$(INSTALL) $(STD_FILES) `opam var share`/Lama/
+	dune b @install --profile=release
+	dune    install --profile=release
+	$(MKDIR) -p `opam var share`/Lama/x64
+	$(INSTALL) $(shell ls _build/default/stdlib/x64/*.[oi] _build/default/stdlib/x64/stdlib/*.lama \
+		runtime/runtime.a runtime/Std.i) \
+		`opam var share`/Lama/x64
+	$(MKDIR) -p `opam var share`/Lama/x32
+	$(INSTALL) $(shell ls _build/default/stdlib/x32/*.[oi] _build/default/stdlib/x32/stdlib/*.lama \
+		runtime32/runtime.a runtime32/Std.i) \
+		`opam var share`/Lama/x32
 
 uninstall:
 	$(RM) -r `opam var share`/Lama
-	$(RM) `opam var bin`/$(EXECUTABLE)
+	dune uninstall
+
 
 regression-all: regression regression-expressions
 
+test: regression
 regression:
-	$(MAKE) clean check -j8 -C regression
-	$(MAKE) clean check -j8 -C stdlib/regression
+	dune test regression
 
 regression-expressions:
-	$(MAKE) clean check -j8 -C regression/expressions
-	$(MAKE) clean check -j8 -C regression/deep-expressions
-
-negative_scenarios_tests:
-	$(MAKE) -C runtime negative_tests
+	dune test regression_long
 
 clean:
-	$(MAKE) clean -C src
-	$(MAKE) clean -C runtime
-	$(MAKE) clean -C stdlib
-	$(MAKE) clean -C regression
-	$(MAKE) clean -C byterun
-	$(MAKE) clean -C bench
-	rm -rf $(BUILDDIR)
+	@dune clean
+

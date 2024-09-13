@@ -43,6 +43,7 @@ class options args =
     val i = ref 1
     val infile = ref (None : string option)
     val outfile = ref (None : string option)
+    val march = ref `AMD64
     val runtime_path = runtime_path_
     val paths = ref [ runtime_path_ ]
     val mode = ref (`Default : [ `Default | `Eval | `SM | `Compile | `BC ])
@@ -79,6 +80,8 @@ class options args =
                     raise
                       (Commandline_error "Path expected after '-I' specifier")
                 | Some path -> self#add_include_path path)
+            | "-march=x86_64" | "-march=amd64" -> march := `AMD64
+            | "-march=x86" -> march := `X86_32
             | "-s" -> self#set_mode `SM
             | "-b" -> self#set_mode `BC
             | "-i" -> self#set_mode `Eval
@@ -139,6 +142,8 @@ class options args =
         Some args.(j))
       else None
 
+    method march : [ `AMD64 | `X86_32 ] = !march
+    method get_debug = ""
     method get_mode = !mode
 
     method get_output_option =

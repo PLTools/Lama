@@ -1,7 +1,6 @@
 open GT
 open Language
-open SM
-   
+
 (* X86 codegeneration interface *)
 
 (* The registers: *)
@@ -66,11 +65,11 @@ let stack_offset i =
   if i >= 0
   then (i+1) * word_size
   else 8 + (-i-1) * word_size
-  
+
 let show instr =
   let rec opnd = function
   | R i      -> regs.(i)
-  | C        -> "4(%ebp)"              
+  | C        -> "4(%ebp)"
   | S i      -> if i >= 0
                 then Printf.sprintf "-%d(%%ebp)" (stack_offset i)
                 else Printf.sprintf "%d(%%ebp)"  (stack_offset i)
@@ -134,12 +133,12 @@ let compile cmd env imports code =
   | ">"  -> "g"
   | _    -> failwith "unknown operator"
   in
-  let box n = (n lsl 1) lor 1 in 
+  let box n = (n lsl 1) lor 1 in
   let rec compile' env scode =
     let on_stack = function S _ -> true | _ -> false in
     let mov x s = if on_stack x && on_stack s then [Mov (x, eax); Mov (eax, s)] else [Mov (x, s)]  in
     let callc env n tail =
-      let tail = tail && env#nargs = n in 
+      let tail = tail && env#nargs = n in
       if tail
       then (
         let rec push_args env acc = function
@@ -178,13 +177,13 @@ let compile cmd env imports code =
             then [Mov (closure, edx); Mov (edx, eax); CallI eax]
             else [Mov (closure, edx); CallI closure]
           in
-          env, pushr @ pushs @ call_closure @ [Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
+          env, pushr @ pushs @ call_closure @ [Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr)
         in
         let y, env = env#allocate in env, code @ [Mov (eax, y)]
       )
     in
     let call env f n tail =
-      let tail = tail && env#nargs = n && f.[0] <> '.' in 
+      let tail = tail && env#nargs = n && f.[0] <> '.' in
       let f =
         match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
       in
@@ -204,7 +203,7 @@ let compile cmd env imports code =
       else (
         let pushr, popr =
           List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers n)
-        in      
+        in
         let pushr, popr = env#save_closure @ pushr, env#rest_closure @ popr in
         let env, code =
           let rec push_args env acc = function
@@ -220,7 +219,7 @@ let compile cmd env imports code =
             | "Bsta"   -> pushs
             | _        -> List.rev pushs
           in
-          env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr) 
+          env, pushr @ pushs @ [Call f; Binop ("+", L (word_size * List.length pushs), esp)] @ (List.rev popr)
         in
         let y, env = env#allocate in env, code @ [Mov (eax, y)]
       )
@@ -241,27 +240,27 @@ let compile cmd env imports code =
           match instr with
           | PUBLIC name -> env#register_public name, []
           | EXTERN name -> env#register_extern name, []
-          | IMPORT name -> env, []
-                         
+          | IMPORT _name -> env, []
+
           | CLOSURE (name, closure) ->
              let pushr, popr =
                List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers 0)
              in
-             let closure_len  = List.length closure in 
+             let closure_len  = List.length closure in
              let push_closure =
                List.map (fun d -> Push (env#loc d)) @@ List.rev closure
              in
-             let s, env = env#allocate in             
+             let s, env = env#allocate in
              (env,
               pushr @
               push_closure @
               [Push (M ("$" ^ name));
               Push (L (box closure_len));
               Call "Bclosure";
-              Binop ("+", L (word_size * (closure_len + 2)), esp); 
+              Binop ("+", L (word_size * (closure_len + 2)), esp);
               Mov (eax, s)] @
               List.rev popr @ env#reload_closure)
-             
+
   	  | CONST n ->
              let s, env' = env#allocate in
 	     (env', [Mov (L (box n), s)])
@@ -276,7 +275,7 @@ let compile cmd env imports code =
              let s,  env' = (env #variable x)#allocate in
              let s', env''= env'#allocate in
              env'',
-             [Lea (env'#loc x, eax); Mov (eax, s); Mov (eax, s')]	     
+             [Lea (env'#loc x, eax); Mov (eax, s); Mov (eax, s')]
 
 	  | LD x ->
              let s, env' = (env#variable x)#allocate in
@@ -395,8 +394,8 @@ let compile cmd env imports code =
                  then [Mov   (x, eax); Binop (op, eax, y); Or1 y]
                  else [Binop (op, x, y); Or1 y]
              )
-             
-          | LABEL  s 
+
+          | LABEL  s
           | FLABEL s
           | SLABEL s    -> env, [Label s]
 
@@ -406,7 +405,7 @@ let compile cmd env imports code =
               let x, env = env#pop in
               env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, l)]
 
-          | BEGIN (f, nargs, nlocals, closure, args, scopes) ->             
+          | BEGIN (f, nargs, nlocals, closure, args, scopes) ->
              let rec stabs_scope scope =
                let names =
                  List.map
@@ -419,7 +418,7 @@ let compile cmd env imports code =
                (if names = [] then [] else [Meta (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f)]) @
                (List.flatten @@ List.map stabs_scope scope.subs) @
                (if names = [] then [] else [Meta (Printf.sprintf "\t.stabn 224,0,0,%s-%s" scope.elab f)])
-             in    
+             in
              let name =
                if f.[0] = 'L' then String.sub f 1 (String.length f - 1) else f
              in
@@ -429,10 +428,10 @@ let compile cmd env imports code =
              env, [Meta (Printf.sprintf "\t.type %s, @function" name)] @
                   (if f = "main"
                    then []
-                   else 
+                   else
                      [Meta (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f)] @
                      (List.mapi (fun i a -> Meta (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a ((i*4) + 8))) args)  @
-                     (List.flatten @@ List.map stabs_scope scopes)                         
+                     (List.flatten @@ List.map stabs_scope scopes)
                   )
                   @
                   [Meta "\t.cfi_startproc"] @
@@ -447,7 +446,7 @@ let compile cmd env imports code =
                       Mov (L 1, M "_init");
                      ]
                    else []
-                  ) @                  
+                  ) @
                   [Push ebp;
                    Meta ("\t.cfi_def_cfa_offset\t" ^ if has_closure then "12" else "8");
                    Meta ("\t.cfi_offset 5, -" ^ if has_closure then "12" else "8");
@@ -466,7 +465,7 @@ let compile cmd env imports code =
                   (if f = cmd#topname
                    then List.map (fun i -> Call ("init" ^ i)) (List.filter (fun i -> i <> "Std") imports)
                    else []
-                  )    
+                  )
 
           | END ->
              let x, env = env#pop in
@@ -494,11 +493,11 @@ let compile cmd env imports code =
              env, [Mov (x, eax); Jmp env#epilogue]
 
           | ELEM              -> call env ".elem" 2 false
-                               
+
           | CALL (f, n, tail) -> call env f n tail
-                         
+
           | CALLC (n, tail) -> callc env n tail
-              
+
           | SEXP (t, n) ->
              let s, env = env#allocate in
              let env, code = call env ".sexp" (n+1) false in
@@ -530,7 +529,7 @@ let compile cmd env imports code =
           | PATT StrCmp -> call env ".string_patt" 2 false
 
           | PATT patt ->
-             call env 
+             call env
                (match patt with
                 | Boxed   -> ".boxed_patt"
                 | UnBoxed -> ".unboxed_patt"
@@ -541,12 +540,12 @@ let compile cmd env imports code =
                ) 1 false
           | LINE (line) ->
              env#gen_line line
-             
-          | FAIL ((line, col), value) ->                       
+
+          | FAIL ((line, col), value) ->
              let v, env = if value then env#peek, env else env#pop in
              let s, env = env#string cmd#get_infile in
              env, [Push (L (box col)); Push (L (box line)); Push (M ("$" ^ s)); Push v; Call "Bmatch_failure"; Binop  ("+", L (4 * word_size), esp)]
-             
+
           | i ->
              invalid_arg (Printf.sprintf "invalid SM insn: %s\n" (GT.show(insn) i))
         in
@@ -554,7 +553,7 @@ let compile cmd env imports code =
 	env'', [Meta (Printf.sprintf "# %s / %s" (GT.show(SM.insn) instr) stack)] @ code' @ code''
   in
   compile' env code
-  
+
 (* A set of strings *)
 module S = Set.Make (String)
 
@@ -572,7 +571,7 @@ class env prg =
     val stringm         = M.empty (* a string map                      *)
     val scount          = 0       (* string count                      *)
     val stack_slots     = 0       (* maximal number of stack positions *)
-                        
+
     val static_size     = 0       (* static data size                  *)
     val stack           = []      (* symbolic stack                    *)
     val nargs           = 0       (* number of function arguments      *)
@@ -586,16 +585,16 @@ class env prg =
     val externs         = S.empty
     val nlabels         = 0
     val first_line      = true
-                        
+
     method publics = S.elements publics
-                   
+
     method register_public name = {< publics = S.add name publics >}
     method register_extern name = {< externs = S.add name externs >}
-                                
+
     method max_locals_size = max_locals_size
-                           
+
     method has_closure = has_closure
-                       
+
     method save_closure =
       if has_closure then [Push edx] else []
 
@@ -604,9 +603,9 @@ class env prg =
 
     method reload_closure =
       if has_closure then [Mov (C (*S 0*), edx)] else []
-      
+
     method fname = fname
-                 
+
     method leave =
       if stack_slots > max_locals_size
       then {< max_locals_size = stack_slots >}
@@ -660,7 +659,7 @@ class env prg =
       | Value.Local  i    -> S i
       | Value.Arg    i    -> S (- (i + if has_closure then 2 else 1))
       | Value.Access i    -> I (word_size * (i+1), edx)
-         
+
     (* allocates a fresh position on a symbolic stack *)
     method allocate =
       let x, n =
@@ -691,7 +690,7 @@ class env prg =
 
     (* tag hash: gets a hash for a string tag *)
     method hash tag =
-      let h = Pervasives.ref 0 in
+      let h = Stdlib.ref 0 in
       for i = 0 to min (String.length tag - 1) 4 do
         h := (!h lsl 6) lor (String.index chars tag.[i])
       done;
@@ -732,7 +731,7 @@ class env prg =
 
     (* gets number of arguments in the current function *)
     method nargs = nargs
-                 
+
     (* gets all global variables *)
     method globals = S.elements (S.diff globals externs)
 
@@ -741,9 +740,9 @@ class env prg =
 
     (* gets a number of stack positions allocated *)
     method allocated = stack_slots
-                     
+
     method allocated_size = Printf.sprintf "LS%s_SIZE" fname
-                     
+
     (* enters a function *)
     method enter f nargs nlocals has_closure =
       {< nargs = nargs; static_size = nlocals; stack_slots = nlocals; stack = []; fname = f; has_closure = has_closure; first_line = true >}
@@ -753,7 +752,7 @@ class env prg =
 
     (* returns a name for local size meta-symbol *)
     method lsize = Printf.sprintf "L%s_SIZE" fname
-                    
+
     (* returns a list of live registers *)
     method live_registers depth =
       let rec inner d acc = function
@@ -771,9 +770,9 @@ class env prg =
       then
          [Meta (Printf.sprintf "\t.stabn 68,0,%d,%s" line lab); Label lab]
       else
-        (if first_line then [Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line)] else []) @  
+        (if first_line then [Meta (Printf.sprintf "\t.stabn 68,0,%d,0" line)] else []) @
         [Meta (Printf.sprintf "\t.stabn 68,0,%d,%s-%s" line lab fname); Label lab]
-      
+
   end
 
 (* Generates an assembler text for a program: first compiles the program into
@@ -804,7 +803,7 @@ let genasm cmd prog =
       Meta (Printf.sprintf "\t.stabs \"%s\",100,0,0,.Ltext" cmd#get_absolute_infile)] @
       globals @
       data @
-      [Meta "\t.text"; Label ".Ltext"; Meta "\t.stabs \"data:t1=r1;0;4294967295;\",128,0,0,0"] @          
+      [Meta "\t.text"; Label ".Ltext"; Meta "\t.stabs \"data:t1=r1;0;4294967295;\",128,0,0,0"] @
       code);
   Buffer.contents asm
 
@@ -812,18 +811,18 @@ let get_std_path () =
   match Sys.getenv_opt "LAMA" with
   | Some s -> s
   | None   -> Stdpath.path
-                                      
+
 (* Builds a program: generates the assembler file and compiles it with the gcc toolchain *)
 let build cmd prog =
   let find_objects imports paths =
     let module S = Set.Make (String) in
     let rec iterate acc s = function
     | []              -> acc
-    | import::imports -> 
+    | import::imports ->
        if S.mem import s
        then iterate acc s imports
        else
-         let path, intfs = Interface.find import paths in         
+         let path, intfs = Interface.find import paths in
          iterate
            ((Filename.concat path (import ^ ".o")) :: acc)
            (S.add import s)

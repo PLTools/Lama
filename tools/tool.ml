@@ -14,9 +14,11 @@ type config =
   ; mutable line : int
   ; mutable col: int
   ; mutable mode: mode
+  ; mutable includes : string list
   }
 
-let config = { filename= "file.ml"; pos="0,0"; line=0; col=0; mode = GoToDef }
+let config = { filename= "file.ml"; pos="0,0"; line=0; col=0; mode = GoToDef; includes = ["."; "./runtime"] }
+let _ = if false then config.pos <- "" else ignore config.pos
 let parse_loc loc =
   Scanf.sscanf loc "%d,%d" (fun l c -> config.line <- l; config.col <- c)
 
@@ -25,6 +27,7 @@ let () =
     [ "-pos", String parse_loc, "L,C when L is line and C is column"
     ; "-def", Unit (fun () -> config.mode <- GoToDef), "go to definition"
     ; "-use", Unit (fun () -> config.mode <- Usages), "find usages"
+    ; "-I", String (fun s -> config.includes <- s :: config.includes), " Add include path"
     ]
     (fun name -> config.filename <- name)
     "Help"
@@ -53,7 +56,7 @@ let do_find e =
     inherit [_,_] Language.Expr.foldl_t_t_stub (foldl_decl, fself) as super
     method! c_Var _inh _ name = on_name name _inh
     method! c_Ref _inh _ name = on_name name _inh
-    method c_Scope init e names r =
+    method! c_Scope init e names r =
       let map = ListLabels.fold_left ~init names ~f:(fun acc (fname,(_,info)) ->
         let acc = Introduced.extend fname (Loc.get_exn fname) acc in
         match info with
@@ -70,7 +73,7 @@ let do_find e =
   (* Format.printf "STUB. Ht size = %d\n%!" (Loc.H.length Loc.tab);
   Loc.H.iter (fun k (l,c) -> Format.printf "%s -> (%d,%d)\n%!" k l c) Loc.tab; *)
 
-  let (_,fold_t) = Expr.fix_decl Expr.foldl_decl_0 ooo in
+  let (_,fold_t) = Expr.fix_decl_t Expr.foldl_decl_0 ooo in
   match fold_t Introduced.empty e with
   | exception (DefinitionFound arg) -> Some arg
   | _ -> None
@@ -89,14 +92,14 @@ let find_usages root (def_name,(_,_)) =
       if in_scope then (on_name name acc, in_scope) else (acc, in_scope)
     method! c_Ref (acc,in_scope) _ name =
       self#c_Var (acc,in_scope) (Var name) name
-    method c_Scope init e names r =
+    method! c_Scope init e names r =
       ListLabels.fold_left ~init names ~f:(fun ((acc, in_scope) as inh) (name,info) ->
         match (in_scope, String.equal def_name name) with
         | (true, true) -> (acc, false)
         | (true, _) -> begin
             match snd info with
-            | `Fun (args, body) when List.mem def_name args ->  inh
-            | `Fun (args, body) -> fself inh body
+            | `Fun (args, _) when List.mem def_name args ->  inh
+            | `Fun (_, body) -> fself inh body
             | `Variable (Some rhs) -> fself inh rhs
             | `Variable None -> inh
         end
@@ -104,20 +107,23 @@ let find_usages root (def_name,(_,_)) =
         | false,false -> begin
             match snd info with
             | `Fun (args, body) when List.memq def_name args -> fself (acc,true) body
-            | `Fun (args, body) -> fself inh body
+            | `Fun (_, body) -> fself inh body
             | `Variable (Some rhs) -> fself inh rhs
             | `Variable None -> inh
         end
       ) |> (fun acc -> fself acc r)
   end in
 
-  let (_,fold_t) = Expr.fix_decl Expr.foldl_decl_0 ooo in
+  let (_,fold_t) = Expr.fix_decl_t Expr.foldl_decl_0 ooo in
   fold_t ([],false) root
 
 
 let () =
   let cfg = object
-    method get_include_paths = ["."; "./runtime"] method get_infile = config.filename method is_workaround=false end
+    method get_include_paths = ["."; "./runtime"; "../runtime"]
+    method get_infile = config.filename
+    method is_workaround = false
+  end
   in
   match Language.run_parser cfg with
   | `Fail s -> failwith s

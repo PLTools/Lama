@@ -3,3 +3,7 @@
 /*.log
 *.i
 *.s
+*.exe
+*.x32.exe 
+*.x64.exe
+

@@ -1,0 +1,210 @@
+
+(rule
+ (targets Expressions.x32.exe)
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
+ (deps (:lama Expressions.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime32"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86
+    %{lama}
+    -I
+    ../stdlib/x32
+    -I
+    ../runtime32
+    -o
+    %{targets}))))
+
+(rule
+ (targets Expressions.x64.exe)
+ 
+ (deps (:lama Expressions.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86_64
+    %{lama}
+    -I
+    ../stdlib/x64
+    -I
+    ../runtime
+    -o
+    %{targets}))))
+
+(rule
+ (targets Functions.x32.exe)
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
+ (deps (:lama Functions.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime32"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86
+    %{lama}
+    -I
+    ../stdlib/x32
+    -I
+    ../runtime32
+    -o
+    %{targets}))))
+
+(rule
+ (targets Functions.x64.exe)
+ 
+ (deps (:lama Functions.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86_64
+    %{lama}
+    -I
+    ../stdlib/x64
+    -I
+    ../runtime
+    -o
+    %{targets}))))
+
+(rule
+ (targets Hello.x32.exe)
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
+ (deps (:lama Hello.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime32"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86
+    %{lama}
+    -I
+    ../stdlib/x32
+    -I
+    ../runtime32
+    -o
+    %{targets}))))
+
+(rule
+ (targets Hello.x64.exe)
+ 
+ (deps (:lama Hello.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86_64
+    %{lama}
+    -I
+    ../stdlib/x64
+    -I
+    ../runtime
+    -o
+    %{targets}))))
+
+(rule
+ (targets PatternMatching.x32.exe)
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
+ (deps (:lama PatternMatching.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime32"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86
+    %{lama}
+    -I
+    ../stdlib/x32
+    -I
+    ../runtime32
+    -o
+    %{targets}))))
+
+(rule
+ (targets PatternMatching.x64.exe)
+ 
+ (deps (:lama PatternMatching.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86_64
+    %{lama}
+    -I
+    ../stdlib/x64
+    -I
+    ../runtime
+    -o
+    %{targets}))))
+
+(rule
+ (targets Values.x32.exe)
+ (enabled_if (= %{ocaml-config:os_type} "linux"))
+ (deps (:lama Values.lama) ../runtime32/runtime.a ../stdlib/x32/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime32"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86
+    %{lama}
+    -I
+    ../stdlib/x32
+    -I
+    ../runtime32
+    -o
+    %{targets}))))
+
+(rule
+ (targets Values.x64.exe)
+ 
+ (deps (:lama Values.lama) ../runtime/runtime.a ../stdlib/x64/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime"
+   (run
+    %{project_root}/src/Driver.exe
+    -march=x86_64
+    %{lama}
+    -I
+    ../stdlib/x64
+    -I
+    ../runtime
+    -o
+    %{targets}))))

@@ -1,0 +1,9 @@
+(rule
+ (target runtime.a)
+ (enabled_if
+  (= %{system} "linux"))
+ (mode
+  (promote (until-clean)))
+ (deps Makefile gc_runtime.s runtime.c runtime.h)
+ (action
+  (run make -j2)))

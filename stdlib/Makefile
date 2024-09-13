@@ -1,29 +1,37 @@
+.PHONY: all
+
 SHELL := /bin/bash
+SRCDIR ?= .
+$(info SRCDIR = $(SRCDIR))
+FILES ?= $(wildcard $(SRCDIR)/*.lama)
+$(info FILES = $(FILES))
+OFILES = $(FILES:$(SRCDIR)/%=%)
+OFILES := $(OFILES:.lama=.o)
+$(info OFILES = $(OFILES))
+ALL := $(sort $(OFILES))
+LAMAC ?= ../src/lamac
+BDIR ?= .
 
-FILES=$(wildcard *.lama)
-ALL=$(sort $(FILES:.lama=.o))
-LAMAC=../src/lamac
+all: $(addprefix $(BDIR)/,$(ALL))
+$(info ALL = $(ALL), SRCDIR = $(SRCDIR))
+$(BDIR)/Fun.o: $(BDIR)/Ref.o
 
-all: $(ALL)
+$(BDIR)/Data.o: $(BDIR)/Ref.o $(BDIR)/Collection.o
 
-Fun.o: Ref.o
+$(BDIR)/Collection.o: $(BDIR)/List.o $(BDIR)/Ref.o
 
-Data.o: Ref.o Collection.o
+$(BDIR)/Array.o: $(BDIR)/List.o
+$(BDIR)/Random.o $(BDIR)/Collection.o: $(BDIR)/Array.o
+$(BDIR)/Ostap.o: $(BDIR)/List.o $(BDIR)/Collection.o $(BDIR)/Ref.o $(BDIR)/Fun.o $(BDIR)/Matcher.o $(BDIR)/Data.o
 
-Collection.o: List.o Ref.o
+$(BDIR)/Buffer.o: $(BDIR)/List.o
 
-Array.o: List.o
+$(BDIR)/STM.o: $(BDIR)/List.o $(BDIR)/Fun.o
 
-Ostap.o: List.o Collection.o Ref.o Fun.o Matcher.o
-
-Buffer.o: List.o
-
-STM.o: List.o Fun.o
-
-%.o: %.lama
-	LAMA=../runtime $(LAMAC) -g -I . -c $<
+$(BDIR)/%.o: $(SRCDIR)/%.lama
+	$(LAMAC) -g -I . -c $< #-o $@
 
 clean:
-	rm -Rf *.s *.o *.i *~
+	$(RM) -r *.s *.o *.i *~
 	pushd regression && make clean && popd
 
