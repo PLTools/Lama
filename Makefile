@@ -24,7 +24,10 @@ install: all
 		runtime32/runtime.a runtime32/Std.i) \
 		`opam var share`/Lama/x32
 
-uninstall:
+_build/default/Lama.install: 
+	dune b @install
+
+uninstall: _build/default/Lama.install
 	$(RM) -r `opam var share`/Lama
 	dune uninstall
 
