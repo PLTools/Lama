@@ -11,7 +11,7 @@
     version2.ml
     (progn
      (run echo let version = "\"")
-     (run echo Version)
+     (run echo 'Version ')
      (run git rev-parse --abbrev-ref HEAD)
      (run echo , " ")
      (run git rev-parse --short HEAD)
