@@ -8,7 +8,8 @@ class options args =
   let dump_sm = 0b010 in
   let dump_source = 0b100 in
   (* Kakadu: binary masks are cool for C code, but for OCaml I don't see any reason to save memory like this *)
-  let runtime_path_ =
+  (* DB: that's not to save memory, but to ease the check :^)                                                *)
+  let generic_runtime_path =
     match Sys.getenv_opt "LAMA" with Some s -> s | None -> Stdpath.path
   in
   let host_os =
@@ -22,20 +23,24 @@ class options args =
     "Lama compiler. (C) JetBrains Reserach, 2017-2024.\n"
     ^ "Usage: lamac <options> <input file>\n\n"
     ^ "When no options specified, builds the source file into executable.\n"
-    ^ "Options:\n" ^ "  -c        --- compile into object file\n"
-    ^ "  -o <file> --- write executable into file <file>\n"
-    ^ "  -I <path> --- add <path> into unit search path list\n"
-    ^ "  -i        --- interpret on a source-level interpreter\n"
-    ^ "  -s        --- compile into stack machine code and interpret on the \
-       stack machine initerpreter\n"
-    ^ "  -g        --- add more debug info and runtime checks\n"
-    ^ "  -dp       --- dump AST (the output will be written into .ast file)\n"
-    ^ "  -dsrc     --- dump pretty-printed source code\n"
-    ^ "  -ds       --- dump stack machine code (the output will be written \
-       into .sm file; has no\n"
-    ^ "                effect if -i option is specfied)\n"
-    ^ "  -b        --- compile to a stack machine bytecode\n"
-    ^ "  -v        --- show version\n" ^ "  -h        --- show this help\n"
+    ^ "Options:\n" 
+    ^ "  -c              --- compile into object file\n"
+    ^ "  -o <file>       --- write executable into file <file>\n"
+    ^ "  -I <path>       --- add <path> into unit search path list\n"
+    ^ "  -i              --- interpret on a source-level interpreter\n"
+    ^ "  -s              --- compile into stack machine code and interpret on the \
+             stack machine initerpreter\n"
+    ^ "  -g              --- add more debug info and runtime checks\n"
+    ^ "  -dp             --- dump AST (the output will be written into .ast file)\n"
+    ^ "  -dsrc           --- dump pretty-printed source code\n"
+    ^ "  -ds             --- dump stack machine code (the output will be written \
+             into .sm file; has no\n"
+    ^ "                      effect if -i option is specfied)\n"
+    ^ "  -b              --- compile to a stack machine bytecode\n"
+    ^ "  -64             --- set native compiler target to X86_64 (default)\n"
+    ^ "  -32             --- set native compiler target to X86_32\n"
+    ^ "  -runtime <path> --- set a path to runtime explicitly\n"
+    ^ "  -v              --- show version\n" ^ "  -h        --- show this help\n"
   in
   object (self)
     val version = ref false
@@ -44,8 +49,9 @@ class options args =
     val infile = ref (None : string option)
     val outfile = ref (None : string option)
     val march = ref `AMD64
-    val runtime_path = runtime_path_
-    val paths = ref [ runtime_path_ ]
+    val runtime_path = generic_runtime_path
+    val explicit_runtime_path = ref None
+    val paths = ref []
     val mode = ref (`Default : [ `Default | `Eval | `SM | `Compile | `BC ])
     val curdir = Unix.getcwd ()
     val debug = ref false
@@ -80,16 +86,23 @@ class options args =
                     raise
                       (Commandline_error "Path expected after '-I' specifier")
                 | Some path -> self#add_include_path path)
-            | "-march=x86_64" | "-march=amd64" -> march := `AMD64
-            | "-march=x86" -> march := `X86_32
-            | "-s" -> self#set_mode `SM
-            | "-b" -> self#set_mode `BC
-            | "-i" -> self#set_mode `Eval
-            | "-ds" -> self#set_dump dump_sm
-            | "-dsrc" -> self#set_dump dump_source
-            | "-dp" -> self#set_dump dump_ast
-            | "-h" -> self#set_help
-            | "-v" -> self#set_version
+            | "-64"      -> march := `AMD64
+            | "-32"      -> march := `X86_32
+            | "-s"       -> self#set_mode `SM
+            | "-b"       -> self#set_mode `BC
+            | "-i"       -> self#set_mode `Eval
+            | "-ds"      -> self#set_dump dump_sm
+            | "-dsrc"    -> self#set_dump dump_source
+            | "-dp"      -> self#set_dump dump_ast
+            | "-h"       -> self#set_help
+            | "-v"       -> self#set_version
+            | "-runtime" ->
+              (match self#peek with
+               | None ->
+                    raise
+                      (Commandline_error "Path expected after '-runtime' specifier")
+               | Some path -> self#set_runtime_path path
+              )
             | "-g" -> set_debug ()
             | _ ->
                 if opt.[0] = '-' then
@@ -142,6 +155,8 @@ class options args =
         Some args.(j))
       else None
 
+    method private set_runtime_path path = explicit_runtime_path := Some path
+          
     method march : [ `AMD64 | `X86_32 ] = !march
     method get_debug = ""
     method get_mode = !mode
@@ -161,8 +176,12 @@ class options args =
       | Some name -> name
 
     method get_help = !help
-    method get_include_paths = !paths
-    method get_runtime_path = runtime_path
+    method get_include_paths = self#get_runtime_path :: !paths
+    method get_runtime_path =
+      match !explicit_runtime_path with
+      | None ->
+        runtime_path ^ (match self#march with `X86_32 -> "/x32" | _ -> "/x64") 
+      | Some p -> p
 
     method basename =
       Filename.chop_suffix (Filename.basename self#get_infile) ".lama"

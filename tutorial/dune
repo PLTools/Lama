@@ -11,11 +11,11 @@
    "../runtime32"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86
+    -32
     %{lama}
     -I
     ../stdlib/x32
-    -I
+    -runtime
     ../runtime32
     -o
     %{targets}))))
@@ -32,11 +32,11 @@
    "../runtime"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86_64
+    -64
     %{lama}
     -I
     ../stdlib/x64
-    -I
+    -runtime
     ../runtime
     -o
     %{targets}))))
@@ -53,11 +53,11 @@
    "../runtime32"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86
+    -32
     %{lama}
     -I
     ../stdlib/x32
-    -I
+    -runtime
     ../runtime32
     -o
     %{targets}))))
@@ -74,11 +74,11 @@
    "../runtime"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86_64
+    -64
     %{lama}
     -I
     ../stdlib/x64
-    -I
+    -runtime
     ../runtime
     -o
     %{targets}))))
@@ -95,11 +95,11 @@
    "../runtime32"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86
+    -32
     %{lama}
     -I
     ../stdlib/x32
-    -I
+    -runtime
     ../runtime32
     -o
     %{targets}))))
@@ -116,11 +116,11 @@
    "../runtime"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86_64
+    -64
     %{lama}
     -I
     ../stdlib/x64
-    -I
+    -runtime
     ../runtime
     -o
     %{targets}))))
@@ -137,11 +137,11 @@
    "../runtime32"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86
+    -32
     %{lama}
     -I
     ../stdlib/x32
-    -I
+    -runtime
     ../runtime32
     -o
     %{targets}))))
@@ -158,11 +158,11 @@
    "../runtime"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86_64
+    -64
     %{lama}
     -I
     ../stdlib/x64
-    -I
+    -runtime
     ../runtime
     -o
     %{targets}))))
@@ -179,11 +179,11 @@
    "../runtime32"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86
+    -32
     %{lama}
     -I
     ../stdlib/x32
-    -I
+    -runtime
     ../runtime32
     -o
     %{targets}))))
@@ -200,11 +200,11 @@
    "../runtime"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86_64
+    -64
     %{lama}
     -I
     ../stdlib/x64
-    -I
+    -runtime
     ../runtime
     -o
     %{targets}))))

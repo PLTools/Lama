@@ -58,5 +58,5 @@
      "../../runtime32"
      (setenv
       LAMAC
-      "../../src/Driver.exe -march=x86 -I ../runtime32"
+      "../../src/Driver.exe -32 -I ../../runtime32"
       (run make -j2 -f ../Makefile all)))))))

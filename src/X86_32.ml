@@ -807,11 +807,6 @@ let genasm cmd prog =
       code);
   Buffer.contents asm
 
-let get_std_path () =
-  match Sys.getenv_opt "LAMA" with
-  | Some s -> s
-  | None   -> Stdpath.path
-
 (* Builds a program: generates the assembler file and compiles it with the gcc toolchain *)
 let build cmd prog =
   let find_objects imports paths =
@@ -834,7 +829,7 @@ let build cmd prog =
   in
   cmd#dump_file "s" (genasm cmd prog);
   cmd#dump_file "i" (Interface.gen prog);
-  let inc  = get_std_path () in
+  let inc  = cmd#get_runtime_path in
   match cmd#get_mode with
   | `Default ->
      let objs = find_objects (fst @@ fst prog) cmd#get_include_paths in

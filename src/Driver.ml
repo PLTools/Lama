@@ -15,7 +15,7 @@ let[@ocaml.warning "-32"] main =
         | `Default | `Compile -> (
             match cmd#march with
             | `X86_32 -> ignore @@ X86_32.build cmd prog
-            | `AMD64 -> ignore @@ X86_64.build cmd prog)
+            | `AMD64  -> ignore @@ X86_64.build cmd prog)
         | `BC -> SM.ByteCode.compile cmd (SM.compile cmd prog)
         | _ ->
             let rec read acc =
