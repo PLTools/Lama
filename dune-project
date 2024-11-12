@@ -1,4 +1,6 @@
-(lang dune 3.3)
+(lang dune 3.11)
+
+(name Lama)
 
 (cram enable)
 

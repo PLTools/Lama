@@ -7,3 +7,9 @@
  (deps Makefile gc_runtime.s runtime.c runtime.h)
  (action
   (run make -j2)))
+
+(install
+ (section share)
+ (files
+  (runtime.a as x32/runtime.a)
+  (Std.i as x32/Std.i)))
