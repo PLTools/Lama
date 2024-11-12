@@ -5,3 +5,9 @@
  (deps Makefile gc.c gc.h runtime_common.h runtime.c runtime.h printf.S)
  (action
   (run make)))
+
+(install
+ (section share)
+ (files
+  (runtime.a as x64/runtime.a)
+  (Std.i as x64/Std.i)))
