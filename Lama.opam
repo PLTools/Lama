@@ -8,7 +8,7 @@ license: "GPL-3.0-only"
 homepage: "https://github.com/PLTools/Lama"
 bug-reports: "https://github.com/PLTools/Lama/issues"
 depends: [
-  "dune" {>= "3.3"}
+  "dune" {>= "3.11"}
   "posix-uname"
   "GT"
   "ostap" {>= "0.6"}
