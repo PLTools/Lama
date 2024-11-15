@@ -57,3 +57,9 @@
       LAMAC
       "../../src/Driver.exe -64 -I ../../runtime"
       (run make -j2 -f ../Makefile all)))))))
+
+(install
+ (section share)
+ (files
+  (glob_files (*.i with_prefix x64))
+  (glob_files (*.o with_prefix x64))))
