@@ -21,7 +21,7 @@ let () =
         let found =
           if Sys.file_exists !lama_file then (
             cram_printfn
-              "../src/Driver.exe -i test%03d.lama < \
+              "  $ ../src/Driver.exe -i test%03d.lama < \
                test%03d.input"
               i i;
             true)
