@@ -16,7 +16,7 @@ install: all
 	dune b @install --profile=release
 	dune    install --profile=release
 
-_build/default/Lama.install: 
+_build/default/Lama.install:
 	dune b @install
 
 uninstall: _build/default/Lama.install
@@ -28,7 +28,7 @@ regression-all: regression regression-expressions
 
 test: regression
 regression:
-	dune test regression
+	dune test regression stdlib/regression
 
 regression-expressions:
 	dune test regression_long

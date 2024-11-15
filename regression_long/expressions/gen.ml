@@ -18,7 +18,7 @@ let () =
 
       if Sys.file_exists lama_file then (
         deps := lama_file :: input_file :: !deps;
-        cram_printfn "  $ LAMA=../../runtime ../../src/Driver.exe -i generated%05d.lama < generated%05d.input" k k
+        cram_printfn "  $ ../../src/Driver.exe -runtime ../../runtime -I ../../runtime -I ../../stdlib/x64 -i generated%05d.lama < generated%05d.input" k k
         )
     done;
     match !deps with
