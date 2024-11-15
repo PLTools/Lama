@@ -11,11 +11,11 @@
     version2.ml
     (progn
      (run echo let version = "\"")
-     (run echo Version)
+     (run echo "Version ")
      (run git rev-parse --abbrev-ref HEAD)
-     (run echo , " ")
+     (run echo ", ")
      (run git rev-parse --short HEAD)
-     (run echo , " ")
+     (run echo ", ")
      (pipe-stdout
       (run git rev-parse --verify HEAD)
       (run git show --no-patch --no-notes --pretty='%cd'))
