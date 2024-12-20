@@ -1304,6 +1304,10 @@ class env prg mode =
                       Buffer.add_char buf '\\';
                       Buffer.add_char buf 't';
                       iterate (i + 2)
+                  | 'r' ->
+                      Buffer.add_char buf '\\';
+                      Buffer.add_char buf 'r';
+                      iterate (i + 2)
                   | _ ->
                       Buffer.add_char buf '\\';
                       Buffer.add_char buf '\\';
