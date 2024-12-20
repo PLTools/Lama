@@ -982,23 +982,21 @@ let compile cmd env imports code =
                   1 false
             | LINE line -> env#gen_line line
             | FAIL ((line, col), value) ->
-                let v, env = if value then (env#peek, env) else env#pop in
+                let value, env = if value then (env#peek, env) else env#pop in
                 let msg_addr, env = env#string cmd#get_infile in
-                let vr, env = env#allocate in
-                let sr, env = env#allocate in
-                let liner, env = env#allocate in
-                let colr, env = env#allocate in
+                let value_arg_addr, env = env#allocate in
+                let msg_arg_addr, env = env#allocate in
+                let line_arg_addr, env = env#allocate in
+                let col_arg_addr, env = env#allocate in
                 let env, code =
                   compile_call env ~fname:".match_failure" 4 false
                 in
                 let _, env = env#pop in
                 ( env,
-                  [
-                    Mov (L col, colr);
-                    Mov (L line, liner);
-                    Mov (msg_addr, sr);
-                    Mov (v, vr);
-                  ]
+                  mov (L col) col_arg_addr
+                  @ mov (L line) line_arg_addr
+                  @ mov msg_addr msg_arg_addr
+                  @ mov value value_arg_addr
                   @ code )
             | i ->
                 invalid_arg
