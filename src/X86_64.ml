@@ -697,10 +697,20 @@ let compile cmd env imports code =
                 let l, env = env#allocate in
                 let env, call = compile_call env ~fname:".string" 1 false in
                 (env, mov addr l @ call)
-            | LDA x ->
+            | LDA x -> (
                 let s, env' = (env#variable x)#allocate in
                 let s', env'' = env'#allocate in
-                (env'', [ Lea (env'#loc x, rax); Mov (rax, s); Mov (rax, s') ])
+                let loc_x = env'#loc x in
+                match loc_x with
+                | R _ ->
+                    failwith
+                      "We are not able to take an address of a register. This \
+                       is the known limitation of 64-bit compiler. If you \
+                       encountered this issue, just do not use indirect \
+                       assignment :("
+                | _ ->
+                    ();
+                    (env'', [ Lea (loc_x, rax); Mov (rax, s); Mov (rax, s') ]))
             | LD x -> (
                 let s, env' = (env#variable x)#allocate in
                 ( env',
