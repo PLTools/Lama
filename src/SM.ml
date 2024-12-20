@@ -1501,8 +1501,7 @@ let compile cmd ((imports, _), p) =
         add_code
           (compile_list false lassn env [ x; e ])
           lassn false
-          [ (match x with Expr.Ref _ -> STI | _ -> STA) ]
-        (*Expr.ElemRef _ -> STA | _ -> STI]*)
+          [ (match x with Expr.ElemRef _ -> STA | _ -> STI) ]
     | Expr.Skip -> (env, false, [])
     | Expr.Seq (s1, s2) -> compile_list tail l env [ s1; s2 ]
     | Expr.If (c, s1, s2) ->
