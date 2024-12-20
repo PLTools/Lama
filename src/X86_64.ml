@@ -697,7 +697,8 @@ let compile cmd env imports code =
                 let l, env = env#allocate in
                 let env, call = compile_call env ~fname:".string" 1 false in
                 (env, mov addr l @ call)
-            | LDA x -> (
+            | LDA _ -> failwith "Should not happen. Indirect assignemts are temporarily prohibited."
+            (*
                 let s, env' = (env#variable x)#allocate in
                 let s', env'' = env'#allocate in
                 let loc_x = env'#loc x in
@@ -710,7 +711,7 @@ let compile cmd env imports code =
                        assignment :("
                 | _ ->
                     ();
-                    (env'', [ Lea (loc_x, rax); Mov (rax, s); Mov (rax, s') ]))
+                    (env'', [ Lea (loc_x, rax); Mov (rax, s); Mov (rax, s') ])*)
             | LD x -> (
                 let s, env' = (env#variable x)#allocate in
                 ( env',
@@ -725,7 +726,8 @@ let compile cmd env imports code =
                   | S _ | M _ -> [ Mov (s, rax); Mov (rax, env'#loc x) ]
                   | _ -> [ Mov (s, env'#loc x) ] ))
             | STA -> compile_call env ~fname:".sta" 3 false
-            | STI -> (
+            | STI -> failwith "Should not happen. Indirect assignemts are temporarily prohibited."
+              (*
                 let v, env = env#pop in
                 let x = env#peek in
                 ( env,
@@ -737,7 +739,7 @@ let compile cmd env imports code =
                         Mov (rdx, I (0, rax));
                         Mov (rdx, x);
                       ]
-                  | _ -> [ Mov (v, rax); Mov (rax, I (0, x)); Mov (rax, x) ] ))
+                  | _ -> [ Mov (v, rax); Mov (rax, I (0, x)); Mov (rax, x) ] )*)
             | BINOP op -> compile_binop env op
             | LABEL s | FLABEL s | SLABEL s -> (env, [ Label s ])
             | JMP l -> ((env#set_stack l)#set_barrier, [ Jmp l ])
