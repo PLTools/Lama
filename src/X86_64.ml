@@ -1505,11 +1505,17 @@ let build cmd prog =
           (Buffer.contents buf) cmd#get_runtime_path
           (match cmd#march with `X86_32 -> "runtime32" | `AMD64 -> "runtime")
       in
-      Sys.command gcc_cmdline
+      let result = Sys.command gcc_cmdline in
+      if result <> 0 then
+        failwith
+          (Printf.sprintf "Assembly compiler failed with exit code %d" result)
   | `Compile ->
       let cmd =
         Printf.sprintf "%s %s %s -c -g %s.s" compiler compiler_flags debug_flags
           cmd#basename
       in
-      Sys.command cmd
+      let result = Sys.command cmd in
+      if result <> 0 then
+        failwith
+          (Printf.sprintf "Assembly compiler failed with exit code %d" result)
   | _ -> invalid_arg "must not happen"
