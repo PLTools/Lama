@@ -260,10 +260,10 @@ let show env instr =
 let in_memory = function M _ | S _ | I _ -> true | C _ | R _ | L _ -> false
 
 let mov x s =
-  (* Numeric literals with more than 32 bits cannot ne directly moved to memory location *)
-  let big_numeric_literal = function L num -> num > 0xFFFFFFFF | _ -> false in
+  (* Numeric literals with more than 32 bits cannot be directly moved to memory location *)
+  let big_numeric_literal = function L num -> (num > 0xFFFFFFFF || num < -0xFFFFFFFF) | _ -> false in
   if x = s then []
-  else if (in_memory x && in_memory s) || big_numeric_literal x then
+  else if (in_memory x && in_memory s) || (big_numeric_literal x && (in_memory x || in_memory s)) then
     [ Mov (x, rax); Mov (rax, s) ]
   else [ Mov (x, s) ]
 
@@ -691,7 +691,7 @@ let compile cmd env imports code =
                 (env, push_closure_code @ mov address l @ call_code)
             | CONST n ->
                 let s, env' = env#allocate in
-                (env', [ Mov (L (box n), s) ])
+                (env', mov (L (box n)) s)
             | STRING s ->
                 let addr, env = env#string s in
                 let l, env = env#allocate in
