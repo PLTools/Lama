@@ -36,7 +36,7 @@ let () =
           if Sys.file_exists !lama_file && i <> 30 then (
             (* cram_printfn "  $ ls ../x64"; *)
             cram_printfn
-              "  $ ../../src/Driver.exe -runtime ../../runtime -I ../../runtime -I ../../stdlib/x64 -ds -dp test%02d.lama -o test 2>&1 | grep -v 'missing .note.GNU-stack'" i;
+              "  $ ../../src/Driver.exe -runtime ../../runtime -I ../../runtime -I ../../stdlib/x64 -ds -dp test%02d.lama -o test" i;
             cram_printfn "  $ ./test";
             true)
           else   false
