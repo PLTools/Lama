@@ -24,7 +24,7 @@ runtime.o: runtime.c runtime.h
 	$(CC) $(PROD_FLAGS) -c runtime.c -o runtime.o
 
 printf.o: printf.S
-	$(CC) $(PROD_FLAGS) -x assembler-with-cpp -c -g printf.S -o printf.o
+	$(CC) $(PROD_FLAGS) -Wa,--noexecstack -x assembler-with-cpp -c -g printf.S -o printf.o
 
 clean:
 	$(RM) *.a *.o *~ negative_scenarios/*.err
