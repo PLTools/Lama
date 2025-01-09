@@ -1427,7 +1427,7 @@ let compile cmd ((imports, _), p) =
     | Expr.Ignore s ->
         let ls, env = env#get_label in
         add_code (compile_expr tail ls env s) ls false [ DROP ]
-    | Expr.ElemRef (x, i) -> compile_list tail l env [ x; i ]
+    | Expr.ElemRef _ -> failwith "Should not happen. Indirect assignemts are temporarily prohibited."
     | Expr.Var x -> (
         let env, line = env#gen_line x in
         let env, acc = env#lookup x in
@@ -1438,10 +1438,7 @@ let compile cmd ((imports, _), p) =
               false,
               line @ [ PROTO (name, env#current_function) ] )
         | _ -> (env, false, line @ [ LD acc ]))
-    | Expr.Ref x ->
-        let env, line = env#gen_line x in
-        let env, acc = env#lookup x in
-        (env, false, line @ [ LDA acc ])
+    | Expr.Ref _ -> failwith "Should not happen. Indirect assignemts are temporarily prohibited."
     | Expr.Const n -> (env, false, [ CONST n ])
     | Expr.String s -> (env, false, [ STRING s ])
     | Expr.Binop (op, x, y) ->
@@ -1496,13 +1493,15 @@ let compile cmd ((imports, _), p) =
         let env, line = env#gen_line x in
         let env, acc = env#lookup x in
         add_code (compile_expr false lassn env e) lassn false (line @ [ ST acc ])
-    | Expr.Assign (x, e) ->
+    | Expr.Assign (Expr.ElemRef (x, i), e) ->
         let lassn, env = env#get_label in
         add_code
-          (compile_list false lassn env [ x; e ])
+          (compile_list false lassn env [ x; i; e ])
           lassn false
-          [ (match x with Expr.Ref _ -> STI | _ -> STA) ]
-        (*Expr.ElemRef _ -> STA | _ -> STI]*)
+          [ STA ]
+    | Expr.Assign (x, _) ->
+        failwith
+          (Printf.sprintf "Indirect assignment is not supported yet: %s" (show Expr.t x))
     | Expr.Skip -> (env, false, [])
     | Expr.Seq (s1, s2) -> compile_list tail l env [ s1; s2 ]
     | Expr.If (c, s1, s2) ->

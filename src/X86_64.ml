@@ -260,10 +260,10 @@ let show env instr =
 let in_memory = function M _ | S _ | I _ -> true | C _ | R _ | L _ -> false
 
 let mov x s =
-  (* Numeric literals with more than 32 bits cannot ne directly moved to memory location *)
-  let big_numeric_literal = function L num -> num > 0xFFFFFFFF | _ -> false in
+  (* Numeric literals with more than 32 bits cannot be directly moved to memory location *)
+  let big_numeric_literal = function L num -> (num > 0xFFFFFFFF || num < -0xFFFFFFFF) | _ -> false in
   if x = s then []
-  else if (in_memory x && in_memory s) || big_numeric_literal x then
+  else if (in_memory x && in_memory s) || (big_numeric_literal x && (in_memory x || in_memory s)) then
     [ Mov (x, rax); Mov (rax, s) ]
   else [ Mov (x, s) ]
 
@@ -691,16 +691,27 @@ let compile cmd env imports code =
                 (env, push_closure_code @ mov address l @ call_code)
             | CONST n ->
                 let s, env' = env#allocate in
-                (env', [ Mov (L (box n), s) ])
+                (env', mov (L (box n)) s)
             | STRING s ->
                 let addr, env = env#string s in
                 let l, env = env#allocate in
                 let env, call = compile_call env ~fname:".string" 1 false in
                 (env, mov addr l @ call)
-            | LDA x ->
+            | LDA _ -> failwith "Should not happen. Indirect assignemts are temporarily prohibited."
+            (*
                 let s, env' = (env#variable x)#allocate in
                 let s', env'' = env'#allocate in
-                (env'', [ Lea (env'#loc x, rax); Mov (rax, s); Mov (rax, s') ])
+                let loc_x = env'#loc x in
+                match loc_x with
+                | R _ ->
+                    failwith
+                      "We are not able to take an address of a register. This \
+                       is the known limitation of 64-bit compiler. If you \
+                       encountered this issue, just do not use indirect \
+                       assignment :("
+                | _ ->
+                    ();
+                    (env'', [ Lea (loc_x, rax); Mov (rax, s); Mov (rax, s') ])*)
             | LD x -> (
                 let s, env' = (env#variable x)#allocate in
                 ( env',
@@ -715,7 +726,8 @@ let compile cmd env imports code =
                   | S _ | M _ -> [ Mov (s, rax); Mov (rax, env'#loc x) ]
                   | _ -> [ Mov (s, env'#loc x) ] ))
             | STA -> compile_call env ~fname:".sta" 3 false
-            | STI -> (
+            | STI -> failwith "Should not happen. Indirect assignemts are temporarily prohibited."
+              (*
                 let v, env = env#pop in
                 let x = env#peek in
                 ( env,
@@ -727,7 +739,7 @@ let compile cmd env imports code =
                         Mov (rdx, I (0, rax));
                         Mov (rdx, x);
                       ]
-                  | _ -> [ Mov (v, rax); Mov (rax, I (0, x)); Mov (rax, x) ] ))
+                  | _ -> [ Mov (v, rax); Mov (rax, I (0, x)); Mov (rax, x) ] )*)
             | BINOP op -> compile_binop env op
             | LABEL s | FLABEL s | SLABEL s -> (env, [ Label s ])
             | JMP l -> ((env#set_stack l)#set_barrier, [ Jmp l ])
@@ -972,23 +984,21 @@ let compile cmd env imports code =
                   1 false
             | LINE line -> env#gen_line line
             | FAIL ((line, col), value) ->
-                let v, env = if value then (env#peek, env) else env#pop in
+                let value, env = if value then (env#peek, env) else env#pop in
                 let msg_addr, env = env#string cmd#get_infile in
-                let vr, env = env#allocate in
-                let sr, env = env#allocate in
-                let liner, env = env#allocate in
-                let colr, env = env#allocate in
+                let value_arg_addr, env = env#allocate in
+                let msg_arg_addr, env = env#allocate in
+                let line_arg_addr, env = env#allocate in
+                let col_arg_addr, env = env#allocate in
                 let env, code =
                   compile_call env ~fname:".match_failure" 4 false
                 in
                 let _, env = env#pop in
                 ( env,
-                  [
-                    Mov (L col, colr);
-                    Mov (L line, liner);
-                    Mov (msg_addr, sr);
-                    Mov (v, vr);
-                  ]
+                  mov (L col) col_arg_addr
+                  @ mov (L line) line_arg_addr
+                  @ mov msg_addr msg_arg_addr
+                  @ mov value value_arg_addr
                   @ code )
             | i ->
                 invalid_arg
@@ -1304,6 +1314,10 @@ class env prg mode =
                       Buffer.add_char buf '\\';
                       Buffer.add_char buf 't';
                       iterate (i + 2)
+                  | 'r' ->
+                      Buffer.add_char buf '\\';
+                      Buffer.add_char buf 'r';
+                      iterate (i + 2)
                   | _ ->
                       Buffer.add_char buf '\\';
                       Buffer.add_char buf '\\';
@@ -1474,8 +1488,8 @@ let build cmd prog =
   in
   let compiler_flags, linker_flags =
     match cmd#target_os with
-    | Darwin -> ("-arch x86_64", "-ld_classic")
-    | Linux -> ("", "")
+    | Darwin -> ("-arch x86_64 -Wa,--noexecstack", "-ld_classic")
+    | Linux -> ("-Wa,--noexecstack", "")
   in
   let debug_flags = if cmd#is_debug then "-g" else "" in
   match cmd#get_mode with
@@ -1493,11 +1507,17 @@ let build cmd prog =
           (Buffer.contents buf) cmd#get_runtime_path
           (match cmd#march with `X86_32 -> "runtime32" | `AMD64 -> "runtime")
       in
-      Sys.command gcc_cmdline
+      let result = Sys.command gcc_cmdline in
+      if result <> 0 then
+        failwith
+          (Printf.sprintf "Assembly compiler failed with exit code %d" result)
   | `Compile ->
       let cmd =
         Printf.sprintf "%s %s %s -c -g %s.s" compiler compiler_flags debug_flags
           cmd#basename
       in
-      Sys.command cmd
+      let result = Sys.command cmd in
+      if result <> 0 then
+        failwith
+          (Printf.sprintf "Assembly compiler failed with exit code %d" result)
   | _ -> invalid_arg "must not happen"
