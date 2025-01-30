@@ -18,6 +18,8 @@ $(BDIR)/Fun.o: $(BDIR)/Ref.o
 
 $(BDIR)/Data.o: $(BDIR)/Ref.o $(BDIR)/Collection.o
 
+$(BDIR)/Queue.o: $(BDIR)/List.o
+
 $(BDIR)/Collection.o: $(BDIR)/List.o $(BDIR)/Ref.o
 
 $(BDIR)/Array.o: $(BDIR)/List.o
