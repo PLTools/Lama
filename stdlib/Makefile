@@ -10,6 +10,8 @@ Fun.o: Ref.o
 
 Data.o: Ref.o Collection.o
 
+Queue.o: List.o 
+
 Collection.o: List.o Ref.o
 
 Array.o: List.o

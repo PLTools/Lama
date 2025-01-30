@@ -1,0 +1,26 @@
+import List;
+
+fun emptyQueue () {
+  [{}, {}]
+}
+
+fun isEmptyQueue (q) {
+  case q of
+    [{}, {}] -> true
+  | _        -> false
+  esac
+}
+
+fun enqueue ([pop, push], x) {
+  [pop, x : push]
+}
+
+fun dequeue ([pop, push]) {
+  case pop of
+    x : pop -> [[pop, push], x]
+  | _       -> case push of
+                 {} -> failure ("dequeueing from empty queue\n")
+               | _  -> dequeue ([reverse (push), {}])
+	       esac
+  esac
+}
