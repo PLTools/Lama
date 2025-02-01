@@ -10,6 +10,8 @@ on:
       - "more-dune"
 
 permissions: read-all
+env:
+  OPAMCONFIRMLEVEL: unsafe-yes
 
 jobs:
   build:
@@ -32,6 +34,8 @@ jobs:
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - run: gcc --version
 
       - run: opam pin add Lama.dev . --no-action
       - run: opam depext Lama.dev --yes --with-test

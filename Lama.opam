@@ -28,3 +28,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
+depexts: [ [ "gcc-14-multilib" ] {os-distribution = "ubuntu"} ]

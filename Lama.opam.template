@@ -1,0 +1,1 @@
+depexts: [ [ "gcc-14-multilib" ] {os-distribution = "ubuntu"} ]
