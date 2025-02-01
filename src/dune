@@ -61,7 +61,7 @@
     SM
     X86_64)
    ((action
-     (run %{project_root}/src/pp5+gt+plugins+ostap+dump.byte %{input-file}))
+     (run %{project_root}/src/pp5+gt+plugins+ostap+dump.exe %{input-file}))
     Language
     Pprinter
     X86_32
@@ -69,7 +69,8 @@
     version)))
  (preprocessor_deps
   (file %{project_root}/src/pp5+gt+plugins+ostap+dump.byte)
-  ;(file %{project_root}/src/pp5+gt+plugins+ostap+dump.exe)
+  (file %{project_root}/src/pp5+gt+plugins+ostap+dump.exe)
+  ;
   )
  ;(inline_tests)
  )
@@ -101,6 +102,18 @@
  (action
   (run
    mkcamlp5
+   -package
+   camlp5,camlp5.pa_o,camlp5.pr_o,ostap.syntax,GT.syntax.all,GT.syntax
+   -o
+   %{targets})))
+
+(rule
+ (targets pp5+gt+plugins+ostap+dump.exe)
+ (deps
+  (package GT))
+ (action
+  (run
+   mkcamlp5.opt
    -package
    camlp5,camlp5.pa_o,camlp5.pr_o,ostap.syntax,GT.syntax.all,GT.syntax
    -o

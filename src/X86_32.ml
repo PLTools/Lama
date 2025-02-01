@@ -22,8 +22,6 @@ let word_size = 4;;
 | I  of int * opnd (* an indirect operand with offset  *)
 with show
 
-let show_opnd = show(opnd)
-
 (* For convenience we define the following synonyms for the registers: *)
 let ebx = R 0
 let ecx = R 1
@@ -150,7 +148,7 @@ let compile cmd env imports code =
         in
         let env    , pushs = push_args env [] n in
         let closure, env   = env#pop in
-        let y      , env   = env#allocate in
+        let _      , env   = env#allocate in
         env, pushs @ [Mov (closure, edx);
                       Mov (I(0, edx), eax);
                       Mov (ebp, esp);
@@ -197,7 +195,7 @@ let compile cmd env imports code =
                else push_args env ((mov x (env#loc (Value.Arg (n-1)))) @ acc) (n-1)
         in
         let env, pushs = push_args env [] n in
-        let y, env = env#allocate in
+        let _, env = env#allocate in
         env, pushs @ [Mov (ebp, esp); Pop (ebp)] @ (if env#has_closure then [Pop ebx] else []) @ [Jmp f]
       )
       else (
@@ -563,8 +561,8 @@ module M = Map.Make (String)
 (* Environment implementation *)
 class env prg =
   let chars          = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'" in
-  let make_assoc l i = List.combine l (List.init (List.length l) (fun x -> x + i)) in
-  let rec assoc  x   = function [] -> raise Not_found | l :: ls -> try List.assoc x l with Not_found -> assoc x ls in
+  (* let make_assoc l i = List.combine l (List.init (List.length l) (fun x -> x + i)) in *)
+  (* let rec assoc  x   = function [] -> raise Not_found | l :: ls -> try List.assoc x l with Not_found -> assoc x ls in *)
   object (self)
     inherit SM.indexer prg
     val globals         = S.empty (* a set of global variables         *)
@@ -663,7 +661,7 @@ class env prg =
     (* allocates a fresh position on a symbolic stack *)
     method allocate =
       let x, n =
-        let rec allocate' = function
+        let allocate' = function
         | []                            -> ebx          , 0
         | (S n)::_                      -> S (n+1)      , n+2
         | (R n)::_ when n < num_of_regs -> R (n+1)      , stack_slots
