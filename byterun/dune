@@ -2,7 +2,8 @@
  (target byterun.exe)
  (deps
   (:main byterun.c)
-  (:runtime ../runtime/runtime.a))
+  (:runtime ../runtime/runtime.a)
+  mac-specific-flags.txt)
  (mode
   (promote (until-clean)))
  (action
