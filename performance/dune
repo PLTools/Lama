@@ -1,8 +1,9 @@
 (rule
- (targets Sort.x64.exe)
+ (targets Sort.exe)
  (deps
   (:lama Sort.lama)
-  ../runtime/x64/runtime.a)
+  ../runtime/runtime.a
+  ../stdlib/x64/Fun.i)
  (mode
   (promote (until-clean)))
  (action
@@ -15,7 +16,7 @@
     %{lama}
     -I
     ../stdlib/x64
-    -I
+    -runtime
     ../runtime
     -o
     %{targets}))))
