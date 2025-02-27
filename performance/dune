@@ -2,7 +2,7 @@
  (targets Sort.x64.exe)
  (deps
   (:lama Sort.lama)
-  ../runtime/runtime.a)
+  ../runtime/x64/runtime.a)
  (mode
   (promote (until-clean)))
  (action
