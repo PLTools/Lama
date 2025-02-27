@@ -49,4 +49,4 @@ jobs:
       - run: opam exec -- dune b
       - run: opam exec -- dune b @install
       - run: opam exec -- dune install
-      #- run: opam exec -- make regression
+      - run: opam exec -- make regression
