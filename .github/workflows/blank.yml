@@ -41,7 +41,10 @@ jobs:
       - run: opam depext Lama.dev --yes --with-test
       - run: opam install . --deps-only --with-test
       - run: eval $(opam env)
-      - run: opam exec -- dune b runtime32 -j1
+
+      - run: rm -fr runtime32
+        if: ${{ matrix.os == 'macos-latest' }}
+
       - run: opam exec -- dune test stdlib/regression -j1
       - run: opam exec -- make install
       - run: opam exec -- make regression
