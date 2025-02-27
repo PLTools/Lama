@@ -4,7 +4,7 @@
  (deps ../src/Driver.exe))
 
 (cram
- (deps ../../runtime/runtime.a ../../runtime/Std.i))
+ (deps ../runtime/runtime.a ../runtime/Std.i))
 
 (cram
  (applies_to test001)
