@@ -21,7 +21,8 @@
 
 (rule
  (target mac-specific-flags.txt)
- (= %{ocaml-config:system} macosx)
+ (enabled_if
+  (= %{ocaml-config:system} macosx))
  (action
   (progn
    (with-stdout-to
