@@ -7,24 +7,25 @@
  (mode
   (promote (until-clean)))
  (action
-  (run gcc %{read:mac-specific-flags.txt} -g %{main} %{runtime} -o %{target})))
+  (run
+   gcc
+   %{read-lines:mac-specific-flags.txt}
+   -g
+   %{main}
+   %{runtime}
+   -o
+   %{target})))
 
 (rule
  (target mac-specific-flags.txt)
  (enabled_if
   (= %{system} "linux"))
  (action
-  (progn
-   (with-stdout-to
-    %{target}
-    (run printf "-g")))))
+  (write-file %{target} "")))
 
 (rule
  (target mac-specific-flags.txt)
  (enabled_if
   (= %{ocaml-config:system} macosx))
  (action
-  (progn
-   (with-stdout-to
-    %{target}
-    (run printf "-arch x86_64 -ld_classic")))))
+  (write-file %{target} "-arch\nx86_64\n-ld_classic")))
