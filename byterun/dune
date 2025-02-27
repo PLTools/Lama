@@ -21,8 +21,7 @@
 
 (rule
  (target mac-specific-flags.txt)
- (enabled_if
-  (= %{system} "darwin"))
+ (= %{ocaml-config:system} macosx)
  (action
   (progn
    (with-stdout-to
