@@ -11,7 +11,7 @@
    "../runtime"
    (run
     %{project_root}/src/Driver.exe
-    -march=x86_64
+    -64
     %{lama}
     -I
     ../stdlib/x64
