@@ -45,8 +45,8 @@ jobs:
       - run: rm -fr runtime32
         if: ${{ matrix.os == 'macos-latest' }}
       - run: opam exec -- dune b
-      - run: opam exec -- dune b @install
-      - run: opam exec -- dune install
+      - run: opam exec -- dune b @install --profile=release
+      - run: opam exec -- dune    install --profile=release
       - run: opam exec -- make regression-all
 
       # works
