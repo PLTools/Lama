@@ -1,3 +1,4 @@
-  $ ../src/Driver.exe -i test083.lama < test083.input
-  Error: could not find an interface file for import "Std"
-  [255]
+  $ ../src/Driver.exe -runtime ../runtime -I ../stdlib/x64 -i test083.lama < test083.input
+   > 7
+  7
+  28
