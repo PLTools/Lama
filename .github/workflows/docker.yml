@@ -6,7 +6,6 @@ on:
       - 'i686-cross'
 
 env:
-  OPAMROOT: /home/opam/.opam
   OPAMCONFIRMLEVEL: unsafe-yes
 
 jobs:
