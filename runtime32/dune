@@ -10,6 +10,8 @@
 
 (install
  (section share)
+ (enabled_if
+  (= %{system} "linux"))
  (files
   (runtime.a as x32/runtime.a)
   (Std.i as x32/Std.i)))
