@@ -48,7 +48,7 @@ jobs:
         if: ${{ matrix.os == 'macos-latest' }}
       - run: opam exec -- make install
         if: ${{ matrix.os != 'macos-latest' }}
-      - run: opam exec -- make regression
+      - run: opam exec -- make regression-all
       # - run: opam exec -- dune test stdlib/regression -j1
       # - run: opam exec -- dune b
       # - run: opam exec -- dune b @install
