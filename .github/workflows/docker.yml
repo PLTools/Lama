@@ -4,15 +4,13 @@ on:
     branches:
       - '1.30'
       - 'i686-cross'
-  
+
+env:
+  OPAMROOT: /home/opam/.opam
+  OPAMCONFIRMLEVEL: unsafe-yes
+
 jobs:
   build:
-    env:
-      #OCANREN_STATS: yes
-      # enabling stats required extra link library
-      OCANREN_DOCS: yes
-      OPAMROOT: /home/user/.opam
-
     runs-on: ubuntu-24.04
     container:
       image: kakadu18/ocaml:lama
