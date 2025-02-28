@@ -42,18 +42,25 @@ jobs:
       - run: opam install . --deps-only --with-test
       - run: eval $(opam env)
 
-      - run: rm -fr runtime32
-        if: ${{ matrix.os == 'macos-latest' }}
-      - run: opam exec -- dune b src runtime runtime32 stdlib tutorial
-        if: ${{ matrix.os != 'macos-latest' }}
-      - run: opam exec -- dune b src runtime stdlib tutorial
-        if: ${{ matrix.os == 'macos-latest' }}
-      - run: opam exec -- dune b @install --profile=release
+      # - run: rm -fr runtime32
+      #   if: ${{ matrix.os == 'macos-latest' }}
+      # - run: opam exec -- dune b src runtime runtime32 stdlib tutorial
+      #   if: ${{ matrix.os != 'macos-latest' }}
+      # - run: opam exec -- dune b src runtime stdlib tutorial
+      #   if: ${{ matrix.os == 'macos-latest' }}
+      # - run: opam exec -- dune b @install --profile=release
+      # - run: opam exec -- dune    install --profile=release
+      # - run: opam exec -- dune test stdlib/regression
+      # - run: opam exec -- dune test regression_long
+      # - run: opam exec -- dune test regression 
+      # - run: opam exec -- make regression-all
+
+      - run: opam exec -- dune b
       - run: opam exec -- dune    install --profile=release
       - run: opam exec -- dune test stdlib/regression
       - run: opam exec -- dune test regression_long
-      - run: opam exec -- dune test regression 
-      # - run: opam exec -- make regression-all
+      - run: opam exec -- make regression-all
+
 
       # works
       # - run: rm -fr runtime32
