@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: kakadu18/ocaml:lama
-      options: --user user
+      #options: --user user
 
     steps:
       - run: opam --version
