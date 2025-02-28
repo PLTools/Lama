@@ -58,9 +58,8 @@ jobs:
       - run: opam exec -- dune b
       - run: opam exec -- dune    install --profile=release
       - run: opam exec -- dune test stdlib/regression
+      - run: opam exec -- dune test regression
       - run: opam exec -- dune test regression_long
-      - run: opam exec -- make regression-all
-
 
       # works
       # - run: rm -fr runtime32
