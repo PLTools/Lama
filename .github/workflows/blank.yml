@@ -44,11 +44,19 @@ jobs:
 
       - run: rm -fr runtime32
         if: ${{ matrix.os == 'macos-latest' }}
-      - run: opam exec -- dune b src runtime stdlib tutorial
-        if: ${{ matrix.os == 'macos-latest' }}
-      - run: opam exec -- make install
-        if: ${{ matrix.os != 'macos-latest' }}
+      - run: opam exec -- dune b
+      - run: opam exec -- dune install
       - run: opam exec -- make regression-all
+
+      # works
+      # - run: rm -fr runtime32
+      #   if: ${{ matrix.os == 'macos-latest' }}
+      # - run: opam exec -- dune b src runtime stdlib tutorial
+      #   if: ${{ matrix.os == 'macos-latest' }}
+      # - run: opam exec -- make install
+      #   if: ${{ matrix.os != 'macos-latest' }}
+      # - run: opam exec -- make regression-all
+
       # - run: opam exec -- dune test stdlib/regression -j1
       # - run: opam exec -- dune b
       # - run: opam exec -- dune b @install
