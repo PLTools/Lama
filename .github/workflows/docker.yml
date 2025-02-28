@@ -17,6 +17,7 @@ jobs:
 
     steps:
       - run: opam --version
+      - run: opam init
       - run: opam exec -- ocamlopt --version
 
       - name: Cancel Previous Runs
