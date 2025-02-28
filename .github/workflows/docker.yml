@@ -6,6 +6,7 @@ on:
       - 'i686-cross'
 
 env:
+  OPAMROOT: /home/user/.opam
   OPAMCONFIRMLEVEL: unsafe-yes
 
 jobs:
@@ -13,17 +14,15 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: kakadu18/ocaml:lama
-      #options: --user user
+
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - run: opam --version
-      - run: opam init --disable-sandboxing -y
+      - run: whoami
       - run: opam exec -- ocamlopt --version
-
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,7 +30,6 @@ jobs:
       - run: |
           opam install . --depext-only --with-test --with-doc
           opam install . --deps-only --with-test --with-doc
-
 
       - name: List installed packages
         run: opam list
