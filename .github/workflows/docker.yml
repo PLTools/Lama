@@ -30,7 +30,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - run: opam install . --yes --deps-only --with-test --with-doc
+      - run: |
+          opam install . --depext-only --with-test --with-doc
+          opam install . --deps-only --with-test --with-doc
+
 
       - name: List installed packages
         run: opam list
