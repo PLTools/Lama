@@ -36,6 +36,8 @@ jobs:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
 
       - run: gcc --version
+      - name: Prepare to install cross-compiler (Ubuntu specific)
+        run: dpkg --add-architecture i386
 
       - run: opam pin add Lama.dev . --no-action
       - run: opam depext Lama.dev --yes --with-test
@@ -52,7 +54,7 @@ jobs:
       - run: opam exec -- dune    install --profile=release
       - run: opam exec -- dune test stdlib/regression
       - run: opam exec -- dune test regression_long
-      - run: opam exec -- dune test regression 
+      - run: opam exec -- dune test regression
       - run: opam exec -- make regression-all
 
       #  fails on mac
