@@ -39,7 +39,9 @@ jobs:
 
       - name: Prepare to install cross-compiler (Ubuntu specific)
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: sudo dpkg --add-architecture i386
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt update -y
 
       - run: opam pin add Lama.dev . --no-action
       - run: opam depext Lama.dev --yes --with-test
