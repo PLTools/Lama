@@ -261,10 +261,15 @@ let in_memory = function M _ | S _ | I _ -> true | C _ | R _ | L _ -> false
 
 let mov x s =
   (* Numeric literals with more than 32 bits cannot be directly moved to memory location *)
-  let big_numeric_literal = function L num -> (num > 0xFFFFFFFF || num < -0xFFFFFFFF) | _ -> false in
+  let big_numeric_literal = function
+    | L num -> num > 0xFFFFFFFF || num < -0xFFFFFFFF
+    | _ -> false
+  in
   if x = s then []
-  else if (in_memory x && in_memory s) || (big_numeric_literal x && (in_memory x || in_memory s)) then
-    [ Mov (x, rax); Mov (rax, s) ]
+  else if
+    (in_memory x && in_memory s)
+    || (big_numeric_literal x && (in_memory x || in_memory s))
+  then [ Mov (x, rax); Mov (rax, s) ]
   else [ Mov (x, s) ]
 
 (* Boxing for numeric values *)
@@ -697,7 +702,10 @@ let compile cmd env imports code =
                 let l, env = env#allocate in
                 let env, call = compile_call env ~fname:".string" 1 false in
                 (env, mov addr l @ call)
-            | LDA _ -> failwith "Should not happen. Indirect assignemts are temporarily prohibited."
+            | LDA _ ->
+                failwith
+                  "Should not happen. Indirect assignemts are temporarily \
+                   prohibited."
             (*
                 let s, env' = (env#variable x)#allocate in
                 let s', env'' = env'#allocate in
@@ -726,8 +734,11 @@ let compile cmd env imports code =
                   | S _ | M _ -> [ Mov (s, rax); Mov (rax, env'#loc x) ]
                   | _ -> [ Mov (s, env'#loc x) ] ))
             | STA -> compile_call env ~fname:".sta" 3 false
-            | STI -> failwith "Should not happen. Indirect assignemts are temporarily prohibited."
-              (*
+            | STI ->
+                failwith
+                  "Should not happen. Indirect assignemts are temporarily \
+                   prohibited."
+                (*
                 let v, env = env#pop in
                 let x = env#peek in
                 ( env,
@@ -921,7 +932,7 @@ let compile cmd env imports code =
                   ]
                   @ (if name = "main" then [ Binop ("^", rax, rax) ] else [])
                   @ [
-                      Meta "\t.cfi_restore\t5";
+                      Meta "\t.cfi_restore\trbp";
                       Meta "\t.cfi_def_cfa\t4, 4";
                       Ret;
                       Meta "\t.cfi_endproc";
@@ -995,11 +1006,9 @@ let compile cmd env imports code =
                 in
                 let _, env = env#pop in
                 ( env,
-                  mov (L col) col_arg_addr
-                  @ mov (L line) line_arg_addr
-                  @ mov msg_addr msg_arg_addr
-                  @ mov value value_arg_addr
-                  @ code )
+                  mov (L col) col_arg_addr @ mov (L line) line_arg_addr
+                  @ mov msg_addr msg_arg_addr @ mov value value_arg_addr @ code
+                )
             | i ->
                 invalid_arg
                   (Printf.sprintf "invalid SM insn: %s\n" (GT.show insn i))
