@@ -51,11 +51,11 @@ jobs:
       - run: eval $(opam env)
 
       - run: rm -fr runtime32
-        if: ${{ matrix.os == 'macos-latest' }}
+        if: ${{ matrix.os == 'macos-latest' || matrix.os == 'macos-13' }}
       - run: opam exec -- dune b src runtime runtime32 stdlib tutorial
-        if: ${{ matrix.os != 'macos-latest' }}
+        if: ${{ matrix.os != 'macos-latest' && matrix.os != 'macos-13'}}
       - run: opam exec -- dune b src runtime stdlib tutorial
-        if: ${{ matrix.os == 'macos-latest' }}
+        if: ${{ matrix.os == 'macos-latest' || matrix.os == 'macos-13' }}
       - run: opam exec -- dune b @install --profile=release
       - run: opam exec -- dune    install --profile=release
       - run: opam exec -- dune test stdlib/regression
