@@ -647,7 +647,7 @@ let compile_call env ?fname nargs tail =
   else compile_common_call env fname nargs
 
 let opt_stabs env stabs =
-  match env#mode.target_os with Darwin -> [] | Linux -> stabs
+  match env#mode.target_os with Darwin -> [] | Linux -> (* [] *) stabs
 
 (* Symbolic stack machine evaluator
 
@@ -875,10 +875,12 @@ let compile cmd env imports code =
                      else [])
                   @ [
                       Push rbp;
-                      Meta "\t.cfi_def_cfa_offset\t8";
-                      Meta "\t.cfi_offset 5, -8";
+                      (* Meta "\t.cfi_def_cfa_offset\t8";
+                         Meta "\t.cfi_offset 5, -8"; *)
+                      Meta "\t.cfi_def_cfa_offset\t16";
+                      Meta "\t.cfi_offset %rbp, -16";
                       Mov (rsp, rbp);
-                      Meta "\t.cfi_def_cfa_register\t5";
+                      Meta "\t.cfi_def_cfa_register\t%rbp";
                       Binop ("-", C env#lsize, rsp);
                       Mov (rdi, r12);
                       Mov (rsi, r13);
@@ -932,8 +934,9 @@ let compile cmd env imports code =
                   ]
                   @ (if name = "main" then [ Binop ("^", rax, rax) ] else [])
                   @ [
-                      Meta "\t.cfi_restore\trbp";
-                      Meta "\t.cfi_def_cfa\t4, 4";
+                      (* Meta "\t.cfi_restore\t5";
+                         Meta "\t.cfi_def_cfa\t4, 4"; *)
+                      Meta "\t.cfi_def_cfa\t%rsp, 8";
                       Ret;
                       Meta "\t.cfi_endproc";
                       Meta
