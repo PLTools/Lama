@@ -141,7 +141,33 @@ There are three forms of expressions to specify composite values: arrays, lists 
 
 \subsection{Let Expressions}
 
-TODO
+\begin{figure}[h]
+  \[
+  \begin{array}{rcll}
+    \defterm{letExpression} & : & \term{let}\s\nonterm{pattern}\s\term{=}\s\nonterm{expression}\s\term{in}\s\nonterm{expression}
+  \end{array}
+  \]
+  \caption{Let-expression syntax}
+  \label{let_expression}
+\end{figure}
+
+Let expression is a derived syntactic form for a one-branch case-expression. An expression
+
+\begin{lstlisting}
+   let p = e in b
+\end{lstlisting}
+
+is equivalent to
+
+\begin{lstlisting}
+   case e of
+     p -> b
+   esac
+\end{lstlisting}
+
+As let expression lacks an explicit ending specifier its scope extends to the right while possible; multiple let expressions on
+the same nesting level associate to the right.
+
 
 \FloatBarrier
 
