@@ -491,7 +491,7 @@ extern regex_t *Lregexp (char *regexp) {
   if (res != 0) {
       char buf[100];
       regerror(res, regexp_compiled, buf, 100);
-      failure("%", buf);
+      failure("%s", buf);
   }
 
   return regexp_compiled;
