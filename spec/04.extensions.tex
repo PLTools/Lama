@@ -149,7 +149,7 @@ The syntax for syntax definition expressions is shown in Fig.~\ref{syntax_expres
       \defterm{syntaxBinding}     & : & [\s\term{-}\s]\s[\s\nonterm{pattern}\s\term{=}\s]\s\s\nonterm{syntaxPostfix}&\\
       \defterm{syntaxPostfix}     & : & \nonterm{syntaxPrimary}\s[\s\term{*}\s\alt\s\term{+}\s\alt\s\term{?}\s]&\\
       \defterm{syntaxPrimary}     & : & \token{LIDENT}\s(\s\term{[}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^*\s]\s\term{]}\s)^*&\alt\\
-                                  &   & \term{(}\s\nonterm{syntaxExpression}\s\term{)}&\alt\\
+                                  &   & \term{(}\s\nonterm{syntaxSeq}\s\term{)}&\alt\\
                                   &   & \term{\$(}\s\nonterm{expression}\s\term{)}&
     \end{array}
   \]
