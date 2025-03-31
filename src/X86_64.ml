@@ -1006,7 +1006,7 @@ let compile cmd env imports code =
                 in
                 let _, env = env#pop in
                 ( env,
-                  mov (L col) col_arg_addr @ mov (L line) line_arg_addr
+                  mov (L (box col)) col_arg_addr @ mov (L (box line)) line_arg_addr
                   @ mov msg_addr msg_arg_addr @ mov value value_arg_addr @ code
                 )
             | i ->
