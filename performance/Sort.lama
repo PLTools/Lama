@@ -1,12 +1,8 @@
-fun compare (x, y) {
-  x - y
-}
-
 fun bubbleSort (l) {
   fun inner (l) {
     case l of
       x : z@(y : tl) ->
-       if compare (x, y) > 0
+       if x > y
        then [true, y : inner (x : tl) [1]]
        else case inner (z) of [f, z] -> [f, x : z] esac
        fi
@@ -28,4 +24,4 @@ fun generate (n) {
   if n then n : generate (n-1) else {} fi
 }
 
-bubbleSort (generate (1000))
+bubbleSort (generate (10000))

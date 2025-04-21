@@ -582,8 +582,8 @@ module Expr =
          eval conf Skip (schedule_list [e; Intrinsic (fun conf -> branch conf bs)])
 
   (* Expression parser. You can use the following terminals:
-       LIDENT  --- a non-empty identifier a-z[a-zA-Z0-9_]* as a string
-       UIDENT  --- a non-empty identifier A-Z[a-zA-Z0-9_]* as a string
+       LIDENT  --- a non-empty identifier a-z[a-zA-Z0-9_']* as a string
+       UIDENT  --- a non-empty identifier A-Z[a-zA-Z0-9_']* as a string
        DECIMAL --- a decimal constant [0-9]+ as a string
   *)
 
@@ -604,7 +604,7 @@ module Expr =
       match s with
       | ":"  -> Sexp   ("cons", [x; y])
       | ":=" -> Assign (x, y)
-      | "=" -> Binop ("==", Call (Var ("compare"), [x; y]), Const (0))
+      | "="  -> Binop ("==", Call (Var ("compare"), [x; y]), Const (0))
       | _    -> Binop  (s, x, y)
     in
     match x with
@@ -1289,13 +1289,16 @@ let run_parser cmd =
        inherit Util.Lexers.string s
        inherit Util.Lexers.char   s
        inherit Util.Lexers.infix  s
-       inherit Util.Lexers.lident kws s
+       inherit Util.Lexers.lident kws s as lident
        inherit Util.Lexers.uident kws s
        inherit Util.Lexers.skip [
         Matcher.Skip.whitespaces " \t\n\r";
         Matcher.Skip.lineComment "--";
         Matcher.Skip.nestedComment "(*" "*)"
        ] s
+
+       method getLIDENT : 'b. (String.t -> 'self -> ('self, 'b, Reason.t) Types.result) -> ('self, 'b, Reason.t) Types.result =
+         fun k -> lident#getIdent (fun s self -> k (String.map (function '\'' -> '$' | c -> c) s) self)
      end
     )
     (if cmd#is_workaround then ostap (p:!(constparse cmd) -EOF)  else ostap (p:!(parse cmd) -EOF))
