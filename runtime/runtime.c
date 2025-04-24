@@ -1,12 +1,9 @@
 /* Runtime library */
 
-#define _GNU_SOURCE 1
+# define _GNU_SOURCE 1
 
-#include "runtime.h"
-#include <regex.h>
-
-#include "gc.h"
-#include "runtime_common.h"
+# include "runtime.h"
+# include "gc.h"
 
 extern size_t __gc_stack_top, __gc_stack_bottom;
 
@@ -486,7 +483,7 @@ extern regex_t *Lregexp (char *regexp) {
 
   int res = regcomp(regexp_compiled, regexp, REG_EXTENDED);
 
-  // printf("Lregexp: got compiled regexp %p, for string %s\n", regexp_compiled, regexp);
+  //printf("Lregexp: got compiled regexp %p, for string %s\n", regexp_compiled, regexp);
 
   if (res != 0) {
       char buf[100];
@@ -506,7 +503,7 @@ extern aint LregexpMatch (regex_t *b, char *s, aint pos) {
 
   int res = regexec(b, s + UNBOX(pos), (size_t) 1, &match, 0);
 
-  // printf("regexpMatch %p: %s, res=%d so=%d eo=%d\n", b, s + UNBOX(pos), res, match.rm_so, match.rm_eo);
+  //printf("regexpMatch %p: %s, res=%d so=%d eo=%d\n", b, s + UNBOX(pos), res, match.rm_so, match.rm_eo);
 
   if (res == 0 && match.rm_so == 0) {
       return BOX(match.rm_eo);
@@ -826,7 +823,7 @@ extern void *Bclosure (aint* args, aint bn) {
 extern void *Barray (aint* args, aint bn) {
   data   *r;
   aint     n = UNBOX(bn);
-
+  
   PRE_GC();
 
   for (aint i = 0; i < n; i++) {

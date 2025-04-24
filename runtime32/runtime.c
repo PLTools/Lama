@@ -630,38 +630,40 @@ extern void* Lsubstring (void *subj, int p, int l) {
             subject length=%d)", pp, ll, LEN(d->tag));
 }
 
-extern struct re_pattern_buffer *Lregexp (char *regexp) {
-  regex_t *b = (regex_t*) malloc (sizeof (regex_t));
+extern regex_t *Lregexp (char *regexp) {
+  regex_t *regexp_compiled = (regex_t *) malloc(sizeof(regex_t));
 
-  /* printf ("regexp: %s,\t%x\n", regexp, b); */
+  memset(regexp_compiled, 0, sizeof(regex_t));
 
-  memset (b, 0, sizeof (regex_t));
+  int res = regcomp(regexp_compiled, regexp, REG_EXTENDED);
 
-  int n = (int) re_compile_pattern (regexp, strlen (regexp), b);
+  //printf("Lregexp: got compiled regexp %p, for string %s\n", regexp_compiled, regexp);
 
-  if (n != 0) {
-    failure ("%", strerror (n));
-  };
+  if (res != 0) {
+      char buf[100];
+      regerror(res, regexp_compiled, buf, 100);
+      failure("%s", buf);
+  }
 
-  return b;
+  return regexp_compiled;
 }
 
-extern int LregexpMatch (struct re_pattern_buffer *b, char *s, int pos) {
-  int res;
+extern void* LregexpMatch (regex_t *b, char *s, int pos) {
+  regmatch_t match;
 
   ASSERT_BOXED("regexpMatch:1", b);
   ASSERT_STRING("regexpMatch:2", s);
   ASSERT_UNBOXED("regexpMatch:3", pos);
 
-  res = re_match (b, s, LEN(TO_DATA(s)->tag), UNBOX(pos), 0);
+  int res = regexec(b, s + UNBOX(pos), (size_t) 1, &match, 0);
 
-  /* printf ("regexpMatch %x: %s, res=%d\n", b, s+UNBOX(pos), res); */
+  //printf ("regexpMatch %p: %s, res=%d so=%d eo=%d\n", b, s + UNBOX(pos), res, match.rm_so, match.rm_eo);
 
-  if (res) {
-    return BOX (res);
+  if (res == 0 && match.rm_so == 0) {
+      return BOX(match.rm_eo);
+  } else {
+      return BOX(-1);
   }
-
-  return BOX (res);
 }
 
 extern void* Bstring (void*);
