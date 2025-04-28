@@ -660,9 +660,9 @@ extern void* LregexpMatch (regex_t *b, char *s, int pos) {
   //printf ("regexpMatch %p: %s, res=%d so=%d eo=%d\n", b, s + UNBOX(pos), res, match.rm_so, match.rm_eo);
 
   if (res == 0 && match.rm_so == 0) {
-      return BOX(match.rm_eo);
+      return (void*)BOX(match.rm_eo);
   } else {
-      return BOX(-1);
+      return (void*)BOX(-1);
   }
 }
 
