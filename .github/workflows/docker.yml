@@ -37,12 +37,11 @@ jobs:
       - name: update
         run: opam update --yes
       - name: upgrade
-        run: opam upgrade ostap --yes
+        run: opam upgrade --yes
 
       - name: List installed packages 2
         run: opam list
 
       - run: eval $(opam env)
-#      - run: opam exec -- dune build --profile=release
-      - run: opam exec -- dune build
+      - run: opam exec -- dune build --profile=release
       - run: opam exec -- dune test regression/ stdlib/regression
