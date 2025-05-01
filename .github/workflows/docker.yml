@@ -32,8 +32,11 @@ jobs:
           opam install . --deps-only --with-test --with-doc
 
       - name: List installed packages
-        run: opam list
+        run: |
+          opam list
+          opam pin list
 
       - run: eval $(opam env)
-      - run: opam exec -- dune build --profile=release
+#      - run: opam exec -- dune build --profile=release
+      - run: opam exec -- dune build
       - run: opam exec -- dune test regression/ stdlib/regression
