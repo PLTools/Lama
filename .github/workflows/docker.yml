@@ -35,6 +35,8 @@ jobs:
         run: opam list
 
       - name: update
+        run: opam update --yes
+      - name: upgrade
         run: opam upgrade ostap --yes
 
       - name: List installed packages 2
