@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
-#include "../runtime/runtime.h"
+#include "../runtime32/runtime.h"
 
 void *__start_custom_data;
 void *__stop_custom_data;
