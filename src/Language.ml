@@ -666,9 +666,9 @@ module Expr =
       basic[infix][atr]: !(expr (fun x -> x) (Array.map (fun (a, (atr, l)) -> a, (atr, List.map (fun (s, _, f) -> ostap (- $(s)), f) l)) infix) (primary infix) atr);
       primary[infix][atr]:
           s:(s:"-"? {match s with None -> fun x -> x | _ -> fun x -> Binop ("-", Const 0, x)})
-          b:base[infix][Val] is:(  "." f:LIDENT args:(-"(" !(Util.list)[parse infix Val] -")")? {`Post (f, args)}
-                                      | "[" i:parse[infix][Val] "]"                             {`Elem i}
-                                      | "(" args:!(Util.list0)[parse infix Val] ")"             {`Call args}
+          b:base[infix][Val] is:(  "." f:LIDENT (*args:(-"(" !(Util.list)[parse infix Val] -")")?*) {`Post (f, None (*args*))}
+                                 | "[" i:parse[infix][Val] "]"                                      {`Elem i}
+                                 | "(" args:!(Util.list0)[parse infix Val] ")"                      {`Call args} 
           )+
         => {match (List.hd (List.rev is)), atr with
             | `Elem i, Reff -> true
