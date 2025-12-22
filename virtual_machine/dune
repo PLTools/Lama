@@ -1,0 +1,42 @@
+(rule
+ (target interpreter.exe)
+ (deps
+  (:main interpreter.c)
+  mac-specific-flags.txt)
+ (mode
+  (promote (until-clean)))
+ (action
+  (run
+   gcc
+   %{read-lines:mac-specific-flags.txt}
+   -g
+   %{main}
+   -o
+   %{target})))
+
+(rule
+ (target mac-specific-flags.txt)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (write-file %{target} "")))
+
+(rule
+ (target mac-specific-flags.txt)
+ (enabled_if
+  (= %{ocaml-config:system} macosx))
+ (action
+  (write-file %{target} "-Wl,-no_pie")))
+
+(cram (deps interpreter.exe))
+
+(cram (applies_to test001)
+  (deps test001.bc ../regression/test001.input))
+(cram (applies_to test002)
+  (deps test002.bc ../regression/test002.input))
+(cram (applies_to test003)
+  (deps test003.bc ../regression/test003.input))
+(cram (applies_to test004)
+  (deps test004.bc ../regression/test004.input))
+(cram (applies_to test005)
+  (deps test005.bc ../regression/test005.input))
