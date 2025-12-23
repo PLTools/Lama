@@ -26,7 +26,6 @@ typedef enum {
 
 typedef struct {
   const uint8_t *code;
-  uint8_t *code_buf; // non-const pointer for freeing
   int code_size;
   int entry_point;
   int globals_count;
