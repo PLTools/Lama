@@ -1,0 +1,31 @@
+#ifndef OPCODES_H
+#define OPCODES_H
+
+typedef enum {
+  OP_BINOP_ADD = 0x01,
+  OP_BINOP_SUB = 0x02,
+  OP_BINOP_MUL = 0x03,
+  OP_BINOP_DIV = 0x04,
+  OP_BINOP_MOD = 0x05,
+  OP_CONST = 0x10,
+  OP_END = 0x16,
+  OP_RET = 0x17,
+  OP_DROP = 0x18,
+  OP_DUP = 0x19,
+  OP_SWAP = 0x1A,
+  OP_LD = 0x20,
+  OP_LD_LOC = 0x21,
+  OP_LD_ARG = 0x22,
+  OP_ST = 0x40,
+  OP_ST_LOC = 0x41,
+  OP_ST_ARG = 0x42,
+  OP_BEGIN = 0x52,
+  OP_BEGIN_CLOSURE = 0x53,
+  OP_CALL = 0x56,
+  OP_LINE = 0x5A,
+  OP_READ = 0x70,
+  OP_WRITE = 0x71,
+  OP_HALT = 0xFF,
+} opcode_t;
+
+#endif

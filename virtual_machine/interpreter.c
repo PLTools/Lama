@@ -1,115 +1,8 @@
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef enum {
-  OP_BINOP_ADD = 0x01,
-  OP_BINOP_SUB = 0x02,
-  OP_BINOP_MUL = 0x03,
-  OP_BINOP_DIV = 0x04,
-  OP_BINOP_MOD = 0x05,
-  OP_CONST = 0x10,
-  OP_END = 0x16,
-  OP_RET = 0x17,
-  OP_DROP = 0x18,
-  OP_DUP = 0x19,
-  OP_SWAP = 0x1A,
-  OP_LD = 0x20,
-  OP_LD_LOC = 0x21,
-  OP_LD_ARG = 0x22,
-  OP_ST = 0x40,
-  OP_ST_LOC = 0x41,
-  OP_ST_ARG = 0x42,
-  OP_BEGIN = 0x52,
-  OP_BEGIN_CLOSURE = 0x53,
-  OP_CALL = 0x56,
-  OP_LINE = 0x5A,
-  OP_READ = 0x70,
-  OP_WRITE = 0x71,
-  OP_HALT = 0xFF,
-} opcode_t;
-
-typedef struct {
-  const uint8_t *code;
-  int code_size;
-  int entry_point;
-  int globals_count;
-} bytecode;
-
-static inline int read_i32(const uint8_t data[], int offset) {
-  return data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) |
-         (data[offset + 3] << 24);
-}
-
-#define HEADER_SIZE 12
-#define PUB_ENTRY_SIZE 8
-
-static int find_entry_point(const uint8_t *data, int pubs_offset, int num_pubs,
-                            const uint8_t *string_table, const char *name) {
-  for (int i = 0; i < num_pubs; i++) {
-    int entry_offset = pubs_offset + i * PUB_ENTRY_SIZE;
-    int name_offset = read_i32(data, entry_offset);
-    char *f_name = (char *)(string_table + name_offset);
-    int address = read_i32(data, entry_offset + 4);
-    if (strcmp(f_name, name) == 0) {
-      return address;
-    }
-  }
-  return -1;
-}
-
-bytecode *load_bytecode(const char *filename) {
-  FILE *f = fopen(filename, "rb");
-  if (!f) {
-    perror("fopen");
-    return NULL;
-  }
-
-  fseek(f, 0, SEEK_END);
-  long size = ftell(f);
-  rewind(f);
-
-  uint8_t *data = malloc(size);
-
-  if (!data) {
-    fclose(f);
-    return NULL;
-  }
-
-  if (fread(data, 1, size, f) != size) {
-    perror("fread");
-    fclose(f);
-    free(data);
-    return NULL;
-  }
-  fclose(f);
-
-  int st_size = read_i32(data, 0);
-  int globals_count = read_i32(data, 4);
-  int num_pubs = read_i32(data, 8);
-  int num_imports = read_i32(data, 12);
-  int num_ext_fixups = read_i32(data, 16);
-
-  int pubs_offset = HEADER_SIZE;
-  int st_offset = pubs_offset + num_pubs * PUB_ENTRY_SIZE;
-  int code_offset = st_offset + st_size;
-  int code_size = size - code_offset;
-
-  uint8_t *string_table = data + st_offset;
-  int main_entry_point =
-      find_entry_point(data, pubs_offset, num_pubs, string_table, "main");
-
-  bytecode *bc = malloc(sizeof(bytecode));
-  bc->code = malloc(code_size);
-  memcpy(bc->code, data + code_offset, code_size);
-  bc->code_size = code_size;
-  bc->entry_point = main_entry_point;
-  bc->globals_count = globals_count;
-
-  free(data);
-  return bc;
-}
+#include "bytecode.h"
+#include "opcodes.h"
 
 #define STACK_SIZE 1024
 
@@ -358,8 +251,7 @@ int main(int argc, char *argv[]) {
   }
 
   run(bc);
-
-  free(bc->code);
-  free(bc);
+  
+  free_bytecode(bc);
   return 0;
 }
