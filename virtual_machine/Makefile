@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -O2 -g
 
-TARGET = interpreter
+TARGET = interpreter.exe
 SOURCES = interpreter.c bytecode.c
 HEADERS = opcodes.h bytecode.h
 OBJECTS = $(SOURCES:.c=.o)
