@@ -3,20 +3,7 @@
 #include <string.h>
 #include "bytecode.h"
 #include "opcodes.h"
-
-#define STACK_SIZE 1024
-
-static inline void push(int **sp, int val) {
-  *(*sp)++ = val;
-}
-
-static inline int pop(int **sp) {
-  return *--(*sp);
-}
-
-static inline int peek(int **sp) {
-  return *(*sp - 1);
-}
+#include "stack.h"
 
 typedef struct frame {
   struct frame *parent;
@@ -53,23 +40,22 @@ static void frame_drop(frame *f) {
 }
 
 void run(bytecode *bc) {
-  int stack[STACK_SIZE];
-  int *sp = stack;
+  stack_t stack;
+  stack_init(&stack);
   int *globals = malloc(sizeof(int) * bc->globals_count);
   int ip = bc->entry_point;
-  int pending_args = 0;
 
   while (ip < bc->code_size) {
     uint8_t opcode = bc->code[ip++];
     int l = opcode & 0xF;
 
-    printf("ip=%d opcode=0x%02X\n", ip, opcode);
+    // printf("ip=%d opcode=0x%02X\n", ip, opcode);
 
     switch (opcode) {
     case OP_CONST: {
       int n = read_i32(bc->code, ip);
       ip += 4;
-      push(&sp, n);
+      stack_push(&stack, n);
       break;
     }
     case OP_BINOP_ADD:
@@ -77,8 +63,8 @@ void run(bytecode *bc) {
     case OP_BINOP_MUL:
     case OP_BINOP_DIV:
     case OP_BINOP_MOD: {
-      int y = pop(&sp);
-      int x = pop(&sp);
+      int y = stack_pop(&stack);
+      int x = stack_pop(&stack);
       int result;
       switch (l) {
       case 1:
@@ -105,64 +91,60 @@ void run(bytecode *bc) {
         result = x % y;
         break;
       }
-      push(&sp, result);
+      stack_push(&stack, result);
       break;
     }
     case OP_LD: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      push(&sp, globals[idx]);
+      stack_push(&stack, globals[idx]);
       break;
     }
     case OP_LD_LOC: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      push(&sp, *frame_local(current_frame, idx));
+      stack_push(&stack, *frame_local(current_frame, idx));
       break;
     }
     case OP_LD_ARG: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      push(&sp, *frame_arg(current_frame, idx));
+      stack_push(&stack, *frame_arg(current_frame, idx));
       break;
     }
     case OP_ST: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      int val = pop(&sp);
+      int val = stack_pop(&stack);
       globals[idx] = val;
-      push(&sp, val);
+      stack_push(&stack, val);
       break;
     }
     case OP_ST_LOC: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      int val = pop(&sp);
+      int val = stack_pop(&stack);
       *frame_local(current_frame, idx) = val;
-      push(&sp, val);
+      stack_push(&stack, val);
       break;
     }
     case OP_ST_ARG: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      int val = pop(&sp);
+      int val = stack_pop(&stack);
       *frame_arg(current_frame, idx) = val;
-      push(&sp, val);
+      stack_push(&stack, val);
       break;
     }
     case OP_DROP:
-      pop(&sp);
+      stack_pop(&stack);
       break;
     case OP_DUP:
-      push(&sp, peek(&sp));
+      stack_dup(&stack);
       break;
-    case OP_SWAP: {
-      int y = pop(&sp);
-      int x = pop(&sp);
-      push(&sp, y);
-      push(&sp, x);
+    case OP_SWAP:
+      stack_swap(&stack);
       break;
-    }
     case OP_BEGIN: {
       int n_args = read_i32(bc->code, ip);
       ip += 4;
@@ -170,7 +152,7 @@ void run(bytecode *bc) {
       ip += 4;
       frame *new_frame = frame_create(current_frame, return_ip, n_args, n_locals);
       for (int i = n_args - 1; i >= 0; i--) {
-        *frame_arg(new_frame, i) = pop(&sp);
+        *frame_arg(new_frame, i) = stack_pop(&stack);
       }
       current_frame = new_frame;
       break;
@@ -210,13 +192,13 @@ void run(bytecode *bc) {
         fprintf(stderr, "Failed to read\n");
         goto end;
       }
-      push(&sp, x);
+      stack_push(&stack, x);
       break;
     }
     case OP_WRITE: {
-      int x = pop(&sp);
+      int x = stack_pop(&stack);
       printf("%d\n", x);
-      push(&sp, x);
+      stack_push(&stack, x);
       break;
     }
     case OP_HALT:
@@ -251,7 +233,7 @@ int main(int argc, char *argv[]) {
   }
 
   run(bc);
-  
+
   free_bytecode(bc);
   return 0;
 }
