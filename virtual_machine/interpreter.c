@@ -4,7 +4,6 @@
 #include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 static inline int *get_local(stack_t *stack, call_frame_t *frame, int idx) {
   return &stack->data[frame->base + frame->n_args + idx];
@@ -29,7 +28,7 @@ void run(bytecode *bc) {
     uint8_t opcode = bc->code[ip++];
     int l = opcode & 0xF;
 
-    // printf("ip=%d opcode=0x%02X\n", ip, opcode);
+    // printf("ip=0x%08X opcode=0x%02X\n", ip-1, opcode);
 
     switch (opcode) {
     case OP_CONST: {
@@ -42,7 +41,13 @@ void run(bytecode *bc) {
     case OP_BINOP_SUB:
     case OP_BINOP_MUL:
     case OP_BINOP_DIV:
-    case OP_BINOP_MOD: {
+    case OP_BINOP_MOD: 
+    case OP_BINOP_EQ:
+    case OP_BINOP_NE:
+    case OP_BINOP_LT:
+    case OP_BINOP_LE:
+    case OP_BINOP_GT:
+    case OP_BINOP_GE: {
       int y = stack_pop(&stack);
       int x = stack_pop(&stack);
       int result;
@@ -70,8 +75,49 @@ void run(bytecode *bc) {
         }
         result = x % y;
         break;
+      case 6: 
+        result = x < y;
+        break;
+      case 7:
+        result = x <= y;
+        break;
+      case 8:
+        result = x > y;
+        break;
+      case 9:
+        result = x >= y;
+        break;
+      case 10:
+        result = x == y;
+        break;
+      case 11:
+        result = x != y;
+        break;
       }
       stack_push(&stack, result);
+      break;
+    }
+    case OP_JMP: {
+      int addr = read_i32(bc->code, ip);
+      ip = addr;
+      break;
+    }
+    case OP_CJMP_Z: {
+      int addr = read_i32(bc->code, ip);
+      ip += 4;
+      int val = stack_pop(&stack);
+      if (val == 0) {
+        ip = addr;
+      }
+      break;
+    }
+    case OP_CJMP_NZ: {
+      int addr = read_i32(bc->code, ip);
+      ip += 4;
+      int val = stack_pop(&stack);
+      if (val != 0) {
+        ip = addr;
+      }
       break;
     }
     case OP_LD: {
@@ -145,7 +191,7 @@ void run(bytecode *bc) {
       call_stack_push(&call_stack, return_ip, base, n_args, n_locals);
       break;
     }
-    case OP_BEGIN_CLOSURE:
+    case OP_BEGIN_CLOSURE: 
       // TODO: skip for now
       ip += 8;
       break;
@@ -206,7 +252,7 @@ void run(bytecode *bc) {
       ip += 4;
       break;
     default:
-      fprintf(stderr, "Not yet supported opcode 0x%02X at ip=%d\n", opcode, ip);
+      fprintf(stderr, "Not yet supported opcode 0x%02X at ip=0x%08x\n", opcode, ip-1);
       goto end;
     }
   }
