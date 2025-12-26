@@ -1,49 +1,29 @@
+#include "bytecode.h"
+#include "call_stack.h"
+#include "opcodes.h"
+#include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "bytecode.h"
-#include "opcodes.h"
-#include "stack.h"
 
-typedef struct frame {
-  struct frame *parent;
-  int return_ip;
-  int n_args;
-  int n_locals;
-  int locals[];
-} frame;
-
-static frame *current_frame = NULL;
-static int return_ip = -1;
-
-static frame *frame_create(frame *parent, int ret_ip, int n_args, int n_locals) {
-  int total_locals = n_args + n_locals;
-  frame *f = malloc(sizeof(frame) + total_locals * sizeof(int));
-  f->parent = parent;
-  f->return_ip = ret_ip;
-  f->n_args = n_args;
-  f->n_locals = n_locals;
-  memset(f->locals, 0, total_locals * sizeof(int));
-  return f;
+static inline int *get_local(stack_t *stack, call_frame_t *frame, int idx) {
+  return &stack->data[frame->base + frame->n_args + idx];
 }
 
-static int *frame_local(frame *f, int idx) {
-  return &f->locals[idx];
-}
-
-static int *frame_arg(frame *f, int idx) {
-  return &f->locals[f->n_locals + idx];
-}
-
-static void frame_drop(frame *f) {
-  free(f);
+static inline int *get_arg(stack_t *stack, call_frame_t *frame, int idx) {
+  return &stack->data[frame->base + idx];
 }
 
 void run(bytecode *bc) {
   stack_t stack;
+  call_stack_t call_stack;
   stack_init(&stack);
+  call_stack_init(&call_stack);
+
   int *globals = malloc(sizeof(int) * bc->globals_count);
+
   int ip = bc->entry_point;
+  int return_ip = -1;
 
   while (ip < bc->code_size) {
     uint8_t opcode = bc->code[ip++];
@@ -103,13 +83,15 @@ void run(bytecode *bc) {
     case OP_LD_LOC: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      stack_push(&stack, *frame_local(current_frame, idx));
+      call_frame_t *frame = call_stack_current(&call_stack);
+      stack_push(&stack, *get_local(&stack, frame, idx));
       break;
     }
     case OP_LD_ARG: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      stack_push(&stack, *frame_arg(current_frame, idx));
+      call_frame_t *frame = call_stack_current(&call_stack);
+      stack_push(&stack, *get_arg(&stack, frame, idx));
       break;
     }
     case OP_ST: {
@@ -123,16 +105,18 @@ void run(bytecode *bc) {
     case OP_ST_LOC: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
+      call_frame_t *frame = call_stack_current(&call_stack);
       int val = stack_pop(&stack);
-      *frame_local(current_frame, idx) = val;
+      *get_local(&stack, frame, idx) = val;
       stack_push(&stack, val);
       break;
     }
     case OP_ST_ARG: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
+      call_frame_t *frame = call_stack_current(&call_stack);
       int val = stack_pop(&stack);
-      *frame_arg(current_frame, idx) = val;
+      *get_arg(&stack, frame, idx) = val;
       stack_push(&stack, val);
       break;
     }
@@ -150,11 +134,15 @@ void run(bytecode *bc) {
       ip += 4;
       int n_locals = read_i32(bc->code, ip);
       ip += 4;
-      frame *new_frame = frame_create(current_frame, return_ip, n_args, n_locals);
-      for (int i = n_args - 1; i >= 0; i--) {
-        *frame_arg(new_frame, i) = stack_pop(&stack);
+
+      int base = (stack.sp - stack.data) - n_args;
+
+      // space for locals
+      for (int i = 0; i < n_locals; i++) {
+        stack_push(&stack, 0);
       }
-      current_frame = new_frame;
+
+      call_stack_push(&call_stack, return_ip, base, n_args, n_locals);
       break;
     }
     case OP_BEGIN_CLOSURE:
@@ -172,22 +160,33 @@ void run(bytecode *bc) {
     }
     case OP_RET:
     case OP_END: {
-      if (current_frame == NULL) {
-        goto end;
-      }
-      int ret_ip = current_frame->return_ip;
-      frame *parent = current_frame->parent;
-      frame_drop(current_frame);
-      current_frame = parent;
-      if (ret_ip < 0) {
-        goto end;
-      }
-      ip = ret_ip;
-      break;
+        if (call_stack_is_empty(&call_stack)) {
+            goto end;
+        }
+        call_frame_t frame = call_stack_pop(&call_stack);
+
+        int current_top = stack.sp - stack.data;
+        int returns_start = frame.base + frame.n_args + frame.n_locals;
+        int n_returns = current_top - returns_start;
+
+        if (n_returns <= 0) {  
+          n_returns = 0;
+        } else {
+            for (int i = 0; i < n_returns; i++) {
+                stack.data[frame.base + i] = stack.data[returns_start + i];
+            }
+        }
+
+        stack.sp = stack.data + frame.base + n_returns;
+        if (frame.return_ip < 0) {
+            goto end;
+        }
+        ip = frame.return_ip;
+        break;
     }
+
     case OP_READ: {
       int x;
-      // TODO: scanf ?
       if (scanf("%d", &x) != 1) {
         fprintf(stderr, "Failed to read\n");
         goto end;
@@ -213,11 +212,6 @@ void run(bytecode *bc) {
   }
 
 end:
-  while (current_frame) {
-    frame *parent = current_frame->parent;
-    frame_drop(current_frame);
-    current_frame = parent;
-  }
   free(globals);
 }
 
