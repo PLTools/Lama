@@ -6,7 +6,7 @@ void stack_init(stack_t *s) {
   s->sp = s->data;
 }
 
-void stack_push(stack_t *s, int val) {
+void stack_push(stack_t *s, aint val) {
   if (s->sp >= s->data + STACK_SIZE) {
     fprintf(stderr, "Stack overflow\n");
     exit(1);
@@ -14,7 +14,7 @@ void stack_push(stack_t *s, int val) {
   *s->sp++ = val;
 }
 
-int stack_pop(stack_t *s) {
+aint stack_pop(stack_t *s) {
   if (s->sp <= s->data) {
     fprintf(stderr, "Cannot pop from an empty stack");
     exit(1);
@@ -22,7 +22,7 @@ int stack_pop(stack_t *s) {
   return *--s->sp;
 }
 
-int stack_peek(const stack_t *s) {
+aint stack_peek(const stack_t *s) {
   if (s->sp <= s->data) {
     fprintf(stderr, "Cannot peek from an empty stack");
     exit(1);
@@ -31,13 +31,13 @@ int stack_peek(const stack_t *s) {
 }
 
 void stack_dup(stack_t *s) {
-  int top = stack_peek(s);
+  aint top = stack_peek(s);
   stack_push(s, top);
 }
 
 void stack_swap(stack_t *s) {
-  int y = stack_pop(s);
-  int x = stack_pop(s);
+  aint y = stack_pop(s);
+  aint x = stack_pop(s);
   stack_push(s, y);
   stack_push(s, x);
 }

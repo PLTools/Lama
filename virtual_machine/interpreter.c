@@ -4,12 +4,27 @@
 #include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "../runtime/runtime_common.h"
 
-static inline int *get_local(stack_t *stack, call_frame_t *frame, int idx) {
+extern aint Lread(void);
+extern aint Lwrite(aint n);
+extern aint Ls__Infix_43(void *p, void *q);
+extern aint Ls__Infix_45(void *p, void *q);
+extern aint Ls__Infix_42(void *p, void *q);
+extern aint Ls__Infix_47(void *p, void *q);
+extern aint Ls__Infix_37(void *p, void *q);
+extern aint Ls__Infix_60(void *p, void *q);
+extern aint Ls__Infix_6061(void *p, void *q);
+extern aint Ls__Infix_62(void *p, void *q);
+extern aint Ls__Infix_6261(void *p, void *q);
+extern aint Ls__Infix_6161(void *p, void *q);
+extern aint Ls__Infix_3361(void *p, void *q);
+
+static inline aint *get_local(stack_t *stack, call_frame_t *frame, int idx) {
   return &stack->data[frame->base + frame->n_args + idx];
 }
 
-static inline int *get_arg(stack_t *stack, call_frame_t *frame, int idx) {
+static inline aint *get_arg(stack_t *stack, call_frame_t *frame, int idx) {
   return &stack->data[frame->base + idx];
 }
 
@@ -19,7 +34,7 @@ void run(bytecode *bc) {
   stack_init(&stack);
   call_stack_init(&call_stack);
 
-  int *globals = malloc(sizeof(int) * bc->globals_count);
+  aint *globals = malloc(sizeof(aint) * bc->globals_count);
 
   int ip = bc->entry_point;
   int return_ip = -1;
@@ -34,7 +49,7 @@ void run(bytecode *bc) {
     case OP_CONST: {
       int n = read_i32(bc->code, ip);
       ip += 4;
-      stack_push(&stack, n);
+      stack_push(&stack, BOX(n));
       break;
     }
     case OP_BINOP_ADD:
@@ -48,50 +63,50 @@ void run(bytecode *bc) {
     case OP_BINOP_LE:
     case OP_BINOP_GT:
     case OP_BINOP_GE: {
-      int y = stack_pop(&stack);
-      int x = stack_pop(&stack);
-      int result;
+      aint y = stack_pop(&stack);
+      aint x = stack_pop(&stack);
+      aint result;
       switch (l) {
-      case 1:
-        result = x + y;
+      case 1: // +
+        result = Ls__Infix_43((void*)x, (void*)y);
         break;
-      case 2:
-        result = x - y;
+      case 2: // -
+        result = Ls__Infix_45((void*)x, (void*)y);
         break;
-      case 3:
-        result = x * y;
+      case 3: // *
+        result = Ls__Infix_42((void*)x, (void*)y);
         break;
-      case 4:
-        if (y == 0) {
+      case 4: // /
+        if (UNBOX(y) == 0) {
           fprintf(stderr, "Division by zero\n");
           goto end;
         }
-        result = x / y;
+        result = Ls__Infix_47((void*)x, (void*)y);
         break;
-      case 5:
-        if (y == 0) {
+      case 5: // %
+        if (UNBOX(y) == 0) {
           fprintf(stderr, "Division by zero\n");
           goto end;
         }
-        result = x % y;
+        result = Ls__Infix_37((void*)x, (void*)y);
         break;
-      case 6: 
-        result = x < y;
+      case 6: // <
+        result = Ls__Infix_60((void*)x, (void*)y);
         break;
-      case 7:
-        result = x <= y;
+      case 7: // <=
+        result = Ls__Infix_6061((void*)x, (void*)y);
         break;
-      case 8:
-        result = x > y;
+      case 8: // >
+        result = Ls__Infix_62((void*)x, (void*)y);
         break;
-      case 9:
-        result = x >= y;
+      case 9: // >=
+        result = Ls__Infix_6261((void*)x, (void*)y);
         break;
-      case 10:
-        result = x == y;
+      case 10: // ==
+        result = Ls__Infix_6161((void*)x, (void*)y);
         break;
-      case 11:
-        result = x != y;
+      case 11: // != 
+        result = Ls__Infix_3361((void*)x, (void*)y);
         break;
       }
       stack_push(&stack, result);
@@ -105,8 +120,8 @@ void run(bytecode *bc) {
     case OP_CJMP_Z: {
       int addr = read_i32(bc->code, ip);
       ip += 4;
-      int val = stack_pop(&stack);
-      if (val == 0) {
+      aint val = stack_pop(&stack);
+      if (UNBOX(val) == 0) {
         ip = addr;
       }
       break;
@@ -114,8 +129,8 @@ void run(bytecode *bc) {
     case OP_CJMP_NZ: {
       int addr = read_i32(bc->code, ip);
       ip += 4;
-      int val = stack_pop(&stack);
-      if (val != 0) {
+      aint val = stack_pop(&stack);
+      if (UNBOX(val) != 0) {
         ip = addr;
       }
       break;
@@ -143,7 +158,7 @@ void run(bytecode *bc) {
     case OP_ST: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      int val = stack_pop(&stack);
+      aint val = stack_pop(&stack);
       globals[idx] = val;
       stack_push(&stack, val);
       break;
@@ -152,7 +167,7 @@ void run(bytecode *bc) {
       int idx = read_i32(bc->code, ip);
       ip += 4;
       call_frame_t *frame = call_stack_current(&call_stack);
-      int val = stack_pop(&stack);
+      aint val = stack_pop(&stack);
       *get_local(&stack, frame, idx) = val;
       stack_push(&stack, val);
       break;
@@ -161,7 +176,7 @@ void run(bytecode *bc) {
       int idx = read_i32(bc->code, ip);
       ip += 4;
       call_frame_t *frame = call_stack_current(&call_stack);
-      int val = stack_pop(&stack);
+      aint val = stack_pop(&stack);
       *get_arg(&stack, frame, idx) = val;
       stack_push(&stack, val);
       break;
@@ -232,18 +247,12 @@ void run(bytecode *bc) {
     }
 
     case OP_READ: {
-      int x;
-      if (scanf("%d", &x) != 1) {
-        fprintf(stderr, "Failed to read\n");
-        goto end;
-      }
-      stack_push(&stack, x);
+      stack_push(&stack, Lread());
       break;
     }
     case OP_WRITE: {
-      int x = stack_pop(&stack);
-      printf("%d\n", x);
-      stack_push(&stack, x);
+      aint val = stack_pop(&stack);
+      stack_push(&stack, Lwrite(val));
       break;
     }
     case OP_HALT:
