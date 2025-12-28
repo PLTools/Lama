@@ -4,7 +4,12 @@
 #include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "../runtime/gc.h"
 #include "../runtime/runtime_common.h"
+
+extern size_t __gc_stack_top, __gc_stack_bottom;
+extern void __gc_init(void);
+extern void __init(void);
 
 extern aint Lread(void);
 extern aint Lwrite(aint n);
@@ -19,6 +24,13 @@ extern aint Ls__Infix_62(void *p, void *q);
 extern aint Ls__Infix_6261(void *p, void *q);
 extern aint Ls__Infix_6161(void *p, void *q);
 extern aint Ls__Infix_3361(void *p, void *q);
+extern aint Ls__Infix_3838(void *p, void *q);
+extern aint Ls__Infix_3333(void *p, void *q);
+
+extern aint Llength(void *p);
+extern void *Barray(aint *args, aint bn);
+extern void *Belem(void *p, aint i);
+extern void *Bsta(void *x, aint i, void *v);
 
 static inline aint *get_local(stack_t *stack, call_frame_t *frame, int idx) {
   return &stack->data[frame->base + frame->n_args + idx];
@@ -33,6 +45,11 @@ void run(bytecode *bc) {
   call_stack_t call_stack;
   stack_init(&stack);
   call_stack_init(&call_stack);
+
+  __init();
+
+  __gc_stack_top = (size_t)&stack.data[0];
+  __gc_stack_bottom = (size_t)&stack.data[STACK_SIZE];
 
   aint *globals = malloc(sizeof(aint) * bc->globals_count);
 
@@ -56,57 +73,65 @@ void run(bytecode *bc) {
     case OP_BINOP_SUB:
     case OP_BINOP_MUL:
     case OP_BINOP_DIV:
-    case OP_BINOP_MOD: 
+    case OP_BINOP_MOD:
     case OP_BINOP_EQ:
     case OP_BINOP_NE:
     case OP_BINOP_LT:
     case OP_BINOP_LE:
     case OP_BINOP_GT:
-    case OP_BINOP_GE: {
+    case OP_BINOP_GE:
+    case OP_BINOP_AND:
+    case OP_BINOP_OR: {
       aint y = stack_pop(&stack);
       aint x = stack_pop(&stack);
       aint result;
       switch (l) {
       case 1: // +
-        result = Ls__Infix_43((void*)x, (void*)y);
+        result = Ls__Infix_43((void *)x, (void *)y);
         break;
       case 2: // -
-        result = Ls__Infix_45((void*)x, (void*)y);
+        result = Ls__Infix_45((void *)x, (void *)y);
         break;
       case 3: // *
-        result = Ls__Infix_42((void*)x, (void*)y);
+        result = Ls__Infix_42((void *)x, (void *)y);
         break;
       case 4: // /
         if (UNBOX(y) == 0) {
           fprintf(stderr, "Division by zero\n");
           goto end;
         }
-        result = Ls__Infix_47((void*)x, (void*)y);
+        result = Ls__Infix_47((void *)x, (void *)y);
         break;
       case 5: // %
         if (UNBOX(y) == 0) {
           fprintf(stderr, "Division by zero\n");
           goto end;
         }
-        result = Ls__Infix_37((void*)x, (void*)y);
+        result = Ls__Infix_37((void *)x, (void *)y);
         break;
       case 6: // <
-        result = Ls__Infix_60((void*)x, (void*)y);
+        result = Ls__Infix_60((void *)x, (void *)y);
         break;
       case 7: // <=
-        result = Ls__Infix_6061((void*)x, (void*)y);
+        result = Ls__Infix_6061((void *)x, (void *)y);
         break;
       case 8: // >
-        result = Ls__Infix_62((void*)x, (void*)y);
+        result = Ls__Infix_62((void *)x, (void *)y);
         break;
       case 9: // >=
-        result = Ls__Infix_6261((void*)x, (void*)y);
+        result = Ls__Infix_6261((void *)x, (void *)y);
         break;
       case 10: // ==
-        result = Ls__Infix_6161((void*)x, (void*)y);
+        result = Ls__Infix_6161((void *)x, (void *)y);
         break;
-      case 11: // != 
-        result = Ls__Infix_3361((void*)x, (void*)y);
+      case 11: // !=
+        result = Ls__Infix_3361((void *)x, (void *)y);
+        break;
+      case 12: // &&
+        result = Ls__Infix_3838((void *)x, (void *)y);
+        break;
+      case 13: // !!
+        result = Ls__Infix_3333((void *)x, (void *)y);
         break;
       }
       stack_push(&stack, result);
@@ -206,7 +231,7 @@ void run(bytecode *bc) {
       call_stack_push(&call_stack, return_ip, base, n_args, n_locals);
       break;
     }
-    case OP_BEGIN_CLOSURE: 
+    case OP_BEGIN_CLOSURE:
       // TODO: skip for now
       ip += 8;
       break;
@@ -221,29 +246,29 @@ void run(bytecode *bc) {
     }
     case OP_RET:
     case OP_END: {
-        if (call_stack_is_empty(&call_stack)) {
-            goto end;
-        }
-        call_frame_t frame = call_stack_pop(&call_stack);
+      if (call_stack_is_empty(&call_stack)) {
+        goto end;
+      }
+      call_frame_t frame = call_stack_pop(&call_stack);
 
-        int current_top = stack.sp - stack.data;
-        int returns_start = frame.base + frame.n_args + frame.n_locals;
-        int n_returns = current_top - returns_start;
+      int current_top = stack.sp - stack.data;
+      int returns_start = frame.base + frame.n_args + frame.n_locals;
+      int n_returns = current_top - returns_start;
 
-        if (n_returns <= 0) {  
-          n_returns = 0;
-        } else {
-            for (int i = 0; i < n_returns; i++) {
-                stack.data[frame.base + i] = stack.data[returns_start + i];
-            }
+      if (n_returns <= 0) {
+        n_returns = 0;
+      } else {
+        for (int i = 0; i < n_returns; i++) {
+          stack.data[frame.base + i] = stack.data[returns_start + i];
         }
+      }
 
-        stack.sp = stack.data + frame.base + n_returns;
-        if (frame.return_ip < 0) {
-            goto end;
-        }
-        ip = frame.return_ip;
-        break;
+      stack.sp = stack.data + frame.base + n_returns;
+      if (frame.return_ip < 0) {
+        goto end;
+      }
+      ip = frame.return_ip;
+      break;
     }
 
     case OP_READ: {
@@ -255,13 +280,49 @@ void run(bytecode *bc) {
       stack_push(&stack, Lwrite(val));
       break;
     }
+    case OP_ELEM: {
+      // [index, array] -> [element]
+      aint idx = stack_pop(&stack);
+      aint arr = stack_pop(&stack);
+      void *elem = Belem((void *)arr, idx);
+      stack_push(&stack, (aint)elem);
+      break;
+    }
+    case OP_STA: {
+      // TODO: support string (two operands)
+      aint val = stack_pop(&stack);
+      aint idx = stack_pop(&stack);
+      aint arr = stack_pop(&stack);
+      Bsta((void *)arr, idx, (void *)val);
+      stack_push(&stack, val);
+      break;
+    }
+    case OP_LENGTH: {
+      aint val = stack_pop(&stack);
+      aint len = Llength((void *)val);
+      stack_push(&stack, len);
+      break;
+    }
+    case OP_BARRAY: {
+      int n = read_i32(bc->code, ip);
+      ip += 4;
+      aint *args = malloc(n * sizeof(aint));
+      for (int i = n - 1; i >= 0; i--) {
+        args[i] = stack_pop(&stack);
+      }
+      void *arr = Barray(args, BOX(n));
+      free(args);
+      stack_push(&stack, (aint)arr);
+      break;
+    }
     case OP_HALT:
       goto end;
     case OP_LINE:
       ip += 4;
       break;
     default:
-      fprintf(stderr, "Not yet supported opcode 0x%02X at ip=0x%08x\n", opcode, ip-1);
+      fprintf(stderr, "Not yet supported opcode 0x%02X at ip=0x%08x\n", opcode,
+              ip - 1);
       goto end;
     }
   }
