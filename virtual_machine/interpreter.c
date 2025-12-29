@@ -7,9 +7,12 @@
 #include "../runtime/gc.h"
 #include "../runtime/runtime_common.h"
 
+void *__start_custom_data;
+void *__stop_custom_data;
+
 extern size_t __gc_stack_top, __gc_stack_bottom;
 extern void __gc_init(void);
-extern void __init(void);
+extern void set_stack(size_t stack_top, size_t stack_bottom);
 
 extern aint Lread(void);
 extern aint Lwrite(aint n);
@@ -46,12 +49,16 @@ void run(bytecode *bc) {
   stack_init(&stack);
   call_stack_init(&call_stack);
 
-  __init();
+  __gc_init();
 
-  __gc_stack_top = (size_t)&stack.data[0];
-  __gc_stack_bottom = (size_t)&stack.data[STACK_SIZE];
-
-  aint *globals = malloc(sizeof(aint) * bc->globals_count);
+  set_stack((size_t)*stack.sp, (size_t)&stack.data[0]);
+  
+  aint *globals = stack.data;
+  // space for globals
+  // TODO: might not be the place to store globals
+  for (int i = 0; i < bc->globals_count; i++) {
+    stack_push(&stack, 0); 
+  }
 
   int ip = bc->entry_point;
   int return_ip = -1;
@@ -328,7 +335,6 @@ void run(bytecode *bc) {
   }
 
 end:
-  free(globals);
 }
 
 int main(int argc, char *argv[]) {
