@@ -1,18 +1,17 @@
+#include "../runtime/gc.h"
+#include "../runtime/runtime_common.h"
 #include "bytecode.h"
 #include "call_stack.h"
 #include "opcodes.h"
 #include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "../runtime/gc.h"
-#include "../runtime/runtime_common.h"
+#include <string.h>
 
 void *__start_custom_data;
 void *__stop_custom_data;
 
-extern size_t __gc_stack_top, __gc_stack_bottom;
-extern void __gc_init(void);
-extern void set_stack(size_t stack_top, size_t stack_bottom);
+extern void __init(void);
 
 extern aint Lread(void);
 extern aint Lwrite(aint n);
@@ -31,16 +30,18 @@ extern aint Ls__Infix_3838(void *p, void *q);
 extern aint Ls__Infix_3333(void *p, void *q);
 
 extern aint Llength(void *p);
+extern void *Lstring(aint *args);
 extern void *Barray(aint *args, aint bn);
+extern void *Bstring(aint *args);
 extern void *Belem(void *p, aint i);
 extern void *Bsta(void *x, aint i, void *v);
 
 static inline aint *get_local(stack_t *stack, call_frame_t *frame, int idx) {
-  return &stack->data[frame->base + frame->n_args + idx];
+  return &stack->data[frame->base - frame->n_args - idx];
 }
 
 static inline aint *get_arg(stack_t *stack, call_frame_t *frame, int idx) {
-  return &stack->data[frame->base + idx];
+  return &stack->data[frame->base - idx];
 }
 
 void run(bytecode *bc) {
@@ -49,15 +50,14 @@ void run(bytecode *bc) {
   stack_init(&stack);
   call_stack_init(&call_stack);
 
-  __gc_init();
+  // gc initialization
+  __init();
 
-  set_stack((size_t)*stack.sp, (size_t)&stack.data[0]);
-  
   aint *globals = stack.data;
   // space for globals
   // TODO: might not be the place to store globals
   for (int i = 0; i < bc->globals_count; i++) {
-    stack_push(&stack, 0); 
+    stack_push(&stack, 0);
   }
 
   int ip = bc->entry_point;
@@ -68,6 +68,7 @@ void run(bytecode *bc) {
     int l = opcode & 0xF;
 
     // printf("ip=0x%08X opcode=0x%02X\n", ip-1, opcode);
+    // printf("stack pointer: %p\n", stack.sp);
 
     switch (opcode) {
     case OP_CONST: {
@@ -228,7 +229,8 @@ void run(bytecode *bc) {
       int n_locals = read_i32(bc->code, ip);
       ip += 4;
 
-      int base = (stack.sp - stack.data) - n_args;
+      // base points to arg0 (highest address of args)
+      int base = (stack.sp - stack.data) + n_args;
 
       // space for locals
       for (int i = 0; i < n_locals; i++) {
@@ -259,18 +261,20 @@ void run(bytecode *bc) {
       call_frame_t frame = call_stack_pop(&call_stack);
 
       int current_top = stack.sp - stack.data;
-      int returns_start = frame.base + frame.n_args + frame.n_locals;
-      int n_returns = current_top - returns_start;
+      int returns_start = frame.base - frame.n_args - frame.n_locals;
+      int n_returns = returns_start - current_top;
 
       if (n_returns <= 0) {
         n_returns = 0;
       } else {
         for (int i = 0; i < n_returns; i++) {
-          stack.data[frame.base + i] = stack.data[returns_start + i];
+          // TODO: make stack function for this
+          stack.data[frame.base - i] = stack.data[returns_start - i];
         }
       }
 
-      stack.sp = stack.data + frame.base + n_returns;
+      // sp points to empty slot below the return values
+      stack.sp = stack.data + frame.base - n_returns;
       if (frame.return_ip < 0) {
         goto end;
       }
@@ -285,6 +289,15 @@ void run(bytecode *bc) {
     case OP_WRITE: {
       aint val = stack_pop(&stack);
       stack_push(&stack, Lwrite(val));
+      break;
+    }
+    case OP_STRING: {
+      // push string from string table onto stack
+      int str_offset = read_i32(bc->code, ip);
+      ip += 4;
+      const char *src = bc->string_table + str_offset;
+      void *str = Bstring((void *)&src);
+      stack_push(&stack, (aint)str);
       break;
     }
     case OP_ELEM: {
@@ -310,15 +323,20 @@ void run(bytecode *bc) {
       stack_push(&stack, len);
       break;
     }
+    case OP_LSTRING: {
+      aint val = stack_pop(&stack);
+      void *str = Lstring(&val);
+      stack_push(&stack, (aint)str);
+      break;
+    }
     case OP_BARRAY: {
       int n = read_i32(bc->code, ip);
       ip += 4;
-      aint *args = malloc(n * sizeof(aint));
+      aint args[n];
       for (int i = n - 1; i >= 0; i--) {
         args[i] = stack_pop(&stack);
       }
       void *arr = Barray(args, BOX(n));
-      free(args);
       stack_push(&stack, (aint)arr);
       break;
     }

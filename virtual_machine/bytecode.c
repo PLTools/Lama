@@ -72,6 +72,15 @@ bytecode *load_bytecode(const char *filename) {
   bc->code_size = code_size;
   bc->entry_point = main_entry_point;
   bc->globals_count = globals_count;
+  bc->public_symbols_count = num_pubs;
+  bc->public_symbols = malloc(num_pubs * sizeof(int));
+  for (int i = 0; i < num_pubs; i++) {
+    int entry_offset = pubs_offset + i * PUB_ENTRY_SIZE;
+    bc->public_symbols[i] = read_i32(data, entry_offset + 4);
+  }
+
+  bc->string_table = malloc(st_size);
+  memcpy((void *)bc->string_table, string_table, st_size);
 
   free(data);
   return bc;
@@ -80,6 +89,8 @@ bytecode *load_bytecode(const char *filename) {
 void free_bytecode(bytecode *bc) {
   if (bc) {
     free((void *)bc->code);
+    free((void *)bc->string_table);
+    free(bc->public_symbols);
     free(bc);
   }
 }
