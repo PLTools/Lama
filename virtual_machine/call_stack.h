@@ -2,6 +2,7 @@
 #define CALL_STACK_H
 
 #include <stddef.h>
+#include "../runtime/runtime_common.h"
 
 #define MAX_CALL_DEPTH 1024
 
@@ -10,6 +11,7 @@ typedef struct {
   int base;
   int n_args;
   int n_locals;
+  aint closure;  // 0 if not a closure call
 } call_frame_t;
 
 typedef struct {
@@ -20,7 +22,7 @@ typedef struct {
 void call_stack_init(call_stack_t *cs);
 
 void call_stack_push(call_stack_t *cs, int return_ip, int base, int n_args,
-                     int n_locals);
+                     int n_locals, aint closure);
 
 call_frame_t call_stack_pop(call_stack_t *cs);
 

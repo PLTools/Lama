@@ -9,7 +9,7 @@ void call_stack_init(call_stack_t *cs) {
 }
 
 void call_stack_push(call_stack_t *cs, int return_ip, int base, int n_args,
-                     int n_locals) {
+                     int n_locals, aint closure) {
   if (cs->top >= MAX_CALL_DEPTH) {
     fprintf(stderr, "Call stack overflow\n");
     exit(1);
@@ -20,6 +20,7 @@ void call_stack_push(call_stack_t *cs, int return_ip, int base, int n_args,
   frame->base = base;
   frame->n_args = n_args;
   frame->n_locals = n_locals;
+  frame->closure = closure;
 }
 
 call_frame_t call_stack_pop(call_stack_t *cs) {

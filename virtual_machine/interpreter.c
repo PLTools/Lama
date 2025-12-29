@@ -4,9 +4,45 @@
 #include "call_stack.h"
 #include "opcodes.h"
 #include "stack.h"
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+
+#ifdef DEBUG_PRINT
+#define STACK_PEEK_SIZE 5
+#define VM_DEBUG(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
+#define VM_TRACE_OP(opcode, ip)                                                \
+  fprintf(stderr, "ip: 0x%08X opcode: %s (0x%02X)\n", (ip),                    \
+          opcode_to_string(opcode), (opcode))
+#define VM_TRACE_STACK(stack)                                                  \
+  do {                                                                         \
+    long sp_idx = (stack)->sp - (stack)->data;                                 \
+    fprintf(stderr, "stack [sp=%p, idx=%ld]: ", (stack)->sp, sp_idx);          \
+    for (int i = 1; i <= STACK_PEEK_SIZE; i++) {                               \
+      if (sp_idx + i < STACK_SIZE) {                                           \
+        fprintf(stderr, "%ld ", (long)(stack)->data[sp_idx + i]);              \
+      }                                                                        \
+    }                                                                          \
+    fprintf(stderr, "\n");                                                     \
+  } while (0)
+#define VM_TRACE_CALL(fmt, ...) fprintf(stderr, "[CALL] " fmt, ##__VA_ARGS__)
+#define VM_ASSERT(cond, msg)                                                   \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      fprintf(stderr, "Assert failed: %s at %s:%d\n", msg, __FILE__,           \
+              __LINE__);                                                       \
+      exit(1);                                                                 \
+    }                                                                          \
+  } while (0)
+#else
+#define VM_DEBUG(fmt, ...)
+#define VM_TRACE_OP(opcode, ip)
+#define VM_TRACE_STACK(stack)
+#define VM_TRACE_CALL(fmt, ...)
+#define VM_ASSERT(cond, msg)
+#endif
+
+static aint pending_closure = 0;
 
 void *__start_custom_data;
 void *__stop_custom_data;
@@ -34,9 +70,20 @@ extern void *Lstring(aint *args);
 extern aint LtagHash(char *s);
 extern void *Barray(aint *args, aint bn);
 extern void *Bsexp(aint *args, aint bn);
+extern void *Bclosure(aint *args, aint bn);
 extern void *Bstring(aint *args);
 extern void *Belem(void *p, aint i);
 extern void *Bsta(void *x, aint i, void *v);
+
+extern aint Btag(void *d, aint t, aint n);
+extern aint Barray_patt(void *d, aint n);
+extern aint Bstring_patt(void *x, void *y);
+extern aint Bclosure_tag_patt(void *x);
+extern aint Bboxed_patt(void *x);
+extern aint Bunboxed_patt(void *x);
+extern aint Barray_tag_patt(void *x);
+extern aint Bstring_tag_patt(void *x);
+extern aint Bsexp_tag_patt(void *x);
 
 static inline aint *get_local(stack_t *stack, call_frame_t *frame, int idx) {
   return &stack->data[frame->base - frame->n_args - idx];
@@ -44,6 +91,35 @@ static inline aint *get_local(stack_t *stack, call_frame_t *frame, int idx) {
 
 static inline aint *get_arg(stack_t *stack, call_frame_t *frame, int idx) {
   return &stack->data[frame->base - idx];
+}
+
+static inline aint *get_closure_var(call_frame_t *frame, int idx) {
+  data *closure_data = TO_DATA(frame->closure);
+  aint *contents = (aint *)closure_data->contents;
+  // +1 because contents[0] is the entry point
+  return &contents[idx + 1];
+}
+
+static aint read_designation(stack_t *stack, call_frame_t *frame, aint *globals,
+                             const uint8_t *code, int *ip_ptr) {
+  uint8_t type_byte = code[(*ip_ptr)++];
+  int idx = read_i32(code, *ip_ptr);
+  *ip_ptr += 4;
+
+  int designation_type = type_byte & 0xF;
+  switch (designation_type) {
+  case 0:
+    return globals[idx];
+  case 1:
+    return *get_local(stack, frame, idx);
+  case 2:
+    return *get_arg(stack, frame, idx);
+  case 3:
+    return *get_closure_var(frame, idx);
+  default:
+    fprintf(stderr, "Unknown designation type: %d\n", designation_type);
+    exit(1);
+  }
 }
 
 void run(bytecode *bc) {
@@ -69,13 +145,14 @@ void run(bytecode *bc) {
     uint8_t opcode = bc->code[ip++];
     int l = opcode & 0xF;
 
-    // printf("ip=0x%08X opcode=0x%02X\n", ip-1, opcode);
-    // printf("stack pointer: %p\n", stack.sp);
+    VM_TRACE_OP(opcode, ip - 1);
+    VM_TRACE_STACK(&stack);
 
     switch (opcode) {
     case OP_CONST: {
       int n = read_i32(bc->code, ip);
       ip += 4;
+      VM_DEBUG("CONST: %d\n", n);
       stack_push(&stack, BOX(n));
       break;
     }
@@ -170,30 +247,47 @@ void run(bytecode *bc) {
       }
       break;
     }
+    // TODO: unify ld and st
     case OP_LD: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
-      stack_push(&stack, globals[idx]);
+      aint val = globals[idx];
+      VM_DEBUG("LD global[%d] = %ld\n", idx, val);
+      stack_push(&stack, val);
       break;
     }
     case OP_LD_LOC: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
       call_frame_t *frame = call_stack_current(&call_stack);
-      stack_push(&stack, *get_local(&stack, frame, idx));
+      aint val = *get_local(&stack, frame, idx);
+      VM_DEBUG("LD_LOC local[%d] = %ld\n", idx, val);
+      stack_push(&stack, val);
       break;
     }
     case OP_LD_ARG: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
       call_frame_t *frame = call_stack_current(&call_stack);
-      stack_push(&stack, *get_arg(&stack, frame, idx));
+      aint val = *get_arg(&stack, frame, idx);
+      VM_DEBUG("LD_ARG arg[%d] = %ld\n", idx, val);
+      stack_push(&stack, val);
+      break;
+    }
+    case OP_LD_CLO: {
+      int idx = read_i32(bc->code, ip);
+      ip += 4;
+      call_frame_t *frame = call_stack_current(&call_stack);
+      aint val = *get_closure_var(frame, idx);
+      VM_DEBUG("LD_CLO closure[%d] = %ld\n", idx, val);
+      stack_push(&stack, val);
       break;
     }
     case OP_ST: {
       int idx = read_i32(bc->code, ip);
       ip += 4;
       aint val = stack_pop(&stack);
+      VM_DEBUG("ST global[%d] = %ld\n", idx, val);
       globals[idx] = val;
       stack_push(&stack, val);
       break;
@@ -203,6 +297,7 @@ void run(bytecode *bc) {
       ip += 4;
       call_frame_t *frame = call_stack_current(&call_stack);
       aint val = stack_pop(&stack);
+      VM_DEBUG("ST_LOC local[%d] = %ld\n", idx, val);
       *get_local(&stack, frame, idx) = val;
       stack_push(&stack, val);
       break;
@@ -212,7 +307,18 @@ void run(bytecode *bc) {
       ip += 4;
       call_frame_t *frame = call_stack_current(&call_stack);
       aint val = stack_pop(&stack);
+      VM_DEBUG("ST_ARG arg[%d] = %ld\n", idx, val);
       *get_arg(&stack, frame, idx) = val;
+      stack_push(&stack, val);
+      break;
+    }
+    case OP_ST_CLO: {
+      int idx = read_i32(bc->code, ip);
+      ip += 4;
+      call_frame_t *frame = call_stack_current(&call_stack);
+      aint val = stack_pop(&stack);
+      VM_DEBUG("ST_CLO closure[%d] = %ld\n", idx, val);
+      *get_closure_var(frame, idx) = val;
       stack_push(&stack, val);
       break;
     }
@@ -225,11 +331,13 @@ void run(bytecode *bc) {
     case OP_SWAP:
       stack_swap(&stack);
       break;
+    // TODO: possibly unify as well
     case OP_BEGIN: {
       int n_args = read_i32(bc->code, ip);
       ip += 4;
       int n_locals = read_i32(bc->code, ip);
       ip += 4;
+      VM_TRACE_CALL("BEGIN n_args=%d n_locals=%d\n", n_args, n_locals);
 
       // base points to arg0 (highest address of args)
       int base = (stack.sp - stack.data) + n_args;
@@ -239,18 +347,81 @@ void run(bytecode *bc) {
         stack_push(&stack, 0);
       }
 
-      call_stack_push(&call_stack, return_ip, base, n_args, n_locals);
+      call_stack_push(&call_stack, return_ip, base, n_args, n_locals, 0);
       break;
     }
-    case OP_BEGIN_CLOSURE:
-      // TODO: skip for now
-      ip += 8;
+    case OP_BEGIN_CLOSURE: {
+      int n_args = read_i32(bc->code, ip);
+      ip += 4;
+      int n_locals = read_i32(bc->code, ip);
+      ip += 4;
+      VM_TRACE_CALL("BEGIN_CLOSURE n_args=%d n_locals=%d\n", n_args, n_locals);
+
+      // CALLC already shifted args and removed closure from stack
+      int base = (stack.sp - stack.data) + n_args;
+      aint closure = pending_closure;
+
+      // space for locals
+      for (int i = 0; i < n_locals; i++) {
+        stack_push(&stack, 0);
+      }
+
+      call_stack_push(&call_stack, return_ip, base, n_args, n_locals, closure);
       break;
+    }
+    case OP_CLOSURE: {
+      // addr:32 n_captured:32 [type:8 idx:32]...
+      int addr = read_i32(bc->code, ip);
+      ip += 4;
+      int n_captured = read_i32(bc->code, ip);
+      ip += 4;
+
+      VM_DEBUG("CLOSURE addr=0x%08X n_captured=%d\n", addr, n_captured);
+
+      aint args[n_captured + 1];
+      args[0] = BOX(addr);
+
+      for (int i = 0; i < n_captured; i++) {
+        aint val = read_designation(&stack, call_stack_current(&call_stack),
+                                    globals, bc->code, &ip);
+        VM_DEBUG("Captured[%d] = %ld\n", i, val);
+        args[i + 1] = val;
+      }
+
+      void *closure = Bclosure(args, BOX(n_captured + 1));
+      stack_push(&stack, (aint)closure);
+      break;
+    }
+    case OP_CALLC: {
+      int n_args = read_i32(bc->code, ip);
+      ip += 4;
+
+      // stack: [... closure arg0 arg1 ... argN-1]
+      int base = (stack.sp - stack.data) + n_args + 1;
+      aint closure = stack.data[base];
+
+      // save closure for BEGIN_CLOSURE to retrieve
+      pending_closure = closure;
+
+      // shift args over closure slot, removing closure from stack
+      for (int i = 0; i < n_args; i++) {
+        stack.data[base - i] = stack.data[base - i - 1];
+      }
+      stack.sp++;
+
+      aint entry_point = UNBOX(((aint *)closure)[0]);
+      VM_TRACE_CALL("CALLC n_args=%d closure=0x%lx entry=0x%lx\n", n_args,
+                    closure, entry_point);
+      return_ip = ip;
+      ip = entry_point;
+      break;
+    }
     case OP_CALL: {
       int addr = read_i32(bc->code, ip);
       ip += 4;
       // discarding n_args
       ip += 4;
+      VM_TRACE_CALL("CALL addr=0x%08X\n", addr);
       return_ip = ip;
       ip = addr;
       break;
@@ -303,7 +474,7 @@ void run(bytecode *bc) {
       break;
     }
     case OP_ELEM: {
-      // [index, array] -> [element]
+      // [top --> index, array] -> [element]
       aint idx = stack_pop(&stack);
       aint arr = stack_pop(&stack);
       void *elem = Belem((void *)arr, idx);
@@ -357,6 +528,77 @@ void run(bytecode *bc) {
 
       void *s = Bsexp(args, BOX(n_fields + 1));
       stack_push(&stack, (aint)s);
+      break;
+    }
+    case OP_TAG: {
+      int tag_offset = read_i32(bc->code, ip);
+      ip += 4;
+      int n_fields = read_i32(bc->code, ip);
+      ip += 4;
+      const char *tag_str = bc->string_table + tag_offset;
+      aint tag_hash = LtagHash((char *)tag_str);
+      aint val = stack_pop(&stack);
+      aint result = Btag((void *)val, tag_hash, BOX(n_fields));
+      stack_push(&stack, result);
+      break;
+    }
+    case OP_ARRAY: {
+      int n = read_i32(bc->code, ip);
+      ip += 4;
+      aint val = stack_pop(&stack);
+      aint result = Barray_patt((void *)val, BOX(n));
+      stack_push(&stack, result);
+      break;
+    }
+    case OP_FAIL: {
+      int line = read_i32(bc->code, ip);
+      ip += 4;
+      int col = read_i32(bc->code, ip);
+      ip += 4;
+      fprintf(stderr, "Match failure at line %d, column %d\n", line, col);
+      goto end;
+    }
+    case OP_PATT_STR_CMP: {
+      aint y = stack_pop(&stack);
+      aint x = stack_pop(&stack);
+      aint result = Bstring_patt((void *)x, (void *)y);
+      stack_push(&stack, result);
+      break;
+    }
+    case OP_PATT_STRING: {
+      aint val = stack_pop(&stack);
+      aint result = Bstring_tag_patt((void *)val);
+      stack_push(&stack, result);
+      break;
+    }
+    case OP_PATT_ARRAY: {
+      aint val = stack_pop(&stack);
+      aint result = Barray_tag_patt((void *)val);
+      stack_push(&stack, result);
+      break;
+    }
+    case OP_PATT_SEXP: {
+      aint val = stack_pop(&stack);
+      aint result = Bsexp_tag_patt((void *)val);
+      stack_push(&stack, result);
+      break;
+    }
+    case OP_PATT_BOXED: {
+      aint val = stack_pop(&stack);
+      aint result = Bboxed_patt((void *)val);
+      stack_push(&stack, result);
+      break;
+    }
+    case OP_PATT_UNBOXED: {
+      aint val = stack_pop(&stack);
+      aint result = Bunboxed_patt((void *)val);
+      stack_push(&stack, result);
+      break;
+    }
+    case OP_PATT_CLOSURE: {
+      aint val = stack_pop(&stack);
+      aint result = Bclosure_tag_patt((void *)val);
+      stack_push(&stack, result);
       break;
     }
     case OP_HALT:

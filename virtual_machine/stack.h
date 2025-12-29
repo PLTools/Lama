@@ -1,8 +1,8 @@
 #ifndef STACK_H
 #define STACK_H
 
-#include <stddef.h>
 #include "../runtime/runtime_common.h"
+#include <stddef.h>
 
 #define STACK_SIZE 1024
 
