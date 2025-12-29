@@ -31,7 +31,9 @@ extern aint Ls__Infix_3333(void *p, void *q);
 
 extern aint Llength(void *p);
 extern void *Lstring(aint *args);
+extern aint LtagHash(char *s);
 extern void *Barray(aint *args, aint bn);
+extern void *Bsexp(aint *args, aint bn);
 extern void *Bstring(aint *args);
 extern void *Belem(void *p, aint i);
 extern void *Bsta(void *x, aint i, void *v);
@@ -338,6 +340,23 @@ void run(bytecode *bc) {
       }
       void *arr = Barray(args, BOX(n));
       stack_push(&stack, (aint)arr);
+      break;
+    }
+    case OP_SEXP: {
+      int tag_offset = read_i32(bc->code, ip);
+      ip += 4;
+      int n_fields = read_i32(bc->code, ip);
+      ip += 4;
+      const char *tag_str = bc->string_table + tag_offset;
+      aint tag_hash = LtagHash((char *)tag_str);
+      aint args[n_fields + 1];
+      for (int i = n_fields - 1; i >= 0; i--) {
+        args[i] = stack_pop(&stack);
+      }
+      args[n_fields] = tag_hash;
+
+      void *s = Bsexp(args, BOX(n_fields + 1));
+      stack_push(&stack, (aint)s);
       break;
     }
     case OP_HALT:

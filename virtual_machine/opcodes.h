@@ -17,6 +17,7 @@ typedef enum {
   OP_BINOP_OR =  0x0D,
   OP_CONST = 0x10,
   OP_STRING = 0x11,
+  OP_SEXP = 0x12,
   OP_STA = 0x14,
   OP_JMP = 0x15,
   OP_END = 0x16,
