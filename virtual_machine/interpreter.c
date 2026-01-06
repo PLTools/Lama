@@ -1,3 +1,9 @@
+/*
+ * Core bytecode interpreter for the Lama VM.
+ * Implements the fetch-decode-execute loop for all supported opcodes.
+ * Manages the data stack, call stack, and interacts with the C runtime.
+ */
+
 #include "../runtime/gc.h"
 #include "../runtime/runtime_common.h"
 #include "bytecode.h"
@@ -85,14 +91,24 @@ extern aint Barray_tag_patt(void *x);
 extern aint Bstring_tag_patt(void *x);
 extern aint Bsexp_tag_patt(void *x);
 
+/**
+ * Retrieves a pointer to a local variable in the current stack frame.
+ * Locals are stored below the arguments in the stack.
+ */
 static inline aint *get_local(stack_t *stack, call_frame_t *frame, int idx) {
   return &stack->data[frame->base - frame->n_args - idx];
 }
 
+/**
+ * Retrieves a pointer to an argument in the current stack frame.
+ */
 static inline aint *get_arg(stack_t *stack, call_frame_t *frame, int idx) {
   return &stack->data[frame->base - idx];
 }
 
+/**
+ * Retrieves a pointer to a variable stored in a closure's environment.
+ */
 static inline aint *get_closure_var(call_frame_t *frame, int idx) {
   data *closure_data = TO_DATA(frame->closure);
   aint *contents = (aint *)closure_data->contents;
@@ -122,6 +138,10 @@ static aint read_designation(stack_t *stack, call_frame_t *frame, aint *globals,
   }
 }
 
+/**
+ * The main execution loop of the virtual machine.
+ * Consumes bytecode and updates the stack and call stack accordingly.
+ */
 void run(bytecode *bc) {
   stack_t stack;
   call_stack_t call_stack;
@@ -614,8 +634,12 @@ void run(bytecode *bc) {
   }
 
 end:
+  return;
 }
 
+/**
+ * Entry point for the VM. Loads bytecode from a file and starts execution.
+ */
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     fprintf(stderr, "Usage: %s <bytecode.bc>\n", argv[0]);

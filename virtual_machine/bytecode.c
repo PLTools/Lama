@@ -1,3 +1,9 @@
+/*
+ * Bytecode loader for Lama VM.
+ * Handles reading .bc files, including the string table, public symbols,
+ * and the bytecode instructions themselves.
+ */
+
 #include "bytecode.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,9 +60,7 @@ bytecode *load_bytecode(const char *filename) {
   int st_size = read_i32(data, 0);
   int globals_count = read_i32(data, 4);
   int num_pubs = read_i32(data, 8);
-  int num_imports = read_i32(data, 12);
-  int num_ext_fixups = read_i32(data, 16);
-
+  
   int pubs_offset = HEADER_SIZE;
   int st_offset = pubs_offset + num_pubs * PUB_ENTRY_SIZE;
   int code_offset = st_offset + st_size;

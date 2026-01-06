@@ -1,3 +1,9 @@
+/*
+ * Utility functions for Lama VM opcodes.
+ * Provides debugging support, such as converting opcode values to string 
+ * representations.
+ */
+
 #include "opcodes.h"
 #include <stdint.h>
 #include <stdio.h>

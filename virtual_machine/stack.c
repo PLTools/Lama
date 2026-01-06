@@ -1,3 +1,9 @@
+/*
+ * Data stack implementation for the Lama VM.
+ * Handles operand storage for expressions and parameters.
+ * Integrated with the garbage collector for root scanning.
+ */
+
 #include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>

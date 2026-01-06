@@ -1,3 +1,9 @@
+/*
+ * Call stack management for the Lama VM.
+ * Tracks function activation records (frames), including return addresses, 
+ * base pointers, and arguments.
+ */
+
 #include "call_stack.h"
 #include <stdio.h>
 #include <stdlib.h>
