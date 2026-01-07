@@ -5,9 +5,13 @@
  */
 
 #include "bytecode.h"
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 int read_i32(const uint8_t data[], int offset) {
   return data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) |
@@ -32,35 +36,34 @@ static int find_entry_point(const uint8_t *data, int pubs_offset, int num_pubs,
 }
 
 bytecode *load_bytecode(const char *filename) {
-  FILE *f = fopen(filename, "rb");
-  if (!f) {
-    perror("fopen");
+  int fd = open(filename, O_RDONLY);
+  if (fd < 0) {
+    perror("open");
     return NULL;
   }
 
-  fseek(f, 0, SEEK_END);
-  long size = ftell(f);
-  rewind(f);
-
-  uint8_t *data = malloc(size);
-
-  if (!data) {
-    fclose(f);
+  struct stat st;
+  if (fstat(fd, &st) < 0) {
+    perror("fstat");
+    close(fd);
     return NULL;
   }
 
-  if (fread(data, 1, size, f) != size) {
-    perror("fread");
-    fclose(f);
-    free(data);
+  size_t size = st.st_size;
+  void *map = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+  close(fd);
+
+  if (map == MAP_FAILED) {
+    perror("mmap");
     return NULL;
   }
-  fclose(f);
+
+  uint8_t *data = (uint8_t *)map;
 
   int st_size = read_i32(data, 0);
   int globals_count = read_i32(data, 4);
   int num_pubs = read_i32(data, 8);
-  
+
   int pubs_offset = HEADER_SIZE;
   int st_offset = pubs_offset + num_pubs * PUB_ENTRY_SIZE;
   int code_offset = st_offset + st_size;
@@ -71,8 +74,12 @@ bytecode *load_bytecode(const char *filename) {
       find_entry_point(data, pubs_offset, num_pubs, string_table, "main");
 
   bytecode *bc = malloc(sizeof(bytecode));
-  bc->code = malloc(code_size);
-  memcpy((void *)bc->code, data + code_offset, code_size);
+  if (!bc) {
+    munmap(map, size);
+    return NULL;
+  }
+
+  bc->code = data + code_offset;
   bc->code_size = code_size;
   bc->entry_point = main_entry_point;
   bc->globals_count = globals_count;
@@ -83,17 +90,19 @@ bytecode *load_bytecode(const char *filename) {
     bc->public_symbols[i] = read_i32(data, entry_offset + 4);
   }
 
-  bc->string_table = malloc(st_size);
-  memcpy((void *)bc->string_table, string_table, st_size);
+  bc->string_table = (const char *)string_table;
 
-  free(data);
+  bc->map_base = map;
+  bc->map_size = size;
+
   return bc;
 }
 
 void free_bytecode(bytecode *bc) {
   if (bc) {
-    free((void *)bc->code);
-    free((void *)bc->string_table);
+    if (bc->map_base) {
+      munmap(bc->map_base, bc->map_size);
+    }
     free(bc->public_symbols);
     free(bc);
   }
