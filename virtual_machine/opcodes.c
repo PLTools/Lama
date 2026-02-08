@@ -1,6 +1,6 @@
 /*
  * Utility functions for Lama VM opcodes.
- * Provides debugging support, such as converting opcode values to string 
+ * Provides debugging support, such as converting opcode values to string
  * representations.
  */
 
@@ -121,8 +121,6 @@ const char *opcode_to_string(uint8_t opcode) {
     return "LSTRING";
   case OP_BARRAY:
     return "BARRAY";
-  case OP_HALT:
-    return "HALT";
   default:
     fprintf(stderr, "Unknown opcode: 0x%02X\n", opcode);
     exit(1);

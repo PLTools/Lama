@@ -7,9 +7,18 @@ else ifeq ($(UNAME_S),Darwin)
     ARCH = -arch x86_64
 endif
 
+LAMA_ENV ?= 1
+
+# Virtual machine doesn't work well with this parameter
+ifeq ($(LAMA_ENV), 1)
+   	ENV_FLAGS := -DLAMA_ENV
+else
+	  ENV_FLAGS := 
+endif
+
 DISABLE_WARNINGS=-Wno-shift-negative-value
 COMMON_FLAGS=$(DISABLE_WARNINGS) -g -fstack-protector-all $(ARCH) --std=c11
-PROD_FLAGS=$(COMMON_FLAGS) -DLAMA_ENV
+PROD_FLAGS=$(COMMON_FLAGS) $(ENV_FLAGS)
 TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
 INVARIANTS_CHECK_FLAGS=$(TEST_FLAGS) -DFULL_INVARIANT_CHECKS

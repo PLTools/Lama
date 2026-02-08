@@ -59,7 +59,6 @@ typedef enum {
   OP_LENGTH = 0x72,
   OP_LSTRING = 0x73,
   OP_BARRAY = 0x74,
-  OP_HALT = 0xFF,
 } opcode_t;
 
 const char *opcode_to_string(uint8_t opcode);
