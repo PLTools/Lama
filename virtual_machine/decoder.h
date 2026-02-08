@@ -12,8 +12,8 @@ union insn;
 // State: ip = instruction pointer, sp = stack pointer, bp = base pointer
 // bp and globals are marked unused since not all handlers need them
 #define DECL_STATE                                                             \
-  union insn *ip, aint *sp, __attribute__((unused)) aint *bp,                 \
-      __attribute__((unused)) aint *globals
+  __attribute((unused)) union insn *ip, __attribute__((unused)) aint *sp,      \
+      __attribute__((unused)) aint *bp, __attribute__((unused)) aint *globals
 #define STATE ip, sp, bp, globals
 
 // Function pointer type for opcode handlers (returns void for tail calls)

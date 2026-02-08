@@ -321,23 +321,6 @@ void op_mod(DECL_STATE) {
   DISPATCH();
 }
 
-void op_read(DECL_STATE) {
-  (void)bp;
-  (void)globals;
-  aint val = Lread();
-  VM_DEBUG("READ: %ld\n", (long)UNBOX(val));
-  STACK_PUSH(sp, val);
-  DISPATCH();
-}
-
-void op_write(DECL_STATE) {
-  aint val = STACK_POP(sp);
-  VM_DEBUG("WRITE: %ld\n", (long)UNBOX(val));
-  aint res = Lwrite(val);
-  STACK_PUSH(sp, res);
-  DISPATCH();
-}
-
 void op_drop(DECL_STATE) {
   VM_DEBUG("DROP\n");
   sp++;
@@ -345,8 +328,6 @@ void op_drop(DECL_STATE) {
 }
 
 void op_dup(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   aint val = STACK_PEEK(sp);
   VM_DEBUG("DUP: %ld\n", (long)UNBOX(val));
   STACK_PUSH(sp, val);
@@ -372,8 +353,6 @@ void op_elem(DECL_STATE) {
 }
 
 void op_sta(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   aint val = STACK_POP(sp);
   aint idx = STACK_POP(sp);
   aint arr = STACK_POP(sp);
@@ -388,8 +367,6 @@ void op_sta(DECL_STATE) {
  * Jumps
  */
 void op_jmp(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   VM_DEBUG("JMP: target=%p\n", (void *)ip->target);
   ip = ip->target;
@@ -397,8 +374,6 @@ void op_jmp(DECL_STATE) {
 }
 
 void op_cjmp_z(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   insn *target = ip->target;
   ip++;
@@ -412,8 +387,6 @@ void op_cjmp_z(DECL_STATE) {
 }
 
 void op_cjmp_nz(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   insn *target = ip->target;
   ip++;
@@ -440,28 +413,6 @@ void op_string(DECL_STATE) {
   DISPATCH();
 }
 
-void op_length(DECL_STATE) {
-  (void)bp;
-  (void)globals;
-  aint val = STACK_POP(sp);
-  aint len = Llength((void *)val);
-  // TODO: think about debugging (becuase it prints after runtime call which
-  // might be bad because we won't see it)
-  VM_DEBUG("LENGTH: val=0x%lx -> len=%ld\n", val, UNBOX(len));
-  STACK_PUSH(sp, len);
-  DISPATCH();
-}
-
-void op_lstring(DECL_STATE) {
-  (void)bp;
-  (void)globals;
-  aint val = STACK_POP(sp);
-  void *str = Lstring(&val);
-  VM_DEBUG("LSTRING: val=%ld -> str=0x%lx\n", UNBOX(val), (aint)str);
-  STACK_PUSH(sp, (aint)str);
-  DISPATCH();
-}
-
 void op_barray(DECL_STATE) {
   (void)bp;
   (void)globals;
@@ -482,8 +433,6 @@ void op_barray(DECL_STATE) {
 }
 
 void op_sexp(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   const char *tag_str = ip->str;
   ip++;
@@ -508,8 +457,6 @@ void op_sexp(DECL_STATE) {
 }
 
 void op_tag(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   const char *tag_str = ip->str;
   ip++;
@@ -526,8 +473,6 @@ void op_tag(DECL_STATE) {
 }
 
 void op_array(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   int32_t n = ip->num;
   aint val = STACK_POP(sp);
@@ -538,9 +483,6 @@ void op_array(DECL_STATE) {
 }
 
 void op_fail(DECL_STATE) {
-  (void)bp;
-  (void)globals;
-  (void)sp;
   ip++;
   int32_t line = ip->num;
   ip++;
@@ -554,8 +496,6 @@ void op_fail(DECL_STATE) {
  * Pattern matching operations
  */
 void op_patt_str_cmp(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   aint y = STACK_POP(sp);
   aint x = STACK_POP(sp);
   VM_DEBUG("PATT_STR_CMP: x=%p, y=%p\n", (void *)x, (void *)y);
@@ -566,8 +506,6 @@ void op_patt_str_cmp(DECL_STATE) {
 }
 
 void op_patt_string(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   aint val = STACK_POP(sp);
   VM_DEBUG("PATT_STRING: val=%p\n", (void *)val);
   aint result = Bstring_tag_patt((void *)val);
@@ -577,8 +515,6 @@ void op_patt_string(DECL_STATE) {
 }
 
 void op_patt_array(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   aint val = STACK_POP(sp);
   VM_DEBUG("PATT_ARRAY: val=%p\n", (void *)val);
   aint result = Barray_tag_patt((void *)val);
@@ -588,8 +524,6 @@ void op_patt_array(DECL_STATE) {
 }
 
 void op_patt_sexp(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   aint val = STACK_POP(sp);
   VM_DEBUG("PATT_SEXP: val=%p\n", (void *)val);
   aint result = Bsexp_tag_patt((void *)val);
@@ -599,8 +533,6 @@ void op_patt_sexp(DECL_STATE) {
 }
 
 void op_patt_boxed(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   aint val = STACK_POP(sp);
   VM_DEBUG("PATT_BOXED: val=%p\n", (void *)val);
   aint result = Bboxed_patt((void *)val);
@@ -610,8 +542,6 @@ void op_patt_boxed(DECL_STATE) {
 }
 
 void op_patt_unboxed(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   aint val = STACK_POP(sp);
   VM_DEBUG("PATT_UNBOXED: val=%ld\n", (long)val);
   aint result = Bunboxed_patt((void *)val);
@@ -621,8 +551,6 @@ void op_patt_unboxed(DECL_STATE) {
 }
 
 void op_patt_closure(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   aint val = STACK_POP(sp);
   VM_DEBUG("PATT_CLOSURE: val=%p\n", (void *)val);
   aint result = Bclosure_tag_patt((void *)val);
@@ -635,7 +563,6 @@ void op_patt_closure(DECL_STATE) {
  * Load / store operations
  */
 void op_ld_glo(DECL_STATE) {
-  (void)bp;
   ip++;
   int32_t idx = ip->num;
   VM_DEBUG("LD_GLO[%d] = %ld\n", idx, (long)globals[idx]);
@@ -644,7 +571,6 @@ void op_ld_glo(DECL_STATE) {
 }
 
 void op_st_glo(DECL_STATE) {
-  (void)bp;
   ip++;
   int32_t idx = ip->num;
   aint val = STACK_PEEK(sp);
@@ -792,8 +718,6 @@ void op_callc(DECL_STATE) {
 }
 
 void op_ret(DECL_STATE) {
-  (void)ip;
-  (void)globals;
   aint ret_val = STACK_PEEK(sp);
   VM_TRACE_CALL("RET sp=%p ret_val=%ld bp=%p\n", (void *)sp, (long)ret_val,
                 (void *)bp);
@@ -802,8 +726,6 @@ void op_ret(DECL_STATE) {
 }
 
 void op_end(DECL_STATE) {
-  (void)ip;
-  (void)globals;
   VM_TRACE_CALL("END sp=%p\n", (void *)sp);
   aint ret_val = STACK_PEEK(sp);
   *bp = ret_val;
@@ -829,8 +751,6 @@ void op_end(DECL_STATE) {
  * reference. The function name is embedded in the next instruction.
  */
 static void op_callc_ext_func_stub(DECL_STATE) {
-  (void)sp;
-  (void)globals;
   ip++;
   const char *func_name = ip->str;
 
@@ -853,8 +773,6 @@ static void op_callc_ext_func_stub(DECL_STATE) {
   return;
 }
 void op_closure(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   insn *target = ip->target;
   ip++;
@@ -915,8 +833,6 @@ void op_call_ext_func(DECL_STATE) {
 }
 
 void op_module_end(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   insn *next_module = ip->target;
 
@@ -965,10 +881,8 @@ decode_ctx_t *decode_ctx_create(const bytecode *bc, int32_t global_offset,
  * Decoding
  */
 // TODO: /??
-static fixup_node_t *add_fixup(decode_ctx_t *ctx, meta_info_t *meta,
-                               size_t target_off, size_t insn_idx,
-                               memory *mem) {
-  (void)ctx;
+static fixup_node_t *add_fixup(meta_info_t *meta, size_t target_off,
+                               size_t insn_idx, memory *mem) {
   fixup_node_t *node = ARENA_NEW(mem->tmp, fixup_node_t);
   if (!node)
     return NULL;
@@ -1058,7 +972,7 @@ static bool handle_jump(decode_ctx_t *ctx, meta_info_t *meta,
     }
   } else {
     // Forward jump
-    if (!add_fixup(ctx, meta, target_off, my_idx, mem)) {
+    if (!add_fixup(meta, target_off, my_idx, mem)) {
       return false;
     }
     if (depth != -1) {
@@ -1233,15 +1147,6 @@ insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
       }
       break;
 
-    case OP_READ:
-      DEPTH_PUSH(depth);
-      EMIT_FUNC(ctx, op_read);
-      break;
-
-    case OP_WRITE:
-      EMIT_FUNC(ctx, op_write);
-      break;
-
     case OP_DROP:
       DEPTH_POP(depth);
       EMIT_FUNC(ctx, op_drop);
@@ -1331,14 +1236,6 @@ insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
       EMIT_STR(ctx, bytecode_get_string(bc, str_idx));
       break;
     }
-
-    case OP_LENGTH:
-      EMIT_FUNC(ctx, op_length);
-      break;
-
-    case OP_LSTRING:
-      EMIT_FUNC(ctx, op_lstring);
-      break;
 
     case OP_BARRAY: {
       int32_t n = reader_i32(&ctx->reader);
@@ -1525,7 +1422,7 @@ insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
         if (target_off < current_bc_off && tm->resolved_idx != -1) {
           ctx->code[target_slot].target = &ctx->code[tm->resolved_idx];
         } else {
-          add_fixup(ctx, meta, target_off, target_slot, mem);
+          add_fixup(meta, target_off, target_slot, mem);
         }
       }
       break;
@@ -1577,7 +1474,7 @@ insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
         if ((uint32_t)target_off < current_bc_off && tm->resolved_idx != -1) {
           ctx->code[target_slot].target = &ctx->code[tm->resolved_idx];
         } else {
-          add_fixup(ctx, meta, (uint32_t)target_off, target_slot, mem);
+          add_fixup(meta, (uint32_t)target_off, target_slot, mem);
         }
       }
       break;

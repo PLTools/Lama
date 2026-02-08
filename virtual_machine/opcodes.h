@@ -54,10 +54,7 @@ typedef enum {
   OP_PATT_BOXED = 0x64,
   OP_PATT_UNBOXED = 0x65,
   OP_PATT_CLOSURE = 0x66,
-  OP_READ = 0x70,
-  OP_WRITE = 0x71,
-  OP_LENGTH = 0x72,
-  OP_LSTRING = 0x73,
+  // TODO: remove this opcode, instead call real function
   OP_BARRAY = 0x74,
 } opcode_t;
 

@@ -319,14 +319,6 @@ module ByteCode = struct
           add_bytes [ (5 * 16) + 1 ];
           add_fixup s;
           add_ints [ 0 ]
-      (* 0x70                 *)
-      | CALL ("read", _, _) -> add_bytes [ (7 * 16) + 0 ]
-      (* 0x71                 *)
-      | CALL ("write", _, _) -> add_bytes [ (7 * 16) + 1 ]
-      (* 0x72                 *)
-      | CALL ("length", _, _) -> add_bytes [ (7 * 16) + 2 ]
-      (* 0x73                 *)
-      | CALL ("string", _, _) -> add_bytes [ (7 * 16) + 3 ]
       (* 0x74                 *)
       | CALL (".array", n, _) ->
           add_bytes [ (7 * 16) + 4 ];
