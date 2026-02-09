@@ -1,5 +1,4 @@
 #include "vm.h"
-#include "../runtime/gc.h"
 #include "../runtime/runtime_common.h"
 #include "arena.h"
 #include "decoder.h"
@@ -28,11 +27,14 @@ virtual_machine *vm_create(const char *main_module_path,
   vm->globals_count = mm->total_globals_count;
 
   insn *entry_point = decode_and_link(mm, mem);
-
   vm->entry_point = entry_point;
+
+  vm->mem = mem;
 
   return vm;
 }
+
+void vm_destroy(virtual_machine *vm) { memory_destroy(vm->mem); }
 
 aint vm_run(virtual_machine *vm) {
 

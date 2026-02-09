@@ -94,5 +94,6 @@ int main(int argc, char *argv[]) {
 
 cleanup:
   free(bytecode_dir);
+  vm_destroy(vm);
   return exit_code;
 }
