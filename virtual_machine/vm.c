@@ -13,14 +13,15 @@ extern void set_args(aint argc, char *argv[]);
 extern size_t __gc_stack_top, __gc_stack_bottom;
 
 virtual_machine *vm_create(const char *main_module_path,
-                           const char *search_path) {
+                           const search_paths *paths) {
 
   // TODO: estimates
   memory *mem = memory_create(1024 * 1024, 4096);
   virtual_machine *vm = ARENA_NEW(mem->main, virtual_machine);
 
-  module_manager *mm = load_modules(main_module_path, search_path, mem);
+  module_manager *mm = load_modules(main_module_path, paths, mem);
   if (!mm) {
+    memory_destroy(mem);
     return NULL;
   }
 
@@ -58,24 +59,4 @@ aint vm_run(virtual_machine *vm) {
   ip->func(ip, sp, bp, globals);
 
   return *bp;
-}
-
-int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    fprintf(stderr, "Usage: %s <bytecode.bc>\n", argv[0]);
-    return 1;
-  }
-
-  __gc_init();
-
-  set_args(argc, argv);
-
-  virtual_machine *vm = vm_create(argv[1], NULL);
-  if (!vm) {
-    return 1;
-  }
-
-  vm_run(vm);
-
-  return 0;
 }

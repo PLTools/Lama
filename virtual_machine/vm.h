@@ -2,6 +2,7 @@
 #define VM_H
 
 #include "decoder.h"
+#include "module_manager.h"
 #include <stddef.h>
 
 typedef struct {
@@ -11,7 +12,7 @@ typedef struct {
 } virtual_machine;
 
 virtual_machine *vm_create(const char *main_module_path,
-                           const char *search_path);
+                           const search_paths *paths);
 
 aint vm_run(virtual_machine *vm);
 

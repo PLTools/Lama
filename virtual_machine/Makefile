@@ -3,8 +3,8 @@ CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -O0
 LIBS = -lffi -ldl
 LDFLAGS = -rdynamic
-TARGET = vm.exe
-SOURCES = decoder.c vm.c bytecode.c linker.c ffi.c module_manager.c arena.c
+TARGET = lama.exe
+SOURCES = lama.c decoder.c vm.c bytecode.c linker.c ffi.c module_manager.c arena.c
 OBJECTS = $(SOURCES:.c=.o)
 
 RUNTIME_DIR = ../runtime

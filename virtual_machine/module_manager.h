@@ -16,6 +16,11 @@
 #define INITIAL_MODULE_CAP 8
 
 typedef struct {
+  const char **paths;
+  size_t len;
+} search_paths;
+
+typedef struct {
   bytecode *bc;        // Loaded bytecode
   int32_t global_base; // Starting index for this module's globals
 } loaded_module;
@@ -36,6 +41,6 @@ typedef struct {
 } module_manager;
 
 module_manager *load_modules(const char *main_module_path,
-                             const char *search_path, memory *mem);
+                             const search_paths *paths, memory *mem);
 
 #endif
