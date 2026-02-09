@@ -77,7 +77,7 @@ typedef struct {
 typedef struct {
   int32_t *offset_to_insn; // offset_to_insn[bytecode_offset] = insn_index
   size_t cap;              // Size of the mapping array (= bytecode size)
-} offset_map_t;
+} offset_map;
 
 typedef struct {
 
@@ -87,27 +87,28 @@ typedef struct {
   size_t code_cap;
   size_t code_len;
 
-  byte_reader_t reader;
-  offset_map_t offset_map;
+  byte_reader reader;
+  offset_map offset_map;
 
   size_t global_offset; // Offset for global variables
 
   size_t module_end_idx; // Pointer to this module's op_module_end instruction
                          // for linking (initialized to -1 if not found)
 
-} decode_ctx_t;
+} decode_ctx;
 
 void symbol_table_init(symbol_table *table);
 void symbol_table_free(symbol_table *table);
 void register_sysargs(symbol_table *table);
 void ext_func_stub_table_init(ext_func_stub_table *table);
-int register_public_symbols(symbol_table *st, insn *code, bytecode *bc,
+int register_public_symbols(symbol_table *st, insn *code,
+                            public_symbols *public_symbols,
                             int32_t *offset_to_insn, int32_t global_base);
 
-decode_ctx_t *decode_ctx_create(const bytecode *bc, int32_t global_offset,
-                                arena_t *arena);
+decode_ctx *decode_ctx_create(const bytecode *bc, int32_t global_offset,
+                                arena *arena);
 
-insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
+insn *decode(decode_ctx *ctx, symbol_table *st, ext_func_stub_table *fst,
              memory *mem);
 
 #endif // DECODER_NEW_H

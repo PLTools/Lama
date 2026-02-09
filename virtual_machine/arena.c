@@ -6,8 +6,8 @@
 
 #define MIN_BLOCK_SIZE 4096
 
-static arena_block_t *block_create(size_t data_size) {
-  arena_block_t *b = malloc(sizeof(arena_block_t) + data_size);
+static arena_block *block_create(size_t data_size) {
+  arena_block *b = malloc(sizeof(arena_block) + data_size);
   if (!b) {
     perror("arena: block_create malloc");
     exit(1);
@@ -18,25 +18,25 @@ static arena_block_t *block_create(size_t data_size) {
   return b;
 }
 
-arena_t *arena_create(size_t init_cap) {
-  arena_t *a = malloc(sizeof(arena_t));
+arena *arena_create(size_t init_cap) {
+  arena *a = malloc(sizeof(arena));
   if (!a) {
     perror("arena: arena_create malloc");
     exit(1);
   }
 
   size_t cap = init_cap < MIN_BLOCK_SIZE ? MIN_BLOCK_SIZE : init_cap;
-  arena_block_t *b = block_create(cap);
+  arena_block *b = block_create(cap);
   a->head = b;
   a->current = b;
   a->block_size = cap;
   return a;
 }
 
-void *arena_alloc(arena_t *arena, size_t size, size_t align) {
+void *arena_alloc(arena *arena, size_t size, size_t align) {
   assert((align & (align - 1)) == 0);
 
-  arena_block_t *blk = arena->current;
+  arena_block *blk = arena->current;
 
   // Align within current block
   size_t mask = align - 1;
@@ -57,7 +57,7 @@ void *arena_alloc(arena_t *arena, size_t size, size_t align) {
   if (new_cap < alloc_need)
     new_cap = alloc_need;
 
-  arena_block_t *nb = block_create(new_cap);
+  arena_block *nb = block_create(new_cap);
   blk->next = nb;
   arena->current = nb;
 
@@ -71,17 +71,17 @@ void *arena_alloc(arena_t *arena, size_t size, size_t align) {
 }
 
 // TODO: cleanup macro?
-arena_savepoint_t arena_save(arena_t *arena) {
-  arena_savepoint_t sp = {.block = arena->current,
+arena_savepoint arena_save(arena *arena) {
+  arena_savepoint sp = {.block = arena->current,
                           .used = arena->current->used};
   return sp;
 };
 
-void arena_restore(arena_t *arena, arena_savepoint_t sp) {
+void arena_restore(arena *arena, arena_savepoint sp) {
   if (!arena || !sp.block)
     return;
 
-  arena_block_t *b = arena->head;
+  arena_block *b = arena->head;
 
   // Walk to the savepoint block
   while (b && b != sp.block) {
@@ -91,11 +91,11 @@ void arena_restore(arena_t *arena, arena_savepoint_t sp) {
   // Restore usage
   b->used = sp.used;
 
-  arena_block_t *to_free = b->next;
+  arena_block *to_free = b->next;
   b->next = NULL;
 
   while (to_free) {
-    arena_block_t *next = to_free->next;
+    arena_block *next = to_free->next;
     free(to_free);
     to_free = next;
   }
@@ -129,7 +129,7 @@ memory *memory_destroy(memory *mem) {
   return NULL;
 }
 
-char *arena_strdup(arena_t *arena, const char *s) {
+char *arena_strdup(arena *arena, const char *s) {
   if (!s)
     return NULL;
 
@@ -139,13 +139,13 @@ char *arena_strdup(arena_t *arena, const char *s) {
   return dst;
 }
 
-void arena_destroy(arena_t *arena) {
+void arena_destroy(arena *arena) {
   if (!arena)
     return;
 
-  arena_block_t *b = arena->head;
+  arena_block *b = arena->head;
   while (b) {
-    arena_block_t *next = b->next;
+    arena_block *next = b->next;
     free(b);
     b = next;
   }

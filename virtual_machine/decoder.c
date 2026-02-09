@@ -90,14 +90,14 @@
 typedef struct fixup_node {
   size_t insn_idx; // Index in code array that needs the jump target
   struct fixup_node *next;
-} fixup_node_t;
+} fixup_node;
 
 // Metadata for each bytecode offset
 typedef struct {
   int32_t resolved_idx; // Index in generated code array (-1 if not visited)
   int32_t stack_depth;  // Expected stack depth (-1 if not visited yet)
-  fixup_node_t *fixups; // Linked list of forward jumps pointing here
-} meta_info_t;
+  fixup_node *fixups; // Linked list of forward jumps pointing here
+} meta_info;
 
 /*
  * External runtime functions (runtime.c)
@@ -251,7 +251,7 @@ static insn *ext_func_stub_table_find(ext_func_stub_table *table,
 
 static insn *ext_func_stub_table_add(ext_func_stub_table *table,
                                      const char *name, fn stub_fn,
-                                     arena_t *code_arena) {
+                                     arena *code_arena) {
   insn *stub = ARENA_ALLOC(code_arena, insn, 2);
 
   char *persistent_name = ARENA_STRDUP(code_arena, name);
@@ -268,12 +268,12 @@ static insn *ext_func_stub_table_add(ext_func_stub_table *table,
   return stub;
 }
 
-int register_public_symbols(symbol_table *st, insn *code, bytecode *bc,
+int register_public_symbols(symbol_table *st, insn *code,
+                            public_symbols *public_symbols,
                             int32_t *offset_to_insn, int32_t global_base) {
 
-  // TODO: Pass symbols only
-  for (size_t i = 0; i < bc->public_symbols_count; i++) {
-    public_symbol_t *pub = &bc->public_symbols[i];
+  for (size_t i = 0; i < public_symbols->len; i++) {
+    public_symbol *pub = &public_symbols->data[i];
 
     insn *code_ptr = NULL;
     int32_t global_idx = 0;
@@ -847,9 +847,9 @@ void op_module_end(DECL_STATE) {
   return;
 }
 
-decode_ctx_t *decode_ctx_create(const bytecode *bc, int32_t global_offset,
-                                arena_t *arena) {
-  decode_ctx_t *ctx = ARENA_NEW(arena, decode_ctx_t);
+decode_ctx *decode_ctx_create(const bytecode *bc, int32_t global_offset,
+                                arena *arena) {
+  decode_ctx *ctx = ARENA_NEW(arena, decode_ctx);
 
   ctx->bc = bc;
 
@@ -881,9 +881,9 @@ decode_ctx_t *decode_ctx_create(const bytecode *bc, int32_t global_offset,
  * Decoding
  */
 // TODO: /??
-static fixup_node_t *add_fixup(meta_info_t *meta, size_t target_off,
+static fixup_node *add_fixup(meta_info *meta, size_t target_off,
                                size_t insn_idx, memory *mem) {
-  fixup_node_t *node = ARENA_NEW(mem->tmp, fixup_node_t);
+  fixup_node *node = ARENA_NEW(mem->tmp, fixup_node);
   if (!node)
     return NULL;
 
@@ -905,7 +905,7 @@ static bool validate_target_off(const bytecode *bc, size_t target_off,
   return true;
 }
 
-static bool emit_ld_glo(decode_ctx_t *ctx, symbol_table *st, int32_t idx,
+static bool emit_ld_glo(decode_ctx *ctx, symbol_table *st, int32_t idx,
                         size_t global_base) {
   const bytecode *bc = ctx->bc;
 
@@ -926,7 +926,7 @@ static bool emit_ld_glo(decode_ctx_t *ctx, symbol_table *st, int32_t idx,
   return true;
 }
 
-static bool emit_st_glo(decode_ctx_t *ctx, symbol_table *st, int32_t idx,
+static bool emit_st_glo(decode_ctx *ctx, symbol_table *st, int32_t idx,
                         size_t global_base) {
   const bytecode *bc = ctx->bc;
 
@@ -950,7 +950,7 @@ static bool emit_st_glo(decode_ctx_t *ctx, symbol_table *st, int32_t idx,
 /*
  * Handle jump target resolution
  */
-static bool handle_jump(decode_ctx_t *ctx, meta_info_t *meta,
+static bool handle_jump(decode_ctx *ctx, meta_info *meta,
                         size_t current_bc_off, int32_t depth, memory *mem) {
   // TODO: unsigned ??
   int32_t target_off = reader_i32(&ctx->reader);
@@ -962,7 +962,7 @@ static bool handle_jump(decode_ctx_t *ctx, meta_info_t *meta,
   size_t my_idx = ctx->code_len;
   EMIT_TARGET(ctx, NULL); // placeholder
 
-  meta_info_t *tm = &meta[target_off];
+  meta_info *tm = &meta[target_off];
   if (target_off < current_bc_off && tm->resolved_idx != -1) {
     // Backward jump
     ctx->code[my_idx].target = &ctx->code[tm->resolved_idx];
@@ -987,7 +987,7 @@ static bool handle_jump(decode_ctx_t *ctx, meta_info_t *meta,
   return true;
 }
 
-insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
+insn *decode(decode_ctx *ctx, symbol_table *st, ext_func_stub_table *fst,
              memory *mem) {
   const bytecode *bc = ctx->bc;
   size_t global_base = ctx->global_offset;
@@ -997,7 +997,7 @@ insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
   ctx->code = code;
   ctx->code_cap = code_cap;
 
-  meta_info_t *meta = ARENA_ALLOC(mem->tmp, meta_info_t, bc->code_size);
+  meta_info *meta = ARENA_ALLOC(mem->tmp, meta_info, bc->code_size);
 
   // Initialize meta table
   for (size_t i = 0; i < bc->code_size; i++) {
@@ -1023,7 +1023,7 @@ insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
     VM_DEBUG("DECODE: visiting bc_off=%zu opcode=%d code_idx=%zu\n",
              current_bc_off, opcode, ctx->code_len);
 
-    meta_info_t *m = &meta[current_bc_off];
+    meta_info *m = &meta[current_bc_off];
     m->resolved_idx = (int32_t)ctx->code_len;
 
     // Update offset map (bytecode offset -> instruction index)
@@ -1043,7 +1043,7 @@ insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
     }
 
     // Resolve forward jumps (backpatching)
-    for (fixup_node_t *f = m->fixups; f; f = f->next) {
+    for (fixup_node *f = m->fixups; f; f = f->next) {
       VM_DEBUG("DECODE: Resolving fixup at bc_off=%zu: insn_idx=%zu -> "
                "code_idx=%zu\n",
                current_bc_off, f->insn_idx, ctx->code_len);
@@ -1418,7 +1418,7 @@ insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
         VM_DEBUG("DECODE: OP_CLOSURE internal target_off=%u target_slot=%zu\n",
                  target_off, target_slot);
 
-        meta_info_t *tm = &meta[target_off];
+        meta_info *tm = &meta[target_off];
         if (target_off < current_bc_off && tm->resolved_idx != -1) {
           ctx->code[target_slot].target = &ctx->code[tm->resolved_idx];
         } else {
@@ -1469,7 +1469,7 @@ insn *decode(decode_ctx_t *ctx, symbol_table *st, ext_func_stub_table *fst,
         EMIT_TARGET(ctx, NULL);
         EMIT_NUM(ctx, n_args);
 
-        meta_info_t *tm = &meta[(uint32_t)target_off];
+        meta_info *tm = &meta[(uint32_t)target_off];
         VM_DEBUG("DECODE:   tm->resolved_idx=%d\n", tm->resolved_idx);
         if ((uint32_t)target_off < current_bc_off && tm->resolved_idx != -1) {
           ctx->code[target_slot].target = &ctx->code[tm->resolved_idx];

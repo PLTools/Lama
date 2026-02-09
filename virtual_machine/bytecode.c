@@ -39,7 +39,7 @@ bytecode *load_bytecode(const char *filename, memory *mem) {
 
   close(fd);
 
-  byte_reader_t reader;
+  byte_reader reader;
   reader_init(&reader, (const uint8_t *)map, file_size);
 
   int32_t string_table_size = reader_i32(&reader);
@@ -70,10 +70,10 @@ bytecode *load_bytecode(const char *filename, memory *mem) {
   bc->globals_count = (size_t)globals_count;
 
   // Allocate and resolve public symbols
-  bc->public_symbols_count = (size_t)num_pubs;
+  bc->public_symbols.len = (size_t)num_pubs;
   if (num_pubs > 0) {
-    bc->public_symbols =
-        ARENA_ALLOC(mem->main, public_symbol_t, (size_t)num_pubs);
+    bc->public_symbols.data =
+        ARENA_ALLOC(mem->main, public_symbol, (size_t)num_pubs);
 
     reader_seek(&reader, pubs_offset);
     for (int32_t i = 0; i < num_pubs; i++) {
@@ -81,22 +81,23 @@ bytecode *load_bytecode(const char *filename, memory *mem) {
       int32_t code_off = reader_i32(&reader);
       int32_t flag = reader_i32(&reader);
 
-      bc->public_symbols[i].name = string_table + name_offset;
-      bc->public_symbols[i].code_offset = code_off;
-      bc->public_symbols[i].flag = flag;
+      bc->public_symbols.data[i].name = string_table + name_offset;
+      bc->public_symbols.data[i].code_offset = code_off;
+      bc->public_symbols.data[i].flag = flag;
     }
   }
 
   // Allocate and resolve imports
-  bc->import_count = (size_t)num_imports;
+  bc->imports.len = (size_t)num_imports;
   if (num_imports > 0) {
-    bc->imports = ARENA_ALLOC(mem->main, const char *, (size_t)num_imports);
+    bc->imports.data =
+        ARENA_ALLOC(mem->main, const char *, (size_t)num_imports);
 
     reader_seek(&reader, imports_offset);
     for (int32_t i = 0; i < num_imports; i++) {
       int32_t name_offset = reader_i32(&reader);
 
-      bc->imports[i] = string_table + name_offset;
+      bc->imports.data[i] = string_table + name_offset;
     }
   }
 

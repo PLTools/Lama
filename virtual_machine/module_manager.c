@@ -18,7 +18,7 @@
  * Build the path to a module's .bc file.
  */
 static char *build_module_path(const char *module_name, const char *search_path,
-                               arena_t *arena) {
+                               arena *arena) {
   char *path = ARENA_ALLOC(arena, char, MAX_PATH_LEN);
   if (search_path && strlen(search_path) > 0) {
     snprintf(path, MAX_PATH_LEN, "%s/%s.bc", search_path, module_name);
@@ -30,7 +30,7 @@ static char *build_module_path(const char *module_name, const char *search_path,
 }
 
 /* Extract module name from filename (without path and extension .bc) */
-static char *extract_module_name(const char *filename, arena_t *arena) {
+static char *extract_module_name(const char *filename, arena *arena) {
   char *path_copy = ARENA_STRDUP(arena, filename);
   char *base = basename(path_copy);
 
@@ -42,7 +42,7 @@ static char *extract_module_name(const char *filename, arena_t *arena) {
   return ARENA_STRDUP(arena, base);
 }
 
-static char *get_directory(const char *filepath, arena_t *arena) {
+static char *get_directory(const char *filepath, arena *arena) {
   char *path_copy = ARENA_STRDUP(arena, filepath);
 
   char *dir = dirname(path_copy);
@@ -106,8 +106,8 @@ static loaded_module *load_module(module_manager *mm, const char *s,
   }
 
   // Recursively load dependencies
-  for (size_t i = 0; i < bc->import_count; i++) {
-    const char *import_name = bc->imports[i];
+  for (size_t i = 0; i < bc->imports.len; i++) {
+    const char *import_name = bc->imports.data[i];
 
     // Skip since we already have it (as runtime.a)
     if (strcmp(import_name, "Std") == 0) {
@@ -136,7 +136,7 @@ module_manager *load_modules(const char *main_module_path,
   // Reserve global index 0 for sysargs
   mm->total_globals_count = 1;
 
-  arena_savepoint_t sp = arena_save(mem->tmp);
+  arena_savepoint sp = arena_save(mem->tmp);
   load_module(mm, main_module_path, search_path, mem);
   arena_restore(mem->tmp, sp);
 

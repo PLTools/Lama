@@ -12,7 +12,7 @@
 extern void op_module_end(DECL_STATE);
 
 insn *decode_and_link(module_manager *mm, memory *mem) {
-  arena_savepoint_t sp = arena_save(mem->tmp);
+  arena_savepoint sp = arena_save(mem->tmp);
   // TODO: shoudl be redone without dynamic array
   symbol_table *st = ARENA_NEW(mem->tmp, symbol_table);
   symbol_table_init(st);
@@ -27,12 +27,12 @@ insn *decode_and_link(module_manager *mm, memory *mem) {
   for (size_t i = 0; i < mm->modules.len; i++) {
     loaded_module *mod = mm->modules.data[i];
 
-    decode_ctx_t *ctx = decode_ctx_create(mod->bc, mod->global_base, mem->tmp);
+    decode_ctx *ctx = decode_ctx_create(mod->bc, mod->global_base, mem->tmp);
 
     insn *mod_code = decode(ctx, st, fst, mem);
 
     // Register public symbols from this module
-    register_public_symbols(st, mod_code, mod->bc,
+    register_public_symbols(st, mod_code, &mod->bc->public_symbols,
                             ctx->offset_map.offset_to_insn, mod->global_base);
 
     if (hd_insn == NULL) {
