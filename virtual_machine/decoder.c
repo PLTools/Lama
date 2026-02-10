@@ -239,6 +239,8 @@ void register_sysargs(symbol_table *table) {
 
 void ext_func_stub_table_init(ext_func_stub_table *table) { da_init(*table); }
 
+void ext_func_stub_table_free(ext_func_stub_table *table) { da_free(*table); }
+
 static insn *ext_func_stub_table_find(ext_func_stub_table *table,
                                       const char *name) {
   for (size_t i = 0; i < table->len; i++) {
