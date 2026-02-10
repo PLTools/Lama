@@ -384,11 +384,11 @@ module ByteCode = struct
             let str_off = StringTab.add st l in
             -(str_off + 1)
         in
-        Bytes.set_int32_ne code addr_ofs (Int32.of_int resolved_addr))
+        Bytes.set_int32_le code addr_ofs (Int32.of_int resolved_addr))
       !func_fixups;
     List.iter
       (fun (ofs, l) ->
-        Bytes.set_int32_ne code ofs
+        Bytes.set_int32_le code ofs
           (Int32.of_int
           @@
             try Hashtbl.find lmap l
