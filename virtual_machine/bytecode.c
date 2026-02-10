@@ -18,6 +18,7 @@ bytecode *load_bytecode(const char *filename, memory *mem) {
   int fd = open(filename, O_RDONLY);
   if (fd < 0) {
     perror("bytecode_load: open");
+    close(fd);
     return NULL;
   }
 
