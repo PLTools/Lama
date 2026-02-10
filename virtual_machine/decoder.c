@@ -96,7 +96,7 @@ typedef struct fixup_node {
 typedef struct {
   int32_t resolved_idx; // Index in generated code array (-1 if not visited)
   int32_t stack_depth;  // Expected stack depth (-1 if not visited yet)
-  fixup_node *fixups; // Linked list of forward jumps pointing here
+  fixup_node *fixups;   // Linked list of forward jumps pointing here
 } meta_info;
 
 /*
@@ -704,7 +704,6 @@ void op_callc(DECL_STATE) {
   STACK_PUSH(sp, (aint)bp);
 
   aint *new_bp = sp + 1;
-
   target->func(target, sp, new_bp, globals);
 
   aint ret_val = *new_bp;
@@ -715,14 +714,6 @@ void op_callc(DECL_STATE) {
 
   STACK_PUSH(sp, ret_val);
   DISPATCH();
-}
-
-void op_ret(DECL_STATE) {
-  aint ret_val = STACK_PEEK(sp);
-  VM_TRACE_CALL("RET sp=%p ret_val=%ld bp=%p\n", (void *)sp, (long)ret_val,
-                (void *)bp);
-  *bp = ret_val;
-  return;
 }
 
 void op_end(DECL_STATE) {
@@ -848,7 +839,7 @@ void op_module_end(DECL_STATE) {
 }
 
 decode_ctx *decode_ctx_create(const bytecode *bc, int32_t global_offset,
-                                arena *arena) {
+                              arena *arena) {
   decode_ctx *ctx = ARENA_NEW(arena, decode_ctx);
 
   ctx->bc = bc;
@@ -882,7 +873,7 @@ decode_ctx *decode_ctx_create(const bytecode *bc, int32_t global_offset,
  */
 // TODO: /??
 static fixup_node *add_fixup(meta_info *meta, size_t target_off,
-                               size_t insn_idx, memory *mem) {
+                             size_t insn_idx, memory *mem) {
   fixup_node *node = ARENA_NEW(mem->tmp, fixup_node);
   if (!node)
     return NULL;
@@ -950,8 +941,8 @@ static bool emit_st_glo(decode_ctx *ctx, symbol_table *st, int32_t idx,
 /*
  * Handle jump target resolution
  */
-static bool handle_jump(decode_ctx *ctx, meta_info *meta,
-                        size_t current_bc_off, int32_t depth, memory *mem) {
+static bool handle_jump(decode_ctx *ctx, meta_info *meta, size_t current_bc_off,
+                        int32_t depth, memory *mem) {
   // TODO: unsigned ??
   int32_t target_off = reader_i32(&ctx->reader);
 
@@ -1487,11 +1478,6 @@ insn *decode(decode_ctx *ctx, symbol_table *st, ext_func_stub_table *fst,
       EMIT_NUM(ctx, n_args);
       break;
     }
-
-    case OP_RET:
-      EMIT_FUNC(ctx, op_ret);
-      DEPTH_DEAD(depth);
-      break;
 
     case OP_END:
       EMIT_FUNC(ctx, op_end);

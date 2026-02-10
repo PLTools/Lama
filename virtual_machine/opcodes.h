@@ -23,7 +23,6 @@ typedef enum {
   OP_STA = 0x14,
   OP_JMP = 0x15,
   OP_END = 0x16,
-  OP_RET = 0x17,
   OP_DROP = 0x18,
   OP_DUP = 0x19,
   OP_SWAP = 0x1A,

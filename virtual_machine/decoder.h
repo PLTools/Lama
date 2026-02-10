@@ -29,7 +29,7 @@ typedef union insn {
 
 /*
  * Sentinel value for external references (both functions and globals).
- * Address = -(index + 1), so index 0 becomes -1, index 1 becomes -2, etc.
+ * Address = -index - 1, so index 0 becomes -1, index 1 becomes -2, etc.
  */
 #define TO_EXT_REF(idx) (-(idx) - 1)
 #define IS_EXT_REF(addr) ((addr) < 0)
@@ -106,7 +106,7 @@ int register_public_symbols(symbol_table *st, insn *code,
                             int32_t *offset_to_insn, int32_t global_base);
 
 decode_ctx *decode_ctx_create(const bytecode *bc, int32_t global_offset,
-                                arena *arena);
+                              arena *arena);
 
 insn *decode(decode_ctx *ctx, symbol_table *st, ext_func_stub_table *fst,
              memory *mem);

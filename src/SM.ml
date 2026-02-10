@@ -243,7 +243,7 @@ module ByteCode = struct
             if S.mem s !extern_globals then begin
               let str_off = StringTab.add st s in
               add_bytes [ b 0 ];
-              add_ints [ -(str_off + 1) ]
+              add_ints [ -str_off - 1 ]
             end else begin
               let i = add_global s in
               add_bytes [ b 0 ];
