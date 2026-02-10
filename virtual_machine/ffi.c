@@ -5,12 +5,58 @@
 
 #include "ffi.h"
 #include "../runtime/runtime_common.h"
+#include "da.h"
+#include "memory.h"
 #include <dlfcn.h>
 #include <ffi.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+struct ffi_call_table {
+  ffi_call_stub *data;
+  size_t len;
+  size_t cap;
+};
+
+ffi_call_table *ffi_call_table_create(void) {
+  ffi_call_table *table = ALLOC(ffi_call_table);
+  da_init(*table);
+  return table;
+}
+
+// Currently frees only table and not stubs themselves since they are needed for
+// execution
+void ffi_call_table_destroy(ffi_call_table *table) {
+  da_free(*table);
+  free(table);
+}
+
+insn *ffi_call_table_find(ffi_call_table *table, const char *name) {
+  for (size_t i = 0; i < table->len; i++) {
+    if (strcmp(table->data[i].name, name) == 0) {
+      return table->data[i].stub;
+    }
+  }
+  return NULL;
+}
+
+insn *ffi_call_table_add(ffi_call_table *table, const char *name, fn stub_fn) {
+  insn *stub = ALLOC_ARRAY(insn, 2);
+
+  char *persistent_name = ESTRDUP(name);
+
+  stub[0].func = stub_fn;
+  stub[1].str = persistent_name;
+
+  ffi_call_stub entry = {.name = persistent_name, .stub = stub};
+  da_append(*table, entry);
+
+  // VM_DEBUG("EXT_FUNC_STUB_TABLE: added '%s' -> stub=%p\n", name, (void
+  // *)stub);
+  return stub;
+}
 
 // TODO: ugly?
 typedef struct {
@@ -35,7 +81,7 @@ static const func_metadata func_table[] = {
     {"Lsprintf", "Bsprintf", false, 1},
 
     // Sentinel
-    {NULL, NULL, false, 0, NULL}};
+    {NULL, NULL, false, 0}};
 
 // TODO: cache?
 static void *lookup_function(const char *name) {
@@ -64,7 +110,7 @@ static aint call_args_array_function(const char *name, aint *args) {
   void *fn = lookup_function(name);
   if (!fn) {
     fprintf(stderr, "Undefined external function: %s\n", name);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   ffi_cif cif;
@@ -76,7 +122,7 @@ static aint call_args_array_function(const char *name, aint *args) {
       ffi_prep_cif(&cif, FFI_DEFAULT_ABI, 1, &ffi_type_pointer, arg_types);
   if (status != FFI_OK) {
     fprintf(stderr, "FFI prep failed for '%s': status=%d\n", name, status);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   ffi_call(&cif, FFI_FN(fn), &result, arg_values);
@@ -92,13 +138,13 @@ static aint call_variadic_function(const char *target_name, int fixed_args,
   void *fn = lookup_function(target_name);
   if (!fn) {
     fprintf(stderr, "Undefined external function: %s\n", target_name);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   if (n_args < fixed_args) {
     fprintf(stderr, "FFI call '%s': expected at least %d args, got %d\n",
             target_name, fixed_args, n_args);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   ffi_cif cif;
@@ -125,7 +171,7 @@ static aint call_variadic_function(const char *target_name, int fixed_args,
   if (status != FFI_OK) {
     fprintf(stderr, "FFI prep failed for '%s': status=%d\n", target_name,
             status);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   ffi_call(&cif, FFI_FN(fn), &result, arg_values);
@@ -136,7 +182,7 @@ static aint call_regular_function(const char *name, aint *args, int n_args) {
   void *fn = lookup_function(name);
   if (!fn) {
     fprintf(stderr, "Undefined external function: %s\n", name);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   ffi_cif cif;
@@ -154,7 +200,7 @@ static aint call_regular_function(const char *name, aint *args, int n_args) {
 
   if (status != FFI_OK) {
     fprintf(stderr, "FFI prep failed for '%s': status=%d\n", name, status);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   ffi_call(&cif, FFI_FN(fn), &result, arg_values);

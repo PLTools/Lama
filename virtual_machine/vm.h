@@ -1,22 +1,17 @@
 #ifndef VM_H
 #define VM_H
 
-#include "arena.h"
-#include "decoder.h"
-#include "module_manager.h"
+#include "../runtime/runtime_common.h"
 #include <stddef.h>
 
-typedef struct {
-  size_t globals_count; // Number of globals
-  insn *entry_point;    // Entry point instruction
-  memory *mem;          // Memory managed by arenas
+typedef struct virtual_machine virtual_machine;
 
-} virtual_machine;
-
-virtual_machine *vm_create(const char *main_module_path,
-                           const search_paths *paths);
+virtual_machine *vm_create(const char *main_unit_path, const char **paths,
+                           size_t total_paths_len);
 
 void vm_destroy(virtual_machine *vm);
+
+void vm_set_args(virtual_machine *vm, int argc, char *argv[]);
 
 aint vm_run(virtual_machine *vm);
 

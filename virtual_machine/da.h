@@ -1,20 +1,22 @@
 #ifndef DA_H
 #define DA_H
 
+#include "memory.h"
+
 /*
  * Dynamic array macros
  */
 #define da_append(xs, x)                                                       \
   do {                                                                         \
-    if (xs.len >= xs.cap) {                                                    \
-      xs.cap = xs.cap == 0 ? 256 : xs.cap * 2;                                 \
-      xs.data = realloc(xs.data, xs.cap * sizeof(*xs.data));                   \
-      if (!xs.data) {                                                          \
+    if ((xs).len >= (xs).cap) {                                                \
+      (xs).cap = (xs).cap == 0 ? 256 : (xs).cap * 2;                           \
+      (xs).data = EREALLOC((xs).data, (xs).cap * sizeof(*(xs).data));          \
+      if (!(xs).data) {                                                        \
         perror("realloc");                                                     \
-        exit(1);                                                               \
+        exit(EXIT_FAILURE);                                                               \
       }                                                                        \
     }                                                                          \
-    xs.data[xs.len++] = x;                                                     \
+    (xs).data[(xs).len++] = x;                                                 \
   } while (0)
 
 #define da_init(xs)                                                            \

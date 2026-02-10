@@ -1,65 +1,164 @@
 #include "linker.h"
-#include "arena.h"
+#include "bytecode.h"
 #include "decoder.h"
-#include "module_manager.h"
-#include <libgen.h>
+#include "ffi.h"
+#include "memory.h"
+#include "symbols.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// opcode handler used to identify module end
-extern void op_module_end(DECL_STATE);
+static void register_public_symbols(symbol_table *st, const bytecode *bc,
+                                    size_t code_offset, size_t global_base,
+                                    const int32_t *bc_to_insn_map) {
+  const public_symbols *pub = &bc->public_symbols;
 
-insn *decode_and_link(module_manager *mm, memory *mem) {
-  arena_savepoint sp = arena_save(mem->tmp);
-  // TODO: shoudl be redone without dynamic array
-  symbol_table *st = ARENA_NEW(mem->tmp, symbol_table);
-  symbol_table_init(st);
+  for (size_t i = 0; i < pub->len; i++) {
+    const public_symbol *p = &pub->data[i];
 
-  register_sysargs(st);
-
-  ext_func_stub_table *fst = ARENA_NEW(mem->tmp, ext_func_stub_table);
-  ext_func_stub_table_init(fst);
-
-  insn *hd_insn = NULL;
-  insn *tl_insn = NULL;
-  for (size_t i = 0; i < mm->modules.len; i++) {
-    loaded_module *mod = mm->modules.data[i];
-
-    decode_ctx *ctx = decode_ctx_create(mod->bc, mod->global_base, mem->tmp);
-
-    insn *mod_code = decode(ctx, st, fst, mem);
-
-    // Register public symbols from this module
-    register_public_symbols(st, mod_code, &mod->bc->public_symbols,
-                            ctx->offset_map.offset_to_insn, mod->global_base);
-
-    if (hd_insn == NULL) {
-      hd_insn = &mod_code[0];
-    }
-
-    // Link previous module's end to this module's start
-    if (tl_insn != NULL) {
-      // prev_module_end is pointing to op_module_end instruction
-      // The next slot contains the target pointer (NULL placeholder)
-      tl_insn[1].target = &mod_code[0];
-    }
-
-    // Remember this module's op_module_end instruction for next iteration
-    // It was emitted after the first END, position stored in
-    // ctx->module_end_idx
-    size_t module_end_idx = ctx->module_end_idx;
-
-    // Last module's op_module_end target remains NULL (program ends)
-    if (module_end_idx == (size_t)-1) {
-      tl_insn = NULL;
+    if (p->flag == PUB_FLAG_FUNCTION) {
+      // p->code_offset is the offset in the bytecode, so we use the mapping
+      int32_t insn_idx = bc_to_insn_map[p->code_offset];
+      if (insn_idx == -1) {
+        fprintf(stderr,
+                "Error: public symbol '%s' at bytecode offset %d not decoded\n",
+                p->name, p->code_offset);
+        exit(EXIT_FAILURE);
+      }
+      int32_t code_idx = insn_idx + code_offset;
+      symbol_table_add_function(st, p->name, code_idx);
     } else {
-      tl_insn = &mod_code[module_end_idx];
+      int32_t gidx = p->code_offset + global_base;
+      symbol_table_add_global(st, p->name, gidx);
     }
   }
+}
 
-  arena_restore(mem->tmp, sp);
+/*
+ * Resolve all stubs from a decoded unit.
+ */
+static void resolve_stubs(decoded *dec, insn *all_code, size_t code_offset,
+                          symbol_table *st, ffi_call_table *ffi_stubs) {
+  // Unit's code starts at all_code + code_offset
+  insn *code = all_code + code_offset;
+  stub *stubs_arr = dec->stubs;
+  size_t stubs_len = dec->stubs_len;
 
-  return hd_insn;
+  for (size_t i = 0; i < stubs_len; i++) {
+    stub *s = &stubs_arr[i];
+    size_t pi = s->patch_idx;
+
+    switch (s->kind) {
+
+    case STUB_CALL: {
+      resolved_symbol *sym = symbol_table_find(st, s->name);
+
+      // Decoder emitted: [NULL] [NULL] [n_args]
+      if (sym && sym->is_function) {
+        code[pi - 1].func = decoder_get_op_call();
+        code[pi].target = &all_code[sym->idx];
+      } else {
+        code[pi - 1].func = decoder_get_op_call_ffi_stub();
+        code[pi].str = s->name;
+      }
+      break;
+    }
+
+    case STUB_CLOSURE: {
+      resolved_symbol *sym = symbol_table_find(st, s->name);
+
+      if (sym && sym->is_function) {
+        code[pi].target = &all_code[sym->idx];
+      } else {
+        // Not found in symbol table — create FFI stub
+        insn *ffi_stub = ffi_call_table_find(ffi_stubs, s->name);
+        if (!ffi_stub) {
+          ffi_stub = ffi_call_table_add(ffi_stubs, s->name,
+                                        decoder_get_op_callc_ffi_stub());
+        }
+        code[pi].target = ffi_stub;
+      }
+      break;
+    }
+
+    case STUB_GLOBAL: {
+      resolved_symbol *sym = symbol_table_find(st, s->name);
+      if (sym && !sym->is_function) {
+        code[pi].num = sym->idx;
+      } else {
+        // TODO: C globals
+        exit(EXIT_FAILURE);
+      }
+      break;
+    }
+    }
+  }
+}
+
+program *link(bytecode **bc_arr, decoded **dec_arr, size_t n) {
+  symbol_table *st = symbol_table_create();
+  ffi_call_table *ffi_stubs = ffi_call_table_create();
+
+  size_t total_code_len = 0;
+  size_t total_globals = 0;
+
+  for (size_t i = 0; i < n; i++) {
+    decoded *dec = dec_arr[i];
+    bytecode *bc = bc_arr[i];
+    register_public_symbols(st, bc, total_code_len, total_globals,
+                            dec->bc_to_insn_map);
+    total_code_len += dec->code_len;
+    total_globals += bc->globals_count;
+  }
+
+  insn *all_code = ALLOC_ARRAY(insn, total_code_len);
+
+  size_t code_offset = 0;
+  for (size_t i = 0; i < n; i++) {
+    decoded *dec = dec_arr[i];
+
+    memcpy(all_code + code_offset, dec->code, dec->code_len * sizeof(insn));
+
+    // Resolve internal jumps
+    for (size_t j = 0; j < dec->relocs_len; j++) {
+      size_t slot = dec->relocs[j];
+      int32_t target_idx = all_code[code_offset + slot].num;
+      all_code[code_offset + slot].target = &all_code[code_offset + target_idx];
+    }
+
+    // Resolve all stubs
+    resolve_stubs(dec, all_code, code_offset, st, ffi_stubs);
+
+    // Link main() functions across units
+    if (i < n - 1 && dec->unit_end_idx != (size_t)-1) {
+      size_t next_offset = code_offset + dec->code_len;
+      all_code[code_offset + dec->unit_end_idx + 1].target =
+          &all_code[next_offset];
+    }
+
+    code_offset += dec->code_len;
+  }
+
+  program *prog = ALLOC(program);
+  prog->code = all_code;
+  prog->code_len = total_code_len;
+  prog->total_globals = total_globals;
+
+  symbol_table_destroy(st);
+  ffi_call_table_destroy(ffi_stubs);
+  // NOTE: we don't free bytecode here since it's used for strings etc.
+  for (size_t i = 0; i < n; i++) {
+    decoded_free(dec_arr[i]);
+  }
+  free(dec_arr);
+
+  return prog;
+}
+
+void prog_free(program *prog) {
+  if (prog) {
+    free(prog->code);
+    free(prog);
+  }
 }

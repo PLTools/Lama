@@ -1,40 +1,70 @@
 #include "vm.h"
+#include "../runtime/gc.h"
 #include "../runtime/runtime_common.h"
-#include "arena.h"
 #include "decoder.h"
 #include "linker.h"
-#include "module_manager.h"
+#include "loader.h"
+#include "memory.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-extern void set_args(aint argc, char *argv[]);
 extern size_t __gc_stack_top, __gc_stack_bottom;
+extern void set_args(aint argc, char *argv[]);
 
-virtual_machine *vm_create(const char *main_module_path,
-                           const search_paths *paths) {
+struct virtual_machine {
+  bytecode **bc_arr; // Array of loaded bytecode units
+  size_t bc_len;
+  insn *entry_point;    // Entry point instruction
+  size_t total_globals; // Number of globals
+};
 
-  // TODO: estimates
-  memory *mem = memory_create(1024 * 1024, 4096);
-  virtual_machine *vm = ARENA_NEW(mem->main, virtual_machine);
+virtual_machine *vm_create(const char *main_unit_path, const char **paths,
+                           size_t total_paths_len) {
+  __gc_init();
+  search_paths search_paths = {.paths = paths, .len = total_paths_len};
 
-  module_manager *mm = load_modules(main_module_path, paths, mem);
-  if (!mm) {
-    memory_destroy(mem);
+  virtual_machine *vm = ALLOC(virtual_machine);
+
+  bytecode **bc_arr = load(main_unit_path, &search_paths, &vm->bc_len);
+  if (!bc_arr) {
+    free(vm);
+    return NULL;
+  }
+  vm->bc_arr = bc_arr;
+  decoded **decoded_arr = decode(bc_arr, vm->bc_len);
+  if (!decoded_arr) {
+    for (size_t i = 0; i < vm->bc_len; i++) {
+      bytecode_free(bc_arr[i]);
+    }
+    free(bc_arr);
+    free(vm);
     return NULL;
   }
 
-  vm->globals_count = mm->total_globals_count;
+  program *prog = link(bc_arr, decoded_arr, vm->bc_len);
 
-  insn *entry_point = decode_and_link(mm, mem);
-  vm->entry_point = entry_point;
+  vm->total_globals = prog->total_globals;
+  vm->entry_point = prog->code;
 
-  vm->mem = mem;
+  free(prog);
 
   return vm;
 }
 
-void vm_destroy(virtual_machine *vm) { memory_destroy(vm->mem); }
+void vm_destroy(virtual_machine *vm) {
+  for (size_t i = 0; i < vm->bc_len; i++) {
+    bytecode_free(vm->bc_arr[i]);
+  }
+  free(vm->bc_arr);
+  free(vm->entry_point);
+  free(vm);
+}
+
+void vm_set_args(virtual_machine *vm, int argc, char *argv[]) {
+  set_args(argc, argv);
+}
 
 aint vm_run(virtual_machine *vm) {
 

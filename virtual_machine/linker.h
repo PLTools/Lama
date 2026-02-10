@@ -1,10 +1,19 @@
 #ifndef LINKER_H
 #define LINKER_H
 
+#include "bytecode.h"
 #include "decoder.h"
-#include "module_manager.h"
-#include "stddef.h"
+#include "insn.h"
+#include <stddef.h>
 
-insn *decode_and_link(module_manager *mm, memory *mem);
+typedef struct {
+  insn *code;
+  size_t code_len;
+  size_t total_globals;
+} program;
 
-#endif
+program *link(bytecode **bc_arr, decoded **dec_arr, size_t n);
+
+void prog_free(program *prog);
+
+#endif // LINKER_H

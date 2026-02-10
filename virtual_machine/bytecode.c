@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "bytecode.h"
-#include "arena.h"
+#include "bytecode_util.h"
+#include "memory.h"
 #include <fcntl.h>
 #include <libgen.h>
 #include <stdio.h>
@@ -14,11 +15,10 @@
 #define PUB_ENTRY_SIZE 12
 #define IMPORT_ENTRY_SIZE 4
 
-bytecode *load_bytecode(const char *filename, memory *mem) {
+bytecode *bytecode_load(const char *filename) {
   int fd = open(filename, O_RDONLY);
   if (fd < 0) {
     perror("bytecode_load: open");
-    close(fd);
     return NULL;
   }
 
@@ -35,6 +35,7 @@ bytecode *load_bytecode(const char *filename, memory *mem) {
 
   if (map == MAP_FAILED) {
     perror("bytecode_load: mmap");
+    close(fd);
     return NULL;
   }
 
@@ -59,7 +60,7 @@ bytecode *load_bytecode(const char *filename, memory *mem) {
   const uint8_t *data = (const uint8_t *)map;
   const char *string_table = (const char *)(data + st_offset);
 
-  bytecode *bc = ARENA_NEW(mem->main, bytecode);
+  bytecode *bc = ALLOC(bytecode);
 
   bc->map_base = map;
   bc->map_size = file_size;
@@ -73,8 +74,7 @@ bytecode *load_bytecode(const char *filename, memory *mem) {
   // Allocate and resolve public symbols
   bc->public_symbols.len = (size_t)num_pubs;
   if (num_pubs > 0) {
-    bc->public_symbols.data =
-        ARENA_ALLOC(mem->main, public_symbol, (size_t)num_pubs);
+    bc->public_symbols.data = ALLOC_ARRAY(public_symbol, num_pubs);
 
     reader_seek(&reader, pubs_offset);
     for (int32_t i = 0; i < num_pubs; i++) {
@@ -91,8 +91,7 @@ bytecode *load_bytecode(const char *filename, memory *mem) {
   // Allocate and resolve imports
   bc->imports.len = (size_t)num_imports;
   if (num_imports > 0) {
-    bc->imports.data =
-        ARENA_ALLOC(mem->main, const char *, (size_t)num_imports);
+    bc->imports.data = ALLOC_ARRAY(const char *, (size_t)num_imports);
 
     reader_seek(&reader, imports_offset);
     for (int32_t i = 0; i < num_imports; i++) {
@@ -102,11 +101,16 @@ bytecode *load_bytecode(const char *filename, memory *mem) {
     }
   }
 
+  // will be set later
+  bc->name = NULL;
+
   return bc;
 }
 
-void free_bytecode(bytecode *bc) {
-  munmap(bc->map_base, bc->map_size);
-  // NOTE: bc itself, public_symbols, imports, and module_name
-  // are all allocated from arena and will be freed when arena is destroyed.
+void bytecode_free(bytecode *bc) { 
+  munmap(bc->map_base, bc->map_size); 
+  free(bc->public_symbols.data);
+  free(bc->imports.data);
+  free((void *)bc->name);
+  free(bc);
 }

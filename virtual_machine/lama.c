@@ -1,7 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
 
-#include "../runtime/gc.h"
-#include "../runtime/runtime_common.h"
 #include "vm.h"
 #include <getopt.h>
 #include <libgen.h>
@@ -11,15 +9,13 @@
 
 #define MAX_INCLUDE_PATHS 64
 
-extern void set_args(aint argc, char *argv[]);
-
 static void print_usage(const char *prog_name) {
   printf("Usage: %s [options] <bytecode.bc> [args]\n", prog_name);
   printf("\nWhen no options are specified, the VM will run the bytecode file "
-         "and look for modules in the same directory.\n");
+         "and look for units in the same directory.\n");
   printf("Options:\n");
   printf("  -h, --help              Show this help message\n");
-  printf("  -I, --include PATH      Add PATH to module search paths (can be "
+  printf("  -I, --include PATH      Add PATH to unit search paths (can be "
          "used multiple times)\n");
 }
 
@@ -29,7 +25,6 @@ int main(int argc, char *argv[]) {
   // TODO: better error handling in general
   int exit_code = 0;
   char *bytecode_dir = NULL;
-  search_paths paths = {0};
 
   static struct option long_options[] = {{"help", no_argument, 0, 'h'},
                                          {"include", required_argument, 0, 'I'},
@@ -53,13 +48,7 @@ int main(int argc, char *argv[]) {
         return 1;
       }
       break;
-    case '?':
-      if (optopt) {
-        fprintf(stderr, "Invalid command line specifier ('-%c')\n", optopt);
-        return 1;
-      }
     default:
-      fprintf(stderr, "Invalid command line specifier\n");
       return 1;
     }
   }
@@ -72,19 +61,14 @@ int main(int argc, char *argv[]) {
 
   char *bytecode_file = argv[optind];
 
-  // Inlcude main module's directory by default
+  // Include main unit's directory by default
   bytecode_dir = strdup(dirname(bytecode_dir));
   include_paths[0] = bytecode_dir;
 
-  paths.paths = (const char **)include_paths;
-  paths.len = include_path_count;
-
-  __gc_init();
-
+  virtual_machine *vm = vm_create(bytecode_file, (const char **)include_paths,
+                                  include_path_count);
   // Skip options, pass only program args
-  set_args(argc - optind, argv + optind);
-
-  virtual_machine *vm = vm_create(bytecode_file, &paths);
+  vm_set_args(vm, argc - optind, argv + optind);
   if (!vm) {
     exit_code = 1;
     goto cleanup;
