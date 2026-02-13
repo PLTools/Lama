@@ -12,7 +12,7 @@ typedef struct {
   const char *name;    // Direct pointer to string
   int32_t code_offset; // Offset into bytecode section (for functions) or global
                        // index
-  int32_t flag;        // PUB_FLAG_FUNCTION or PUB_FLAG_GLOBAL
+  uint8_t flag;        // PUB_FLAG_FUNCTION or PUB_FLAG_GLOBAL
 } public_symbol;
 
 typedef struct {

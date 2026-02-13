@@ -404,7 +404,7 @@ module ByteCode = struct
               with Not_found ->
                 failwith (Printf.sprintf "ERROR: undefined label of public '%s'" name)
           in
-          (Int32.of_int @@ StringTab.add st name, Int32.of_int pos, Int32.of_int flag))
+          (Int32.of_int @@ StringTab.add st name, Int32.of_int pos, flag))
         !pubs
     in
     let imports =
@@ -422,7 +422,7 @@ module ByteCode = struct
       (fun (name_off, offset, flag) ->
         Buffer.add_int32_le file name_off;
         Buffer.add_int32_le file offset;
-        Buffer.add_int32_le file flag)
+        Buffer.add_char file (Char.chr flag))
       pubs_resolved;
     Buffer.add_bytes file code;
     let f = open_out_bin (Printf.sprintf "%s.bc" cmd#basename) in

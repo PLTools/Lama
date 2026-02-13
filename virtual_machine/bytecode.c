@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #define HEADER_SIZE 16
-#define PUB_ENTRY_SIZE 12
+#define PUB_ENTRY_SIZE 9
 #define IMPORT_ENTRY_SIZE 4
 
 bytecode *bytecode_load(const char *filename) {
@@ -80,7 +80,7 @@ bytecode *bytecode_load(const char *filename) {
     for (int32_t i = 0; i < num_pubs; i++) {
       int32_t name_offset = reader_i32(&reader);
       int32_t code_off = reader_i32(&reader);
-      int32_t flag = reader_i32(&reader);
+      uint8_t flag = reader_u8(&reader);
 
       bc->public_symbols.data[i].name = string_table + name_offset;
       bc->public_symbols.data[i].code_offset = code_off;
