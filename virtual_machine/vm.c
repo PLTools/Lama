@@ -79,9 +79,9 @@ aint vm_run(virtual_machine *vm) {
 
   // Globals at the top of stack
   aint *globals = stack_data;
-
-  extern void *global_sysargs;
-  globals[0] = (aint)global_sysargs;
+  for (size_t i = 0; i < vm->total_globals; i++) {
+    globals[i] = 0;
+  }
 
   aint *sp = &stack_data[active_stack_size - 1];
   aint *bp = sp;
