@@ -67,6 +67,14 @@ fn decoder_get_op_call_ffi_stub(void) { return op_call_ffi_stub; }
 
 fn decoder_get_op_callc_ffi_stub(void) { return op_callc_ffi_stub; }
 
+fn decoder_get_op_ld_glo(void) { return op_ld_glo; }
+
+fn decoder_get_op_st_glo(void) { return op_st_glo; }
+
+fn decoder_get_op_ld_glo_ext(void) { return op_ld_glo_ext; }
+
+fn decoder_get_op_st_glo_ext(void) { return op_st_glo_ext; }
+
 typedef struct fixup_node {
   size_t insn_idx; // Index in code array that needs the jump target
   struct fixup_node *next;
@@ -169,10 +177,10 @@ static bool emit_ld_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
     int str_offset = EXT_REF_INDEX(idx);
     const char *glob_name = bytecode_get_string(bc, str_offset);
     VM_DEBUG("DECODE: OP_LD external global '%s' (stub)\n", glob_name);
-    EMIT_FUNC(ctx, op_ld_glo);
+    EMIT_FUNC(ctx, NULL); // linker will patch this
     size_t patch_idx = ctx->code_len;
     EMIT_NUM(ctx, 0); // placeholder — linker will patch
-    add_stub(ctx, patch_idx, glob_name, STUB_GLOBAL);
+    add_stub(ctx, patch_idx, glob_name, STUB_GLOBAL_LD);
   } else {
     EMIT_FUNC(ctx, op_ld_glo);
     EMIT_NUM(ctx, global_base + idx);
@@ -187,10 +195,10 @@ static bool emit_st_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
     int str_offset = EXT_REF_INDEX(idx);
     const char *glob_name = bytecode_get_string(bc, str_offset);
     VM_DEBUG("DECODE: OP_ST external global '%s' (stub)\n", glob_name);
-    EMIT_FUNC(ctx, op_st_glo);
+    EMIT_FUNC(ctx, NULL); // linker will patch this
     size_t patch_idx = ctx->code_len;
     EMIT_NUM(ctx, 0); // placeholder — linker will patch
-    add_stub(ctx, patch_idx, glob_name, STUB_GLOBAL);
+    add_stub(ctx, patch_idx, glob_name, STUB_GLOBAL_ST);
   } else {
     EMIT_FUNC(ctx, op_st_glo);
     EMIT_NUM(ctx, global_base + idx);

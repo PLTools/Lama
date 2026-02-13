@@ -11,7 +11,8 @@
 typedef enum {
   STUB_CALL,
   STUB_CLOSURE,
-  STUB_GLOBAL,
+  STUB_GLOBAL_LD,
+  STUB_GLOBAL_ST,
 } stub_kind;
 
 /*
@@ -45,5 +46,9 @@ void decoded_free(decoded *dec);
 fn decoder_get_op_call(void);
 fn decoder_get_op_call_ffi_stub(void);
 fn decoder_get_op_callc_ffi_stub(void);
+fn decoder_get_op_ld_glo(void);
+fn decoder_get_op_st_glo(void);
+fn decoder_get_op_ld_glo_ext(void);
+fn decoder_get_op_st_glo_ext(void);
 
 #endif // DECODER_NEW_H

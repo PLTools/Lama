@@ -410,6 +410,26 @@ void op_st_glo(DECL_STATE) {
   DISPATCH();
 }
 
+/*
+ * Load / store extenral globals
+ */
+void op_ld_glo_ext(DECL_STATE) {
+  ip++;
+  aint *ptr = ip->global_ptr;
+  VM_DEBUG("LD_GLO_FFI ptr=%p val=%ld\n", (void *)ptr, (long)*ptr);
+  STACK_PUSH(sp, *ptr);
+  DISPATCH();
+}
+
+void op_st_glo_ext(DECL_STATE) {
+  ip++;
+  aint *ptr = ip->global_ptr;
+  aint val = STACK_PEEK(sp);
+  VM_DEBUG("ST_GLO_FFI ptr=%p val=%ld\n", (void *)ptr, (long)val);
+  *ptr = val;
+  DISPATCH();
+}
+
 void op_ld_loc(DECL_STATE) {
   ip++;
   int32_t idx = ip->num;

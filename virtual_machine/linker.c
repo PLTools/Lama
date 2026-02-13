@@ -4,6 +4,7 @@
 #include "ffi.h"
 #include "memory.h"
 #include "symbols.h"
+#include <dlfcn.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,13 +83,31 @@ static void resolve_stubs(decoded *dec, insn *all_code, size_t code_offset,
       break;
     }
 
-    case STUB_GLOBAL: {
+    case STUB_GLOBAL_LD:
+    case STUB_GLOBAL_ST: {
       resolved_symbol *sym = symbol_table_find(st, s->name);
       if (sym && !sym->is_function) {
+        // Global from another unit
+        if (s->kind == STUB_GLOBAL_LD) {
+          code[pi - 1].func = decoder_get_op_ld_glo();
+        } else {
+          code[pi - 1].func = decoder_get_op_st_glo();
+        }
         code[pi].num = sym->idx;
       } else {
-        // TODO: C globals
-        exit(EXIT_FAILURE);
+        // C global
+        void *ptr = dlsym(RTLD_DEFAULT, s->name);
+        if (ptr) {
+          if (s->kind == STUB_GLOBAL_LD) {
+            code[pi - 1].func = decoder_get_op_ld_glo_ext();
+          } else {
+            code[pi - 1].func = decoder_get_op_st_glo_ext();
+          }
+          code[pi].global_ptr = (aint *)ptr;
+        } else {
+          fprintf(stderr, "Error: unresolved global '%s'\n", s->name);
+          exit(EXIT_FAILURE);
+        }
       }
       break;
     }
