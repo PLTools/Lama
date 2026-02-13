@@ -46,15 +46,6 @@ static char *build_unit_path(const char *unit_name, const search_paths *paths) {
 }
 
 /*
- * Check if a string looks like a file path (contains '/' or ends with '.bc')
- */
-static bool is_filepath(const char *str) {
-  size_t len = strlen(str);
-  return strchr(str, '/') != NULL ||
-         (len > 3 && strcmp(str + len - 3, ".bc") == 0);
-}
-
-/*
  * Find a loaded unit by name. Returns its index, or (size_t)-1 if not found.
  */
 static size_t find_loaded(bytecode_array *units, const char *name) {
