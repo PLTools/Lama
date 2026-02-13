@@ -62,8 +62,6 @@ void op_closure(DECL_STATE);
 void op_callc_ffi_stub(DECL_STATE);
 void op_call_ffi_stub(DECL_STATE);
 
-void op_unit_end(DECL_STATE);
-
 void op_line(DECL_STATE);
 
 #endif // OPS_H

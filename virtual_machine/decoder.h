@@ -31,7 +31,6 @@ typedef struct {
   size_t code_len;
   stub *stubs; // Fixups for the linker to resolve
   size_t stubs_len;
-  size_t unit_end_idx; // Index of op_unit_end in code[] (-1 if none)
   int32_t *bc_to_insn_map;
   size_t *relocs; // Indices of insn with internal target offsets
   size_t relocs_len;

@@ -113,12 +113,15 @@ program *link(bytecode **bc_arr, decoded **dec_arr, size_t n) {
   }
 
   insn *all_code = ALLOC_ARRAY(insn, total_code_len);
+  insn **entry_points = ALLOC_ARRAY(insn *, n);
 
   size_t code_offset = 0;
   for (size_t i = 0; i < n; i++) {
     decoded *dec = dec_arr[i];
 
     memcpy(all_code + code_offset, dec->code, dec->code_len * sizeof(insn));
+
+    entry_points[i] = &all_code[code_offset];
 
     // Resolve internal jumps
     for (size_t j = 0; j < dec->relocs_len; j++) {
@@ -130,13 +133,6 @@ program *link(bytecode **bc_arr, decoded **dec_arr, size_t n) {
     // Resolve all stubs
     resolve_stubs(dec, all_code, code_offset, st, ffi_stubs);
 
-    // Link main() functions across units
-    if (i < n - 1 && dec->unit_end_idx != (size_t)-1) {
-      size_t next_offset = code_offset + dec->code_len;
-      all_code[code_offset + dec->unit_end_idx + 1].target =
-          &all_code[next_offset];
-    }
-
     code_offset += dec->code_len;
   }
 
@@ -144,6 +140,8 @@ program *link(bytecode **bc_arr, decoded **dec_arr, size_t n) {
   prog->code = all_code;
   prog->code_len = total_code_len;
   prog->total_globals = total_globals;
+  prog->entry_points = entry_points;
+  prog->entry_points_len = n;
 
   symbol_table_destroy(st);
   ffi_call_table_destroy(ffi_stubs);
@@ -159,6 +157,7 @@ program *link(bytecode **bc_arr, decoded **dec_arr, size_t n) {
 void prog_free(program *prog) {
   if (prog) {
     free(prog->code);
+    free(prog->entry_points);
     free(prog);
   }
 }

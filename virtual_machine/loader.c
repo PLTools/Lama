@@ -22,6 +22,12 @@ typedef struct {
   size_t cap;
 } bytecode_array;
 
+typedef struct {
+  size_t *data; // Indices into the loaded bytecode_array
+  size_t len;
+  size_t cap;
+} exec_order;
+
 /*
  * Build the path to a unit's .bc file by searching through paths.
  */
@@ -48,13 +54,16 @@ static bool is_filepath(const char *str) {
          (len > 3 && strcmp(str + len - 3, ".bc") == 0);
 }
 
-static bool find_loaded(bytecode_array *units, const char *name) {
+/*
+ * Find a loaded unit by name. Returns its index, or (size_t)-1 if not found.
+ */
+static size_t find_loaded(bytecode_array *units, const char *name) {
   for (size_t i = 0; i < units->len; i++) {
     if (strcmp(units->data[i]->name, name) == 0) {
-      return true;
+      return i;
     }
   }
-  return false;
+  return (size_t)-1;
 }
 
 /*
@@ -77,21 +86,14 @@ static char *extract_unit_name(const char *filename) {
 /*
  * Load a single unit and its dependencies recursively.
  */
-static bool load_unit_recursive(bytecode_array *units, const char *s,
-                                const search_paths *paths) {
-  char *filepath = NULL;
-  char *unit_name = NULL;
+static bool load_unit_recursive(bytecode_array *units, exec_order *order,
+                                const char *s, const search_paths *paths) {
 
-  // The initial call uses a filepath, recursive calls use unit names
-  if (is_filepath(s)) {
-    filepath = ESTRDUP(s);
-    unit_name = extract_unit_name(s);
-  } else {
-    filepath = build_unit_path(s, paths);
-    unit_name = ESTRDUP(s);
-  }
+  char *filepath = build_unit_path(s, paths);
+  char *unit_name = ESTRDUP(s);
 
-  if (find_loaded(units, unit_name)) {
+  size_t existing = find_loaded(units, unit_name);
+  if (existing != (size_t)-1) {
     free(filepath);
     free(unit_name);
     return true;
@@ -107,7 +109,10 @@ static bool load_unit_recursive(bytecode_array *units, const char *s,
   }
   bc->name = unit_name;
 
-  // Recursively load dependencies first (topological order)
+  size_t my_idx = units->len;
+  da_append(*units, bc);
+
+  // Recursively load dependencies
   for (size_t i = 0; i < bc->imports.len; i++) {
     const char *import_name = bc->imports.data[i];
 
@@ -116,22 +121,70 @@ static bool load_unit_recursive(bytecode_array *units, const char *s,
       continue;
     }
 
-    load_unit_recursive(units, import_name, paths);
+    if (!load_unit_recursive(units, order, import_name, paths)) {
+      free(filepath);
+      return false;
+    }
   }
 
-  da_append(*units, bc);
+  da_append(*order, my_idx);
   free(filepath);
   return true;
 }
 
-bytecode **load(const char *main_unit_path, const search_paths *paths,
-                size_t *out_len) {
+static bytecode *load_main_unit(const char *path) {
+  char *filepath = ESTRDUP(path);
+  char *unit_name = extract_unit_name(path);
+  bytecode *bc = bytecode_load(filepath);
+  if (!bc) {
+    fprintf(stderr, "Failed to load main unit from '%s'\n", filepath);
+    exit(EXIT_FAILURE);
+  }
+
+  bc->name = unit_name;
+  free(filepath);
+  return bc;
+}
+
+load_result load(const char *main_unit_path, const search_paths *paths) {
+  load_result result = {0};
   bytecode_array m;
   da_init(m);
+  exec_order order;
+  da_init(order);
 
-  if (!load_unit_recursive(&m, main_unit_path, paths)) {
-    return NULL;
+  bytecode *bc = load_main_unit(main_unit_path);
+
+  for (size_t i = 0; i < bc->imports.len; i++) {
+    const char *import_name = bc->imports.data[i];
+
+    // Skip Std since we have it as runtime.a
+    if (strcmp(import_name, "Std") == 0) {
+      continue;
+    }
+
+    if (!load_unit_recursive(&m, &order, import_name, paths)) {
+      free(order.data);
+      return result;
+    }
   }
-  *out_len = m.len;
-  return m.data;
+
+  // Check if main unit was already loaded as a dependency
+  // NOTE: this is all done to comply with the semantics of the reference
+  // implementation which allows main module to execute twice (if it's imported
+  // by one of its dependencies).
+  size_t main_idx = find_loaded(&m, bc->name);
+  if (main_idx == (size_t)-1) {
+    main_idx = m.len;
+    da_append(m, bc);
+  } else {
+    bytecode_free(bc);
+  }
+  da_append(order, main_idx);
+
+  result.units = m.data;
+  result.units_len = m.len;
+  result.exec_order = order.data;
+  result.exec_order_len = order.len;
+  return result;
 }

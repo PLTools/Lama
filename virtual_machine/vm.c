@@ -14,10 +14,14 @@ extern size_t __gc_stack_top, __gc_stack_bottom;
 extern void set_args(aint argc, char *argv[]);
 
 struct virtual_machine {
-  bytecode **bc_arr; // Array of loaded bytecode units
+  bytecode **bc_arr; // Array of unique loaded bytecode units
   size_t bc_len;
-  insn *entry_point;    // Entry point instruction
-  size_t total_globals; // Number of globals
+  insn *code;          // Contiguous code array
+  insn **entry_points; // Entry point for each unique unit
+  size_t entry_points_len;
+  size_t *exec_order; // Indices into entry_points[], execution order
+  size_t exec_order_len;
+  size_t total_globals;
 };
 
 virtual_machine *vm_create(const char *main_unit_path, const char **paths,
@@ -27,26 +31,33 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
 
   virtual_machine *vm = ALLOC(virtual_machine);
 
-  bytecode **bc_arr = load(main_unit_path, &search_paths, &vm->bc_len);
-  if (!bc_arr) {
+  load_result lr = load(main_unit_path, &search_paths);
+  if (!lr.units) {
     free(vm);
     return NULL;
   }
-  vm->bc_arr = bc_arr;
-  decoded **decoded_arr = decode(bc_arr, vm->bc_len);
+  vm->bc_arr = lr.units;
+  vm->bc_len = lr.units_len;
+
+  decoded **decoded_arr = decode(lr.units, lr.units_len);
   if (!decoded_arr) {
     for (size_t i = 0; i < vm->bc_len; i++) {
-      bytecode_free(bc_arr[i]);
+      bytecode_free(lr.units[i]);
     }
-    free(bc_arr);
+    free(lr.units);
+    free(lr.exec_order);
     free(vm);
     return NULL;
   }
 
-  program *prog = link(bc_arr, decoded_arr, vm->bc_len);
+  program *prog = link(lr.units, decoded_arr, lr.units_len);
 
   vm->total_globals = prog->total_globals;
-  vm->entry_point = prog->code;
+  vm->code = prog->code;
+  vm->entry_points = prog->entry_points;
+  vm->entry_points_len = prog->entry_points_len;
+  vm->exec_order = lr.exec_order;
+  vm->exec_order_len = lr.exec_order_len;
 
   free(prog);
 
@@ -58,7 +69,9 @@ void vm_destroy(virtual_machine *vm) {
     bytecode_free(vm->bc_arr[i]);
   }
   free(vm->bc_arr);
-  free(vm->entry_point);
+  free(vm->code);
+  free(vm->entry_points);
+  free(vm->exec_order);
   free(vm);
 }
 
@@ -86,9 +99,12 @@ aint vm_run(virtual_machine *vm) {
   aint *sp = &stack_data[active_stack_size - 1];
   aint *bp = sp;
 
-  insn *ip = vm->entry_point;
+  for (size_t i = 0; i < vm->exec_order_len; i++) {
+    size_t unit_idx = vm->exec_order[i];
+    insn *ip = vm->entry_points[unit_idx];
 
-  ip->func(ip, sp, bp, globals);
+    ip->func(ip, sp, bp, globals);
+  }
 
   return *bp;
 }

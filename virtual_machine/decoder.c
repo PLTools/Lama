@@ -86,7 +86,6 @@ typedef struct {
   size_t code_len;
   byte_reader reader;
   size_t global_offset;
-  size_t unit_end_idx;
 
   struct {
     stub *data;
@@ -112,7 +111,6 @@ decode_ctx *decode_ctx_create(const bytecode *bc, int32_t global_offset) {
   ctx->code = NULL;
   ctx->code_len = 0;
   ctx->global_offset = global_offset;
-  ctx->unit_end_idx = -1;
   ctx->bc_to_insn_map = NULL;
 
   da_init(ctx->stubs);
@@ -258,7 +256,6 @@ static insn *decode_internal(decode_ctx *ctx) {
   }
 
   int32_t depth = 0;
-  bool first_end_seen = false;
 
   while (!reader_eof(&ctx->reader)) {
     size_t current_bc_off = reader_pos(&ctx->reader);
@@ -699,16 +696,6 @@ static insn *decode_internal(decode_ctx *ctx) {
     case OP_END:
       EMIT_FUNC(ctx, op_end);
       DEPTH_DEAD(depth);
-
-      // After the first END (main function's end), emit unit bridge
-      if (!first_end_seen) {
-        first_end_seen = true;
-        VM_DEBUG("DECODE: First END detected, emitting op_unit_end bridge\n");
-        ctx->unit_end_idx = ctx->code_len;
-        EMIT_FUNC(ctx, op_unit_end);
-        // Will be patched by linker
-        EMIT_TARGET(ctx, NULL);
-      }
       break;
 
     case OP_LINE: {
@@ -779,7 +766,6 @@ decoded **decode(bytecode **bc_arr, size_t n) {
         .code_len = ctx->code_len,
         .stubs = ctx->stubs.data,
         .stubs_len = ctx->stubs.len,
-        .unit_end_idx = ctx->unit_end_idx,
         .bc_to_insn_map = ctx->bc_to_insn_map,
         .relocs = ctx->relocs.data,
         .relocs_len = ctx->relocs.len,

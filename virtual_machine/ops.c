@@ -515,8 +515,6 @@ void op_call(DECL_STATE) {
   DISPATCH();
 }
 
-void op_unit_end(DECL_STATE);
-
 void op_callc(DECL_STATE) {
   ip++;
   int32_t n_args = ip->num;
@@ -551,15 +549,6 @@ void op_end(DECL_STATE) {
   VM_TRACE_CALL("END sp=%p\n", (void *)sp);
   aint ret_val = STACK_PEEK(sp);
   *bp = ret_val;
-  // If a unit_end bridge follows, jump to it.
-  // Otherwise, return to finish execution.
-  insn *next = ip + 1;
-  if (next && next->func == op_unit_end) {
-    VM_DEBUG("END: jumping to unit_end bridge at %p\n", (void *)next);
-    ip = next;
-    DISPATCH_JUMP();
-  }
-  VM_DEBUG("END: returning (no unit bridge)\n");
   return;
 }
 
@@ -594,6 +583,7 @@ void op_callc_ffi_stub(DECL_STATE) {
 
   return;
 }
+
 void op_closure(DECL_STATE) {
   ip++;
   insn *target = ip->target;
@@ -638,22 +628,6 @@ void op_call_ffi_stub(DECL_STATE) {
   VM_DEBUG("FFI_CALL: result=%ld\n", (long)UNBOX(result));
   STACK_PUSH(sp, result);
   DISPATCH();
-}
-
-void op_unit_end(DECL_STATE) {
-  ip++;
-  insn *next_unit = ip->target;
-
-  VM_DEBUG("UNIT_END: next_unit=%p\n", (void *)next_unit);
-
-  if (next_unit) {
-    ip = next_unit;
-    DISPATCH_JUMP();
-  }
-  // If no next unit, just fall through (return)
-  VM_DEBUG("UNIT_END: no next unit, returning\n");
-
-  return;
 }
 
 #ifdef DEBUG_PRINT
