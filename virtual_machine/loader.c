@@ -94,10 +94,10 @@ static bool load_unit_recursive(bytecode_array *units, exec_order *order,
   if (!bc) {
     fprintf(stderr, "Failed to load dependency '%s' from '%s'\n", unit_name,
             filepath);
-    free(filepath);
     free(unit_name);
     return false;
   }
+  free(filepath);
   bc->name = unit_name;
 
   size_t my_idx = units->len;
@@ -119,7 +119,6 @@ static bool load_unit_recursive(bytecode_array *units, exec_order *order,
   }
 
   da_append(*order, my_idx);
-  free(filepath);
   return true;
 }
 

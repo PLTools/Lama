@@ -50,7 +50,7 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
     return NULL;
   }
 
-  program *prog = link(lr.units, decoded_arr, lr.units_len);
+  program_link *prog = link(lr.units, decoded_arr, lr.units_len);
 
   vm->total_globals = prog->total_globals;
   vm->code = prog->code;
@@ -65,6 +65,9 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
 }
 
 void vm_destroy(virtual_machine *vm) {
+  if (!vm) {
+    return;
+  }
   for (size_t i = 0; i < vm->bc_len; i++) {
     bytecode_free(vm->bc_arr[i]);
   }

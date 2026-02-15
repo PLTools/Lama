@@ -115,7 +115,7 @@ static void resolve_stubs(decoded *dec, insn *all_code, size_t code_offset,
   }
 }
 
-program *link(bytecode **bc_arr, decoded **dec_arr, size_t n) {
+program_link *link(bytecode **bc_arr, decoded **dec_arr, size_t n) {
   symbol_table *st = symbol_table_create();
   ffi_call_table *ffi_stubs = ffi_call_table_create();
 
@@ -155,7 +155,7 @@ program *link(bytecode **bc_arr, decoded **dec_arr, size_t n) {
     code_offset += dec->code_len;
   }
 
-  program *prog = ALLOC(program);
+  program_link *prog = ALLOC(program_link);
   prog->code = all_code;
   prog->code_len = total_code_len;
   prog->total_globals = total_globals;
@@ -173,10 +173,11 @@ program *link(bytecode **bc_arr, decoded **dec_arr, size_t n) {
   return prog;
 }
 
-void prog_free(program *prog) {
-  if (prog) {
-    free(prog->code);
-    free(prog->entry_points);
-    free(prog);
+void program_free(program_link *prog) {
+  if (!prog) {
+    return;
   }
+  free(prog->code);
+  free(prog->entry_points);
+  free(prog);
 }

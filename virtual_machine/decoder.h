@@ -3,7 +3,7 @@
 
 #include "../runtime/runtime_common.h"
 #include "bytecode.h"
-#include "bytecode_util.h"
+#include "reader.h"
 #include "insn.h"
 #include <stddef.h>
 #include <stdint.h>

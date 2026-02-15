@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static const char *MAIN_FUNC = "main";
+
 struct symbol_table {
   resolved_symbol *data;
   size_t len;
@@ -18,6 +20,9 @@ symbol_table *symbol_table_create(void) {
 }
 
 void symbol_table_destroy(symbol_table *table) {
+  if (!table) {
+    return;
+  }
   da_free(*table);
   free(table);
 }
@@ -34,8 +39,8 @@ resolved_symbol *symbol_table_find(symbol_table *table, const char *name) {
 static int symbol_table_add(symbol_table *table, const char *name,
                             bool is_function, int32_t idx) {
 
-  // Allow duplicate "main" (each bytecode has one)
-  if (strcmp(name, "main") != 0) {
+  // Allow duplicate main() (each uinit has one)
+  if (strcmp(name, MAIN_FUNC) != 0) {
     resolved_symbol *existing = symbol_table_find(table, name);
     if (existing) {
       fprintf(stderr, "Error: Duplicate symbol '%s' found in symbol table\n",

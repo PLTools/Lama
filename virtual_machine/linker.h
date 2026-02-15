@@ -12,10 +12,10 @@ typedef struct {
   size_t total_globals;
   insn **entry_points; // Entry point for each unit (pointer into code)
   size_t entry_points_len;
-} program;
+} program_link;
 
-program *link(bytecode **bc_arr, decoded **dec_arr, size_t n);
+program_link *link(bytecode **bc_arr, decoded **dec_arr, size_t n);
 
-void prog_free(program *prog);
+void program_free(program_link *prog);
 
 #endif // LINKER_H

@@ -1,5 +1,5 @@
-#ifndef BYTECODE_UTIL_H
-#define BYTECODE_UTIL_H
+#ifndef READER_H
+#define READER_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -57,4 +57,4 @@ static inline bool reader_eof(const byte_reader *r) {
   return r->pos >= r->size;
 }
 
-#endif // BYTECODE_UTIL_H
+#endif // READER_H

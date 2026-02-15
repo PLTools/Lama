@@ -9,14 +9,16 @@
 
 #define MAX_INCLUDE_PATHS 64
 
-static void print_usage(const char *prog_name) {
-  printf("Usage: %s [options] <bytecode.bc> [args]\n", prog_name);
-  printf("\nWhen no options are specified, the VM will run the bytecode file "
-         "and look for units in the same directory.\n");
-  printf("Options:\n");
-  printf("  -h, --help              Show this help message\n");
-  printf("  -I, --include PATH      Add PATH to unit search paths (can be "
-         "used multiple times)\n");
+static void print_usage(FILE *dest, const char *prog_name) {
+  fprintf(dest, "Usage: %s [options] <bytecode.bc> [args]\n", prog_name);
+  fprintf(dest,
+          "\nWhen no options are specified, the VM will run the bytecode file "
+          "and look for units in the same directory.\n");
+  fprintf(dest, "Options:\n");
+  fprintf(dest, "  -h, --help              Show this help message\n");
+  fprintf(dest,
+          "  -I, --include PATH      Add PATH to unit search paths (can be "
+          "used multiple times)\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -37,7 +39,7 @@ int main(int argc, char *argv[]) {
          -1) {
     switch (opt) {
     case 'h':
-      print_usage(argv[0]);
+      print_usage(stdout, argv[0]);
       return 0;
     case 'I':
       if (include_path_count < MAX_INCLUDE_PATHS) {
@@ -49,13 +51,14 @@ int main(int argc, char *argv[]) {
       }
       break;
     default:
+      print_usage(stdout, argv[0]);
       return 1;
     }
   }
 
   if (optind >= argc) {
     fprintf(stderr, "No bytecode file specified\n\n");
-    print_usage(argv[0]);
+    print_usage(stderr, argv[0]);
     return 1;
   }
 
@@ -67,17 +70,18 @@ int main(int argc, char *argv[]) {
 
   virtual_machine *vm = vm_create(bytecode_file, (const char **)include_paths,
                                   include_path_count);
-  // Skip options, pass only program args
-  vm_set_args(vm, argc - optind, argv + optind);
   if (!vm) {
     exit_code = 1;
     goto cleanup;
   }
 
+  // Skip options, pass only program args
+  vm_set_args(vm, argc - optind, argv + optind);
+
   vm_run(vm);
 
 cleanup:
-  free(bytecode_dir);
   vm_destroy(vm);
+  free(bytecode_dir);
   return exit_code;
 }

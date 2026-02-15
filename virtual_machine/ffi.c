@@ -29,6 +29,9 @@ ffi_call_table *ffi_call_table_create(void) {
 // Currently frees only table and not stubs themselves since they are needed for
 // execution
 void ffi_call_table_destroy(ffi_call_table *table) {
+  if (!table) {
+    return;
+  }
   da_free(*table);
   free(table);
 }
@@ -88,6 +91,7 @@ static void *lookup_function(const char *name) {
   void *fn = dlsym(RTLD_DEFAULT, name);
   char *error = dlerror();
   if (error) {
+    fprintf(stderr, "Error looking up function '%s': %s\n", name, error);
     return NULL;
   }
   return fn;

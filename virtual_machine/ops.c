@@ -130,7 +130,7 @@ void op_div(DECL_STATE) {
   VM_DEBUG("DIV: x=%ld, y=%ld\n", (long)UNBOX(x), (long)UNBOX(y));
   if (UNBOX(y) == 0) {
     fprintf(stderr, "Division by zero\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   aint res = Ls__Infix_47((void *)x, (void *)y);
   VM_DEBUG("DIV result=%ld\n", (long)UNBOX(res));
@@ -144,7 +144,7 @@ void op_mod(DECL_STATE) {
   VM_DEBUG("MOD: x=%ld, y=%ld\n", (long)UNBOX(x), (long)UNBOX(y));
   if (UNBOX(y) == 0) {
     fprintf(stderr, "Division by zero\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   aint res = Ls__Infix_37((void *)x, (void *)y);
   VM_DEBUG("MOD result=%ld\n", (long)UNBOX(res));

@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "bytecode.h"
-#include "bytecode_util.h"
 #include "memory.h"
+#include "reader.h"
 #include <fcntl.h>
 #include <libgen.h>
 #include <stdio.h>
@@ -107,8 +107,11 @@ bytecode *bytecode_load(const char *filename) {
   return bc;
 }
 
-void bytecode_free(bytecode *bc) { 
-  munmap(bc->map_base, bc->map_size); 
+void bytecode_free(bytecode *bc) {
+  if (!bc) {
+    return;
+  }
+  munmap(bc->map_base, bc->map_size);
   free(bc->public_symbols.data);
   free(bc->imports.data);
   free((void *)bc->name);

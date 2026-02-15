@@ -750,14 +750,7 @@ static insn *decode_internal(decode_ctx *ctx) {
 }
 
 decoded **decode(bytecode **bc_arr, size_t n) {
-  typedef struct {
-    decoded **data;
-    size_t len;
-    size_t cap;
-  } decoded_array;
-
-  decoded_array result;
-  da_init(result);
+  decoded **result = ALLOC_ARRAY(decoded *, n);
 
   size_t global_offset = 0;
 
@@ -778,12 +771,12 @@ decoded **decode(bytecode **bc_arr, size_t n) {
         .relocs = ctx->relocs.data,
         .relocs_len = ctx->relocs.len,
     };
-    da_append(result, dec);
+    result[i] = dec;
     global_offset += bc_arr[i]->globals_count;
     free(ctx);
   }
 
-  return result.data;
+  return result;
 }
 
 void decoded_free(decoded *dec) {

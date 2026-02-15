@@ -1,5 +1,5 @@
-#ifndef BYTECODE_NEW_H
-#define BYTECODE_NEW_H
+#ifndef BYTECODE_H
+#define BYTECODE_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -60,4 +60,4 @@ static inline const char *bytecode_get_string(const bytecode *bc,
   return bc->string_table + offset;
 }
 
-#endif // BYTECODE_NEW_H
+#endif // BYTECODE_H

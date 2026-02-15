@@ -12,7 +12,7 @@ RUNTIME_LIB = $(RUNTIME_DIR)/runtime.a
 
 all: $(TARGET)
 
-debug: CFLAGS += -DDEBUG_PRINT -g3 -Og -O0
+debug: CFLAGS += -DDEBUG_PRINT -g3 -Og -O0 -fsanitize=address
 debug: $(TARGET)
 
 $(TARGET): $(OBJECTS) $(RUNTIME_LIB)
