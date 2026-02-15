@@ -214,7 +214,7 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta, size_t current_bc_off,
     ctx->code.data[my_idx].num = tm->resolved_idx;
     da_append(ctx->relocs, my_idx);
     if (depth != -1 && tm->stack_depth != -1 && tm->stack_depth != depth) {
-      fprintf(stderr, "Error: Loop stack mismatch\n");
+      fprintf(stderr, "Error: Loop stack mismatch at bc_off=%zu\n", current_bc_off);
       return false;
     }
   } else {
@@ -249,6 +249,7 @@ static insn *decode_internal(decode_ctx *ctx) {
   }
 
   int32_t depth = 0;
+  insn *result = NULL;
 
   while (!reader_eof(&ctx->reader)) {
     size_t current_bc_off = reader_pos(&ctx->reader);
@@ -266,7 +267,7 @@ static insn *decode_internal(decode_ctx *ctx) {
         fprintf(stderr,
                 "Error: Stack mismatch at offset %zu (expected %d, got %d)\n",
                 current_bc_off, m->stack_depth, depth);
-        return NULL;
+        goto cleanup;
       }
       m->stack_depth = depth;
     } else {
@@ -274,13 +275,19 @@ static insn *decode_internal(decode_ctx *ctx) {
     }
 
     // Resolve forward jumps (backpatching) — store as index, record relocation
-    for (fixup_node *f = m->fixups; f; f = f->next) {
+    fixup_node *f = m->fixups;
+    while (f) {
       VM_DEBUG("DECODE: Resolving fixup at bc_off=%zu: insn_idx=%zu -> "
                "code_idx=%zu\n",
                current_bc_off, f->insn_idx, ctx->code.len);
       ctx->code.data[f->insn_idx].num = (int32_t)ctx->code.len;
       da_append(ctx->relocs, f->insn_idx);
+      
+      fixup_node *next = f->next;
+      free(f);
+      f = next;
     }
+    m->fixups = NULL;
 
     switch (opcode) {
     case OP_CONST:
@@ -357,7 +364,7 @@ static insn *decode_internal(decode_ctx *ctx) {
     case OP_JMP:
       EMIT_FUNC(ctx, op_jmp);
       if (!handle_jump(ctx, meta, current_bc_off, depth)) {
-        return NULL;
+        goto cleanup;
       }
       DEPTH_DEAD(depth);
       break;
@@ -366,7 +373,7 @@ static insn *decode_internal(decode_ctx *ctx) {
       DEPTH_POP(depth);
       EMIT_FUNC(ctx, op_cjmp_z);
       if (!handle_jump(ctx, meta, current_bc_off, depth)) {
-        return NULL;
+        goto cleanup;
       }
       break;
 
@@ -374,7 +381,7 @@ static insn *decode_internal(decode_ctx *ctx) {
       DEPTH_POP(depth);
       EMIT_FUNC(ctx, op_cjmp_nz);
       if (!handle_jump(ctx, meta, current_bc_off, depth)) {
-        return NULL;
+        goto cleanup;
       }
       break;
 
@@ -590,7 +597,7 @@ static insn *decode_internal(decode_ctx *ctx) {
           break;
         default:
           fprintf(stderr, "Unknown designation type: %d\n", designation_type);
-          return NULL;
+          goto cleanup;
         }
       }
 
@@ -615,7 +622,7 @@ static insn *decode_internal(decode_ctx *ctx) {
       } else {
         uint32_t target_off = (uint32_t)target_raw;
         if (!validate_target_off(bc, target_off, current_bc_off, "CLOSURE")) {
-          return NULL;
+          goto cleanup;
         }
 
         EMIT_FUNC(ctx, op_closure);
@@ -660,7 +667,7 @@ static insn *decode_internal(decode_ctx *ctx) {
       } else {
         if (!validate_target_off(bc, (uint32_t)target_off, current_bc_off,
                                  "CALL")) {
-          return NULL;
+          goto cleanup;
         }
         size_t target_slot = ctx->code.len + 1;
         EMIT_FUNC(ctx, op_call);
@@ -709,8 +716,7 @@ static insn *decode_internal(decode_ctx *ctx) {
     default:
       fprintf(stderr, "Not yet supported opcode 0x%02X at ip=0x%08zx\n", opcode,
               reader_pos(&ctx->reader) - 1);
-      free(meta);
-      return NULL;
+      goto cleanup;
     }
   }
 
@@ -720,6 +726,9 @@ static insn *decode_internal(decode_ctx *ctx) {
     ctx->bc_to_insn_map[i] = meta[i].resolved_idx;
   }
 
+  result = ctx->code.data;
+
+cleanup:
   // Free temporary metadata and fixup nodes
   for (size_t i = 0; i < bc->code_size; i++) {
     fixup_node *node = meta[i].fixups;
@@ -731,7 +740,7 @@ static insn *decode_internal(decode_ctx *ctx) {
   }
   free(meta);
 
-  return ctx->code.data;
+  return result;
 }
 
 decoded **decode(bytecode **bc_arr, size_t n) {
