@@ -4,6 +4,7 @@
 #include "ffi.h"
 #include "memory.h"
 #include "symbols.h"
+#include <assert.h>
 #include <dlfcn.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -50,13 +51,14 @@ static void resolve_stubs(decoded *dec, insn *all_code, size_t code_offset,
     stub *s = &stubs_arr[i];
     size_t pi = s->patch_idx;
 
+    resolved_symbol *sym = symbol_table_find(st, s->name);
     switch (s->kind) {
 
     case STUB_CALL: {
-      resolved_symbol *sym = symbol_table_find(st, s->name);
 
       // Decoder emitted: [NULL] [NULL] [n_args]
-      if (sym && sym->is_function) {
+      if (sym) {
+        assert(sym->is_function);
         code[pi - 1].func = decoder_get_op_call();
         code[pi].target = &all_code[sym->idx];
       } else {
@@ -67,9 +69,9 @@ static void resolve_stubs(decoded *dec, insn *all_code, size_t code_offset,
     }
 
     case STUB_CLOSURE: {
-      resolved_symbol *sym = symbol_table_find(st, s->name);
 
-      if (sym && sym->is_function) {
+      if (sym) {
+        assert(sym->is_function);
         code[pi].target = &all_code[sym->idx];
       } else {
         // Not found in symbol table — create FFI stub
@@ -85,9 +87,9 @@ static void resolve_stubs(decoded *dec, insn *all_code, size_t code_offset,
 
     case STUB_GLOBAL_LD:
     case STUB_GLOBAL_ST: {
-      resolved_symbol *sym = symbol_table_find(st, s->name);
-      if (sym && !sym->is_function) {
+      if (sym) {
         // Global from another unit
+        assert(!sym->is_function);
         if (s->kind == STUB_GLOBAL_LD) {
           code[pi - 1].func = decoder_get_op_ld_glo();
         } else {
