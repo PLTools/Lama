@@ -44,22 +44,10 @@
 /*
  * Code emission macros - append to code array in context
  */
-#define EMIT_FUNC(ctx, f)                                                      \
-  do {                                                                         \
-    (ctx)->code[(ctx)->code_len++].func = (f);                                 \
-  } while (0)
-#define EMIT_NUM(ctx, n)                                                       \
-  do {                                                                         \
-    (ctx)->code[(ctx)->code_len++].num = (n);                                  \
-  } while (0)
-#define EMIT_STR(ctx, s)                                                       \
-  do {                                                                         \
-    (ctx)->code[(ctx)->code_len++].str = (s);                                  \
-  } while (0)
-#define EMIT_TARGET(ctx, t)                                                    \
-  do {                                                                         \
-    (ctx)->code[(ctx)->code_len++].target = (t);                               \
-  } while (0)
+#define EMIT_FUNC(ctx, f) da_append((ctx)->code, ((insn){.func = (f)}))
+#define EMIT_NUM(ctx, n) da_append((ctx)->code, ((insn){.num = (n)}))
+#define EMIT_STR(ctx, s) da_append((ctx)->code, ((insn){.str = (s)}))
+#define EMIT_TARGET(ctx, t) da_append((ctx)->code, ((insn){.target = (t)}))
 
 fn decoder_get_op_call(void) { return op_call; }
 
@@ -90,8 +78,13 @@ typedef struct {
 
 typedef struct {
   const bytecode *bc;
-  insn *code;
-  size_t code_len;
+
+  struct {
+    insn *data;
+    size_t len;
+    size_t cap;
+  } code;
+
   byte_reader reader;
   size_t global_offset;
 
@@ -116,13 +109,11 @@ decode_ctx *decode_ctx_create(const bytecode *bc, int32_t global_offset) {
 
   ctx->bc = bc;
 
-  ctx->code = NULL;
-  ctx->code_len = 0;
   ctx->global_offset = global_offset;
   ctx->bc_to_insn_map = NULL;
 
+  da_init(ctx->code);
   da_init(ctx->stubs);
-
   da_init(ctx->relocs);
 
   reader_init(&ctx->reader, bc->code, bc->code_size);
@@ -139,9 +130,6 @@ static void add_stub(decode_ctx *ctx, size_t patch_idx, const char *name,
 static fixup_node *add_fixup(meta_info *meta, size_t target_off,
                              size_t insn_idx) {
   fixup_node *node = ALLOC(fixup_node);
-  if (!node)
-    return NULL;
-
   node->insn_idx = insn_idx;
   node->next = meta[target_off].fixups;
   meta[target_off].fixups = node;
@@ -165,8 +153,8 @@ static bool validate_target_off(const bytecode *bc, size_t target_off,
  * The linker will convert it to an absolute pointer after copying.
  */
 static void emit_target_idx(decode_ctx *ctx, size_t target_code_idx) {
-  size_t slot = ctx->code_len;
-  ctx->code[ctx->code_len++].num = (int32_t)target_code_idx;
+  size_t slot = ctx->code.len;
+  da_append(ctx->code, ((insn){.num = (int32_t)target_code_idx}));
   da_append(ctx->relocs, slot);
 }
 
@@ -178,7 +166,7 @@ static bool emit_ld_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
     const char *glob_name = bytecode_get_string(bc, str_offset);
     VM_DEBUG("DECODE: OP_LD external global '%s' (stub)\n", glob_name);
     EMIT_FUNC(ctx, NULL); // linker will patch this
-    size_t patch_idx = ctx->code_len;
+    size_t patch_idx = ctx->code.len;
     EMIT_NUM(ctx, 0); // placeholder — linker will patch
     add_stub(ctx, patch_idx, glob_name, STUB_GLOBAL_LD);
   } else {
@@ -196,7 +184,7 @@ static bool emit_st_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
     const char *glob_name = bytecode_get_string(bc, str_offset);
     VM_DEBUG("DECODE: OP_ST external global '%s' (stub)\n", glob_name);
     EMIT_FUNC(ctx, NULL); // linker will patch this
-    size_t patch_idx = ctx->code_len;
+    size_t patch_idx = ctx->code.len;
     EMIT_NUM(ctx, 0); // placeholder — linker will patch
     add_stub(ctx, patch_idx, glob_name, STUB_GLOBAL_ST);
   } else {
@@ -217,13 +205,13 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta, size_t current_bc_off,
     return false;
   }
 
-  size_t my_idx = ctx->code_len;
+  size_t my_idx = ctx->code.len;
   EMIT_NUM(ctx, 0); // placeholder — will hold code index
 
   meta_info *tm = &meta[target_off];
   if (target_off < (int32_t)current_bc_off && tm->resolved_idx != -1) {
     // Backward jump — already resolved, store as index
-    ctx->code[my_idx].num = tm->resolved_idx;
+    ctx->code.data[my_idx].num = tm->resolved_idx;
     da_append(ctx->relocs, my_idx);
     if (depth != -1 && tm->stack_depth != -1 && tm->stack_depth != depth) {
       fprintf(stderr, "Error: Loop stack mismatch\n");
@@ -247,12 +235,9 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta, size_t current_bc_off,
 }
 
 static insn *decode_internal(decode_ctx *ctx) {
+
   const bytecode *bc = ctx->bc;
   size_t global_base = ctx->global_offset;
-
-  size_t code_cap = bc->code_size * 16; // TODO: estimate better
-  insn *code = ALLOC_ARRAY(insn, code_cap);
-  ctx->code = code;
 
   meta_info *meta = ALLOC_ARRAY(meta_info, bc->code_size);
 
@@ -270,10 +255,10 @@ static insn *decode_internal(decode_ctx *ctx) {
     uint8_t opcode = reader_u8(&ctx->reader);
 
     VM_DEBUG("DECODE: visiting bc_off=%zu opcode=%d code_idx=%zu\n",
-             current_bc_off, opcode, ctx->code_len);
+             current_bc_off, opcode, ctx->code.len);
 
     meta_info *m = &meta[current_bc_off];
-    m->resolved_idx = (int32_t)ctx->code_len;
+    m->resolved_idx = (int32_t)ctx->code.len;
 
     // Validate stack depth
     if (depth != -1) {
@@ -292,8 +277,8 @@ static insn *decode_internal(decode_ctx *ctx) {
     for (fixup_node *f = m->fixups; f; f = f->next) {
       VM_DEBUG("DECODE: Resolving fixup at bc_off=%zu: insn_idx=%zu -> "
                "code_idx=%zu\n",
-               current_bc_off, f->insn_idx, ctx->code_len);
-      ctx->code[f->insn_idx].num = (int32_t)ctx->code_len;
+               current_bc_off, f->insn_idx, ctx->code.len);
+      ctx->code.data[f->insn_idx].num = (int32_t)ctx->code.len;
       da_append(ctx->relocs, f->insn_idx);
     }
 
@@ -621,7 +606,7 @@ static insn *decode_internal(decode_ctx *ctx) {
         // Emit closure with NULL target placeholder.
         // Linker will resolve to inter-unit function or create FFI stub.
         EMIT_FUNC(ctx, op_closure);
-        size_t target_slot = ctx->code_len;
+        size_t target_slot = ctx->code.len;
         EMIT_TARGET(ctx, NULL); // placeholder
         EMIT_NUM(ctx, n_captured);
 
@@ -634,13 +619,13 @@ static insn *decode_internal(decode_ctx *ctx) {
         }
 
         EMIT_FUNC(ctx, op_closure);
-        size_t target_slot = ctx->code_len;
+        size_t target_slot = ctx->code.len;
         EMIT_NUM(ctx, 0); // placeholder — will hold code index
         EMIT_NUM(ctx, n_captured);
 
         meta_info *tm = &meta[target_off];
         if (target_off < current_bc_off && tm->resolved_idx != -1) {
-          ctx->code[target_slot].num = tm->resolved_idx;
+          ctx->code.data[target_slot].num = tm->resolved_idx;
           da_append(ctx->relocs, target_slot);
         } else {
           add_fixup(meta, target_off, target_slot);
@@ -656,7 +641,7 @@ static insn *decode_internal(decode_ctx *ctx) {
 
       VM_DEBUG("DECODE: OP_CALL target_off=0x%x n_args=%d "
                "current_bc_off=%zu code_idx=%zu\n",
-               target_off, n_args, current_bc_off, ctx->code_len);
+               target_off, n_args, current_bc_off, ctx->code.len);
 
       if (IS_EXT_REF(target_off)) {
         int str_offset = EXT_REF_INDEX(target_off);
@@ -666,7 +651,7 @@ static insn *decode_internal(decode_ctx *ctx) {
 
         // To be patched by linker
         EMIT_FUNC(ctx, NULL);
-        size_t name_slot = ctx->code_len;
+        size_t name_slot = ctx->code.len;
         EMIT_TARGET(ctx, NULL);
         EMIT_NUM(ctx, n_args);
 
@@ -677,14 +662,14 @@ static insn *decode_internal(decode_ctx *ctx) {
                                  "CALL")) {
           return NULL;
         }
-        size_t target_slot = ctx->code_len + 1;
+        size_t target_slot = ctx->code.len + 1;
         EMIT_FUNC(ctx, op_call);
         EMIT_NUM(ctx, 0); // placeholder — will hold code index
         EMIT_NUM(ctx, n_args);
 
         meta_info *tm = &meta[(uint32_t)target_off];
         if ((uint32_t)target_off < current_bc_off && tm->resolved_idx != -1) {
-          ctx->code[target_slot].num = tm->resolved_idx;
+          ctx->code.data[target_slot].num = tm->resolved_idx;
           da_append(ctx->relocs, target_slot);
         } else {
           add_fixup(meta, (uint32_t)target_off, target_slot);
@@ -746,7 +731,7 @@ static insn *decode_internal(decode_ctx *ctx) {
   }
   free(meta);
 
-  return ctx->code;
+  return ctx->code.data;
 }
 
 decoded **decode(bytecode **bc_arr, size_t n) {
@@ -764,7 +749,7 @@ decoded **decode(bytecode **bc_arr, size_t n) {
     decoded *dec = ALLOC(decoded);
     *dec = (decoded){
         .code = code,
-        .code_len = ctx->code_len,
+        .code_len = ctx->code.len,
         .stubs = ctx->stubs.data,
         .stubs_len = ctx->stubs.len,
         .bc_to_insn_map = ctx->bc_to_insn_map,
