@@ -104,9 +104,11 @@ static bool load_unit_recursive(bytecode_array *units, exec_order *order,
   da_append(*units, bc);
 
   // Recursively load dependencies
-  for (size_t i = 0; i < bc->imports.len; i++) {
-    const char *import_name = bc->imports.data[i];
 
+  const char *import_name;
+  bytecode_iterator iter;
+  bytecode_imports_init(&iter, bc);
+  while (bytecode_imports_next(&iter, &import_name)) {
     // Skip Std since we have it as runtime.a
     if (strcmp(import_name, "Std") == 0) {
       continue;
@@ -145,8 +147,10 @@ load_result load(const char *main_unit_path, const search_paths *paths) {
 
   bytecode *bc = load_main_unit(main_unit_path);
 
-  for (size_t i = 0; i < bc->imports.len; i++) {
-    const char *import_name = bc->imports.data[i];
+  const char *import_name;
+  bytecode_iterator iter;
+  bytecode_imports_init(&iter, bc);
+  while (bytecode_imports_next(&iter, &import_name)) {
 
     // Skip Std since we have it as runtime.a
     if (strcmp(import_name, "Std") == 0) {

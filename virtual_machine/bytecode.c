@@ -1,7 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "bytecode.h"
 #include "memory.h"
-#include "reader.h"
 #include <fcntl.h>
 #include <libgen.h>
 #include <stdio.h>
@@ -57,8 +56,8 @@ bytecode *bytecode_load(const char *filename) {
 
   // TODO: VALIdation
 
+  const char *string_table = map + st_offset;
   const uint8_t *data = (const uint8_t *)map;
-  const char *string_table = (const char *)(data + st_offset);
 
   bytecode *bc = ALLOC(bytecode);
 
@@ -71,35 +70,11 @@ bytecode *bytecode_load(const char *filename) {
   bc->code_size = code_size;
   bc->globals_count = (size_t)globals_count;
 
-  // Allocate and resolve public symbols
-  bc->public_symbols.len = (size_t)num_pubs;
-  if (num_pubs > 0) {
-    bc->public_symbols.data = ALLOC_ARRAY(public_symbol, num_pubs);
+  bc->pubs = data + pubs_offset;
+  bc->pubs_len = (size_t)num_pubs;
 
-    reader_seek(&reader, pubs_offset);
-    for (int32_t i = 0; i < num_pubs; i++) {
-      int32_t name_offset = reader_i32(&reader);
-      int32_t code_off = reader_i32(&reader);
-      uint8_t flag = reader_u8(&reader);
-
-      bc->public_symbols.data[i].name = string_table + name_offset;
-      bc->public_symbols.data[i].code_offset = code_off;
-      bc->public_symbols.data[i].flag = flag;
-    }
-  }
-
-  // Allocate and resolve imports
-  bc->imports.len = (size_t)num_imports;
-  if (num_imports > 0) {
-    bc->imports.data = ALLOC_ARRAY(const char *, (size_t)num_imports);
-
-    reader_seek(&reader, imports_offset);
-    for (int32_t i = 0; i < num_imports; i++) {
-      int32_t name_offset = reader_i32(&reader);
-
-      bc->imports.data[i] = string_table + name_offset;
-    }
-  }
+  bc->imports = data + imports_offset;
+  bc->imports_len = (size_t)num_imports;
 
   // will be set later
   bc->name = NULL;
@@ -107,13 +82,49 @@ bytecode *bytecode_load(const char *filename) {
   return bc;
 }
 
+void bytecode_pubs_init(bytecode_iterator *iter, const bytecode *bc) {
+  reader_init(&iter->reader, bc->pubs, bc->pubs_len * PUB_ENTRY_SIZE);
+  iter->string_table = bc->string_table;
+  iter->len = bc->pubs_len;
+  iter->curr = 0;
+}
+
+bool bytecode_pubs_next(bytecode_iterator *iter, public_symbol *out) {
+  if (iter->curr >= iter->len) {
+    return false;
+  }
+  int32_t name_offset = reader_i32(&iter->reader);
+  out->name = iter->string_table + name_offset;
+  out->code_offset = reader_i32(&iter->reader);
+  out->flag = reader_u8(&iter->reader);
+
+  iter->curr++;
+  return true;
+}
+
+void bytecode_imports_init(bytecode_iterator *it, const bytecode *bc) {
+  reader_init(&it->reader, bc->imports, bc->imports_len * IMPORT_ENTRY_SIZE);
+  it->string_table = bc->string_table;
+  it->len = bc->imports_len;
+  it->curr = 0;
+}
+
+bool bytecode_imports_next(bytecode_iterator *it, const char **out_name) {
+  if (it->curr >= it->len) {
+    return false;
+  }
+  int32_t name_offset = reader_i32(&it->reader);
+  *out_name = it->string_table + name_offset;
+
+  it->curr++;
+  return true;
+}
+
 void bytecode_free(bytecode *bc) {
   if (!bc) {
     return;
   }
   munmap(bc->map_base, bc->map_size);
-  free(bc->public_symbols.data);
-  free(bc->imports.data);
   free((void *)bc->name);
   free(bc);
 }

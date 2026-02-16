@@ -14,25 +14,26 @@
 static void register_public_symbols(symbol_table *st, const bytecode *bc,
                                     size_t code_offset, size_t global_base,
                                     const int32_t *bc_to_insn_map) {
-  const public_symbols *pub = &bc->public_symbols;
+  public_symbol pub;
+  bytecode_iterator iter;
+  bytecode_pubs_init(&iter, bc);
 
-  for (size_t i = 0; i < pub->len; i++) {
-    const public_symbol *p = &pub->data[i];
+  while (bytecode_pubs_next(&iter, &pub)) {
 
-    if (p->flag == PUB_FLAG_FUNCTION) {
-      // p->code_offset is the offset in the bytecode, so we use the mapping
-      int32_t insn_idx = bc_to_insn_map[p->code_offset];
+    if (pub.flag == PUB_FLAG_FUNCTION) {
+      // pub.code_offset is the offset in the bytecode, so we use the mapping
+      int32_t insn_idx = bc_to_insn_map[pub.code_offset];
       if (insn_idx == -1) {
         fprintf(stderr,
                 "Error: public symbol '%s' at bytecode offset %d not decoded\n",
-                p->name, p->code_offset);
+                pub.name, pub.code_offset);
         exit(EXIT_FAILURE);
       }
       int32_t code_idx = insn_idx + code_offset;
-      symbol_table_add_function(st, p->name, code_idx);
+      symbol_table_add_function(st, pub.name, code_idx);
     } else {
-      int32_t gidx = p->code_offset + global_base;
-      symbol_table_add_global(st, p->name, gidx);
+      int32_t global_idx = pub.code_offset + global_base;
+      symbol_table_add_global(st, pub.name, global_idx);
     }
   }
 }

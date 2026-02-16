@@ -1,6 +1,7 @@
 #ifndef BYTECODE_H
 #define BYTECODE_H
 
+#include "reader.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -16,16 +17,6 @@ typedef struct {
 } public_symbol;
 
 typedef struct {
-  public_symbol *data;
-  size_t len;
-} public_symbols;
-
-typedef struct {
-  const char **data;
-  size_t len;
-} imports;
-
-typedef struct {
   // Memory-mapped file
   void *map_base;
   size_t map_size;
@@ -36,9 +27,11 @@ typedef struct {
   const uint8_t *code;
   size_t code_size;
 
-  public_symbols public_symbols;
+  const uint8_t *pubs;
+  size_t pubs_len;
 
-  imports imports;
+  const uint8_t *imports;
+  size_t imports_len;
 
   size_t globals_count;
 
@@ -49,6 +42,18 @@ bytecode *bytecode_load(const char *filename);
 
 void bytecode_free(bytecode *bc);
 
+typedef struct {
+  byte_reader reader;
+  const char *string_table;
+  size_t len;
+  size_t curr;
+} bytecode_iterator;
+
+void bytecode_pubs_init(bytecode_iterator *iter, const bytecode *bc);
+bool bytecode_pubs_next(bytecode_iterator *iter, public_symbol *out);
+
+void bytecode_imports_init(bytecode_iterator *iter, const bytecode *bc);
+bool bytecode_imports_next(bytecode_iterator *iter, const char **out_name);
 /*
  * Get string from string table by offset
  */
