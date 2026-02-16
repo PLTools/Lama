@@ -26,7 +26,10 @@ typedef struct symbol_table symbol_table;
 
 symbol_table *symbol_table_create(void);
 void symbol_table_destroy(symbol_table *table);
-resolved_symbol *symbol_table_find(symbol_table *table, const char *name);
+resolved_symbol *symbol_table_find_function(symbol_table *table,
+                                            const char *name);
+resolved_symbol *symbol_table_find_global(symbol_table *table,
+                                          const char *name);
 int symbol_table_add_function(symbol_table *table, const char *name,
                               int32_t code_index);
 int symbol_table_add_global(symbol_table *table, const char *name,

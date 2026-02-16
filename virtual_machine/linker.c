@@ -1,6 +1,6 @@
 #include "linker.h"
 #include "bytecode.h"
-#include "decoder.h"
+#include "converter.h"
 #include "ffi.h"
 #include "memory.h"
 #include "symbols.h"
@@ -55,34 +55,12 @@ static void resolve_stubs(decoded *dec, insn *all_code, size_t code_offset,
     resolved_symbol *sym = symbol_table_find(st, s->name);
     switch (s->kind) {
 
-    case STUB_CALL: {
-
-      // Decoder emitted: [NULL] [NULL] [n_args]
-      if (sym) {
-        assert(sym->is_function);
-        code[pi - 1].func = decoder_get_op_call();
-        code[pi].target = &all_code[sym->idx];
-      } else {
-        code[pi - 1].func = decoder_get_op_call();
-        insn *ffi_stub = ffi_call_table_find(ffi_stubs, s->name);
-        if (!ffi_stub) {
-          ffi_stub = ffi_call_table_add(ffi_stubs, s->name,
-                                        decoder_get_op_callc_ffi_stub());
-        }
-        code[pi].target = ffi_stub;
-        // code[pi - 1].func = decoder_get_op_call_ffi_stub();
-        // code[pi].str = s->name;
-      }
-      break;
-    }
-
-    case STUB_CLOSURE: {
+    case STUB_FUNC: {
 
       if (sym) {
         assert(sym->is_function);
         code[pi].target = &all_code[sym->idx];
       } else {
-        // Not found in symbol table — create FFI stub
         insn *ffi_stub = ffi_call_table_find(ffi_stubs, s->name);
         if (!ffi_stub) {
           ffi_stub = ffi_call_table_add(ffi_stubs, s->name,

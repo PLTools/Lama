@@ -13,10 +13,8 @@ typedef struct {
 } search_paths;
 
 typedef struct {
-  bytecode **units;      // Array of unique loaded bytecode units
-  size_t units_len;      // Number of unique units
-  size_t *exec_order;    // Indices into units[], in execution order
-  size_t exec_order_len; // Length of exec_order (may be units_len + 1)
+  bytecode **units; // Array of unique loaded bytecode units
+  size_t units_len; // Number of unique units
 } load_result;
 
 load_result load(const char *main_unit_path, const search_paths *paths);

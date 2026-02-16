@@ -2,7 +2,7 @@
 #define LINKER_H
 
 #include "bytecode.h"
-#include "decoder.h"
+#include "converter.h"
 #include "insn.h"
 #include <stddef.h>
 

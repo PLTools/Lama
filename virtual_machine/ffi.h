@@ -23,7 +23,11 @@ typedef struct ffi_call_table ffi_call_table;
 
 ffi_call_table *ffi_call_table_create(void);
 void ffi_call_table_destroy(ffi_call_table *table);
-insn *ffi_call_table_find(ffi_call_table *table, const char *name);
+size_t ffi_call_table_find(ffi_call_table *table, const char *name);
 insn *ffi_call_table_add(ffi_call_table *table, const char *name, fn stub_fn);
+size_t ffi_call_table_count(ffi_call_table *table);
+ffi_call_stub *ffi_call_table_get(ffi_call_table *table, size_t idx);
+
+insn *ffi_call_table_get_all(ffi_call_table *table);
 
 #endif // FFI_CALL_H

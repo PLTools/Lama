@@ -573,15 +573,9 @@ void op_end(DECL_STATE) {
 }
 
 /*
- * Closures
+ * FFI call
  */
-
-/*
- * FFI closure stub - called when an external closure is invoked
- * via op_callc This stub is generated for each unresolved external closure
- * reference. The function name is embedded in the next instruction.
- */
-void op_callc_ffi_stub(DECL_STATE) {
+void op_ffi_call(DECL_STATE) {
   ip++;
   const char *func_name = ip->str;
 
@@ -624,29 +618,6 @@ void op_closure(DECL_STATE) {
   void *closure = Bclosure(tmp_args, BOX(n_captured));
   VM_DEBUG("CLOSURE: created=%p\n", (void *)closure);
   STACK_PUSH(sp, (aint)closure);
-  DISPATCH();
-}
-
-// TODO: think about unifying with callc_ffi
-void op_call_ffi_stub(DECL_STATE) {
-  ip++;
-  const char *func_name = ip->str;
-  ip++;
-  int32_t n_args = ip->num;
-
-  VM_DEBUG("FFI_CALL: func='%s' n_args=%d\n", func_name, n_args);
-
-  aint args[256];
-  aint *args_base = sp + 1;
-  for (int32_t i = 0; i < n_args; i++) {
-    args[i] = args_base[n_args - 1 - i];
-  }
-  sp += n_args;
-
-  aint result = ffi_call_c(func_name, args, n_args);
-
-  VM_DEBUG("FFI_CALL: result=%ld\n", (long)result);
-  STACK_PUSH(sp, result);
   DISPATCH();
 }
 

@@ -32,17 +32,20 @@ void ffi_call_table_destroy(ffi_call_table *table) {
   if (!table) {
     return;
   }
+  for (size_t i = 0; i < table->len; i++) {
+    free(table->data[i].stub);
+  }
   da_free(*table);
   free(table);
 }
 
-insn *ffi_call_table_find(ffi_call_table *table, const char *name) {
+size_t ffi_call_table_find(ffi_call_table *table, const char *name) {
   for (size_t i = 0; i < table->len; i++) {
     if (strcmp(table->data[i].name, name) == 0) {
-      return table->data[i].stub;
+      return i;
     }
   }
-  return NULL;
+  return -1;
 }
 
 insn *ffi_call_table_add(ffi_call_table *table, const char *name, fn stub_fn) {
@@ -59,6 +62,24 @@ insn *ffi_call_table_add(ffi_call_table *table, const char *name, fn stub_fn) {
   // VM_DEBUG("EXT_FUNC_STUB_TABLE: added '%s' -> stub=%p\n", name, (void
   // *)stub);
   return stub;
+}
+
+size_t ffi_call_table_count(ffi_call_table *table) { return table->len; }
+
+ffi_call_stub *ffi_call_table_get(ffi_call_table *table, size_t idx) {
+  return &table->data[idx];
+}
+
+insn *ffi_call_table_get_all(ffi_call_table *table) {
+  if (table->len == 0) {
+    return NULL;
+  }
+  insn *all_stubs = ALLOC_ARRAY(insn, table->len * 2);
+  for (size_t i = 0; i < table->len; i++) {
+    all_stubs[i * 2] = table->data[i].stub[0];
+    all_stubs[i * 2 + 1] = table->data[i].stub[1];
+  }
+  return all_stubs;
 }
 
 // TODO: ugly?
