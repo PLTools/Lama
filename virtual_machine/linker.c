@@ -63,8 +63,15 @@ static void resolve_stubs(decoded *dec, insn *all_code, size_t code_offset,
         code[pi - 1].func = decoder_get_op_call();
         code[pi].target = &all_code[sym->idx];
       } else {
-        code[pi - 1].func = decoder_get_op_call_ffi_stub();
-        code[pi].str = s->name;
+        code[pi - 1].func = decoder_get_op_call();
+        insn *ffi_stub = ffi_call_table_find(ffi_stubs, s->name);
+        if (!ffi_stub) {
+          ffi_stub = ffi_call_table_add(ffi_stubs, s->name,
+                                        decoder_get_op_callc_ffi_stub());
+        }
+        code[pi].target = ffi_stub;
+        // code[pi - 1].func = decoder_get_op_call_ffi_stub();
+        // code[pi].str = s->name;
       }
       break;
     }

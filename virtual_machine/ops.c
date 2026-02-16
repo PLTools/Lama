@@ -645,7 +645,7 @@ void op_call_ffi_stub(DECL_STATE) {
 
   aint result = ffi_call_c(func_name, args, n_args);
 
-  VM_DEBUG("FFI_CALL: result=%ld\n", (long)UNBOX(result));
+  VM_DEBUG("FFI_CALL: result=%ld\n", (long)result);
   STACK_PUSH(sp, result);
   DISPATCH();
 }
