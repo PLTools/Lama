@@ -14,13 +14,7 @@ type scope = {
 }
 [@@deriving gt ~options:{ show }]
 
-let normal_label = "L"
-let builtin_label = "B"
-let global_label = "global_"
-let labeled s = normal_label ^ s
-let labeled_builtin s = builtin_label ^ s
-let labeled_global s = global_label ^ s
-let labeled_scoped i s = labeled s ^ "_" ^ string_of_int i
+let labeled_scoped i s = s ^ "_" ^ string_of_int i
 let show_scope = show scope
 
 (* The type for the stack machine instructions *)
@@ -88,10 +82,10 @@ type insn =
   | PATT of patt
   (* match failure (location, leave a value    *)
   | FAIL of Loc.t * bool
-  (* external definition                       *)
-  | EXTERN of string
-  (* public   definition                       *)
-  | PUBLIC of string
+  (* external definition (name, is_function)   *)
+  | EXTERN of string * bool
+  (* public   definition (name, is_function)   *)
+  | PUBLIC of string * bool
   (* import clause                             *)
   | IMPORT of string
   (* line info                                 *)
@@ -168,19 +162,28 @@ module ByteCode = struct
        16 FLABEL
   *)
 
+  (* Public symbol flags *)
+  let pub_flag_function = 0
+  let pub_flag_global = 1
+
   let compile cmd insns =
     let code = Buffer.create 256 in
     let st = StringTab.create () in
     let lmap = Stdlib.ref M.empty in
-    let pubs = Stdlib.ref S.empty in
+    let pubs = Stdlib.ref [] in
     let imports = Stdlib.ref S.empty in
     let globals = Stdlib.ref M.empty in
     let glob_count = Stdlib.ref 0 in
     let fixups = Stdlib.ref [] in
+    let func_fixups = Stdlib.ref [] in
     let add_lab l = lmap := M.add l (Buffer.length code) !lmap in
-    let add_public l = pubs := S.add l !pubs in
+    let add_public name is_fun =
+      let flag = if is_fun then pub_flag_function else pub_flag_global in
+      pubs := (name, flag) :: !pubs
+    in
     let add_import l = imports := S.add l !imports in
     let add_fixup l = fixups := (Buffer.length code, l) :: !fixups in
+    let add_func_fixup l = func_fixups := (Buffer.length code, l) :: !func_fixups in
     let add_bytes = List.iter (fun x -> Buffer.add_char code @@ Char.chr x) in
     let add_ints =
       List.iter (fun x -> Buffer.add_int32_ne code @@ Int32.of_int x)
@@ -271,13 +274,13 @@ module ByteCode = struct
           add_fixup s;
           add_ints [ 0 ]
       (* 0x70                 *)
-      | CALL (f, _, _) when f = labeled "read" -> add_bytes [ (7 * 16) + 0 ]
+      | CALL (f, _, _) when f = "read" -> add_bytes [ (7 * 16) + 0 ]
       (* 0x71                 *)
-      | CALL (f, _, _) when f = labeled "write" -> add_bytes [ (7 * 16) + 1 ]
+      | CALL (f, _, _) when f = "write" -> add_bytes [ (7 * 16) + 1 ]
       (* 0x72                 *)
-      | CALL (f, _, _) when f = labeled "length" -> add_bytes [ (7 * 16) + 2 ]
+      | CALL (f, _, _) when f = "length" -> add_bytes [ (7 * 16) + 2 ]
       (* 0x73                 *)
-      | CALL (f, _, _) when f = labeled "string" -> add_bytes [ (7 * 16) + 3 ]
+      | CALL (f, _, _) when f = "string" -> add_bytes [ (7 * 16) + 3 ]
       (* 0x74                 *)
       | CALL (".array", n, _) ->
           add_bytes [ (7 * 16) + 4 ];
@@ -293,7 +296,7 @@ module ByteCode = struct
       (* 0x54 l:32 n:32 d*:32 *)
       | CLOSURE (s, ds) ->
           add_bytes [ (5 * 16) + 4 ];
-          add_fixup s;
+          add_func_fixup s;
           add_ints [ 0; List.length ds ];
           add_designations None ds
       (* 0x55 n:32            *)
@@ -303,7 +306,7 @@ module ByteCode = struct
       (* 0x56 l:32 n:32       *)
       | CALL (fn, n, _) ->
           add_bytes [ (5 * 16) + 6 ];
-          add_fixup fn;
+          add_func_fixup fn;
           add_ints [ 0; n ]
       (* 0x57 s:32 n:32       *)
       | TAG (s, n) ->
@@ -325,7 +328,7 @@ module ByteCode = struct
       (* 0x6p                 *)
       | PATT p -> add_bytes [ (6 * 16) + enum patt p ]
       | EXTERN _ -> ()
-      | PUBLIC s -> add_public s
+      | PUBLIC (name, is_fun) -> add_public name is_fun
       | IMPORT s -> add_import s
       | _ ->
           failwith
@@ -344,14 +347,15 @@ module ByteCode = struct
             failwith (Printf.sprintf "ERROR: undefined label '%s'" l)))
       !fixups;
     let pubs =
-      List.map (fun l ->
-          ( Int32.of_int @@ StringTab.add st l,
+      List.map (fun (name, flag) ->
+          ( Int32.of_int @@ StringTab.add st name,
             Int32.of_int
             @@
-            try M.find l !lmap
+            (try M.find name !lmap
             with Not_found ->
-              failwith (Printf.sprintf "ERROR: undefined label '%s'" l) ))
-      @@ S.elements !pubs
+              failwith (Printf.sprintf "ERROR: undefined label of public '%s'" name)),
+            flag ))
+      @@ List.rev !pubs
     in
     let st = Buffer.to_bytes st.StringTab.buffer in
     let file = Buffer.create 1024 in
@@ -359,9 +363,10 @@ module ByteCode = struct
     Buffer.add_int32_ne file (Int32.of_int @@ !glob_count);
     Buffer.add_int32_ne file (Int32.of_int @@ List.length pubs);
     List.iter
-      (fun (n, o) ->
+      (fun (n, o, f) ->
         Buffer.add_int32_ne file n;
-        Buffer.add_int32_ne file o)
+        Buffer.add_int32_ne file o;
+        Buffer.add_uint8 file f)
       pubs;
     Buffer.add_bytes file st;
     Buffer.add_bytes file code;
@@ -770,11 +775,6 @@ let run p i =
          inherit indexer p
 
          method builtin f args ((cstack, stack, glob, loc, i, o) : config) =
-           let f =
-             match f.[0] with
-             | 'L' -> String.sub f 1 (String.length f - 1)
-             | _ -> f
-           in
            let _, i, o, r =
              Language.Builtin.eval (State.I, i, o, [])
                (List.map Obj.magic @@ List.rev args)
@@ -1038,10 +1038,10 @@ class env cmd imports =
     method global_scope = scope_index = 0
 
     method get_label =
-      (labeled @@ string_of_int label_index, {<label_index = label_index + 1>})
+      (string_of_int label_index, {<label_index = label_index + 1>})
 
     method get_end_label =
-      let lab = labeled @@ string_of_int label_index in
+      let lab = string_of_int label_index in
       (lab, {<end_label = lab; label_index = label_index + 1>})
 
     method end_label = end_label
@@ -1049,16 +1049,12 @@ class env cmd imports =
     method nlocals = scope.nlocals
 
     method get_decls =
-      let opt_label = function
-        | true -> labeled
-        | _ -> labeled_global
-      in
       List.flatten
       @@ List.map (function
-           | name, `Extern, f -> [ EXTERN (opt_label f name) ]
-           | name, `Public, f -> [ PUBLIC (opt_label f name) ]
+           | name, `Extern, f -> [ EXTERN (name, f) ]
+           | name, `Public, f -> [ PUBLIC (name, f) ]
            | name, `PublicExtern, f ->
-               [ PUBLIC (opt_label f name); EXTERN (opt_label f name) ]
+               [ PUBLIC (name, f); EXTERN (name, f) ]
            | _ -> invalid_arg "must not happen")
       @@ List.filter (function _, `Local, _ -> false | _ -> true) decls
 
@@ -1200,10 +1196,9 @@ class env cmd imports =
                  }>}
 
     method fun_internal_name (name : string) =
-      (match scope.st with
-      | State.G _ -> labeled
-      | _ -> labeled_scoped scope_index)
-        name
+      match scope.st with
+      | State.G _ -> name
+      | _ -> labeled_scoped scope_index name
 
     method add_fun_name (name : string)
         (m : [ `Local | `Extern | `Public | `PublicExtern ]) =
@@ -1668,7 +1663,7 @@ let compile cmd ((imports, _), p) =
   in
   let prg =
     List.map (fun i -> IMPORT i) imports
-    @ [ PUBLIC topname ] @ env#get_decls @ List.flatten prg
+    @ [ PUBLIC (topname, true) ] @ env#get_decls @ List.flatten prg
   in
   (*Printf.eprintf "Before propagating closures:\n";
     Printf.eprintf "%s\n%!" env#show_funinfo;

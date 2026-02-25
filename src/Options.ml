@@ -2,6 +2,9 @@ exception Commandline_error of string
 
 type os_t = Linux | Darwin
 
+let init_label = "_init"
+let labeled_init s = init_label ^ s
+
 class options args =
   let n = Array.length args in
   let dump_ast = 0b1 in
@@ -187,7 +190,7 @@ class options args =
       Filename.chop_suffix (Filename.basename self#get_infile) ".lama"
 
     method topname =
-      match !mode with `Compile -> "init" ^ self#basename | _ -> "main"
+      match !mode with `Compile -> labeled_init self#basename | _ -> "main"
 
     method dump_file ext contents =
       let name = self#basename in

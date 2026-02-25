@@ -112,6 +112,13 @@ let show instr =
 (* Opening stack machine to use instructions without fully qualified names *)
 open SM
 
+let normal_label = "L"
+let builtin_label = "B"
+let global_label = "global_"
+let labeled s = normal_label ^ s
+let labeled_builtin s = builtin_label ^ s
+let labeled_global s = global_label ^ s
+
 (* Symbolic stack machine evaluator
 
      compile : env -> prg -> env * instr list
@@ -183,7 +190,7 @@ let compile cmd env imports code =
     let call env f n tail =
       let tail = tail && env#nargs = n && f.[0] <> '.' in
       let f =
-        match f.[0] with '.' -> "B" ^ String.sub f 1 (String.length f - 1) | _ -> f
+        match f.[0] with '.' -> labeled_builtin (String.sub f 1 (String.length f - 1)) | _ -> env#asm_fun_name f
       in
       if tail
       then (
@@ -230,17 +237,22 @@ let compile cmd env imports code =
         let env', code' =
           if env#is_barrier
           then match instr with
-               | LABEL  s -> if env#has_stack s then (env#drop_barrier)#retrieve_stack s, [Label s] else env#drop_stack, []
-               | FLABEL s -> env#drop_barrier, [Label s]
-               | SLABEL s -> env, [Label s]
+               | LABEL  s -> if env#has_stack s then (env#drop_barrier)#retrieve_stack s, [Label (env#asm_fun_name s)] else env#drop_stack, []
+               | FLABEL s -> env#drop_barrier, [Label (env#asm_fun_name s)]
+               | SLABEL s -> env, [Label (env#asm_fun_name s)]
                | _        -> env, []
           else
           match instr with
-          | PUBLIC name -> env#register_public name, []
-          | EXTERN name -> env#register_extern name, []
+          | PUBLIC (name, is_fun) ->
+              let asm_name = if is_fun then env#asm_fun_name name else labeled_global name in
+              env#register_public asm_name, []
+          | EXTERN (name, is_fun) ->
+              let asm_name = if is_fun then env#asm_fun_name name else labeled_global name in
+              env#register_extern asm_name, []
           | IMPORT _name -> env, []
 
           | CLOSURE (name, closure) ->
+             let asm_name = env#asm_fun_name name in
              let pushr, popr =
                List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers 0)
              in
@@ -252,7 +264,7 @@ let compile cmd env imports code =
              (env,
               pushr @
               push_closure @
-              [Push (M ("$" ^ name));
+              [Push (M ("$" ^ asm_name));
               Push (L (box closure_len));
               Call "Bclosure";
               Binop ("+", L (word_size * (closure_len + 2)), esp);
@@ -395,15 +407,16 @@ let compile cmd env imports code =
 
           | LABEL  s
           | FLABEL s
-          | SLABEL s    -> env, [Label s]
+          | SLABEL s    -> env, [Label (env#asm_fun_name s)]
 
-	  | JMP   l     -> (env#set_stack l)#set_barrier, [Jmp l]
+	  | JMP   l     -> (env#set_stack l)#set_barrier, [Jmp (env#asm_fun_name l)]
 
           | CJMP (s, l) ->
               let x, env = env#pop in
-              env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, l)]
+              env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, env#asm_fun_name l)]
 
           | BEGIN (f, nargs, nlocals, closure, args, scopes) ->
+             let asm_f = env#asm_fun_name f in
              let rec stabs_scope scope =
                let names =
                  List.map
@@ -413,21 +426,18 @@ let compile cmd env imports code =
                    scope.names
                in
                names @
-               (if names = [] then [] else [Meta (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f)]) @
+               (if names = [] then [] else [Meta (Printf.sprintf "\t.stabn 192,0,0,%s-%s" (labeled scope.blab) asm_f)]) @
                (List.flatten @@ List.map stabs_scope scope.subs) @
-               (if names = [] then [] else [Meta (Printf.sprintf "\t.stabn 224,0,0,%s-%s" scope.elab f)])
-             in
-             let name =
-               if f.[0] = 'L' then String.sub f 1 (String.length f - 1) else f
+               (if names = [] then [] else [Meta (Printf.sprintf "\t.stabn 224,0,0,%s-%s" (labeled scope.elab) asm_f)])
              in
              env#assert_empty_stack;
              let has_closure = closure <> [] in
-             let env         = env#enter f nargs nlocals has_closure in
-             env, [Meta (Printf.sprintf "\t.type %s, @function" name)] @
+             let env         = env#enter asm_f nargs nlocals has_closure in
+             env, [Meta (Printf.sprintf "\t.type %s, @function" asm_f)] @
                   (if f = "main"
                    then []
                    else
-                     [Meta (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name f)] @
+                     [Meta (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" f asm_f)] @
                      (List.mapi (fun i a -> Meta (Printf.sprintf "\t.stabs \"%s:p1\",160,0,0,%d" a ((i*4) + 8))) args)  @
                      (List.flatten @@ List.map stabs_scope scopes)
                   )
@@ -461,7 +471,9 @@ let compile cmd env imports code =
                    else []
                   ) @
                   (if f = cmd#topname
-                   then List.map (fun i -> Call ("init" ^ i)) (List.filter (fun i -> i <> "Std") imports)
+                   then 
+                    let open Options in
+                    List.map (fun i -> Call (labeled_init i)) (List.filter (fun i -> i <> "Std") imports)
                    else []
                   )
 
@@ -559,7 +571,7 @@ module S = Set.Make (String)
 module M = Map.Make (String)
 
 (* Environment implementation *)
-class env prg =
+class env prg topname =
   let chars          = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'" in
   (* let make_assoc l i = List.combine l (List.init (List.length l) (fun x -> x + i)) in *)
   (* let rec assoc  x   = function [] -> raise Not_found | l :: ls -> try List.assoc x l with Not_found -> assoc x ls in *)
@@ -649,11 +661,14 @@ class env prg =
     method has_stack l = (*Printf.printf "Retrieving stack for %s\n" l;*)
       M.mem l stackmap
 
+    (* prefixes the name for a function *)
+    method asm_fun_name name = if name = topname then name else labeled name
+
     (* gets a name for a global variable *)
     method loc x =
       match x with
-      | Value.Global name -> M ("global_" ^ name)
-      | Value.Fun    name -> M ("$" ^ name)
+      | Value.Global name -> M (labeled_global name)
+      | Value.Fun    name -> M ("$" ^ self#asm_fun_name name)
       | Value.Local  i    -> S i
       | Value.Arg    i    -> S (- (i + if has_closure then 2 else 1))
       | Value.Access i    -> I (word_size * (i+1), edx)
@@ -697,7 +712,7 @@ class env prg =
     (* registers a variable in the environment *)
     method variable x =
       match x with
-      | Value.Global name -> {< globals = S.add ("global_" ^ name) globals >}
+      | Value.Global name -> {< globals = S.add (labeled_global name) globals >}
       | _                 -> self
 
     (* registers a string constant *)
@@ -799,7 +814,7 @@ class env prg =
 *)
 let genasm cmd prog =
   let sm        = SM.compile cmd prog in
-  let env, code = compile cmd (new env sm) (fst (fst prog)) sm in
+  let env, code = compile cmd (new env sm cmd#topname) (fst (fst prog)) sm in
   let globals =
     List.map (fun s -> Meta (Printf.sprintf "\t.globl\t%s" s)) env#publics
   in
@@ -810,7 +825,7 @@ let genasm cmd prog =
               Meta (Printf.sprintf "filler:\t.fill\t%d, 4, 1" env#max_locals_size)] @
               (List.concat @@
                  List.map
-                   (fun s -> [Meta (Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s" (String.sub s (String.length "global_") (String.length s - String.length "global_")) s);
+                   (fun s -> [Meta (Printf.sprintf "\t.stabs \"%s:S1\",40,0,0,%s" (String.sub s (String.length global_label) (String.length s - String.length global_label)) s);
                               Meta (Printf.sprintf "%s:\t.int\t1" s)])
                    env#globals
               )
