@@ -190,7 +190,7 @@ let compile cmd env imports code =
     let call env f n tail =
       let tail = tail && env#nargs = n && f.[0] <> '.' in
       let f =
-        match f.[0] with '.' -> labeled_builtin (String.sub f 1 (String.length f - 1)) | _ -> env#asm_fun_name f
+        match f.[0] with '.' -> labeled_builtin (String.sub f 1 (String.length f - 1)) | _ -> env#asm_name f
       in
       if tail
       then (
@@ -237,22 +237,22 @@ let compile cmd env imports code =
         let env', code' =
           if env#is_barrier
           then match instr with
-               | LABEL  s -> if env#has_stack s then (env#drop_barrier)#retrieve_stack s, [Label (env#asm_fun_name s)] else env#drop_stack, []
-               | FLABEL s -> env#drop_barrier, [Label (env#asm_fun_name s)]
-               | SLABEL s -> env, [Label (env#asm_fun_name s)]
+               | LABEL  s -> if env#has_stack s then (env#drop_barrier)#retrieve_stack s, [Label (env#asm_name s)] else env#drop_stack, []
+               | FLABEL s -> env#drop_barrier, [Label (env#asm_name s)]
+               | SLABEL s -> env, [Label (env#asm_name s)]
                | _        -> env, []
           else
           match instr with
           | PUBLIC (name, is_fun) ->
-              let asm_name = if is_fun then env#asm_fun_name name else labeled_global name in
+              let asm_name = if is_fun then env#asm_name name else labeled_global name in
               env#register_public asm_name, []
           | EXTERN (name, is_fun) ->
-              let asm_name = if is_fun then env#asm_fun_name name else labeled_global name in
+              let asm_name = if is_fun then env#asm_name name else labeled_global name in
               env#register_extern asm_name, []
           | IMPORT _name -> env, []
 
           | CLOSURE (name, closure) ->
-             let asm_name = env#asm_fun_name name in
+             let asm_name = env#asm_name name in
              let pushr, popr =
                List.split @@ List.map (fun r -> (Push r, Pop r)) (env#live_registers 0)
              in
@@ -407,16 +407,16 @@ let compile cmd env imports code =
 
           | LABEL  s
           | FLABEL s
-          | SLABEL s    -> env, [Label (env#asm_fun_name s)]
+          | SLABEL s    -> env, [Label (env#asm_name s)]
 
-	  | JMP   l     -> (env#set_stack l)#set_barrier, [Jmp (env#asm_fun_name l)]
+	  | JMP   l     -> (env#set_stack l)#set_barrier, [Jmp (env#asm_name l)]
 
           | CJMP (s, l) ->
               let x, env = env#pop in
-              env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, env#asm_fun_name l)]
+              env#set_stack l, [Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp  (s, env#asm_name l)]
 
           | BEGIN (f, nargs, nlocals, closure, args, scopes) ->
-             let asm_f = env#asm_fun_name f in
+             let asm_f = env#asm_name f in
              let rec stabs_scope scope =
                let names =
                  List.map
@@ -661,14 +661,14 @@ class env prg topname =
     method has_stack l = (*Printf.printf "Retrieving stack for %s\n" l;*)
       M.mem l stackmap
 
-    (* prefixes the name for a function *)
-    method asm_fun_name name = if name = topname then name else labeled name
+    (* prefixes a function name or a label *)
+    method asm_name name = if name = topname then name else labeled name
 
     (* gets a name for a global variable *)
     method loc x =
       match x with
       | Value.Global name -> M (labeled_global name)
-      | Value.Fun    name -> M ("$" ^ self#asm_fun_name name)
+      | Value.Fun    name -> M ("$" ^ self#asm_name name)
       | Value.Local  i    -> S i
       | Value.Arg    i    -> S (- (i + if has_closure then 2 else 1))
       | Value.Access i    -> I (word_size * (i+1), edx)

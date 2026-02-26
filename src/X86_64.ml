@@ -674,22 +674,22 @@ let compile cmd env imports code =
             match instr with
             | LABEL s ->
                 if env#has_stack s then
-                  (env#drop_barrier#retrieve_stack s, [ Label (env#asm_fun_name s) ])
+                  (env#drop_barrier#retrieve_stack s, [ Label (env#asm_name s) ])
                 else (env#drop_stack, [])
-            | FLABEL s -> (env#drop_barrier, [ Label (env#asm_fun_name s) ])
-            | SLABEL s -> (env, [ Label (env#asm_fun_name s) ])
+            | FLABEL s -> (env#drop_barrier, [ Label (env#asm_name s) ])
+            | SLABEL s -> (env, [ Label (env#asm_name s) ])
             | _ -> (env, [])
           else
             match instr with
             | PUBLIC (name, is_fun) ->
-                let asm_name = if is_fun then env#asm_fun_name name else labeled_global name in
+                let asm_name = if is_fun then env#asm_name name else labeled_global name in
                 (env#register_public asm_name, [])
             | EXTERN (name, is_fun) ->
-                let asm_name = if is_fun then env#asm_fun_name name else labeled_global name in
+                let asm_name = if is_fun then env#asm_name name else labeled_global name in
                 (env#register_extern asm_name, [])
             | IMPORT _ -> (env, [])
             | CLOSURE (name, closure) ->
-                let asm_name = env#asm_fun_name name in
+                let asm_name = env#asm_name name in
                 let ext = if env#is_external asm_name then E else I in
                 let address = M (F, ext, A, asm_name) in
                 let l, env = env#allocate in
@@ -764,14 +764,14 @@ let compile cmd env imports code =
                       ]
                   | _ -> [ Mov (v, rax); Mov (rax, I (0, x)); Mov (rax, x) ] )*)
             | BINOP op -> compile_binop env op
-            | LABEL s | FLABEL s | SLABEL s -> (env, [ Label (env#asm_fun_name s) ])
-            | JMP l -> ((env#set_stack l)#set_barrier, [ Jmp (env#asm_fun_name l) ])
+            | LABEL s | FLABEL s | SLABEL s -> (env, [ Label (env#asm_name s) ])
+            | JMP l -> ((env#set_stack l)#set_barrier, [ Jmp (env#asm_name l) ])
             | CJMP (s, l) ->
                 let x, env = env#pop in
                 ( env#set_stack l,
-                  [ Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp (s, env#asm_fun_name l) ] )
+                  [ Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp (s, env#asm_name l) ] )
             | BEGIN (f, nargs, nlocals, closure, _args, scopes) ->
-                let asm_f = env#asm_fun_name f in
+                let asm_f = env#asm_name f in
                 let _ =
                   let is_safepoint = List.mem asm_f safepoint_functions in
                   let is_vararg =
@@ -964,7 +964,7 @@ let compile cmd env imports code =
                 (env, [ Mov (x, rax); Jmp env#epilogue ])
             | ELEM -> compile_call env ~fname:".elem" 2 false
             | CALL (fname, n, tail) ->
-                let asm_fname = match fname.[0] with '.' -> fname | _ -> env#asm_fun_name fname in
+                let asm_fname = match fname.[0] with '.' -> fname | _ -> env#asm_name fname in
                 compile_call env ~fname:asm_fname n tail
             | CALLC (n, tail) -> compile_call env n tail
             | SEXP (t, n) ->
@@ -1247,8 +1247,8 @@ class env prg mode topname =
     method has_stack l = M.mem l stackmap
     method is_external name = S.mem name externs
 
-    (* prefixes the name for a function *)
-    method asm_fun_name name = if name = topname then name else labeled name
+    (* prefixes a function name or a label *)
+    method asm_name name = if name = topname then name else labeled name
 
     (* gets a location for a variable *)
     method loc x =
@@ -1258,7 +1258,7 @@ class env prg mode topname =
           let ext = if self#is_external name then E else I in
           M (D, ext, V, loc_name)
       | Value.Fun name ->
-          let asm_name = self#asm_fun_name name in
+          let asm_name = self#asm_name name in
           let ext = if self#is_external asm_name then E else I in
           M (F, ext, A, asm_name)
       | Value.Local i -> S i
