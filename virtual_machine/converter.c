@@ -117,10 +117,9 @@ typedef struct {
 
 } decode_ctx;
 
-decode_ctx *decode_ctx_create(const bytecode *bc, symbol_table *st,
-                              ffi_call_table *ffi, int32_t global_offset) {
-  decode_ctx *ctx = ALLOC(decode_ctx);
-
+static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
+                            symbol_table *st, ffi_call_table *ffi,
+                            int32_t global_offset) {
   ctx->bc = bc;
 
   ctx->global_offset = global_offset;
@@ -133,8 +132,14 @@ decode_ctx *decode_ctx_create(const bytecode *bc, symbol_table *st,
   ctx->ffi = ffi;
 
   reader_init(&ctx->reader, bc->code, bc->code_size);
+}
 
-  return ctx;
+static void free_decoded_arr(decoded *arr, size_t n) {
+  for (size_t i = 0; i < n; i++) {
+    free(arr[i].code);
+    free(arr[i].bc_to_insn_map);
+    free(arr[i].relocs);
+  }
 }
 
 static void add_reloc(decode_ctx *ctx, size_t patch_idx, const char *name,
@@ -852,49 +857,8 @@ static void resolve_relocs(insn *all_code, decoded *dec, size_t code_offset,
   }
 }
 
-program *decode(bytecode **bc_arr, size_t n) {
-  symbol_table *st = symbol_table_create();
-  ffi_call_table *ffi = ffi_call_table_create();
-
-  decoded *dec_arr = ALLOC_ARRAY(decoded, n);
-
-  size_t total_code_len = 0;
-  size_t total_globals = 0;
-
-  for (size_t i = 0; i < n; i++) {
-    decode_ctx *ctx = decode_ctx_create(bc_arr[i], st, ffi, total_code_len);
-    insn *code = decode_internal(ctx);
-    if (!code) {
-      fprintf(stderr, "Failed to decode %s\n", bc_arr[i]->name);
-      free(ctx->bc_to_insn_map);
-      free(ctx);
-      for (size_t j = 0; j < i; j++) {
-        free(dec_arr[j].code);
-        free(dec_arr[j].bc_to_insn_map);
-        free(dec_arr[j].relocs);
-      }
-      free(dec_arr);
-      symbol_table_destroy(st);
-      ffi_call_table_destroy(ffi);
-      return NULL;
-    }
-
-    dec_arr[i] = (decoded){
-        .code = code,
-        .code_len = ctx->code.len,
-        .bc_to_insn_map = ctx->bc_to_insn_map,
-        .relocs = ctx->relocs.data,
-        .relocs_len = ctx->relocs.len,
-    };
-
-    register_public_symbols(ctx->st, bc_arr[i], total_code_len, total_globals,
-                            ctx->bc_to_insn_map);
-
-    total_code_len += ctx->code.len;
-    total_globals += bc_arr[i]->globals_count;
-    free(ctx);
-  }
-
+static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
+                             size_t total_globals, ffi_call_table *ffi) {
   size_t ffi_call_len = ffi_call_table_len(ffi);
   size_t ffi_call_offset = total_code_len;
   size_t all_code_len = total_code_len + ffi_call_len * FFI_STUB_SIZE;
@@ -902,15 +866,14 @@ program *decode(bytecode **bc_arr, size_t n) {
   insn *all_code = ALLOC_ARRAY(insn, all_code_len);
   insn **entry_points = ALLOC_ARRAY(insn *, n);
 
+  // Copy code and resolve relocations
   size_t code_offset = 0;
   for (size_t i = 0; i < n; i++) {
     decoded *dec = &dec_arr[i];
 
     // Move instructions into final code array
     memcpy(all_code + code_offset, dec->code, dec->code_len * sizeof(insn));
-
     entry_points[i] = &all_code[code_offset];
-
     resolve_relocs(all_code, dec, code_offset, ffi_call_offset);
 
     code_offset += dec->code_len;
@@ -926,24 +889,60 @@ program *decode(bytecode **bc_arr, size_t n) {
     ffi_idx++;
   }
 
-  ffi_resolved *ffi_data = ffi_call_table_release(ffi);
-
   program *prog = ALLOC(program);
   prog->code = all_code;
   prog->code_len = all_code_len;
   prog->total_globals = total_globals;
   prog->entry_points = entry_points;
-  prog->ffi_data = ffi_data;
+  prog->ffi_data = ffi_call_table_release(ffi);
   prog->ffi_len = ffi_call_len;
 
-  symbol_table_destroy(st);
-  ffi_call_table_destroy(ffi);
+  return prog;
+}
+
+program *decode(bytecode **bc_arr, size_t n) {
+  symbol_table *st = symbol_table_create();
+  ffi_call_table *ffi = ffi_call_table_create();
+
+  decoded *dec_arr = ALLOC_ARRAY(decoded, n);
+  program *prog = NULL;
+  size_t n_decoded = 0;
+
+  size_t total_code_len = 0;
+  size_t total_globals = 0;
 
   for (size_t i = 0; i < n; i++) {
-    free(dec_arr[i].code);
-    free(dec_arr[i].bc_to_insn_map);
-    free(dec_arr[i].relocs);
+    decode_ctx ctx;
+    decode_ctx_init(&ctx, bc_arr[i], st, ffi, total_code_len);
+    insn *code = decode_internal(&ctx);
+    if (!code) {
+      fprintf(stderr, "Failed to decode %s\n", bc_arr[i]->name);
+      free(ctx.bc_to_insn_map);
+      goto cleanup;
+    }
+
+    dec_arr[i] = (decoded){
+        .code = code,
+        .code_len = ctx.code.len,
+        .bc_to_insn_map = ctx.bc_to_insn_map,
+        .relocs = ctx.relocs.data,
+        .relocs_len = ctx.relocs.len,
+    };
+    n_decoded++;
+
+    register_public_symbols(st, bc_arr[i], total_code_len, total_globals,
+                            ctx.bc_to_insn_map);
+
+    total_code_len += ctx.code.len;
+    total_globals += bc_arr[i]->globals_count;
   }
+
+  prog = link_program(dec_arr, n, total_code_len, total_globals, ffi);
+
+cleanup:
+  symbol_table_destroy(st);
+  ffi_call_table_destroy(ffi);
+  free_decoded_arr(dec_arr, n_decoded);
   free(dec_arr);
 
   return prog;
