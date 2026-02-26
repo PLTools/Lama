@@ -15,74 +15,37 @@
 #include <string.h>
 
 struct ffi_call_table {
-  ffi_call_stub *data;
+  ffi_resolved *data;
   size_t len;
   size_t cap;
+
+  // Used for dedup
+  struct {
+    const char **data;
+    size_t len;
+    size_t cap;
+  } names;
 };
 
 ffi_call_table *ffi_call_table_create(void) {
   ffi_call_table *table = ALLOC(ffi_call_table);
   da_init(*table);
+  da_init(table->names);
   return table;
 }
 
-// Currently frees only table and not stubs themselves since they are needed for
-// execution
 void ffi_call_table_destroy(ffi_call_table *table) {
   if (!table) {
     return;
   }
-  for (size_t i = 0; i < table->len; i++) {
-    free(table->data[i].stub);
+  for (size_t i = 0; i < table->names.len; i++) {
+    free((char *)table->names.data[i]);
   }
-  da_free(*table);
+  da_free(table->names);
+  free(table->data);
   free(table);
 }
 
-size_t ffi_call_table_find(ffi_call_table *table, const char *name) {
-  for (size_t i = 0; i < table->len; i++) {
-    if (strcmp(table->data[i].name, name) == 0) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-insn *ffi_call_table_add(ffi_call_table *table, const char *name, fn stub_fn) {
-  insn *stub = ALLOC_ARRAY(insn, 2);
-
-  char *persistent_name = ESTRDUP(name);
-
-  stub[0].func = stub_fn;
-  stub[1].str = persistent_name;
-
-  ffi_call_stub entry = {.name = persistent_name, .stub = stub};
-  da_append(*table, entry);
-
-  // VM_DEBUG("EXT_FUNC_STUB_TABLE: added '%s' -> stub=%p\n", name, (void
-  // *)stub);
-  return stub;
-}
-
-size_t ffi_call_table_count(ffi_call_table *table) { return table->len; }
-
-ffi_call_stub *ffi_call_table_get(ffi_call_table *table, size_t idx) {
-  return &table->data[idx];
-}
-
-insn *ffi_call_table_get_all(ffi_call_table *table) {
-  if (table->len == 0) {
-    return NULL;
-  }
-  insn *all_stubs = ALLOC_ARRAY(insn, table->len * 2);
-  for (size_t i = 0; i < table->len; i++) {
-    all_stubs[i * 2] = table->data[i].stub[0];
-    all_stubs[i * 2 + 1] = table->data[i].stub[1];
-  }
-  return all_stubs;
-}
-
-// TODO: ugly?
 typedef struct {
   const char *lama_name;
   const char *target_name;
@@ -107,7 +70,6 @@ static const func_metadata func_table[] = {
     // Sentinel
     {NULL, NULL, false, 0}};
 
-// TODO: cache?
 static void *lookup_function(const char *name) {
   void *fn = dlsym(RTLD_DEFAULT, name);
   char *error = dlerror();
@@ -127,17 +89,70 @@ static const func_metadata *lookup_metadata(const char *name) {
   return NULL;
 }
 
-/*
- * Functions that take (aint* args) - a pointer to argument array
- * TODO: a better way?
- */
-static aint call_args_array_function(const char *name, aint *args) {
-  void *fn = lookup_function(name);
+size_t ffi_call_table_intern(ffi_call_table *table, const char *name) {
+  for (size_t i = 0; i < table->names.len; i++) {
+    if (strcmp(table->names.data[i], name) == 0) {
+      return i;
+    }
+  }
+
+  const func_metadata *meta = lookup_metadata(name);
+  const char *target_name = meta ? meta->target_name : name;
+
+  void *fn = lookup_function(target_name);
   if (!fn) {
     fprintf(stderr, "Undefined external function: %s\n", name);
     exit(EXIT_FAILURE);
   }
 
+  ffi_kind kind = FFI_REGULAR;
+  int fixed_args = 0;
+
+  if (meta) {
+    if (meta->is_args_array) {
+      kind = FFI_ARGS_ARRAY;
+    } else {
+      kind = FFI_VARIADIC;
+      fixed_args = meta->fixed_args;
+    }
+  }
+
+  ffi_resolved entry = {
+      .fn_ptr = fn,
+      .kind = kind,
+      .fixed_args = fixed_args,
+  };
+
+  da_append(*table, entry);
+  da_append(table->names, ESTRDUP(name));
+  return table->len - 1;
+}
+
+size_t ffi_call_table_len(ffi_call_table *table) { return table->len; }
+
+ffi_resolved *ffi_call_table_release(ffi_call_table *table) {
+  ffi_resolved *data = table->data;
+  table->data = NULL;
+  table->len = 0;
+  table->cap = 0;
+  return data;
+}
+
+void ffi_call_table_emit_init(ffi_call_iterator *iter, ffi_call_table *table) {
+  iter->table = table;
+  iter->curr = 0;
+}
+
+bool ffi_call_table_emit_next(ffi_call_iterator *iter, ffi_resolved **out) {
+  if (iter->curr >= iter->table->len) {
+    return false;
+  }
+  *out = &iter->table->data[iter->curr];
+  iter->curr++;
+  return true;
+}
+
+static aint call_args_array(void *fn_ptr, aint *args) {
   ffi_cif cif;
   ffi_type *arg_types[1] = {&ffi_type_pointer};
   void *arg_values[1] = {&args};
@@ -146,29 +161,19 @@ static aint call_args_array_function(const char *name, aint *args) {
   ffi_status status =
       ffi_prep_cif(&cif, FFI_DEFAULT_ABI, 1, &ffi_type_pointer, arg_types);
   if (status != FFI_OK) {
-    fprintf(stderr, "FFI prep failed for '%s': status=%d\n", name, status);
+    fprintf(stderr, "FFI prep failed: status=%d\n", status);
     exit(EXIT_FAILURE);
   }
 
-  ffi_call(&cif, FFI_FN(fn), &result, arg_values);
+  ffi_call(&cif, FFI_FN(fn_ptr), &result, arg_values);
   return (aint)result;
 }
 
-/*
- * Mapping functions due to runtime.c x32 and x64 variants of printf etc.
- * TODO: very ugly
- */
-static aint call_variadic_function(const char *target_name, int fixed_args,
-                                   aint *args, int n_args) {
-  void *fn = lookup_function(target_name);
-  if (!fn) {
-    fprintf(stderr, "Undefined external function: %s\n", target_name);
-    exit(EXIT_FAILURE);
-  }
-
+static aint call_variadic(void *fn_ptr, int fixed_args, aint *args,
+                          int n_args) {
   if (n_args < fixed_args) {
-    fprintf(stderr, "FFI call '%s': expected at least %d args, got %d\n",
-            target_name, fixed_args, n_args);
+    fprintf(stderr, "FFI variadic call: expected at least %d args, got %d\n",
+            fixed_args, n_args);
     exit(EXIT_FAILURE);
   }
 
@@ -189,27 +194,18 @@ static aint call_variadic_function(const char *target_name, int fixed_args,
     }
   }
 
-  // TODO: ABI ?
   ffi_status status = ffi_prep_cif_var(&cif, FFI_DEFAULT_ABI, fixed_args,
                                        n_args, &ffi_type_pointer, arg_types);
-
   if (status != FFI_OK) {
-    fprintf(stderr, "FFI prep failed for '%s': status=%d\n", target_name,
-            status);
+    fprintf(stderr, "FFI prep failed: status=%d\n", status);
     exit(EXIT_FAILURE);
   }
 
-  ffi_call(&cif, FFI_FN(fn), &result, arg_values);
+  ffi_call(&cif, FFI_FN(fn_ptr), &result, arg_values);
   return (aint)result;
 }
 
-static aint call_regular_function(const char *name, aint *args, int n_args) {
-  void *fn = lookup_function(name);
-  if (!fn) {
-    fprintf(stderr, "Undefined external function: %s\n", name);
-    exit(EXIT_FAILURE);
-  }
-
+static aint call_regular(void *fn_ptr, aint *args, int n_args) {
   ffi_cif cif;
   ffi_type *arg_types[n_args];
   void *arg_values[n_args];
@@ -222,28 +218,25 @@ static aint call_regular_function(const char *name, aint *args, int n_args) {
 
   ffi_status status =
       ffi_prep_cif(&cif, FFI_DEFAULT_ABI, n_args, &ffi_type_pointer, arg_types);
-
   if (status != FFI_OK) {
-    fprintf(stderr, "FFI prep failed for '%s': status=%d\n", name, status);
+    fprintf(stderr, "FFI prep failed: status=%d\n", status);
     exit(EXIT_FAILURE);
   }
 
-  ffi_call(&cif, FFI_FN(fn), &result, arg_values);
-
+  ffi_call(&cif, FFI_FN(fn_ptr), &result, arg_values);
   return result;
 }
 
-aint ffi_call_c(const char *name, aint *args, int n_args) {
-  const func_metadata *meta = lookup_metadata(name);
-
-  if (meta) {
-    if (meta->is_args_array) {
-      return call_args_array_function(meta->target_name, args);
-    } else {
-      return call_variadic_function(meta->target_name, meta->fixed_args, args,
-                                    n_args);
-    }
+aint ffi_call_c(const ffi_resolved *res, aint *args, int n_args) {
+  switch (res->kind) {
+  case FFI_ARGS_ARRAY:
+    return call_args_array(res->fn_ptr, args);
+  case FFI_VARIADIC:
+    return call_variadic(res->fn_ptr, res->fixed_args, args, n_args);
+  case FFI_REGULAR:
+    return call_regular(res->fn_ptr, args, n_args);
+  default:
+    fprintf(stderr, "Unknown FFI kind: %d\n", res->kind);
+    exit(EXIT_FAILURE);
   }
-
-  return call_regular_function(name, args, n_args);
 }

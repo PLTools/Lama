@@ -19,6 +19,8 @@ struct virtual_machine {
   insn **entry_points; // Entry point for each unique unit
   size_t entry_points_len;
   size_t total_globals;
+  void *ffi_data; // ffi_resolved array
+  size_t ffi_count;
 };
 
 virtual_machine *vm_create(const char *main_unit_path, const char **paths,
@@ -49,6 +51,8 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
   vm->total_globals = prog->total_globals;
   vm->code = prog->code;
   vm->entry_points = prog->entry_points;
+  vm->ffi_data = prog->ffi_data;
+  vm->ffi_count = prog->ffi_len;
 
   free(prog);
 
@@ -63,6 +67,7 @@ void vm_destroy(virtual_machine *vm) {
     bytecode_free(vm->bc_arr[i]);
   }
   free(vm->bc_arr);
+  free(vm->ffi_data);
   free(vm->code);
   free(vm->entry_points);
   free(vm);

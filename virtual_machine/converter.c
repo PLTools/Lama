@@ -56,6 +56,7 @@
 #define EMIT_TARGET(ctx, t) da_append((ctx)->code, ((insn){.target = (t)}))
 #define EMIT_GLOBAL_PTR(ctx, p)                                                \
   da_append((ctx)->code, ((insn){.global_ptr = (p)}))
+#define EMIT_PTR(ctx, p) da_append((ctx)->code, ((insn){.ptr = (p)}))
 
 #define FFI_STUB_SIZE 2
 
@@ -661,11 +662,7 @@ static insn *decode_internal(decode_ctx *ctx) {
               ctx,
               sym->idx); // placeholder, will be resolved to inter-unit function
         } else {
-          size_t idx = ffi_call_table_find(ctx->ffi, ext_func_name);
-          if (idx == -1) {
-            ffi_call_table_add(ctx->ffi, ext_func_name, op_ffi_call);
-            idx = ffi_call_table_count(ctx->ffi) - 1;
-          }
+          size_t idx = ffi_call_table_intern(ctx->ffi, ext_func_name);
           add_reloc(ctx, target_slot, ext_func_name, FFI);
           EMIT_NUM(ctx, idx); // placeholder, will be resolved to FFI call
         }
@@ -719,11 +716,7 @@ static insn *decode_internal(decode_ctx *ctx) {
               ctx,
               sym->idx); // placeholder, will be resolved to inter-unit function
         } else {
-          size_t idx = ffi_call_table_find(ctx->ffi, ext_func_name);
-          if (idx == -1) {
-            ffi_call_table_add(ctx->ffi, ext_func_name, op_ffi_call);
-            idx = ffi_call_table_count(ctx->ffi) - 1;
-          }
+          size_t idx = ffi_call_table_intern(ctx->ffi, ext_func_name);
           add_reloc(ctx, target_slot, ext_func_name, FFI);
           EMIT_NUM(ctx, idx); // placeholder, will be resolved to FFI call
         }
@@ -872,10 +865,17 @@ program *decode(bytecode **bc_arr, size_t n) {
     decode_ctx *ctx = decode_ctx_create(bc_arr[i], st, ffi, total_code_len);
     insn *code = decode_internal(ctx);
     if (!code) {
-      // TODO: cleanup
       fprintf(stderr, "Failed to decode %s\n", bc_arr[i]->name);
-      free(dec_arr);
+      free(ctx->bc_to_insn_map);
       free(ctx);
+      for (size_t j = 0; j < i; j++) {
+        free(dec_arr[j].code);
+        free(dec_arr[j].bc_to_insn_map);
+        free(dec_arr[j].relocs);
+      }
+      free(dec_arr);
+      symbol_table_destroy(st);
+      ffi_call_table_destroy(ffi);
       return NULL;
     }
 
@@ -895,7 +895,7 @@ program *decode(bytecode **bc_arr, size_t n) {
     free(ctx);
   }
 
-  size_t ffi_call_len = ffi_call_table_count(ffi);
+  size_t ffi_call_len = ffi_call_table_len(ffi);
   size_t ffi_call_offset = total_code_len;
   size_t all_code_len = total_code_len + ffi_call_len * FFI_STUB_SIZE;
 
@@ -916,19 +916,25 @@ program *decode(bytecode **bc_arr, size_t n) {
     code_offset += dec->code_len;
   }
 
-  // Copy FFI calls into the tail of all_code
-  insn *ffi_data = ffi_call_table_get_all(ffi);
-  if (ffi_data) {
-    memcpy(all_code + ffi_call_offset, ffi_data,
-           ffi_call_len * FFI_STUB_SIZE * sizeof(insn));
-    free(ffi_data);
+  ffi_call_iterator ffi_iter;
+  ffi_call_table_emit_init(&ffi_iter, ffi);
+  ffi_resolved *res;
+  size_t ffi_idx = 0;
+  while (ffi_call_table_emit_next(&ffi_iter, &res)) {
+    all_code[ffi_call_offset + ffi_idx * FFI_STUB_SIZE].func = op_ffi_call;
+    all_code[ffi_call_offset + ffi_idx * FFI_STUB_SIZE + 1].ptr = res;
+    ffi_idx++;
   }
+
+  ffi_resolved *ffi_data = ffi_call_table_release(ffi);
 
   program *prog = ALLOC(program);
   prog->code = all_code;
   prog->code_len = all_code_len;
   prog->total_globals = total_globals;
   prog->entry_points = entry_points;
+  prog->ffi_data = ffi_data;
+  prog->ffi_len = ffi_call_len;
 
   symbol_table_destroy(st);
   ffi_call_table_destroy(ffi);
@@ -947,6 +953,7 @@ void program_free(program *prog) {
   if (!prog) {
     return;
   }
+  free(prog->ffi_data);
   free(prog->code);
   free(prog->entry_points);
   free(prog);

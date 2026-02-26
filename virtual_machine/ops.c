@@ -1,4 +1,3 @@
-
 #include "ops.h"
 #include "../runtime/runtime_common.h"
 #include "ffi.h"
@@ -573,15 +572,15 @@ void op_end(DECL_STATE) {
 }
 
 /*
- * FFI call
+ * FFI call — dispatches via pre-resolved ffi_resolved struct
  */
 void op_ffi_call(DECL_STATE) {
   ip++;
-  const char *func_name = ip->str;
+  const ffi_resolved *res = (const ffi_resolved *)ip->ptr;
 
   int32_t n_args = (int32_t)bp[1];
 
-  VM_DEBUG("FFI_STUB: func='%s' n_args=%d bp=%p\n", func_name, n_args,
+  VM_DEBUG("FFI_CALL: kind=%d n_args=%d bp=%p\n", res->kind, n_args,
            (void *)bp);
 
   aint args[256];
@@ -589,10 +588,9 @@ void op_ffi_call(DECL_STATE) {
     args[i] = bp[n_args + 1 - i];
   }
 
-  aint result = ffi_call_c(func_name, args, n_args);
-  VM_DEBUG("FFI_STUB: func='%s' result=%ld\n", func_name, (long)result);
+  aint result = ffi_call_c(res, args, n_args);
+  VM_DEBUG("FFI_CALL: result=%ld\n", (long)result);
 
-  // Store result in return value slot
   *bp = result;
 
   return;

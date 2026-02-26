@@ -27,6 +27,7 @@ typedef union insn {
   const char *str;    // String operand (direct pointer)
   union insn *target; // Direct jump target (pointer to insn)
   aint *global_ptr;   // Pointer to a C global variable
+  void *ptr;          // Generic pointer
 } insn;
 
 #endif // INSN_H

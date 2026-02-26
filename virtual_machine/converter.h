@@ -13,6 +13,8 @@ typedef struct {
   size_t code_len;
   size_t total_globals;
   insn **entry_points;
+  void *ffi_data;
+  size_t ffi_len;
 } program;
 
 program *decode(bytecode **bc_arr, size_t n);
