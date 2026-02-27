@@ -422,7 +422,7 @@ module ByteCode = struct
       (fun (name_off, offset, flag) ->
         Buffer.add_int32_le file name_off;
         Buffer.add_int32_le file offset;
-        Buffer.add_char file (Char.chr flag))
+        Buffer.add_uint8  file flag)
       pubs_resolved;
     Buffer.add_bytes file code;
     let f = open_out_bin (Printf.sprintf "%s.bc" cmd#basename) in
