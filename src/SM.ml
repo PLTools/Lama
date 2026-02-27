@@ -14,7 +14,7 @@ type scope = {
 }
 [@@deriving gt ~options:{ show }]
 
-let labeled_scoped i s = s ^ "_" ^ string_of_int i
+let scoped i s = s ^ "_" ^ string_of_int i
 let show_scope = show scope
 
 (* The type for the stack machine instructions *)
@@ -175,7 +175,6 @@ module ByteCode = struct
     let globals = Stdlib.ref M.empty in
     let glob_count = Stdlib.ref 0 in
     let fixups = Stdlib.ref [] in
-    let func_fixups = Stdlib.ref [] in
     let add_lab l = lmap := M.add l (Buffer.length code) !lmap in
     let add_public name is_fun =
       let flag = if is_fun then pub_flag_function else pub_flag_global in
@@ -183,7 +182,6 @@ module ByteCode = struct
     in
     let add_import l = imports := S.add l !imports in
     let add_fixup l = fixups := (Buffer.length code, l) :: !fixups in
-    let add_func_fixup l = func_fixups := (Buffer.length code, l) :: !func_fixups in
     let add_bytes = List.iter (fun x -> Buffer.add_char code @@ Char.chr x) in
     let add_ints =
       List.iter (fun x -> Buffer.add_int32_ne code @@ Int32.of_int x)
@@ -274,13 +272,13 @@ module ByteCode = struct
           add_fixup s;
           add_ints [ 0 ]
       (* 0x70                 *)
-      | CALL (f, _, _) when f = "read" -> add_bytes [ (7 * 16) + 0 ]
+      | CALL ("read", _, _) -> add_bytes [ (7 * 16) + 0 ]
       (* 0x71                 *)
-      | CALL (f, _, _) when f = "write" -> add_bytes [ (7 * 16) + 1 ]
+      | CALL ("write", _, _) -> add_bytes [ (7 * 16) + 1 ]
       (* 0x72                 *)
-      | CALL (f, _, _) when f = "length" -> add_bytes [ (7 * 16) + 2 ]
+      | CALL ("length", _, _) -> add_bytes [ (7 * 16) + 2 ]
       (* 0x73                 *)
-      | CALL (f, _, _) when f = "string" -> add_bytes [ (7 * 16) + 3 ]
+      | CALL ("string", _, _) -> add_bytes [ (7 * 16) + 3 ]
       (* 0x74                 *)
       | CALL (".array", n, _) ->
           add_bytes [ (7 * 16) + 4 ];
@@ -296,7 +294,6 @@ module ByteCode = struct
       (* 0x54 l:32 n:32 d*:32 *)
       | CLOSURE (s, ds) ->
           add_bytes [ (5 * 16) + 4 ];
-          add_func_fixup s;
           add_ints [ 0; List.length ds ];
           add_designations None ds
       (* 0x55 n:32            *)
@@ -306,7 +303,6 @@ module ByteCode = struct
       (* 0x56 l:32 n:32       *)
       | CALL (fn, n, _) ->
           add_bytes [ (5 * 16) + 6 ];
-          add_func_fixup fn;
           add_ints [ 0; n ]
       (* 0x57 s:32 n:32       *)
       | TAG (s, n) ->
@@ -1198,7 +1194,7 @@ class env cmd imports =
     method fun_internal_name (name : string) =
       match scope.st with
       | State.G _ -> name
-      | _ -> labeled_scoped scope_index name
+      | _ -> scoped scope_index name
 
     method add_fun_name (name : string)
         (m : [ `Local | `Extern | `Public | `PublicExtern ]) =

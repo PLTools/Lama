@@ -279,7 +279,7 @@ let compile cmd env imports code =
              let s, env = env#string s in
              let l, env = env#allocate in
              let env, call = call env ".string" 1 false in
-             (env, Mov (M ("$" ^ s), l) :: call)
+             (env, Mov (s, l) :: call)
 
           | LDA x ->
              let s,  env' = (env #variable x)#allocate in
@@ -552,9 +552,20 @@ let compile cmd env imports code =
              env#gen_line line
 
           | FAIL ((line, col), value) ->
-             let v, env = if value then env#peek, env else env#pop in
-             let s, env = env#string cmd#get_infile in
-             env, [Push (L (box col)); Push (L (box line)); Push (M ("$" ^ s)); Push v; Call "Bmatch_failure"; Binop  ("+", L (4 * word_size), esp)]
+             let value, env = if value then (env#peek, env) else env#pop in
+             let msg_addr, env = env#string cmd#get_infile in
+             let value_arg_addr, env = env#allocate in
+             let msg_arg_addr, env = env#allocate in
+             let line_arg_addr, env = env#allocate in
+             let col_arg_addr, env = env#allocate in
+             let env, code =
+               call env ".match_failure" 4 false
+             in
+             let _, env = env#pop in
+             ( env,
+               mov (L (box col)) col_arg_addr @ mov (L (box line)) line_arg_addr
+               @ mov msg_addr msg_arg_addr @ mov value value_arg_addr @ code
+             )
 
           | i ->
              invalid_arg (Printf.sprintf "invalid SM insn: %s\n" (GT.show(insn) i))
@@ -757,11 +768,11 @@ class env prg topname =
         Buffer.contents buf
       in
       let x = escape x in
-      try M.find x stringm, self
+      try M ("$" ^ M.find x stringm), self
       with Not_found ->
         let y = Printf.sprintf "string_%d" scount in
         let m = M.add x y stringm in
-        y, {< scount = scount + 1; stringm = m>}
+        M ("$" ^ y), {< scount = scount + 1; stringm = m>}
 
     (* gets number of arguments in the current function *)
     method nargs = nargs

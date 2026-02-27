@@ -2,7 +2,7 @@ exception Commandline_error of string
 
 type os_t = Linux | Darwin
 
-let init_label = "_init"
+let init_label = "Init"
 let labeled_init s = init_label ^ s
 
 class options args =
