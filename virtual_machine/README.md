@@ -23,4 +23,40 @@ The VM is tightly integrated with the Lama runtime (`../runtime/`). It relies on
 
 ## Bytecode format
 
-The VM executes a dense bytecode format where each instruction consists of a 1-byte opcode followed by optional immediate values or offsets. Function definitions include metadata about the number of arguments and local variables required.
+### Layout
+Bytes are laid out in little-endian order.
+1. Header (16 bytes)
+2. String table (variable)
+3. Imports (number of imports * 4 bytes)
+4. Public symbols (number of public symbols * 9 bytes)
+5. Code section (until 0xFF)
+
+### Header
+| offset | size | field |
+|--------|------|-------|
+| 0 | 4 | string table size |
+| 4 | 4 | globals count |
+| 8 | 4 | number of imports |
+| 12 | 4 | number of public symbols |
+
+### Imports
+Each entry is 4 bytes:
+- `name_offset` (int32): offset into string table for module name
+
+### Public symbols
+Each entry is 9 bytes:
+- `name_offset` (int32): offset into string table
+- `code_offset` (int32): for functions: bytecode offset; for globals: global index
+- `flag` (uint8): 0 = function, 1 = global
+
+### External references
+CALL (0x56) and CLOSURE (0x54) instructions use negative values for external function references.
+LD (0x20) and ST (0x40) instructions use negative values for external global references.
+
+The encoding is the same for both:
+- Non-negative values: local references (bytecode offset for functions, global index for globals)
+- Negative values: `string_table_offset = -value -1`
+
+The string at that offset is looked up to resolve the external symbol at load time. 
+
+
