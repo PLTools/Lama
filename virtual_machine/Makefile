@@ -4,7 +4,7 @@ CFLAGS = -Wall -Wextra -std=c99 -O0
 LIBS = -lffi -ldl
 LDFLAGS = -rdynamic
 TARGET = lama.exe
-SOURCES = lama.c converter.c vm.c bytecode.c ffi.c loader.c symbols.c ops.c memory.c
+SOURCES = lama.c converter.c vm.c bytecode.c ffi.c loader.c symbols.c ops.c memory.c opcodes.c
 OBJECTS = $(SOURCES:.c=.o)
 
 RUNTIME_DIR = ../runtime
