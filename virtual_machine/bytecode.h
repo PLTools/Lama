@@ -18,7 +18,7 @@ typedef struct {
 
 typedef struct {
   // Memory-mapped file
-  void *map_base;
+  const uint8_t *map_base;
   size_t map_size;
 
   const char *string_table;

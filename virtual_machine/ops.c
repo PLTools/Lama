@@ -233,8 +233,6 @@ void op_cjmp_nz(DECL_STATE) {
  * String, data etc.
  */
 void op_string(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   const char *str = ip->str;
   VM_DEBUG("STRING: \"%s\"\n", str);
@@ -244,8 +242,6 @@ void op_string(DECL_STATE) {
 }
 
 void op_barray(DECL_STATE) {
-  (void)bp;
-  (void)globals;
   ip++;
   int32_t n = ip->num;
   VM_DEBUG("BARRAY: n=%d\n", n);
@@ -313,6 +309,9 @@ void op_array(DECL_STATE) {
 }
 
 void op_fail(DECL_STATE) {
+  (void)sp;
+  (void)bp;
+  (void)globals;
   ip++;
   int32_t line = ip->num;
   ip++;
@@ -565,6 +564,8 @@ void op_callc(DECL_STATE) {
 }
 
 void op_end(DECL_STATE) {
+  (void)ip;
+  (void)globals;
   VM_TRACE_CALL("END sp=%p\n", (void *)sp);
   aint ret_val = STACK_PEEK(sp);
   *bp = ret_val;
@@ -575,6 +576,8 @@ void op_end(DECL_STATE) {
  * FFI call — dispatches via pre-resolved ffi_resolved struct
  */
 void op_ffi_call(DECL_STATE) {
+  (void)sp;
+  (void)globals;
   ip++;
   const ffi_resolved *res = (const ffi_resolved *)ip->ptr;
 

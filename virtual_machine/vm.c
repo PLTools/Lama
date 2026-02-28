@@ -74,6 +74,7 @@ void vm_destroy(virtual_machine *vm) {
 }
 
 void vm_set_args(virtual_machine *vm, int argc, char *argv[]) {
+  (void)vm;
   set_args(argc, argv);
 }
 

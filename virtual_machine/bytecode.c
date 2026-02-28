@@ -30,9 +30,9 @@ bytecode *bytecode_load(const char *filename) {
 
   size_t file_size = (size_t)st.st_size;
 
-  void *map = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
+  const uint8_t *data = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
 
-  if (map == MAP_FAILED) {
+  if (data == MAP_FAILED) {
     perror("bytecode_load: mmap");
     close(fd);
     return NULL;
@@ -41,7 +41,7 @@ bytecode *bytecode_load(const char *filename) {
   close(fd);
 
   byte_reader reader;
-  reader_init(&reader, (const uint8_t *)map, file_size);
+  reader_init(&reader, data, file_size);
 
   int32_t string_table_size = reader_i32(&reader);
   int32_t globals_count = reader_i32(&reader);
@@ -55,13 +55,11 @@ bytecode *bytecode_load(const char *filename) {
   size_t code_size = file_size - code_offset;
 
   // TODO: VALIdation
-
-  const char *string_table = map + st_offset;
-  const uint8_t *data = (const uint8_t *)map;
+  const char *string_table = (const char *)data + st_offset;
 
   bytecode *bc = ALLOC(bytecode);
 
-  bc->map_base = map;
+  bc->map_base = data;
   bc->map_size = file_size;
 
   bc->string_table = string_table;
@@ -124,7 +122,7 @@ void bytecode_free(bytecode *bc) {
   if (!bc) {
     return;
   }
-  munmap(bc->map_base, bc->map_size);
+  munmap((void *)bc->map_base, bc->map_size);
   free((void *)bc->name);
   free(bc);
 }

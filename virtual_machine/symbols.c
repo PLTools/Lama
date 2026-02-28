@@ -30,7 +30,7 @@ void symbol_table_destroy(symbol_table *table) {
 static resolved_symbol *symbol_table_find(symbol_table *table, const char *name,
                                           bool is_function) {
   for (size_t i = 0; i < table->len; i++) {
-    if (strcmp(table->data[i].name, name) == 0) {
+    if (strcmp(table->data[i].name, name) == 0 && table->data[i].is_function == is_function) {
       return &table->data[i];
     }
   }

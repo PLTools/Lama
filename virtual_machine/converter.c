@@ -159,7 +159,7 @@ static fixup_node *add_fixup(meta_info *meta, size_t target_off,
 
 static bool validate_target_off(const bytecode *bc, int32_t target_off,
                                 size_t current_bc_off, const char *op_name) {
-  if (target_off >= bc->code_size) {
+  if (target_off >= (int32_t)bc->code_size) {
     fprintf(
         stderr,
         "Error: %s target_off=%d out of range (bc_off=%zu, code_size=%zu)\n",
@@ -683,7 +683,7 @@ static insn *decode_internal(decode_ctx *ctx) {
         EMIT_NUM(ctx, n_captured);
 
         meta_info *tm = &meta[target_off];
-        if (target_off < current_bc_off && tm->resolved_idx != -1) {
+        if (target_off < (int32_t)current_bc_off && tm->resolved_idx != -1) {
           ctx->code.data[target_slot].num = tm->resolved_idx;
           add_reloc(ctx, target_slot, NULL, INTERNAL);
         } else {
@@ -736,7 +736,7 @@ static insn *decode_internal(decode_ctx *ctx) {
         EMIT_NUM(ctx, n_args);
 
         meta_info *tm = &meta[target_off];
-        if (target_off < current_bc_off && tm->resolved_idx != -1) {
+        if (target_off < (int32_t)current_bc_off && tm->resolved_idx != -1) {
           ctx->code.data[target_slot].num = tm->resolved_idx;
           add_reloc(ctx, target_slot, NULL, INTERNAL);
         } else {
