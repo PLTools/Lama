@@ -1,6 +1,7 @@
 #include "converter.h"
 #include "bytecode.h"
 #include "da.h"
+#include "debug.h"
 #include "ffi.h"
 #include "memory.h"
 #include "opcodes.h"
@@ -14,13 +15,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-// TODO: conolidate
-#ifdef DEBUG_PRINT
-#define VM_DEBUG(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
-#else
-#define VM_DEBUG(fmt, ...)
-#endif
 
 /*
  * Sentinel value for external references (both functions and globals).

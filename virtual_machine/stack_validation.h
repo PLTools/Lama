@@ -1,14 +1,9 @@
 #ifndef STACK_VALIDATION_H
 #define STACK_VALIDATION_H
 
+#include "debug.h"
 #include <stdint.h>
 #include <stdlib.h>
-
-#ifdef DEBUG_PRINT
-#define VM_DEBUG(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
-#else
-#define VM_DEBUG(fmt, ...)
-#endif
 
 /*
  * Different states of reachability for stack validation:

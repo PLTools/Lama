@@ -1,5 +1,6 @@
 #include "ops.h"
 #include "../runtime/runtime_common.h"
+#include "debug.h"
 #include "ffi.h"
 #include "insn.h"
 #include <stdio.h>
@@ -40,37 +41,6 @@ extern aint Barray_tag_patt(void *x);
 extern aint Bstring_tag_patt(void *x);
 extern aint Bsexp_tag_patt(void *x);
 
-/*
- * Debug macros
- */
-#ifdef DEBUG_PRINT
-#define VM_DEBUG(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
-#define VM_TRACE_STACK(stack)                                                  \
-  do {                                                                         \
-    long sp_idx = (stack)->sp - (stack)->data;                                 \
-    fprintf(stderr, "  stack [sp=%p, idx=%ld]: ", (stack)->sp, sp_idx);        \
-    for (int i = 1; i <= STACK_PEEK_SIZE; i++) {                               \
-      if (sp_idx + i < STACK_SIZE) {                                           \
-        fprintf(stderr, "%ld ", (long)(stack)->data[sp_idx + i]);              \
-      }                                                                        \
-    }                                                                          \
-    fprintf(stderr, "\n");                                                     \
-  } while (0)
-#define VM_TRACE_CALL(fmt, ...) fprintf(stderr, "[CALL] " fmt, ##__VA_ARGS__)
-#define VM_ASSERT(cond, msg)                                                   \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      fprintf(stderr, "Assert failed: %s at %s:%d\n", msg, __FILE__,           \
-              __LINE__);                                                       \
-      exit(1);                                                                 \
-    }                                                                          \
-  } while (0)
-#else
-#define VM_DEBUG(fmt, ...)
-#define VM_TRACE_STACK(stack)
-#define VM_TRACE_CALL(fmt, ...)
-#define VM_ASSERT(cond, msg)
-#endif
 
 #define DISPATCH()                                                             \
   do {                                                                         \
@@ -500,7 +470,7 @@ void op_begin(DECL_STATE) {
   int32_t n_locals = ip->num;
   ip++;
 
-  VM_TRACE_CALL("BEGIN n_args=%d n_locals=%d bp=%p sp=%p\n", n_args, n_locals,
+  VM_DEBUG("BEGIN n_args=%d n_locals=%d bp=%p sp=%p\n", n_args, n_locals,
                 (void *)bp, (void *)sp);
 
   for (int32_t i = 0; i < n_locals; i++) {
@@ -516,7 +486,7 @@ void op_call(DECL_STATE) {
   ip++;
   int32_t n_args = ip->num;
 
-  VM_TRACE_CALL("CALL target=%p n_args=%d sp=%p bp=%p\n", (void *)target,
+  VM_DEBUG("CALL target=%p n_args=%d sp=%p bp=%p\n", (void *)target,
                 n_args, (void *)sp, (void *)bp);
 
   STACK_PUSH(sp, (aint)n_args);
@@ -543,7 +513,7 @@ void op_callc(DECL_STATE) {
   aint entry = closure[0];
   insn *target = (insn *)entry;
 
-  VM_TRACE_CALL("CALLC closure=%p target=%p n_args=%d sp=%p bp=%p\n",
+  VM_DEBUG("CALLC closure=%p target=%p n_args=%d sp=%p bp=%p\n",
                 (void *)closure, (void *)target, n_args, (void *)sp,
                 (void *)bp);
 
@@ -566,7 +536,7 @@ void op_callc(DECL_STATE) {
 void op_end(DECL_STATE) {
   (void)ip;
   (void)globals;
-  VM_TRACE_CALL("END sp=%p\n", (void *)sp);
+  VM_DEBUG("END sp=%p\n", (void *)sp);
   aint ret_val = STACK_PEEK(sp);
   *bp = ret_val;
   return;
