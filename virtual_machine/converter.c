@@ -5,6 +5,7 @@
 #include "memory.h"
 #include "opcodes.h"
 #include "ops.h"
+#include "stack_validation.h"
 #include "symbols.h"
 #include <assert.h>
 #include <dlfcn.h>
@@ -28,30 +29,6 @@
 #define TO_EXT_REF(idx) (-(idx) - 1)
 #define IS_EXT_REF(addr) ((addr) < 0)
 #define EXT_REF_INDEX(addr) (-(addr) - 1)
-
-/*
- * Symbolic stack depth tracking macros used during decoding
- */
-
-typedef enum { LIVE, BARRIER, DEAD } reach_state;
-
-#define DEPTH_INC(d, state, n)                                                 \
-  do {                                                                         \
-    if ((state) != DEAD) {                                                     \
-      VM_DEBUG("  DEPTH: %d -> %d (+%d)\n", (d), (d) + (n), (n));              \
-      (d) += (n);                                                              \
-    }                                                                          \
-  } while (0)
-#define DEPTH_DEC(d, state, n)                                                 \
-  do {                                                                         \
-    if ((state) != DEAD) {                                                     \
-      VM_DEBUG("  DEPTH: %d -> %d (-%d)\n", (d), (d) - (n), (n));              \
-      (d) -= (n);                                                              \
-      assert((d) >= 0 && "stack underflow");                                   \
-    }                                                                          \
-  } while (0)
-#define DEPTH_PUSH(d, state) DEPTH_INC(d, state, 1)
-#define DEPTH_POP(d, state) DEPTH_DEC(d, state, 1)
 
 /*
  * Code emission macros - append to code array in context
@@ -121,6 +98,7 @@ typedef struct {
   symbol_table *st;
   ffi_call_table *ffi;
 
+  stack_validation sv;
 } decode_ctx;
 
 static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
@@ -246,9 +224,11 @@ static bool emit_st_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
 /*
  * Handle jump target resolution (intra-unit only — these are always local)
  */
-static bool handle_jump(decode_ctx *ctx, meta_info *meta, size_t current_bc_off,
-                        int32_t depth, reach_state state) {
+static bool handle_jump(decode_ctx *ctx, meta_info *meta,
+                        size_t current_bc_off) {
   int32_t target_off = reader_i32(&ctx->reader);
+  int32_t depth = ctx->sv.depth;
+  reach_state state = ctx->sv.state;
 
   if (!validate_target_off(ctx->bc, target_off, current_bc_off, "JUMP")) {
     return false;
@@ -320,8 +300,10 @@ static insn *decode_internal(decode_ctx *ctx) {
     meta[i].fixups = NULL;
   }
 
-  int32_t depth = 0;
-  reach_state state = LIVE;
+  ctx->sv = (stack_validation){
+      .depth = 0, .state = LIVE, .max_depth = 0, .max_depth_pos = 0};
+  da_init(ctx->sv.func_stack);
+
   insn *result = NULL;
 
   while (!reader_eof(&ctx->reader)) {
@@ -329,46 +311,46 @@ static insn *decode_internal(decode_ctx *ctx) {
     uint8_t opcode = reader_u8(&ctx->reader);
 
     VM_DEBUG("DECODE: bc_off=%zu %s (0x%02X) depth=%d\n", current_bc_off,
-             opcode_to_string(opcode), opcode, depth,
-             state == BARRIER ? " [barrier]"
-             : state == DEAD  ? " [dead]"
-                              : "");
+             opcode_to_string(opcode), opcode, ctx->sv.depth,
+             ctx->sv.state == BARRIER ? " [barrier]"
+             : ctx->sv.state == DEAD  ? " [dead]"
+                                      : "");
 
     meta_info *m = &meta[current_bc_off];
     m->resolved_idx = (int32_t)ctx->code.len;
 
     // Validate stack depth at intersections
-    if (state == DEAD) {
+    if (ctx->sv.state == DEAD) {
       if (m->stack_depth != -1) {
         // Forward jump visited
-        VM_DEBUG("  DEPTH: %d -> %d", depth, m->stack_depth);
-        depth = m->stack_depth;
-        state = LIVE;
+        VM_DEBUG("  DEPTH: %d -> %d", ctx->sv.depth, m->stack_depth);
+        ctx->sv.depth = m->stack_depth;
+        ctx->sv.state = LIVE;
       } else {
         // No forward jump
         VM_DEBUG("  DEPTH: dead, skipping at bc_off=%zu\n", current_bc_off);
         m->stack_depth = -1; // unvisited
       }
-    } else if (state == BARRIER) {
+    } else if (ctx->sv.state == BARRIER) {
       if (m->stack_depth != -1) {
         // Forward jump visited
-        VM_DEBUG("  DEPTH: %d -> %d", depth, m->stack_depth);
-        depth = m->stack_depth;
+        VM_DEBUG("  DEPTH: %d -> %d", ctx->sv.depth, m->stack_depth);
+        ctx->sv.depth = m->stack_depth;
       } else {
         // No forward jump
         VM_DEBUG("  DEPTH: barrier, keeping stale depth=%d at bc_off=%zu\n",
-                 depth, current_bc_off);
-        m->stack_depth = depth;
+                 ctx->sv.depth, current_bc_off);
+        m->stack_depth = ctx->sv.depth;
       }
-      state = LIVE;
+      ctx->sv.state = LIVE;
     } else {
-      if (m->stack_depth != -1 && m->stack_depth != depth) {
+      if (m->stack_depth != -1 && m->stack_depth != ctx->sv.depth) {
         fprintf(stderr,
                 "Error: Stack mismatch at offset %zu (expected %d, got %d)\n",
-                current_bc_off, m->stack_depth, depth);
+                current_bc_off, m->stack_depth, ctx->sv.depth);
         goto cleanup;
       }
-      m->stack_depth = depth;
+      m->stack_depth = ctx->sv.depth;
     }
 
     // Resolve forward jumps (backpatching) — store as index, record
@@ -389,109 +371,109 @@ static insn *decode_internal(decode_ctx *ctx) {
 
     switch (opcode) {
     case OP_CONST:
-      DEPTH_PUSH(depth, state);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_const);
       EMIT_NUM(ctx, reader_i32(&ctx->reader));
       break;
 
     case OP_BINOP_ADD:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_add);
       break;
 
     case OP_BINOP_SUB:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_sub);
       break;
 
     case OP_BINOP_MUL:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_mul);
       break;
 
     case OP_BINOP_DIV:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_div);
       break;
 
     case OP_BINOP_MOD:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_mod);
       break;
 
     case OP_BINOP_LT:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_lt);
       break;
 
     case OP_BINOP_LE:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_le);
       break;
 
     case OP_BINOP_GT:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_gt);
       break;
 
     case OP_BINOP_GE:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_ge);
       break;
 
     case OP_BINOP_EQ:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_eq);
       break;
 
     case OP_BINOP_NE:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_ne);
       break;
 
     case OP_BINOP_AND:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_and);
       break;
 
     case OP_BINOP_OR:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_or);
       break;
 
     case OP_JMP:
       EMIT_FUNC(ctx, op_jmp);
-      if (!handle_jump(ctx, meta, current_bc_off, depth, state)) {
+      if (!handle_jump(ctx, meta, current_bc_off)) {
         goto cleanup;
       }
-      if (state != DEAD) {
-        state = BARRIER;
+      if (ctx->sv.state != DEAD) {
+        ctx->sv.state = BARRIER;
       }
       break;
 
     case OP_CJMP_Z:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_cjmp_z);
-      if (!handle_jump(ctx, meta, current_bc_off, depth, state)) {
+      if (!handle_jump(ctx, meta, current_bc_off)) {
         goto cleanup;
       }
       break;
 
     case OP_CJMP_NZ:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_cjmp_nz);
-      if (!handle_jump(ctx, meta, current_bc_off, depth, state)) {
+      if (!handle_jump(ctx, meta, current_bc_off)) {
         goto cleanup;
       }
       break;
 
     case OP_DROP:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_drop);
       break;
 
     case OP_DUP:
-      DEPTH_PUSH(depth, state);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_dup);
       break;
 
@@ -500,18 +482,18 @@ static insn *decode_internal(decode_ctx *ctx) {
       break;
 
     case OP_ELEM:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_elem);
       break;
 
     case OP_STA:
       // TODO:
-      DEPTH_DEC(depth, state, 2);
+      DEPTH_DEC(ctx->sv, 2);
       EMIT_FUNC(ctx, op_sta);
       break;
 
     case OP_LD: {
-      DEPTH_PUSH(depth, state);
+      DEPTH_PUSH(ctx->sv);
       int32_t idx = reader_i32(&ctx->reader);
       emit_ld_glo(ctx, idx, global_base);
       break;
@@ -524,7 +506,7 @@ static insn *decode_internal(decode_ctx *ctx) {
     }
 
     case OP_LD_LOC: {
-      DEPTH_PUSH(depth, state);
+      DEPTH_PUSH(ctx->sv);
       int32_t idx = reader_i32(&ctx->reader);
       EMIT_FUNC(ctx, op_ld_loc);
       EMIT_NUM(ctx, idx);
@@ -539,7 +521,7 @@ static insn *decode_internal(decode_ctx *ctx) {
     }
 
     case OP_LD_ARG: {
-      DEPTH_PUSH(depth, state);
+      DEPTH_PUSH(ctx->sv);
       int32_t idx = reader_i32(&ctx->reader);
       EMIT_FUNC(ctx, op_ld_arg);
       EMIT_NUM(ctx, idx);
@@ -554,7 +536,7 @@ static insn *decode_internal(decode_ctx *ctx) {
     }
 
     case OP_LD_CLO: {
-      DEPTH_PUSH(depth, state);
+      DEPTH_PUSH(ctx->sv);
       int32_t idx = reader_i32(&ctx->reader);
       EMIT_FUNC(ctx, op_ld_clo);
       EMIT_NUM(ctx, idx);
@@ -569,7 +551,7 @@ static insn *decode_internal(decode_ctx *ctx) {
     }
 
     case OP_STRING: {
-      DEPTH_PUSH(depth, state);
+      DEPTH_PUSH(ctx->sv);
       int32_t str_idx = reader_i32(&ctx->reader);
       EMIT_FUNC(ctx, op_string);
       EMIT_STR(ctx, bytecode_get_string(bc, str_idx));
@@ -579,7 +561,7 @@ static insn *decode_internal(decode_ctx *ctx) {
     case OP_BARRAY: {
       int32_t n = reader_i32(&ctx->reader);
       // push array, pop elements == n - 1 net stack change
-      DEPTH_DEC(depth, state, n - 1);
+      DEPTH_DEC(ctx->sv, n - 1);
       EMIT_FUNC(ctx, op_barray);
       EMIT_NUM(ctx, n);
       break;
@@ -589,7 +571,7 @@ static insn *decode_internal(decode_ctx *ctx) {
       int32_t tag_idx = reader_i32(&ctx->reader);
       int32_t n_fields = reader_i32(&ctx->reader);
       // push sexp, pop elements == n_fields - 1 net stack change
-      DEPTH_DEC(depth, state, n_fields - 1);
+      DEPTH_DEC(ctx->sv, n_fields - 1);
       EMIT_FUNC(ctx, op_sexp);
       EMIT_STR(ctx, bytecode_get_string(bc, tag_idx));
       EMIT_NUM(ctx, n_fields);
@@ -618,12 +600,12 @@ static insn *decode_internal(decode_ctx *ctx) {
       EMIT_FUNC(ctx, op_fail);
       EMIT_NUM(ctx, line);
       EMIT_NUM(ctx, col);
-      state = DEAD;
+      ctx->sv.state = DEAD;
       break;
     }
 
     case OP_PATT_STR_CMP:
-      DEPTH_POP(depth, state);
+      DEPTH_POP(ctx->sv);
       EMIT_FUNC(ctx, op_patt_str_cmp);
       break;
 
@@ -655,11 +637,18 @@ static insn *decode_internal(decode_ctx *ctx) {
     case OP_BEGIN_CLOSURE: {
       int32_t n_args = reader_i32(&ctx->reader);
       int32_t n_locals = reader_i32(&ctx->reader);
-      depth = 0;
+      ctx->sv.depth = 0;
+      // Save outer function's max_depth
+      func_frame frame = {.max_depth = ctx->sv.max_depth,
+                          .max_depth_pos = ctx->sv.max_depth_pos};
+      da_append(ctx->sv.func_stack, frame);
+      ctx->sv.max_depth = 0;
       EMIT_FUNC(ctx, op_begin);
       EMIT_NUM(ctx, n_args);
       EMIT_NUM(ctx, n_locals);
-      EMIT_NUM(ctx, 0);
+      ctx->sv.max_depth_pos = ctx->code.len;
+      EMIT_NUM(ctx, 0); // placeholder for max depth, will be patched
+
       break;
     }
 
@@ -680,21 +669,21 @@ static insn *decode_internal(decode_ctx *ctx) {
         int designation_type = type_byte & 0xF;
         switch (designation_type) {
         case 0: // Global
-          DEPTH_PUSH(depth, state);
+          DEPTH_PUSH(ctx->sv);
           emit_ld_glo(ctx, idx, global_base);
           break;
         case 1: // Local
-          DEPTH_PUSH(depth, state);
+          DEPTH_PUSH(ctx->sv);
           EMIT_FUNC(ctx, op_ld_loc);
           EMIT_NUM(ctx, idx);
           break;
         case 2: // Arg
-          DEPTH_PUSH(depth, state);
+          DEPTH_PUSH(ctx->sv);
           EMIT_FUNC(ctx, op_ld_arg);
           EMIT_NUM(ctx, idx);
           break;
         case 3: // Closure var
-          DEPTH_PUSH(depth, state);
+          DEPTH_PUSH(ctx->sv);
           EMIT_FUNC(ctx, op_ld_clo);
           EMIT_NUM(ctx, idx);
           break;
@@ -704,7 +693,7 @@ static insn *decode_internal(decode_ctx *ctx) {
         }
       }
 
-      DEPTH_DEC(depth, state, n_captured - 1);
+      DEPTH_DEC(ctx->sv, n_captured - 1);
 
       EMIT_FUNC(ctx, op_closure);
 
@@ -757,7 +746,7 @@ static insn *decode_internal(decode_ctx *ctx) {
       int32_t target_off = reader_i32(&ctx->reader);
       int32_t n_args = reader_i32(&ctx->reader);
       // push n_args, return 1 value == n_args - 1 net stack change
-      DEPTH_DEC(depth, state, n_args - 1);
+      DEPTH_DEC(ctx->sv, n_args - 1);
 
       VM_DEBUG("DECODE: OP_CALL target_off=0x%x n_args=%d "
                "current_bc_off=%zu code_idx=%zu\n",
@@ -812,7 +801,7 @@ static insn *decode_internal(decode_ctx *ctx) {
 
     case OP_CALLC: {
       int32_t n_args = reader_i32(&ctx->reader);
-      DEPTH_DEC(depth, state, n_args);
+      DEPTH_DEC(ctx->sv, n_args);
       EMIT_FUNC(ctx, op_callc);
       EMIT_NUM(ctx, n_args);
       break;
@@ -820,15 +809,22 @@ static insn *decode_internal(decode_ctx *ctx) {
 
     case OP_END:
       // depth == 1 <=> return value (?)
-      if (state != DEAD && depth != 1) {
-        fprintf(stderr, "Error: END with depth = %d at bc_off=%zu\n", depth,
-                current_bc_off);
+      if (ctx->sv.state != DEAD && ctx->sv.depth != 1) {
+        fprintf(stderr, "Error: END with depth = %d at bc_off=%zu\n",
+                ctx->sv.depth, current_bc_off);
         goto cleanup;
       }
       EMIT_FUNC(ctx, op_end);
-      if (state != DEAD) {
-        state = BARRIER;
+      if (ctx->sv.state != DEAD) {
+        ctx->code.data[ctx->sv.max_depth_pos].num = ctx->sv.max_depth;
+        ctx->sv.state = BARRIER;
       }
+      assert(ctx->sv.func_stack.len > 0);
+      ctx->sv.max_depth =
+          ctx->sv.func_stack.data[ctx->sv.func_stack.len - 1].max_depth;
+      ctx->sv.max_depth_pos =
+          ctx->sv.func_stack.data[ctx->sv.func_stack.len - 1].max_depth_pos;
+      ctx->sv.func_stack.len--;
       break;
 
     case OP_LINE: {
@@ -851,6 +847,10 @@ static insn *decode_internal(decode_ctx *ctx) {
               reader_pos(&ctx->reader) - 1);
       goto cleanup;
     }
+
+    if (ctx->sv.state != DEAD && ctx->sv.depth > ctx->sv.max_depth) {
+      ctx->sv.max_depth = ctx->sv.depth;
+    }
   }
 
   // Extract mapping
@@ -861,6 +861,7 @@ static insn *decode_internal(decode_ctx *ctx) {
   result = ctx->code.data;
 
 cleanup:
+  da_free(ctx->sv.func_stack);
   // Free temporary metadata and fixup nodes
   for (size_t i = 0; i < bc->code_size; i++) {
     fixup_node *node = meta[i].fixups;
