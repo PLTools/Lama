@@ -552,20 +552,9 @@ let compile cmd env imports code =
              env#gen_line line
 
           | FAIL ((line, col), value) ->
-             let value, env = if value then (env#peek, env) else env#pop in
-             let msg_addr, env = env#string cmd#get_infile in
-             let value_arg_addr, env = env#allocate in
-             let msg_arg_addr, env = env#allocate in
-             let line_arg_addr, env = env#allocate in
-             let col_arg_addr, env = env#allocate in
-             let env, code =
-               call env ".match_failure" 4 false
-             in
-             let _, env = env#pop in
-             ( env,
-               mov (L (box col)) col_arg_addr @ mov (L (box line)) line_arg_addr
-               @ mov msg_addr msg_arg_addr @ mov value value_arg_addr @ code
-             )
+             let v, env = if value then env#peek, env else env#pop in
+             let s, env = env#string cmd#get_infile in
+             env, [Push (L (box col)); Push (L (box line)); Push s; Push v; Call "Bmatch_failure"; Binop  ("+", L (4 * word_size), esp)]
 
           | i ->
              invalid_arg (Printf.sprintf "invalid SM insn: %s\n" (GT.show(insn) i))
