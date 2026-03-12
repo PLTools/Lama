@@ -13,7 +13,7 @@ void *__stop_custom_data;
 typedef struct
 {
   char *string_ptr;          /* A pointer to the beginning of the string table */
-  int *public_ptr;           /* A pointer to the beginning of publics table    */
+  char *public_ptr;          /* A pointer to the beginning of publics table    */
   char *code_ptr;            /* A pointer to the bytecode itself               */
   int *global_ptr;           /* A pointer to the global area                   */
   int stringtab_size;        /* The size (in bytes) of the string table        */
@@ -28,16 +28,25 @@ char *get_string(bytefile *f, int pos)
   return &f->string_ptr[pos];
 }
 
+/* Each public symbol entry: int32 name_offset, int32 code_offset, uint8 flag */
+#define PUBLIC_ENTRY_SIZE 9
+
 /* Gets a name for a public symbol */
 char *get_public_name(bytefile *f, int i)
 {
-  return get_string(f, f->public_ptr[i * 2]);
+  return get_string(f, *(int *)(f->public_ptr + i * PUBLIC_ENTRY_SIZE));
 }
 
-/* Gets an offset for a publie symbol */
+/* Gets an offset for a public symbol */
 int get_public_offset(bytefile *f, int i)
 {
-  return f->public_ptr[i * 2 + 1];
+  return *(int *)(f->public_ptr + i * PUBLIC_ENTRY_SIZE + sizeof(int));
+}
+
+/* Gets a flag for a public symbol (0 = function, 1 = global) */
+char get_public_flag(bytefile *f, int i)
+{
+  return f->public_ptr[i * PUBLIC_ENTRY_SIZE + 2 * sizeof(int)];
 }
 
 /* Reads a binary bytecode file by name and unpacks it */
@@ -57,7 +66,7 @@ bytefile *read_file(char *fname)
     failure("%s\n", strerror(errno));
   }
 
-  file = (bytefile *)malloc(sizeof(int) * 4 + (size = ftell(f)));
+  file = (bytefile *)malloc(sizeof(void *) * 4 + (size = ftell(f)));
 
   if (file == 0)
   {
@@ -73,8 +82,8 @@ bytefile *read_file(char *fname)
 
   fclose(f);
 
-  file->string_ptr = &file->buffer[file->public_symbols_number * 2 * sizeof(int)];
-  file->public_ptr = (int *)file->buffer;
+  file->string_ptr = &file->buffer[file->public_symbols_number * PUBLIC_ENTRY_SIZE];
+  file->public_ptr = file->buffer;
   file->code_ptr = &file->string_ptr[file->stringtab_size];
   file->global_ptr = (int *)malloc(file->global_area_size * sizeof(int));
 
@@ -281,23 +290,23 @@ void disassemble(FILE *f, bytefile *bf)
       switch (l)
       {
       case 0:
-        fprintf(f, "CALL\tLread");
+        fprintf(f, "CALL\tread");
         break;
 
       case 1:
-        fprintf(f, "CALL\tLwrite");
+        fprintf(f, "CALL\twrite");
         break;
 
       case 2:
-        fprintf(f, "CALL\tLlength");
+        fprintf(f, "CALL\tlength");
         break;
 
       case 3:
-        fprintf(f, "CALL\tLstring");
+        fprintf(f, "CALL\tstring");
         break;
 
       case 4:
-        fprintf(f, "CALL\tBarray\t%d", INT);
+        fprintf(f, "CALL\t.array\t%d", INT);
         break;
 
       default:
@@ -327,7 +336,8 @@ void dump_file(FILE *f, bytefile *bf)
   fprintf(f, "Public symbols          :\n");
 
   for (i = 0; i < bf->public_symbols_number; i++)
-    fprintf(f, "   0x%.8x: %s\n", get_public_offset(bf, i), get_public_name(bf, i));
+    fprintf(f, "   0x%.8x: %s (%s)\n", get_public_offset(bf, i), get_public_name(bf, i),
+            get_public_flag(bf, i) == 0 ? "function" : "global");
 
   fprintf(f, "Code:\n");
   disassemble(f, bf);
