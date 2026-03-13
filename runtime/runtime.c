@@ -55,8 +55,9 @@ void Lassert (void *f, char *s, ...) {
       failure("string value expected in %s\n", memo);                                              \
   while (0)
 
-extern void *Bsexp (aint* args, aint bn);
-extern aint   LtagHash (char *);
+extern void *Bsexp    (aint* args, aint bn);
+extern aint  LtagHash (char *);
+extern void *Lclone   (aint* args);
 
 void *global_sysargs;
 
@@ -422,6 +423,28 @@ extern aint Luppercase (void *v) {
 extern aint Llowercase (void *v) {
   ASSERT_UNBOXED("Llowercase:1", v);
   return BOX(tolower((int)UNBOX(v)));
+}
+
+extern void* LtagOf (void *v) {
+  void *res;
+  
+  PRE_GC();
+
+  aint bsexp_args[] = {BOX(TO_SEXP(v)->tag)};
+  res = Bsexp(bsexp_args, BOX(1));
+
+  POST_GC();
+
+  return res;
+}
+
+extern void* LmakeSexp (void *t, void *a) {
+  aint args[] = {(aint) a};
+  void* p     = Lclone (args);
+  
+  TO_SEXP(p)->tag = TO_SEXP(t)->tag;
+  
+  return p;
 }
 
 extern aint LmatchSubString (char *subj, char *patt, aint pos) {
