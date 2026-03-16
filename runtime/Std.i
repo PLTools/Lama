@@ -57,3 +57,5 @@ F,flatCompare;
 F,tagHash;
 F,uppercase;
 F,lowercase;
+F,tagOf;
+F,makeSexp;

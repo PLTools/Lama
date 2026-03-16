@@ -55,8 +55,9 @@ void Lassert (void *f, char *s, ...) {
       failure("string value expected in %s\n", memo);                                              \
   while (0)
 
-extern void *Bsexp (aint* args, aint bn);
-extern aint   LtagHash (char *);
+extern void *Bsexp    (aint* args, aint bn);
+extern aint  LtagHash (char *);
+extern void *Lclone   (aint* args);
 
 void *global_sysargs;
 
@@ -423,6 +424,58 @@ extern aint Llowercase (void *v) {
   ASSERT_UNBOXED("Llowercase:1", v);
   return BOX(tolower((int)UNBOX(v)));
 }
+
+extern void* LtagOf (void *v) {
+  data *obj;
+  void *res;
+  
+  PRE_GC();
+  
+  res = (void *)de_hash(TO_SEXP(v)->tag);
+  obj = alloc_string(strlen(res));
+  strncpy(obj->contents, res, strlen(res));
+  res = obj->contents;
+  
+  POST_GC();
+
+  return res;
+}
+
+extern void* LmakeSexp (void *bt, void* ap) {
+  data *obj;
+  void *res;
+
+  aint tag = UNBOX(bt);
+
+  PRE_GC();
+
+  data *a = TO_DATA(ap);
+  aint  t = TAG(a->data_header), l = LEN(a->data_header);
+
+  push_extra_root((void**)&ap);
+  switch (t) {
+    case ARRAY_TAG:
+      obj = (data *)alloc_sexp(l);
+      obj->forward_address = TO_DATA(ap)->forward_address;
+      memcpy(((sexp *)obj)->contents, TO_DATA(ap)->contents, MEMBER_SIZE * l);
+      res = (void *)obj->contents;
+      break;
+    case SEXP_TAG:
+      obj = (data *)alloc_sexp(l);
+      memcpy(obj, TO_DATA(ap), sexp_size(l));
+      res = (void *)obj->contents;
+      break;
+    default: failure("invalid data_header %ld in makeSexp *****\n", t);
+  }
+  pop_extra_root((void**)&ap);
+
+  POST_GC();
+
+  TO_SEXP(res)->tag = tag;
+
+  return res;
+}
+
 
 extern aint LmatchSubString (char *subj, char *patt, aint pos) {
   data *p = TO_DATA(patt), *s = TO_DATA(subj);
