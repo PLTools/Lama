@@ -2,8 +2,6 @@
 
 # credit: ProgramSnail
 
-make build
-
 prefix="../regression/"
 suffix=".lama"
 
