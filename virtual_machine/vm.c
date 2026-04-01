@@ -33,10 +33,12 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
   search_paths search_paths = {.paths = paths, .len = total_paths_len};
 
   virtual_machine *vm = ALLOC(virtual_machine);
+  memset(vm, 0, sizeof(virtual_machine));
+  vm->stack_base = MAP_FAILED;
 
   load_result lr = load(main_unit_path, &search_paths);
   if (!lr.units) {
-    free(vm);
+    vm_destroy(vm);
     return NULL;
   }
   vm->bc_arr = lr.units;
@@ -47,11 +49,7 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN, -1, 0);
   if (vm->stack_base == MAP_FAILED) {
     perror("mmap stack");
-    for (size_t i = 0; i < vm->bc_len; i++) {
-      bytecode_free(lr.units[i]);
-    }
-    free(lr.units);
-    free(vm);
+    vm_destroy(vm);
     return NULL;
   }
 
@@ -63,12 +61,7 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
 
   program *prog = decode(lr.units, lr.units_len, vm->globals);
   if (!prog) {
-    for (size_t i = 0; i < vm->bc_len; i++) {
-      bytecode_free(lr.units[i]);
-    }
-    free(lr.units);
-    munmap(vm->stack_base, vm->stack_size);
-    free(vm);
+    vm_destroy(vm);
     return NULL;
   }
 
@@ -86,14 +79,18 @@ void vm_destroy(virtual_machine *vm) {
   if (!vm) {
     return;
   }
-  for (size_t i = 0; i < vm->bc_len; i++) {
-    bytecode_free(vm->bc_arr[i]);
+  if (vm->bc_arr) {
+    for (size_t i = 0; i < vm->bc_len; i++) {
+      bytecode_free(vm->bc_arr[i]);
+    }
+    free(vm->bc_arr);
   }
-  free(vm->bc_arr);
   free(vm->ffi_data);
   free(vm->code);
   free(vm->entry_points);
-  munmap(vm->stack_base, vm->stack_size);
+  if (vm->stack_base && vm->stack_base != MAP_FAILED) {
+    munmap(vm->stack_base, vm->stack_size);
+  }
   free(vm);
 }
 
