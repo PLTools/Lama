@@ -10,8 +10,8 @@
 
 union insn;
 // State: ip = instruction pointer, sp = stack pointer, bp = base pointer
-#define DECL_STATE union insn *ip, aint *sp, aint *bp, aint *globals
-#define STATE ip, sp, bp, globals
+#define DECL_STATE union insn *ip, aint *sp, aint *bp
+#define STATE ip, sp, bp
 
 // Function pointer type for opcode handlers (returns void for tail calls)
 typedef void (*fn)(DECL_STATE);

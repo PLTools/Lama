@@ -80,6 +80,7 @@ typedef struct {
   } code;
 
   byte_reader reader;
+  aint *globals;
   size_t global_offset;
 
   struct {
@@ -97,9 +98,10 @@ typedef struct {
 
 static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
                             symbol_table *st, ffi_call_table *ffi,
-                            int32_t global_offset) {
+                            aint *globals, size_t global_offset) {
   ctx->bc = bc;
 
+  ctx->globals = globals;
   ctx->global_offset = global_offset;
   ctx->bc_to_insn_map = ALLOC_ARRAY(int32_t, bc->code_size);
 
@@ -154,19 +156,19 @@ static bool emit_ld_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
     int str_offset = EXT_REF_INDEX(idx);
     const char *glob_name = bytecode_get_string(bc, str_offset);
 
-    VM_DEBUG("DECODE: OP_LD external global '%s' (stub)\n", glob_name);
+    VM_DEBUG("DECODE: OP_LD external global '%s'\n", glob_name);
 
     resolved_symbol *sym = symbol_table_find_global(ctx->st, glob_name);
     if (sym) {
       // Global from another unit
       EMIT_FUNC(ctx, op_ld_glo);
-      EMIT_NUM(ctx, sym->idx);
+      EMIT_GLOBAL_PTR(ctx, &ctx->globals[sym->idx]);
       return true;
     } else {
       // C global
       void *ptr = dlsym(RTLD_DEFAULT, glob_name);
       if (ptr) {
-        EMIT_FUNC(ctx, op_ld_glo_ext);
+        EMIT_FUNC(ctx, op_ld_glo);
         EMIT_GLOBAL_PTR(ctx, (aint *)ptr);
         return true;
       } else {
@@ -176,7 +178,7 @@ static bool emit_ld_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
     }
   } else {
     EMIT_FUNC(ctx, op_ld_glo);
-    EMIT_NUM(ctx, global_base + idx);
+    EMIT_GLOBAL_PTR(ctx, &ctx->globals[global_base + idx]);
   }
   return true;
 }
@@ -188,19 +190,19 @@ static bool emit_st_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
     int str_offset = EXT_REF_INDEX(idx);
     const char *glob_name = bytecode_get_string(bc, str_offset);
 
-    VM_DEBUG("DECODE: OP_ST external global '%s' (stub)\n", glob_name);
+    VM_DEBUG("DECODE: OP_ST external global '%s'\n", glob_name);
 
     resolved_symbol *sym = symbol_table_find_global(ctx->st, glob_name);
     if (sym) {
       // Global from another unit
       EMIT_FUNC(ctx, op_st_glo);
-      EMIT_NUM(ctx, sym->idx);
+      EMIT_GLOBAL_PTR(ctx, &ctx->globals[sym->idx]);
       return true;
     } else {
       // C global
       void *ptr = dlsym(RTLD_DEFAULT, glob_name);
       if (ptr) {
-        EMIT_FUNC(ctx, op_st_glo_ext);
+        EMIT_FUNC(ctx, op_st_glo);
         EMIT_GLOBAL_PTR(ctx, (aint *)ptr);
         return true;
       } else {
@@ -210,7 +212,7 @@ static bool emit_st_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
     }
   } else {
     EMIT_FUNC(ctx, op_st_glo);
-    EMIT_NUM(ctx, global_base + idx);
+    EMIT_GLOBAL_PTR(ctx, &ctx->globals[global_base + idx]);
   }
   return true;
 }
@@ -974,7 +976,15 @@ static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
   return prog;
 }
 
-program *decode(bytecode **bc_arr, size_t n) {
+size_t count_globals(bytecode **bc_arr, size_t n) {
+  size_t total = 0;
+  for (size_t i = 0; i < n; i++) {
+    total += bc_arr[i]->globals_count;
+  }
+  return total;
+}
+
+program *decode(bytecode **bc_arr, size_t n, aint *globals) {
   symbol_table *st = symbol_table_create();
   ffi_call_table *ffi = ffi_call_table_create();
 
@@ -987,7 +997,7 @@ program *decode(bytecode **bc_arr, size_t n) {
 
   for (size_t i = 0; i < n; i++) {
     decode_ctx ctx;
-    decode_ctx_init(&ctx, bc_arr[i], st, ffi, total_globals);
+    decode_ctx_init(&ctx, bc_arr[i], st, ffi, globals, total_globals);
     insn *code = decode_internal(&ctx);
     if (!code) {
       fprintf(stderr, "Failed to decode %s\n", bc_arr[i]->name);

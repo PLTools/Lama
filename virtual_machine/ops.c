@@ -297,7 +297,6 @@ void op_array(DECL_STATE) {
 void op_fail(DECL_STATE) {
   (void)sp;
   (void)bp;
-  (void)globals;
   ip++;
   int32_t line = ip->num;
   ip++;
@@ -375,41 +374,21 @@ void op_patt_closure(DECL_STATE) {
 }
 
 /*
- * Load / store operations
+ * Load / store global variables (by pointer)
  */
 void op_ld_glo(DECL_STATE) {
   ip++;
-  int32_t idx = ip->num;
-  VM_DEBUG("LD_GLO[%d] = %ld\n", idx, (long)globals[idx]);
-  STACK_PUSH(sp, globals[idx]);
+  aint *ptr = ip->global_ptr;
+  VM_DEBUG("LD_GLO ptr=%p val=%ld\n", (void *)ptr, (long)*ptr);
+  STACK_PUSH(sp, *ptr);
   DISPATCH();
 }
 
 void op_st_glo(DECL_STATE) {
   ip++;
-  int32_t idx = ip->num;
-  aint val = STACK_PEEK(sp);
-  VM_DEBUG("ST_GLO[%d] = %ld\n", idx, (long)val);
-  globals[idx] = val;
-  DISPATCH();
-}
-
-/*
- * Load / store extenral globals
- */
-void op_ld_glo_ext(DECL_STATE) {
-  ip++;
-  aint *ptr = ip->global_ptr;
-  VM_DEBUG("LD_GLO_FFI ptr=%p val=%ld\n", (void *)ptr, (long)*ptr);
-  STACK_PUSH(sp, *ptr);
-  DISPATCH();
-}
-
-void op_st_glo_ext(DECL_STATE) {
-  ip++;
   aint *ptr = ip->global_ptr;
   aint val = STACK_PEEK(sp);
-  VM_DEBUG("ST_GLO_FFI ptr=%p val=%ld\n", (void *)ptr, (long)val);
+  VM_DEBUG("ST_GLO ptr=%p val=%ld\n", (void *)ptr, (long)val);
   *ptr = val;
   DISPATCH();
 }
@@ -535,7 +514,6 @@ void op_callc(DECL_STATE) {
 }
 
 void op_end(DECL_STATE) {
-  (void)globals;
   (void)sp;
   aint ret_val = STACK_POP(sp);
 
@@ -556,7 +534,6 @@ void op_end(DECL_STATE) {
  */
 void op_ffi_call(DECL_STATE) {
   (void)sp;
-  (void)globals;
   ip++;
   const ffi_resolved *res = (const ffi_resolved *)ip->ptr;
 
@@ -611,7 +588,6 @@ void op_init(DECL_STATE) {
 void op_eof(DECL_STATE) {
   (void)ip;
   (void)bp;
-  (void)globals;
   (void)sp;
   return;
 }

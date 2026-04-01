@@ -20,6 +20,7 @@ struct virtual_machine {
   insn **entry_points; // Entry point for each unique unit
   size_t entry_points_len;
   size_t total_globals;
+  aint *globals;  // Globals array (at the top of the stack)
   void *ffi_data; // ffi_resolved array
   size_t ffi_count;
   void *stack_base;
@@ -41,8 +42,11 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
   vm->bc_arr = lr.units;
   vm->bc_len = lr.units_len;
 
-  program *prog = decode(lr.units, lr.units_len);
-  if (!prog) {
+  vm->stack_size = 8 * 1024 * 1024;
+  vm->stack_base = mmap(NULL, vm->stack_size, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN, -1, 0);
+  if (vm->stack_base == MAP_FAILED) {
+    perror("mmap stack");
     for (size_t i = 0; i < vm->bc_len; i++) {
       bytecode_free(lr.units[i]);
     }
@@ -51,7 +55,23 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
     return NULL;
   }
 
-  vm->total_globals = prog->total_globals;
+  // Compute total globals and place at the top of the stack
+  vm->total_globals = count_globals(lr.units, lr.units_len);
+  aint *stack_top = (aint *)((char *)vm->stack_base + vm->stack_size);
+  vm->globals = stack_top - vm->total_globals;
+  memset(vm->globals, 0, vm->total_globals * sizeof(aint));
+
+  program *prog = decode(lr.units, lr.units_len, vm->globals);
+  if (!prog) {
+    for (size_t i = 0; i < vm->bc_len; i++) {
+      bytecode_free(lr.units[i]);
+    }
+    free(lr.units);
+    munmap(vm->stack_base, vm->stack_size);
+    free(vm);
+    return NULL;
+  }
+
   vm->code = prog->code;
   vm->entry_points = prog->entry_points;
   vm->ffi_data = prog->ffi_data;
@@ -59,13 +79,6 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
 
   free(prog);
 
-  vm->stack_size = 8 * 1024 * 1024;
-  vm->stack_base = mmap(NULL, vm->stack_size, PROT_READ | PROT_WRITE,
-                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN, -1, 0);
-  if (vm->stack_base == MAP_FAILED) {
-    perror("mmap stack");
-    exit(EXIT_FAILURE);
-  }
   return vm;
 }
 
@@ -90,13 +103,8 @@ void vm_set_args(virtual_machine *vm, int argc, char *argv[]) {
 }
 
 aint vm_run(virtual_machine *vm) {
-
   aint *stack_top = (aint *)((char *)vm->stack_base + vm->stack_size);
-
-  aint *globals = stack_top - vm->total_globals;
-  memset(globals, 0, vm->total_globals * sizeof(aint));
-
-  aint *sp = globals - 1;
+  aint *sp = vm->globals - 1;
 
   __gc_stack_top = (size_t)sp;
   __gc_stack_bottom = (size_t)stack_top;
@@ -105,7 +113,7 @@ aint vm_run(virtual_machine *vm) {
   aint ret_val = 0;
   for (size_t i = 0; i < vm->bc_len; i++) {
     insn *ip = vm->entry_points[i];
-    ip->func(ip, sp, bp, globals);
+    ip->func(ip, sp, bp);
     ret_val = *sp;
   }
 

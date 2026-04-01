@@ -17,7 +17,9 @@ typedef struct {
   size_t ffi_len;
 } program;
 
-program *decode(bytecode **bc_arr, size_t n);
+size_t count_globals(bytecode **bc_arr, size_t n);
+
+program *decode(bytecode **bc_arr, size_t n, aint *globals);
 void program_free(program *prog);
 
 #endif // CONVERTER_H
