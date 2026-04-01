@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 
 extern size_t __gc_stack_top, __gc_stack_bottom;
 extern void set_args(aint argc, char *argv[]);
@@ -21,6 +22,8 @@ struct virtual_machine {
   size_t total_globals;
   void *ffi_data; // ffi_resolved array
   size_t ffi_count;
+  void *stack_base;
+  size_t stack_size;
 };
 
 virtual_machine *vm_create(const char *main_unit_path, const char **paths,
@@ -56,6 +59,13 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
 
   free(prog);
 
+  vm->stack_size = 8 * 1024 * 1024;
+  vm->stack_base = mmap(NULL, vm->stack_size, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN, -1, 0);
+  if (vm->stack_base == MAP_FAILED) {
+    perror("mmap stack");
+    exit(EXIT_FAILURE);
+  }
   return vm;
 }
 
@@ -70,6 +80,7 @@ void vm_destroy(virtual_machine *vm) {
   free(vm->ffi_data);
   free(vm->code);
   free(vm->entry_points);
+  munmap(vm->stack_base, vm->stack_size);
   free(vm);
 }
 
@@ -80,29 +91,23 @@ void vm_set_args(virtual_machine *vm, int argc, char *argv[]) {
 
 aint vm_run(virtual_machine *vm) {
 
-  // TODO: this is all very ugly
-  size_t active_stack_size = 32768;
-  __attribute__((aligned(16))) aint stack_data[65536];
+  aint *stack_top = (aint *)((char *)vm->stack_base + vm->stack_size);
 
-  memset(stack_data, 0, active_stack_size * sizeof(aint));
+  aint *globals = stack_top - vm->total_globals;
+  memset(globals, 0, vm->total_globals * sizeof(aint));
 
-  __gc_stack_bottom = (size_t)(stack_data + active_stack_size);
-  __gc_stack_top = (size_t)(stack_data - 16);
+  aint *sp = globals - 1;
 
-  // Globals at the top of stack
-  aint *globals = stack_data;
-  for (size_t i = 0; i < vm->total_globals; i++) {
-    globals[i] = 0;
-  }
+  __gc_stack_top = (size_t)sp;
+  __gc_stack_bottom = (size_t)stack_top;
 
-  aint *sp = &stack_data[active_stack_size - 1];
-  aint *bp = sp;
-
+  aint *bp;
+  aint ret_val = 0;
   for (size_t i = 0; i < vm->bc_len; i++) {
     insn *ip = vm->entry_points[i];
-
     ip->func(ip, sp, bp, globals);
+    ret_val = *sp;
   }
 
-  return *bp;
+  return ret_val;
 }

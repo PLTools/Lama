@@ -54,6 +54,7 @@ typedef enum {
   OP_PATT_UNBOXED = 0x65,
   OP_PATT_CLOSURE = 0x66,
   OP_BARRAY = 0x74,
+  OP_EOF = 0xFF,
 } opcode_t;
 
 const char *opcode_to_string(uint8_t opcode);

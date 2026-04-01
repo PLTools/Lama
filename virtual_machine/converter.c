@@ -298,6 +298,9 @@ static insn *decode_internal(decode_ctx *ctx) {
       .depth = 0, .state = LIVE, .max_depth = 0, .max_depth_pos = 0};
   da_init(ctx->sv.func_stack);
 
+  EMIT_FUNC(ctx, op_init);
+  EMIT_NUM(ctx, 0); // placeholder for op_eof
+
   insn *result = NULL;
 
   while (!reader_eof(&ctx->reader)) {
@@ -739,7 +742,7 @@ static insn *decode_internal(decode_ctx *ctx) {
     case OP_CALL: {
       int32_t target_off = reader_i32(&ctx->reader);
       int32_t n_args = reader_i32(&ctx->reader);
-      // push n_args, return 1 value == n_args - 1 net stack change
+      // consume n_args, produce 1 result = net -(n_args - 1)
       DEPTH_DEC(ctx->sv, n_args - 1);
 
       VM_DEBUG("DECODE: OP_CALL target_off=0x%x n_args=%d "
@@ -832,8 +835,7 @@ static insn *decode_internal(decode_ctx *ctx) {
       break;
     }
 
-    case 0xFF:
-    case 0x00:
+    case OP_EOF:
       break;
 
     default:
@@ -927,12 +929,15 @@ static void resolve_relocs(insn *all_code, decoded *dec, size_t code_offset,
 static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
                              size_t total_globals, ffi_call_table *ffi) {
   size_t ffi_call_len = ffi_call_table_len(ffi);
-  size_t ffi_call_offset = total_code_len;
-  size_t all_code_len = total_code_len + ffi_call_len * FFI_STUB_SIZE;
+
+  size_t eof_offset = total_code_len;
+  size_t ffi_call_offset = eof_offset + 1;
+  size_t all_code_len = ffi_call_offset + ffi_call_len * FFI_STUB_SIZE;
 
   insn *all_code = ALLOC_ARRAY(insn, all_code_len);
   insn **entry_points = ALLOC_ARRAY(insn *, n);
 
+  all_code[eof_offset].func = op_eof;
   // Copy code and resolve relocations
   size_t code_offset = 0;
   for (size_t i = 0; i < n; i++) {
@@ -942,6 +947,8 @@ static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
     memcpy(all_code + code_offset, dec->code, dec->code_len * sizeof(insn));
     entry_points[i] = &all_code[code_offset];
     resolve_relocs(all_code, dec, code_offset, ffi_call_offset);
+
+    all_code[code_offset + 1].target = &all_code[eof_offset];
 
     code_offset += dec->code_len;
   }
@@ -980,7 +987,7 @@ program *decode(bytecode **bc_arr, size_t n) {
 
   for (size_t i = 0; i < n; i++) {
     decode_ctx ctx;
-    decode_ctx_init(&ctx, bc_arr[i], st, ffi, total_code_len);
+    decode_ctx_init(&ctx, bc_arr[i], st, ffi, total_globals);
     insn *code = decode_internal(&ctx);
     if (!code) {
       fprintf(stderr, "Failed to decode %s\n", bc_arr[i]->name);

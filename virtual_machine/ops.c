@@ -5,6 +5,9 @@
 #include "insn.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+extern size_t __gc_stack_top;
 
 /*
  * External runtime functions (runtime.c)
@@ -41,7 +44,6 @@ extern aint Barray_tag_patt(void *x);
 extern aint Bstring_tag_patt(void *x);
 extern aint Bsexp_tag_patt(void *x);
 
-
 #define DISPATCH()                                                             \
   do {                                                                         \
     ip++;                                                                      \
@@ -59,6 +61,29 @@ extern aint Bsexp_tag_patt(void *x);
 #define STACK_PUSH(sp, val) (*sp-- = (val))
 #define STACK_POP(sp) (*++sp)
 #define STACK_PEEK(sp) (*(sp + 1))
+#define STACK_REVERSE(base, n)                                                 \
+  do {                                                                         \
+    for (int32_t _i = 0; _i < (n) / 2; _i++) {                                 \
+      aint _tmp = (base)[_i];                                                  \
+      (base)[_i] = (base)[(n) - 1 - _i];                                       \
+      (base)[(n) - 1 - _i] = _tmp;                                             \
+    }                                                                          \
+  } while (0)
+
+#define FRAME_SAVED_BP (-1)
+#define FRAME_SAVED_IP (-2)
+#define FRAME_SAVED_SP (-3)
+#define FRAME_LOCALS (-4)
+
+#define PUSH_FRAME(n_args_val, saved_bp, saved_ip, caller_sp_val)              \
+  do {                                                                         \
+    STACK_PUSH(sp, n_args_val);                                                \
+    aint *new_bp = sp + 1;                                                     \
+    STACK_PUSH(sp, (aint)(saved_bp));                                          \
+    STACK_PUSH(sp, (aint)(saved_ip));                                          \
+    STACK_PUSH(sp, (aint)(caller_sp_val));                                     \
+    bp = new_bp;                                                               \
+  } while (0)
 
 #define DEFINE_BINOP(name, fn, opname)                                         \
   void name(DECL_STATE) {                                                      \
@@ -205,8 +230,8 @@ void op_cjmp_nz(DECL_STATE) {
 void op_string(DECL_STATE) {
   ip++;
   const char *str = ip->str;
-  VM_DEBUG("STRING: \"%s\"\n", str);
   void *result = Bstring((void *)&str);
+  VM_DEBUG("STRING literal: \"%s\" -> %p\n", str, result);
   STACK_PUSH(sp, (aint)result);
   DISPATCH();
 }
@@ -215,15 +240,10 @@ void op_barray(DECL_STATE) {
   ip++;
   int32_t n = ip->num;
   VM_DEBUG("BARRAY: n=%d\n", n);
-  aint *args_base = sp + 1;
-  aint tmp_args[256];
-  // TODO: optimize for passing direct pointer
-  // instead of population array
-  for (int32_t i = 0; i < n; i++) {
-    tmp_args[i] = args_base[n - 1 - i];
-  }
+  aint *args = sp + 1;
+  STACK_REVERSE(args, n);
   sp += n;
-  void *arr = Barray(tmp_args, BOX(n));
+  void *arr = Barray(args, BOX(n));
   STACK_PUSH(sp, (aint)arr);
   DISPATCH();
 }
@@ -237,14 +257,10 @@ void op_sexp(DECL_STATE) {
   aint tag_hash = LtagHash((char *)tag_str);
   VM_DEBUG("SEXP: tag=\"%s\" (hash=0x%lx), n_fields=%d\n", tag_str, tag_hash,
            n_fields);
-  aint args[256];
-  aint *args_base = sp + 1;
-  // TODO: optimize for passing direct pointer
-  // instead of population array
-  for (int32_t i = 0; i < n_fields; i++) {
-    args[i] = args_base[n_fields - 1 - i];
-  }
-  args[n_fields] = tag_hash;
+  // Use the free slot at sp for tag_hash, reverse the whole range in-place
+  *sp = tag_hash;
+  STACK_REVERSE(sp, n_fields + 1);
+  aint *args = sp;
   sp += n_fields;
 
   void *s = Bsexp(args, BOX(n_fields + 1));
@@ -401,8 +417,9 @@ void op_st_glo_ext(DECL_STATE) {
 void op_ld_loc(DECL_STATE) {
   ip++;
   int32_t idx = ip->num;
-  VM_DEBUG("LD_LOC[%d] bp=%p bp[-idx]=%ld\n", idx, (void *)bp, (long)bp[-idx]);
-  STACK_PUSH(sp, bp[-idx]);
+  VM_DEBUG("LD_LOC[%d] bp=%p val=%ld\n", idx, (void *)bp,
+           (long)bp[FRAME_LOCALS - idx]);
+  STACK_PUSH(sp, bp[FRAME_LOCALS - idx]);
   DISPATCH();
 }
 
@@ -411,15 +428,15 @@ void op_st_loc(DECL_STATE) {
   int32_t idx = ip->num;
   aint val = STACK_PEEK(sp);
   VM_DEBUG("ST_LOC[%d] = %ld bp=%p\n", idx, (long)val, (void *)bp);
-  bp[-idx] = val;
+  bp[FRAME_LOCALS - idx] = val;
   DISPATCH();
 }
 
 void op_ld_arg(DECL_STATE) {
   ip++;
   int32_t idx = ip->num;
-  int32_t n_args = (int32_t)bp[1];
-  aint val = bp[n_args + 1 - idx];
+  int32_t n_args = (int32_t)bp[0];
+  aint val = bp[n_args - idx];
   VM_DEBUG("LD_ARG[%d] n_args=%d bp=%p val=%ld\n", idx, n_args, (void *)bp,
            (long)val);
   STACK_PUSH(sp, val);
@@ -429,18 +446,18 @@ void op_ld_arg(DECL_STATE) {
 void op_st_arg(DECL_STATE) {
   ip++;
   int32_t idx = ip->num;
-  int32_t n_args = (int32_t)bp[1];
+  int32_t n_args = (int32_t)bp[0];
   aint val = STACK_PEEK(sp);
   VM_DEBUG("ST_ARG[%d] = %ld bp=%p\n", idx, (long)val, (void *)bp);
-  bp[n_args + 1 - idx] = val;
+  bp[n_args - idx] = val;
   DISPATCH();
 }
 
 void op_ld_clo(DECL_STATE) {
   ip++;
   int32_t idx = ip->num;
-  int32_t n_args = (int32_t)bp[1];
-  aint *closure = (aint *)bp[n_args + 2];
+  int32_t n_args = (int32_t)bp[0];
+  aint *closure = (aint *)bp[n_args + 1];
   VM_DEBUG("LD_CLO[%d] closure=%p val=%ld\n", idx, (void *)closure,
            (long)closure[idx + 1]);
   STACK_PUSH(sp, closure[idx + 1]);
@@ -450,9 +467,9 @@ void op_ld_clo(DECL_STATE) {
 void op_st_clo(DECL_STATE) {
   ip++;
   int32_t idx = ip->num;
-  int32_t n_args = (int32_t)bp[1];
+  int32_t n_args = (int32_t)bp[0];
   aint val = STACK_PEEK(sp);
-  aint *closure = (aint *)bp[n_args + 2];
+  aint *closure = (aint *)bp[n_args + 1];
   VM_DEBUG("ST_CLO[%d] = %ld closure=%p\n", idx, (long)val, (void *)closure);
   closure[idx + 1] = val;
   DISPATCH();
@@ -462,20 +479,22 @@ void op_st_clo(DECL_STATE) {
  * Function call operations
  */
 void op_begin(DECL_STATE) {
-
   ip++;
   int32_t n_args = ip->num;
   (void)n_args;
   ip++;
   int32_t n_locals = ip->num;
   ip++;
+  int32_t max_depth = ip->num;
 
-  VM_DEBUG("BEGIN n_args=%d n_locals=%d bp=%p sp=%p\n", n_args, n_locals,
-                (void *)bp, (void *)sp);
+  VM_DEBUG("BEGIN n_args=%d n_locals=%d max_depth=%d bp=%p sp=%p\n", n_args,
+           n_locals, max_depth, (void *)bp, (void *)sp);
 
   for (int32_t i = 0; i < n_locals; i++) {
     STACK_PUSH(sp, 0);
   }
+
+  __gc_stack_top = (size_t)(sp - max_depth);
 
   DISPATCH();
 }
@@ -485,61 +504,51 @@ void op_call(DECL_STATE) {
   insn *target = ip->target;
   ip++;
   int32_t n_args = ip->num;
+  ip++; // sort of a return address
 
-  VM_DEBUG("CALL target=%p n_args=%d sp=%p bp=%p\n", (void *)target,
-                n_args, (void *)sp, (void *)bp);
+  VM_DEBUG("CALL target=%p n_args=%d sp=%p bp=%p\n", (void *)target, n_args,
+           (void *)sp, (void *)bp);
 
-  STACK_PUSH(sp, (aint)n_args);
-  STACK_PUSH(sp, (aint)bp);
-
-  aint *new_bp = sp + 1;
-  target->func(target, sp, new_bp, globals);
-
-  aint ret_val = *new_bp;
-
-  sp = new_bp + n_args + 1;
-
-  STACK_PUSH(sp, ret_val);
-  DISPATCH();
+  aint *caller_sp = sp + n_args;
+  PUSH_FRAME(n_args, bp, ip, caller_sp);
+  ip = target;
+  DISPATCH_JUMP();
 }
 
 void op_callc(DECL_STATE) {
   ip++;
   int32_t n_args = ip->num;
+  ip++; // sort of a return address
 
   aint closure_val = *(sp + 1 + n_args);
   aint *closure = (aint *)closure_val;
-
   aint entry = closure[0];
   insn *target = (insn *)entry;
 
   VM_DEBUG("CALLC closure=%p target=%p n_args=%d sp=%p bp=%p\n",
-                (void *)closure, (void *)target, n_args, (void *)sp,
-                (void *)bp);
+           (void *)closure, (void *)target, n_args, (void *)sp, (void *)bp);
 
-  STACK_PUSH(sp, (aint)n_args);
-  STACK_PUSH(sp, (aint)bp);
-
-  aint *new_bp = sp + 1;
-  target->func(target, sp, new_bp, globals);
-
-  aint ret_val = *new_bp;
-  VM_DEBUG("CALLC: return value=%ld new_bp=%p\n", (long)ret_val,
-           (void *)new_bp);
-
-  sp = new_bp + n_args + 2;
-
-  STACK_PUSH(sp, ret_val);
-  DISPATCH();
+  aint *caller_sp = sp + n_args + 1;
+  PUSH_FRAME(n_args, bp, ip, caller_sp);
+  ip = target;
+  DISPATCH_JUMP();
 }
 
 void op_end(DECL_STATE) {
-  (void)ip;
   (void)globals;
-  VM_DEBUG("END sp=%p\n", (void *)sp);
-  aint ret_val = STACK_PEEK(sp);
-  *bp = ret_val;
-  return;
+  (void)sp;
+  aint ret_val = STACK_POP(sp);
+
+  VM_DEBUG("END ret_val=%ld bp=%p sp=%p\n", (long)ret_val, (void *)bp,
+           (void *)sp);
+
+  // Restore caller's state from frame
+  sp = (aint *)bp[FRAME_SAVED_SP];
+  ip = (insn *)bp[FRAME_SAVED_IP];
+  bp = (aint *)bp[FRAME_SAVED_BP];
+
+  STACK_PUSH(sp, ret_val);
+  DISPATCH_JUMP();
 }
 
 /*
@@ -551,22 +560,23 @@ void op_ffi_call(DECL_STATE) {
   ip++;
   const ffi_resolved *res = (const ffi_resolved *)ip->ptr;
 
-  int32_t n_args = (int32_t)bp[1];
+  int32_t n_args = (int32_t)bp[0];
 
   VM_DEBUG("FFI_CALL: kind=%d n_args=%d bp=%p\n", res->kind, n_args,
            (void *)bp);
 
-  aint args[256];
-  for (int32_t i = 0; i < n_args; i++) {
-    args[i] = bp[n_args + 1 - i];
-  }
-
-  aint result = ffi_call_c(res, args, n_args);
+  // args at bp[1..n_args]
+  STACK_REVERSE(bp + 1, n_args);
+  aint result = ffi_call_c(res, bp + 1, n_args);
   VM_DEBUG("FFI_CALL: result=%ld\n", (long)result);
 
-  *bp = result;
+  // Same as op_end
+  sp = (aint *)bp[FRAME_SAVED_SP];
+  ip = (insn *)bp[FRAME_SAVED_IP];
+  bp = (aint *)bp[FRAME_SAVED_BP];
 
-  return;
+  STACK_PUSH(sp, result);
+  DISPATCH_JUMP();
 }
 
 void op_closure(DECL_STATE) {
@@ -577,19 +587,33 @@ void op_closure(DECL_STATE) {
 
   VM_DEBUG("CLOSURE: target=%p n_captured=%d\n", (void *)target, n_captured);
 
-  aint tmp_args[256];
-  tmp_args[0] = (aint)target;
-  aint *args_base = sp + 1;
-  for (int32_t i = 0; i < n_captured; i++) {
-    tmp_args[i + 1] = args_base[n_captured - 1 - i];
-    VM_DEBUG("CLOSURE: captured[%d]=%ld\n", i, (long)tmp_args[i + 1]);
-  }
+  *sp = (aint)target;
+  STACK_REVERSE(sp + 1, n_captured);
+  aint *args = sp;
   sp += n_captured;
 
-  void *closure = Bclosure(tmp_args, BOX(n_captured));
+  void *closure = Bclosure(args, BOX(n_captured));
   VM_DEBUG("CLOSURE: created=%p\n", (void *)closure);
   STACK_PUSH(sp, (aint)closure);
   DISPATCH();
+}
+
+void op_init(DECL_STATE) {
+  ip++;
+  insn *eof_ip = ip->target;
+
+  aint *caller_sp = sp;
+  PUSH_FRAME(0, 0, eof_ip, caller_sp);
+
+  DISPATCH();
+}
+
+void op_eof(DECL_STATE) {
+  (void)ip;
+  (void)bp;
+  (void)globals;
+  (void)sp;
+  return;
 }
 
 #ifdef DEBUG_PRINT

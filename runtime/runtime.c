@@ -7,6 +7,7 @@
 
 extern size_t __gc_stack_top, __gc_stack_bottom;
 
+#ifdef LAMA_ENV
 #define PRE_GC()                                                                                   \
   bool flag = false;                                                                               \
   flag      = __gc_stack_top == 0;                                                                 \
@@ -14,10 +15,13 @@ extern size_t __gc_stack_top, __gc_stack_bottom;
   assert(__gc_stack_top != 0);                                                                     \
   assert((__gc_stack_top & 0xF) == 0);                                                             \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);
-
 #define POST_GC()                                                                                  \
   assert(__builtin_frame_address(0) <= (void *)__gc_stack_top);                                    \
   if (flag) { __gc_stack_top = 0; }
+#else
+#define PRE_GC() (void)0
+#define POST_GC() (void)0
+#endif
 
 _Noreturn static void vfailure (char *s, va_list args) {
   fprintf(stderr, "*** FAILURE: ");

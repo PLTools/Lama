@@ -63,6 +63,8 @@ void op_ffi_call(DECL_STATE);
 void op_ld_glo_ext(DECL_STATE);
 void op_st_glo_ext(DECL_STATE);
 
+void op_init(DECL_STATE);
+void op_eof(DECL_STATE);
 void op_line(DECL_STATE);
 
 #endif // OPS_H

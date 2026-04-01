@@ -38,6 +38,8 @@ typedef struct {
       VM_DEBUG("  DEPTH: %d -> %d (+%d)\n", (sv).depth, (sv).depth + (n),      \
                (n));                                                           \
       (sv).depth += (n);                                                       \
+      if ((sv).depth > (sv).max_depth)                                         \
+        (sv).max_depth = (sv).depth;                                           \
     }                                                                          \
   } while (0)
 #define DEPTH_DEC(sv, n)                                                       \
