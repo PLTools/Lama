@@ -206,7 +206,7 @@ module ByteCode = struct
         let rec iterate i =
           if i < n then
             match x.[i] with
-            | '"' -> 
+            | '"' ->
                 Buffer.add_char buf '"';
                 iterate (i + 1)
             | '\\' -> (
@@ -388,9 +388,9 @@ module ByteCode = struct
         Bytes.set_int32_le code ofs
           (Int32.of_int
           @@
-            try Hashtbl.find lmap l
-            with Not_found ->
-              failwith (Printf.sprintf "ERROR: undefined label '%s'" l)))
+          try Hashtbl.find lmap l
+          with Not_found ->
+            failwith (Printf.sprintf "ERROR: undefined label '%s'" l)))
       !fixups;
     let pubs_resolved =
       List.rev_map (fun (name, flag) ->
@@ -410,19 +410,19 @@ module ByteCode = struct
     let imports =
       List.rev_map (fun l -> Int32.of_int @@ StringTab.add st l) !imports
     in
-    let str_table = Buffer.to_bytes st.StringTab.buffer in
+    let st = Buffer.to_bytes st.StringTab.buffer in
     let file = Buffer.create 1024 in
-    Buffer.add_int32_le file (Int32.of_int @@ Bytes.length str_table);
+    Buffer.add_int32_le file (Int32.of_int @@ Bytes.length st);
     Buffer.add_int32_le file (Int32.of_int @@ Hashtbl.length globals);
     Buffer.add_int32_le file (Int32.of_int @@ List.length imports);
     Buffer.add_int32_le file (Int32.of_int @@ List.length pubs_resolved);
-    Buffer.add_bytes file str_table;
+    Buffer.add_bytes file st;
     List.iter (fun n -> Buffer.add_int32_le file n) imports;
     List.iter
-      (fun (name_off, offset, flag) ->
-        Buffer.add_int32_le file name_off;
-        Buffer.add_int32_le file offset;
-        Buffer.add_uint8  file flag)
+      (fun (n, o, f) ->
+        Buffer.add_int32_le file n;
+        Buffer.add_int32_le file o;
+        Buffer.add_uint8 file f)
       pubs_resolved;
     Buffer.add_bytes file code;
     let f = open_out_bin (Printf.sprintf "%s.bc" cmd#basename) in
@@ -1618,8 +1618,8 @@ let compile cmd ((imports, _), p) =
                   Some lfalse,
                   i + 1,
                   ((match lab with
-                     | None -> [ SLABEL blab ]
-                     | Some l -> [ SLABEL blab; LABEL l; DUP ])
+                   | None -> [ SLABEL blab ]
+                   | Some l -> [ SLABEL blab; LABEL l; DUP ])
                   @ pcode @ bindcode @ scode @ jmp @ [ SLABEL elab ])
                   :: code,
                   lfalse' )
