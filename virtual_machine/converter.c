@@ -24,6 +24,8 @@
 #define IS_EXT_REF(addr) ((addr) < 0)
 #define EXT_REF_INDEX(addr) (-(addr) - 1)
 
+#define GLOBAL_PREFIX "global_"
+
 /*
  * Code emission macros - append to code array in context
  */
@@ -70,6 +72,23 @@ typedef struct {
   size_t relocs_len;
 } decoded;
 
+/*
+ * Cache for external C globals..
+ * Also used as GC root table.
+ */
+typedef struct {
+  const char *name;
+  void *ptr;
+} ext_global_entry;
+
+typedef struct {
+  struct {
+    ext_global_entry *data;
+    size_t len;
+    size_t cap;
+  } entries;
+} ext_global_cache;
+
 typedef struct {
   const bytecode *bc;
 
@@ -92,13 +111,15 @@ typedef struct {
   int32_t *bc_to_insn_map;
   symbol_table *st;
   ffi_call_table *ffi;
+  ext_global_cache *ext_globals;
 
   stack_validation sv;
 } decode_ctx;
 
 static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
                             symbol_table *st, ffi_call_table *ffi,
-                            aint *globals, size_t global_offset) {
+                            ext_global_cache *ext_globals, aint *globals,
+                            size_t global_offset) {
   ctx->bc = bc;
 
   ctx->globals = globals;
@@ -110,8 +131,36 @@ static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
 
   ctx->st = st;
   ctx->ffi = ffi;
+  ctx->ext_globals = ext_globals;
 
   reader_init(&ctx->reader, bc->code, bc->code_size);
+}
+
+/*
+ * Resolve an external C global -- prefix with "global_", dlsym, cache.
+ */
+static void *resolve_ext_global(ext_global_cache *cache, const char *name) {
+  for (size_t i = 0; i < cache->entries.len; i++) {
+    if (strcmp(cache->entries.data[i].name, name) == 0) {
+      return cache->entries.data[i].ptr;
+    }
+  }
+
+  size_t nlen = strlen(name);
+  char prefixed[sizeof(GLOBAL_PREFIX) + nlen];
+  memcpy(prefixed, GLOBAL_PREFIX, sizeof(GLOBAL_PREFIX) - 1);
+  memcpy(prefixed + sizeof(GLOBAL_PREFIX) - 1, name, nlen + 1);
+
+  void *ptr = dlsym(RTLD_DEFAULT, prefixed);
+  if (!ptr) {
+    fprintf(stderr, "Error: unresolved global '%s' (tried '%s')\n", name,
+            prefixed);
+    return NULL;
+  }
+
+  ext_global_entry entry = {.name = name, .ptr = ptr};
+  da_append(cache->entries, entry);
+  return ptr;
 }
 
 static void free_decoded_arr(decoded *arr, size_t n) {
@@ -149,71 +198,45 @@ static bool validate_target_off(const bytecode *bc, int32_t target_off,
   return true;
 }
 
-static bool emit_ld_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
-  const bytecode *bc = ctx->bc;
+static bool emit_ext_glo(decode_ctx *ctx, const char *glob_name, fn op) {
+  resolved_symbol *sym = symbol_table_find_global(ctx->st, glob_name);
+  if (sym) {
+    // Global from another unit
+    EMIT_FUNC(ctx, op);
+    EMIT_GLOBAL_PTR(ctx, &ctx->globals[sym->idx]);
+    return true;
+  }
+  // C global
+  void *ptr = resolve_ext_global(ctx->ext_globals, glob_name);
+  if (!ptr) {
+    return false;
+  }
+  EMIT_FUNC(ctx, op);
+  EMIT_GLOBAL_PTR(ctx, (aint *)ptr);
+  return true;
+}
 
+static bool emit_ld_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
   if (IS_EXT_REF(idx)) {
     int str_offset = EXT_REF_INDEX(idx);
-    const char *glob_name = bytecode_get_string(bc, str_offset);
-
+    const char *glob_name = bytecode_get_string(ctx->bc, str_offset);
     VM_DEBUG("DECODE: OP_LD external global '%s'\n", glob_name);
-
-    resolved_symbol *sym = symbol_table_find_global(ctx->st, glob_name);
-    if (sym) {
-      // Global from another unit
-      EMIT_FUNC(ctx, op_ld_glo);
-      EMIT_GLOBAL_PTR(ctx, &ctx->globals[sym->idx]);
-      return true;
-    } else {
-      // C global
-      void *ptr = dlsym(RTLD_DEFAULT, glob_name);
-      if (ptr) {
-        EMIT_FUNC(ctx, op_ld_glo);
-        EMIT_GLOBAL_PTR(ctx, (aint *)ptr);
-        return true;
-      } else {
-        fprintf(stderr, "Error: unresolved global '%s'\n", glob_name);
-        return false;
-      }
-    }
-  } else {
-    EMIT_FUNC(ctx, op_ld_glo);
-    EMIT_GLOBAL_PTR(ctx, &ctx->globals[global_base + idx]);
+    return emit_ext_glo(ctx, glob_name, op_ld_glo);
   }
+  EMIT_FUNC(ctx, op_ld_glo);
+  EMIT_GLOBAL_PTR(ctx, &ctx->globals[global_base + idx]);
   return true;
 }
 
 static bool emit_st_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
-  const bytecode *bc = ctx->bc;
-
   if (IS_EXT_REF(idx)) {
     int str_offset = EXT_REF_INDEX(idx);
-    const char *glob_name = bytecode_get_string(bc, str_offset);
-
+    const char *glob_name = bytecode_get_string(ctx->bc, str_offset);
     VM_DEBUG("DECODE: OP_ST external global '%s'\n", glob_name);
-
-    resolved_symbol *sym = symbol_table_find_global(ctx->st, glob_name);
-    if (sym) {
-      // Global from another unit
-      EMIT_FUNC(ctx, op_st_glo);
-      EMIT_GLOBAL_PTR(ctx, &ctx->globals[sym->idx]);
-      return true;
-    } else {
-      // C global
-      void *ptr = dlsym(RTLD_DEFAULT, glob_name);
-      if (ptr) {
-        EMIT_FUNC(ctx, op_st_glo);
-        EMIT_GLOBAL_PTR(ctx, (aint *)ptr);
-        return true;
-      } else {
-        fprintf(stderr, "Error: unresolved global '%s'\n", glob_name);
-        return false;
-      }
-    }
-  } else {
-    EMIT_FUNC(ctx, op_st_glo);
-    EMIT_GLOBAL_PTR(ctx, &ctx->globals[global_base + idx]);
+    return emit_ext_glo(ctx, glob_name, op_st_glo);
   }
+  EMIT_FUNC(ctx, op_st_glo);
+  EMIT_GLOBAL_PTR(ctx, &ctx->globals[global_base + idx]);
   return true;
 }
 
@@ -987,6 +1010,8 @@ size_t count_globals(bytecode **bc_arr, size_t n) {
 program *decode(bytecode **bc_arr, size_t n, aint *globals) {
   symbol_table *st = symbol_table_create();
   ffi_call_table *ffi = ffi_call_table_create();
+  ext_global_cache ext_globals = {0};
+  da_init(ext_globals.entries);
 
   decoded *dec_arr = ALLOC_ARRAY(decoded, n);
   program *prog = NULL;
@@ -997,7 +1022,8 @@ program *decode(bytecode **bc_arr, size_t n, aint *globals) {
 
   for (size_t i = 0; i < n; i++) {
     decode_ctx ctx;
-    decode_ctx_init(&ctx, bc_arr[i], st, ffi, globals, total_globals);
+    decode_ctx_init(&ctx, bc_arr[i], st, ffi, &ext_globals, globals,
+                    total_globals);
     insn *code = decode_internal(&ctx);
     if (!code) {
       fprintf(stderr, "Failed to decode %s\n", bc_arr[i]->name);
@@ -1026,6 +1052,7 @@ program *decode(bytecode **bc_arr, size_t n, aint *globals) {
 cleanup:
   symbol_table_destroy(st);
   ffi_call_table_destroy(ffi);
+  da_free(ext_globals.entries);
   free_decoded_arr(dec_arr, n_decoded);
   free(dec_arr);
 

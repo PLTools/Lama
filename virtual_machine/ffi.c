@@ -46,26 +46,28 @@ void ffi_call_table_destroy(ffi_call_table *table) {
   free(table);
 }
 
+#define FUNC_PREFIX "L"
+
 typedef struct {
-  const char *lama_name;
-  const char *target_name;
+  const char *name;        // raw name as it appears in bytecode
+  const char *target_name; // explicit dlsym name, or NULL for default
   bool is_args_array;
   int fixed_args;
 } func_metadata;
 
 static const func_metadata func_table[] = {
     // Args array functions
-    {"Lsubstring", "Lsubstring", true, 0},
-    {"Lstringcat", "Lstringcat", true, 0},
-    {"Lstring", "Lstring", true, 0},
-    {"Li__Infix_4343", "Li__Infix_4343", true, 0}, // strcat
-    {"Ls__Infix_58", "Ls__Infix_58", true, 0},     // : (cons)
-    {"Lclone", "Lclone", true, 0},                 // clone
+    {"substring", NULL, true, 0},
+    {"stringcat", NULL, true, 0},
+    {"string", NULL, true, 0},
+    {"i__Infix_4343", NULL, true, 0}, // strcat
+    {"s__Infix_58", NULL, true, 0},   // : (cons)
+    {"clone", NULL, true, 0},
 
     // Variadic functions with mapping
-    {"Lprintf", "Bprintf", false, 1},
-    {"Lfprintf", "Bfprintf", false, 2},
-    {"Lsprintf", "Bsprintf", false, 1},
+    {"printf", "Bprintf", false, 1},
+    {"fprintf", "Bfprintf", false, 2},
+    {"sprintf", "Bsprintf", false, 1},
 
     // Sentinel
     {NULL, NULL, false, 0}};
@@ -81,8 +83,8 @@ static void *lookup_function(const char *name) {
 }
 
 static const func_metadata *lookup_metadata(const char *name) {
-  for (int i = 0; func_table[i].lama_name != NULL; i++) {
-    if (strcmp(name, func_table[i].lama_name) == 0) {
+  for (int i = 0; func_table[i].name != NULL; i++) {
+    if (strcmp(name, func_table[i].name) == 0) {
       return &func_table[i];
     }
   }
@@ -97,17 +99,9 @@ size_t ffi_call_table_intern(ffi_call_table *table, const char *name) {
   }
 
   const func_metadata *meta = lookup_metadata(name);
-  const char *target_name = meta ? meta->target_name : name;
-
-  void *fn = lookup_function(target_name);
-  if (!fn) {
-    fprintf(stderr, "Undefined external function: %s\n", name);
-    exit(EXIT_FAILURE);
-  }
 
   ffi_kind kind = FFI_REGULAR;
   int fixed_args = 0;
-
   if (meta) {
     if (meta->is_args_array) {
       kind = FFI_ARGS_ARRAY;
@@ -115,6 +109,22 @@ size_t ffi_call_table_intern(ffi_call_table *table, const char *name) {
       kind = FFI_VARIADIC;
       fixed_args = meta->fixed_args;
     }
+  }
+
+  void *fn;
+  if (meta && meta->target_name) {
+    fn = lookup_function(meta->target_name);
+  } else {
+    size_t nlen = strlen(name);
+    char prefixed[sizeof(FUNC_PREFIX) + nlen];
+    memcpy(prefixed, FUNC_PREFIX, sizeof(FUNC_PREFIX) - 1);
+    memcpy(prefixed + sizeof(FUNC_PREFIX) - 1, name, nlen + 1);
+    fn = lookup_function(prefixed);
+  }
+
+  if (!fn) {
+    fprintf(stderr, "Undefined external function: %s\n", name);
+    exit(EXIT_FAILURE);
   }
 
   ffi_resolved entry = {
