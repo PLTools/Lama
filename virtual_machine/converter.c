@@ -435,67 +435,80 @@ static bool decode_internal(decode_ctx *ctx) {
       break;
 
     case OP_BINOP_ADD:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_add);
       break;
 
     case OP_BINOP_SUB:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_sub);
       break;
 
     case OP_BINOP_MUL:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_mul);
       break;
 
     case OP_BINOP_DIV:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_div);
       break;
 
     case OP_BINOP_MOD:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_mod);
       break;
 
     case OP_BINOP_LT:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_lt);
       break;
 
     case OP_BINOP_LE:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_le);
       break;
 
     case OP_BINOP_GT:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_gt);
       break;
 
     case OP_BINOP_GE:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_ge);
       break;
 
     case OP_BINOP_EQ:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_eq);
       break;
 
     case OP_BINOP_NE:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_ne);
       break;
 
     case OP_BINOP_AND:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_and);
       break;
 
     case OP_BINOP_OR:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_or);
       break;
 
@@ -536,17 +549,21 @@ static bool decode_internal(decode_ctx *ctx) {
       break;
 
     case OP_SWAP:
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_INC(ctx->sv, 2);
       EMIT_FUNC(ctx, op_swap);
       break;
 
     case OP_ELEM:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_elem);
       break;
 
     case OP_STA:
       // TODO:
-      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_DEC(ctx->sv, 3);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_sta);
       break;
 
@@ -620,8 +637,8 @@ static bool decode_internal(decode_ctx *ctx) {
 
     case OP_BARRAY: {
       int32_t n = reader_i32(&ctx->reader);
-      // push array, pop elements == n - 1 net stack change
-      DEPTH_DEC(ctx->sv, n - 1);
+      DEPTH_DEC(ctx->sv, n);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_barray);
       EMIT_NUM(ctx, n);
       break;
@@ -630,8 +647,8 @@ static bool decode_internal(decode_ctx *ctx) {
     case OP_SEXP: {
       int32_t tag_idx = reader_i32(&ctx->reader);
       int32_t n_fields = reader_i32(&ctx->reader);
-      // push sexp, pop elements == n_fields - 1 net stack change
-      DEPTH_DEC(ctx->sv, n_fields - 1);
+      DEPTH_DEC(ctx->sv, n_fields);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_sexp);
       EMIT_STR(ctx, bytecode_get_string(bc, tag_idx));
       EMIT_NUM(ctx, n_fields);
@@ -639,6 +656,8 @@ static bool decode_internal(decode_ctx *ctx) {
     }
 
     case OP_TAG: {
+      DEPTH_POP(ctx->sv);
+      DEPTH_PUSH(ctx->sv);
       int32_t tag_idx = reader_i32(&ctx->reader);
       int32_t n_fields = reader_i32(&ctx->reader);
       EMIT_FUNC(ctx, op_tag);
@@ -648,6 +667,8 @@ static bool decode_internal(decode_ctx *ctx) {
     }
 
     case OP_ARRAY: {
+      DEPTH_POP(ctx->sv);
+      DEPTH_PUSH(ctx->sv);
       int32_t n = reader_i32(&ctx->reader);
       EMIT_FUNC(ctx, op_array);
       EMIT_NUM(ctx, n);
@@ -665,31 +686,44 @@ static bool decode_internal(decode_ctx *ctx) {
     }
 
     case OP_PATT_STR_CMP:
-      DEPTH_POP(ctx->sv);
+      DEPTH_DEC(ctx->sv, 2);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_patt_str_cmp);
       break;
 
     case OP_PATT_STRING:
+      DEPTH_POP(ctx->sv);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_patt_string);
       break;
 
     case OP_PATT_ARRAY:
+      DEPTH_POP(ctx->sv);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_patt_array);
       break;
 
     case OP_PATT_SEXP:
+      DEPTH_POP(ctx->sv);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_patt_sexp);
       break;
 
     case OP_PATT_BOXED:
+      DEPTH_POP(ctx->sv);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_patt_boxed);
       break;
 
     case OP_PATT_UNBOXED:
+      DEPTH_POP(ctx->sv);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_patt_unboxed);
       break;
 
     case OP_PATT_CLOSURE:
+      DEPTH_POP(ctx->sv);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_patt_closure);
       break;
 
@@ -753,7 +787,8 @@ static bool decode_internal(decode_ctx *ctx) {
         }
       }
 
-      DEPTH_DEC(ctx->sv, n_captured - 1);
+      DEPTH_DEC(ctx->sv, n_captured);
+      DEPTH_PUSH(ctx->sv);
 
       EMIT_FUNC(ctx, op_closure);
 
@@ -805,8 +840,8 @@ static bool decode_internal(decode_ctx *ctx) {
     case OP_CALL: {
       int32_t target_off = reader_i32(&ctx->reader);
       int32_t n_args = reader_i32(&ctx->reader);
-      // consume n_args, produce 1 result = net -(n_args - 1)
-      DEPTH_DEC(ctx->sv, n_args - 1);
+      DEPTH_DEC(ctx->sv, n_args);
+      DEPTH_PUSH(ctx->sv);
 
       VM_DEBUG("DECODE: OP_CALL target_off=0x%x n_args=%d "
                "current_bc_off=%zu code_idx=%zu\n",
@@ -861,7 +896,8 @@ static bool decode_internal(decode_ctx *ctx) {
 
     case OP_CALLC: {
       int32_t n_args = reader_i32(&ctx->reader);
-      DEPTH_DEC(ctx->sv, n_args);
+      DEPTH_DEC(ctx->sv, n_args + 1);
+      DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_callc);
       EMIT_NUM(ctx, n_args);
       break;
