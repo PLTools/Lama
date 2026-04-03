@@ -1,5 +1,4 @@
 #include "converter.h"
-#include "../runtime/gc.h"
 #include "bytecode.h"
 #include "da.h"
 #include "debug.h"
@@ -158,8 +157,6 @@ static void *resolve_ext_global(ext_global_cache *cache, const char *name) {
             prefixed);
     return NULL;
   }
-
-  push_extra_root((void **)ptr);
 
   ext_global_entry entry = {.name = name, .ptr = ptr};
   da_append(cache->entries, entry);
