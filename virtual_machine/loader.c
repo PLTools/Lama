@@ -77,23 +77,10 @@ static char *extract_unit_name(const char *filename) {
 /*
  * Load a single unit and its dependencies recursively.
  */
-static bool load_unit_recursive(bytecode_array *units, const char *s,
+static bool load_unit_recursive(bytecode_array *units, const char *unit_name,
+                                const char *filepath,
                                 const search_paths *paths) {
-  char *filepath = NULL;
-  char *unit_name = NULL;
-
-  // The initial call uses a filepath, recursive calls use unit names
-  if (is_filepath(s)) {
-    filepath = ESTRDUP(s);
-    unit_name = extract_unit_name(s);
-  } else {
-    filepath = build_unit_path(s, paths);
-    unit_name = ESTRDUP(s);
-  }
-
   if (find_loaded(units, unit_name)) {
-    free(filepath);
-    free(unit_name);
     return true;
   }
 
@@ -101,11 +88,9 @@ static bool load_unit_recursive(bytecode_array *units, const char *s,
   if (!bc) {
     fprintf(stderr, "Failed to load dependency '%s' from '%s'\n", unit_name,
             filepath);
-    free(filepath);
-    free(unit_name);
     return false;
   }
-  bc->name = unit_name;
+  bc->name = ESTRDUP(unit_name);
 
   // Recursively load dependencies first (topological order)
   const char *import_name;
@@ -118,11 +103,12 @@ static bool load_unit_recursive(bytecode_array *units, const char *s,
       continue;
     }
 
-    load_unit_recursive(units, import_name, paths);
+    char *dep_path = build_unit_path(import_name, paths);
+    load_unit_recursive(units, import_name, dep_path, paths);
+    free(dep_path);
   }
 
   da_append(*units, bc);
-  free(filepath);
   return true;
 }
 
@@ -130,7 +116,19 @@ load_result load(const char *main_unit_path, const search_paths *paths) {
   bytecode_array m;
   da_init(m);
 
-  load_unit_recursive(&m, main_unit_path, paths);
+  char *filepath;
+  char *unit_name;
+  if (is_filepath(main_unit_path)) {
+    filepath = ESTRDUP(main_unit_path);
+    unit_name = extract_unit_name(main_unit_path);
+  } else {
+    filepath = build_unit_path(main_unit_path, paths);
+    unit_name = ESTRDUP(main_unit_path);
+  }
+
+  load_unit_recursive(&m, unit_name, filepath, paths);
+  free(filepath);
+  free(unit_name);
 
   load_result result = {
       .units = m.data,
