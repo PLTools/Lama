@@ -55,7 +55,7 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
   vm->stack_base = (char *)mmap_base + vm->stack_size;
 
   // Compute total globals and place at the top of the stack
-  vm->total_globals = count_globals(lr.units, lr.units_len);
+  vm->total_globals = bytecode_count_globals(lr.units, lr.units_len);
   vm->globals = (aint *)vm->stack_base - vm->total_globals;
   memset(vm->globals, 0, vm->total_globals * sizeof(aint));
 

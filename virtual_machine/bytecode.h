@@ -49,6 +49,8 @@ typedef struct {
   size_t curr;
 } bytecode_iterator;
 
+size_t bytecode_count_globals(bytecode **bc_arr, size_t n);
+
 void bytecode_pubs_init(bytecode_iterator *iter, const bytecode *bc);
 bool bytecode_pubs_next(bytecode_iterator *iter, public_symbol *out);
 

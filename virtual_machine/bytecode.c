@@ -118,6 +118,14 @@ bool bytecode_imports_next(bytecode_iterator *it, const char **out_name) {
   return true;
 }
 
+size_t bytecode_count_globals(bytecode **bc_arr, size_t n) {
+  size_t total = 0;
+  for (size_t i = 0; i < n; i++) {
+    total += bc_arr[i]->globals_count;
+  }
+  return total;
+}
+
 void bytecode_free(bytecode *bc) {
   if (!bc) {
     return;

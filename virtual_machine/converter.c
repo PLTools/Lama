@@ -1002,14 +1002,6 @@ static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
   return prog;
 }
 
-size_t count_globals(bytecode **bc_arr, size_t n) {
-  size_t total = 0;
-  for (size_t i = 0; i < n; i++) {
-    total += bc_arr[i]->globals_count;
-  }
-  return total;
-}
-
 program *decode(bytecode **bc_arr, size_t n, aint *globals) {
   symbol_table *st = symbol_table_create();
   ffi_call_table *ffi = ffi_call_table_create();
