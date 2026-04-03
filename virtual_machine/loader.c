@@ -43,9 +43,10 @@ static char *build_unit_path(const char *unit_name, const search_paths *paths) {
  * Check if a string looks like a file path (contains '/' or ends with '.bc')
  */
 static bool is_filepath(const char *str) {
+  if (strchr(str, '/') != NULL)
+    return true;
   size_t len = strlen(str);
-  return strchr(str, '/') != NULL ||
-         (len > 3 && strcmp(str + len - 3, ".bc") == 0);
+  return len > 3 && strcmp(str + len - 3, ".bc") == 0;
 }
 
 static bool find_loaded(bytecode_array *units, const char *name) {
