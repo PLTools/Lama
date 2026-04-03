@@ -45,18 +45,18 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
   vm->bc_len = lr.units_len;
 
   vm->stack_size = 8 * 1024 * 1024;
-  vm->stack_base = mmap(NULL, vm->stack_size, PROT_READ | PROT_WRITE,
-                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN, -1, 0);
-  if (vm->stack_base == MAP_FAILED) {
+  void *mmap_base = mmap(NULL, vm->stack_size, PROT_READ | PROT_WRITE,
+                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN, -1, 0);
+  if (mmap_base == MAP_FAILED) {
     perror("mmap stack");
     vm_destroy(vm);
     return NULL;
   }
+  vm->stack_base = (char *)mmap_base + vm->stack_size;
 
   // Compute total globals and place at the top of the stack
   vm->total_globals = count_globals(lr.units, lr.units_len);
-  aint *stack_top = (aint *)((char *)vm->stack_base + vm->stack_size);
-  vm->globals = stack_top - vm->total_globals;
+  vm->globals = (aint *)vm->stack_base - vm->total_globals;
   memset(vm->globals, 0, vm->total_globals * sizeof(aint));
 
   program *prog = decode(lr.units, lr.units_len, vm->globals);
@@ -89,7 +89,7 @@ void vm_destroy(virtual_machine *vm) {
   free(vm->code);
   free(vm->entry_points);
   if (vm->stack_base && vm->stack_base != MAP_FAILED) {
-    munmap(vm->stack_base, vm->stack_size);
+    munmap((char *)vm->stack_base - vm->stack_size, vm->stack_size);
   }
   free(vm);
 }
@@ -100,11 +100,10 @@ void vm_set_args(virtual_machine *vm, int argc, char *argv[]) {
 }
 
 aint vm_run(virtual_machine *vm) {
-  aint *stack_top = (aint *)((char *)vm->stack_base + vm->stack_size);
   aint *sp = vm->globals - 1;
 
   __gc_stack_top = (size_t)sp;
-  __gc_stack_bottom = (size_t)stack_top;
+  __gc_stack_bottom = (size_t)vm->stack_base;
 
   aint *bp;
   aint ret_val = 0;
