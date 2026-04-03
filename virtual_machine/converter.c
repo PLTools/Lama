@@ -308,7 +308,7 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
   return true;
 }
 
-static insn *decode_internal(decode_ctx *ctx) {
+static bool decode_internal(decode_ctx *ctx) {
 
   const bytecode *bc = ctx->bc;
   size_t global_base = ctx->global_offset;
@@ -329,7 +329,7 @@ static insn *decode_internal(decode_ctx *ctx) {
   EMIT_FUNC(ctx, op_init);
   EMIT_NUM(ctx, 0); // placeholder for op_eof
 
-  insn *result = NULL;
+  bool ok = false;
 
   while (!reader_eof(&ctx->reader)) {
     size_t current_bc_off = reader_pos(&ctx->reader);
@@ -882,7 +882,7 @@ static insn *decode_internal(decode_ctx *ctx) {
     ctx->bc_to_insn_map[i] = meta[i].resolved_idx;
   }
 
-  result = ctx->code.data;
+  ok = true;
 
 cleanup:
   da_free(ctx->sv.func_stack);
@@ -897,7 +897,7 @@ cleanup:
   }
   free(meta);
 
-  return result;
+  return ok;
 }
 
 static void register_public_symbols(symbol_table *st, const bytecode *bc,
@@ -1027,15 +1027,14 @@ program *decode(bytecode **bc_arr, size_t n, aint *globals) {
     decode_ctx ctx;
     decode_ctx_init(&ctx, bc_arr[i], st, ffi, &ext_globals, globals,
                     total_globals);
-    insn *code = decode_internal(&ctx);
-    if (!code) {
+    if (!decode_internal(&ctx)) {
       fprintf(stderr, "Failed to decode %s\n", bc_arr[i]->name);
       free(ctx.bc_to_insn_map);
       goto cleanup;
     }
 
     dec_arr[i] = (decoded){
-        .code = code,
+        .code = ctx.code.data,
         .code_len = ctx.code.len,
         .bc_to_insn_map = ctx.bc_to_insn_map,
         .relocs = ctx.relocs.data,
