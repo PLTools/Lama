@@ -24,7 +24,7 @@ The VM is tightly integrated with the Lama runtime (`../runtime/`). It relies on
 ## Bytecode format
 
 ### Layout
-Bytes are laid out in little-endian order.
+Multi-byte integers are laid out in little-endian order.
 1. Header (16 bytes)
 2. String table (variable)
 3. Imports (number of imports * 4 bytes)
@@ -32,12 +32,11 @@ Bytes are laid out in little-endian order.
 5. Code section (until 0xFF)
 
 ### Header
-| offset | size | field |
-|--------|------|-------|
-| 0 | 4 | string table size |
-| 4 | 4 | globals count |
-| 8 | 4 | number of imports |
-| 12 | 4 | number of public symbols |
+The header is 16 bytes:
+*   `string_table_size` (int32): size of the string table
+*   `globals_count` (int32): number of global slots (stored on the stack)
+*   `imports_count` (int32): number of imports
+*   `public_symbols_count` (int32): number of public symbols
 
 ### Imports
 Each entry is 4 bytes:
