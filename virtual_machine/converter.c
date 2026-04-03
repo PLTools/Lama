@@ -6,7 +6,6 @@
 #include "memory.h"
 #include "opcodes.h"
 #include "ops.h"
-#include "stack_validation.h"
 #include "symbols.h"
 #include <assert.h>
 #include <dlfcn.h>
@@ -88,6 +87,33 @@ typedef struct {
     size_t cap;
   } entries;
 } ext_global_cache;
+
+/*
+ * Different states of reachability for stack validation:
+ * LIVE: currently decoding sequentially, reachable from previous instruction
+ * BARRIER: just emitted JMP or END, so next instruction is reachable but not
+ * from previous instruction
+ * DEAD: not reachable from previous instruction
+ */
+typedef enum { LIVE, BARRIER, DEAD } reach_state;
+
+typedef struct {
+  int32_t max_depth;    // max stack depth of the function
+  size_t max_depth_pos; // position in code array where max_depth is emitted
+                        // (for patching)
+} func_frame;
+
+typedef struct {
+  int32_t depth;
+  reach_state state;
+  int32_t max_depth;
+  size_t max_depth_pos;
+  struct {
+    func_frame *data;
+    size_t len;
+    size_t cap;
+  } func_stack;
+} stack_validation;
 
 typedef struct {
   const bytecode *bc;
@@ -292,6 +318,28 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
   }
   return true;
 }
+
+#define DEPTH_INC(sv, n)                                                       \
+  do {                                                                         \
+    if ((sv).state != DEAD) {                                                  \
+      VM_DEBUG("  DEPTH: %d -> %d (+%d)\n", (sv).depth, (sv).depth + (n),      \
+               (n));                                                           \
+      (sv).depth += (n);                                                       \
+      if ((sv).depth > (sv).max_depth)                                         \
+        (sv).max_depth = (sv).depth;                                           \
+    }                                                                          \
+  } while (0)
+#define DEPTH_DEC(sv, n)                                                       \
+  do {                                                                         \
+    if ((sv).state != DEAD) {                                                  \
+      VM_DEBUG("  DEPTH: %d -> %d (-%d)\n", (sv).depth, (sv).depth - (n),      \
+               (n));                                                           \
+      (sv).depth -= (n);                                                       \
+      assert((sv).depth >= 0 && "stack underflow");                            \
+    }                                                                          \
+  } while (0)
+#define DEPTH_PUSH(sv) DEPTH_INC(sv, 1)
+#define DEPTH_POP(sv) DEPTH_DEC(sv, 1)
 
 static bool decode_internal(decode_ctx *ctx) {
 
@@ -886,6 +934,11 @@ cleanup:
 
   return ok;
 }
+
+#undef DEPTH_INC
+#undef DEPTH_DEC
+#undef DEPTH_PUSH
+#undef DEPTH_POP
 
 static void register_public_symbols(symbol_table *st, const bytecode *bc,
                                     size_t code_offset, size_t global_base,
