@@ -216,26 +216,14 @@ static bool emit_ext_glo(decode_ctx *ctx, const char *glob_name, fn op) {
   return true;
 }
 
-static bool emit_ld_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
+static bool emit_glo(decode_ctx *ctx, int32_t idx, size_t global_base, fn op) {
   if (IS_EXT_REF(idx)) {
     int str_offset = EXT_REF_INDEX(idx);
     const char *glob_name = bytecode_get_string(ctx->bc, str_offset);
-    VM_DEBUG("DECODE: OP_LD external global '%s'\n", glob_name);
-    return emit_ext_glo(ctx, glob_name, op_ld_glo);
+    VM_DEBUG("DECODE: external global '%s'\n", glob_name);
+    return emit_ext_glo(ctx, glob_name, op);
   }
-  EMIT_FUNC(ctx, op_ld_glo);
-  EMIT_GLOBAL_PTR(ctx, &ctx->globals[global_base + idx]);
-  return true;
-}
-
-static bool emit_st_glo(decode_ctx *ctx, int32_t idx, size_t global_base) {
-  if (IS_EXT_REF(idx)) {
-    int str_offset = EXT_REF_INDEX(idx);
-    const char *glob_name = bytecode_get_string(ctx->bc, str_offset);
-    VM_DEBUG("DECODE: OP_ST external global '%s'\n", glob_name);
-    return emit_ext_glo(ctx, glob_name, op_st_glo);
-  }
-  EMIT_FUNC(ctx, op_st_glo);
+  EMIT_FUNC(ctx, op);
   EMIT_GLOBAL_PTR(ctx, &ctx->globals[global_base + idx]);
   return true;
 }
@@ -517,13 +505,15 @@ static bool decode_internal(decode_ctx *ctx) {
     case OP_LD: {
       DEPTH_PUSH(ctx->sv);
       int32_t idx = reader_i32(&ctx->reader);
-      emit_ld_glo(ctx, idx, global_base);
+      VM_DEBUG("DECODE: OP_LD global idx=%d\n", idx);
+      emit_glo(ctx, idx, global_base, op_ld_glo);
       break;
     }
 
     case OP_ST: {
       int32_t idx = reader_i32(&ctx->reader);
-      emit_st_glo(ctx, idx, global_base);
+      VM_DEBUG("DECODE: OP_ST global idx=%d\n", idx);
+      emit_glo(ctx, idx, global_base, op_st_glo);
       break;
     }
 
@@ -692,7 +682,7 @@ static bool decode_internal(decode_ctx *ctx) {
         switch (designation_type) {
         case 0: // Global
           DEPTH_PUSH(ctx->sv);
-          emit_ld_glo(ctx, idx, global_base);
+          emit_glo(ctx, idx, global_base, op_ld_glo);
           break;
         case 1: // Local
           DEPTH_PUSH(ctx->sv);
