@@ -148,7 +148,7 @@ void op_mod(DECL_STATE) {
 
 void op_drop(DECL_STATE) {
   VM_DEBUG("DROP\n");
-  sp++;
+  *++sp = 0;
   DISPATCH();
 }
 
