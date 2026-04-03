@@ -465,7 +465,9 @@ void op_begin(DECL_STATE) {
     STACK_PUSH(sp, 0);
   }
 
-  __gc_stack_top = (size_t)(sp - max_depth);
+  aint *offset = sp - max_depth;
+  memset(offset + 1, 0, max_depth * sizeof(aint));
+  __gc_stack_top = (size_t)offset;
 
   DISPATCH();
 }
