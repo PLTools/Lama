@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
       }
       break;
     default:
-      print_usage(stdout, argv[0]);
+      print_usage(stderr, argv[0]);
       return 1;
     }
   }
