@@ -159,6 +159,10 @@ static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
   ctx->ffi = ffi;
   ctx->ext_globals = ext_globals;
 
+  ctx->sv = (stack_validation){
+      .depth = 0, .state = LIVE, .max_depth = 0, .max_depth_pos = 0};
+  da_init(ctx->sv.func_stack);
+
   reader_init(&ctx->reader, bc->code, bc->code_size);
 }
 
@@ -354,10 +358,6 @@ static bool decode_internal(decode_ctx *ctx) {
     meta[i].stack_depth = -1;
     meta[i].fixups = NULL;
   }
-
-  ctx->sv = (stack_validation){
-      .depth = 0, .state = LIVE, .max_depth = 0, .max_depth_pos = 0};
-  da_init(ctx->sv.func_stack);
 
   EMIT_FUNC(ctx, op_init);
   EMIT_NUM(ctx, 0); // placeholder for op_eof
