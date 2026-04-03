@@ -25,8 +25,9 @@ typedef struct {
 /*
  * Build the path to a unit's .bc file by searching through paths.
  */
-static char *build_unit_path(const char *unit_name, const search_paths *paths) {
-  char *path = ALLOC_ARRAY(char, MAX_PATH_LEN);
+static const char *build_unit_path(const char *unit_name,
+                                   const search_paths *paths) {
+  static char path[MAX_PATH_LEN];
 
   for (size_t i = 0; i < paths->len; i++) {
     snprintf(path, MAX_PATH_LEN, "%s/%s.bc", paths->paths[i], unit_name);
@@ -35,7 +36,6 @@ static char *build_unit_path(const char *unit_name, const search_paths *paths) {
     }
   }
 
-  free(path);
   return NULL;
 }
 
@@ -104,9 +104,8 @@ static bool load_unit_recursive(bytecode_array *units, const char *unit_name,
       continue;
     }
 
-    char *dep_path = build_unit_path(import_name, paths);
+    const char *dep_path = build_unit_path(import_name, paths);
     load_unit_recursive(units, import_name, dep_path, paths);
-    free(dep_path);
   }
 
   da_append(*units, bc);
@@ -117,10 +116,10 @@ load_result load(const char *main_unit_path, const search_paths *paths) {
   bytecode_array m;
   da_init(m);
 
-  char *filepath;
+  const char *filepath;
   char *unit_name;
   if (is_filepath(main_unit_path)) {
-    filepath = ESTRDUP(main_unit_path);
+    filepath = main_unit_path;
     unit_name = extract_unit_name(main_unit_path);
   } else {
     filepath = build_unit_path(main_unit_path, paths);
@@ -128,7 +127,6 @@ load_result load(const char *main_unit_path, const search_paths *paths) {
   }
 
   load_unit_recursive(&m, unit_name, filepath, paths);
-  free(filepath);
   free(unit_name);
 
   load_result result = {
