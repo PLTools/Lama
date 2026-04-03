@@ -98,21 +98,10 @@ typedef struct {
 typedef enum { LIVE, BARRIER, DEAD } reach_state;
 
 typedef struct {
-  int32_t max_depth;    // max stack depth of the function
-  size_t max_depth_pos; // position in code array where max_depth is emitted
-                        // (for patching)
-} func_frame;
-
-typedef struct {
   int32_t depth;
   reach_state state;
   int32_t max_depth;
   size_t max_depth_pos;
-  struct {
-    func_frame *data;
-    size_t len;
-    size_t cap;
-  } func_stack;
 } stack_validation;
 
 typedef struct {
@@ -161,7 +150,6 @@ static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
 
   ctx->sv = (stack_validation){
       .depth = 0, .state = LIVE, .max_depth = 0, .max_depth_pos = 0};
-  da_init(ctx->sv.func_stack);
 
   reader_init(&ctx->reader, bc->code, bc->code_size);
 }
@@ -732,10 +720,6 @@ static bool decode_internal(decode_ctx *ctx) {
       int32_t n_args = reader_i32(&ctx->reader);
       int32_t n_locals = reader_i32(&ctx->reader);
       ctx->sv.depth = 0;
-      // Save outer function's max_depth
-      func_frame frame = {.max_depth = ctx->sv.max_depth,
-                          .max_depth_pos = ctx->sv.max_depth_pos};
-      da_append(ctx->sv.func_stack, frame);
       ctx->sv.max_depth = 0;
       EMIT_FUNC(ctx, op_begin);
       EMIT_NUM(ctx, n_args);
@@ -915,12 +899,6 @@ static bool decode_internal(decode_ctx *ctx) {
         ctx->code.data[ctx->sv.max_depth_pos].num = ctx->sv.max_depth;
         ctx->sv.state = BARRIER;
       }
-      assert(ctx->sv.func_stack.len > 0);
-      ctx->sv.max_depth =
-          ctx->sv.func_stack.data[ctx->sv.func_stack.len - 1].max_depth;
-      ctx->sv.max_depth_pos =
-          ctx->sv.func_stack.data[ctx->sv.func_stack.len - 1].max_depth_pos;
-      ctx->sv.func_stack.len--;
       break;
 
     case OP_LINE: {
@@ -956,7 +934,6 @@ static bool decode_internal(decode_ctx *ctx) {
   ok = true;
 
 cleanup:
-  da_free(ctx->sv.func_stack);
   // Free temporary metadata and fixup nodes
   for (size_t i = 0; i < bc->code_size; i++) {
     fixup_node *node = meta[i].fixups;
