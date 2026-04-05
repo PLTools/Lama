@@ -1716,9 +1716,12 @@ let compile cmd ((imports, _), p) =
       ]
       env
   in
+  let top_public =
+    match cmd#get_mode with `BC -> [] | _ -> [ PUBLIC (topname, true) ]
+  in
   let prg =
     List.map (fun i -> IMPORT i) imports
-    @ [ PUBLIC (topname, true) ] @ env#get_decls @ List.flatten prg
+    @ top_public @ env#get_decls @ List.flatten prg
   in
   (*Printf.eprintf "Before propagating closures:\n";
     Printf.eprintf "%s\n%!" env#show_funinfo;
