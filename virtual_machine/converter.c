@@ -1039,16 +1039,13 @@ static void resolve_relocs(insn *all_code, decoded *dec, size_t code_offset,
 
 static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
                              size_t total_globals, ffi_call_table *ffi) {
+  static insn eof_ip = {.func = op_eof};
   size_t ffi_call_len = ffi_call_table_len(ffi);
-
-  size_t eof_offset = total_code_len;
-  size_t ffi_call_offset = eof_offset + 1;
+  size_t ffi_call_offset = total_code_len;
   size_t all_code_len = ffi_call_offset + ffi_call_len * FFI_STUB_SIZE;
 
   insn *all_code = ALLOC_ARRAY(insn, all_code_len);
   insn **entry_points = ALLOC_ARRAY(insn *, n);
-
-  all_code[eof_offset].func = op_eof;
   // Copy code and resolve relocations
   size_t code_offset = 0;
   for (size_t i = 0; i < n; i++) {
@@ -1059,7 +1056,7 @@ static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
     entry_points[i] = &all_code[code_offset];
     resolve_relocs(all_code, dec, code_offset, ffi_call_offset);
 
-    all_code[code_offset + 1].target = &all_code[eof_offset];
+    all_code[code_offset + 1].target = &eof_ip;
 
     code_offset += dec->code_len;
   }

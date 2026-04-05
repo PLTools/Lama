@@ -566,6 +566,13 @@ void op_closure(DECL_STATE) {
   DISPATCH();
 }
 
+/*
+ * op_init is a setup for the main op_begin of the entry point unit. It pushes a
+ * fake frame with 0 args and no saved state, so that the main function can use
+ * the normal CALL/END sequence without worrying about the initial case. The
+ * fake return address points to a special op_eof which just returns, causing
+ * the whole program to exit when the main function returns.
+ */
 void op_init(DECL_STATE) {
   ip++;
   insn *eof_ip = ip->target;
