@@ -292,6 +292,48 @@ static bool emit_glo(decode_ctx *ctx, int32_t idx, size_t global_base, fn op) {
 }
 
 /*
+ * Emit target slot for CALL/CLOSURE, handles external and internal targets.
+ */
+static bool emit_target(decode_ctx *ctx, meta_info *meta, int32_t target_off,
+                        size_t current_bc_off, const char *opname) {
+  const bytecode *bc = ctx->bc;
+  size_t target_slot = ctx->code.len;
+
+  if (IS_EXT_REF(target_off)) {
+    int str_offset = EXT_REF_INDEX(target_off);
+    const char *name = bytecode_get_string(bc, str_offset);
+    VM_DEBUG("DECODE: %s external '%s'\n", opname, name);
+
+    resolved_symbol *sym = symbol_table_find_function(ctx->st, name);
+    if (sym) {
+      add_reloc(ctx, target_slot, name, UNIT);
+      EMIT_NUM(
+          ctx,
+          sym->idx); // placeholder, will be resolved to inter-unit function
+    } else {
+      size_t idx = ffi_call_table_intern(ctx->ffi, name);
+      add_reloc(ctx, target_slot, name, FFI);
+      EMIT_NUM(ctx, idx); // placeholder, will be resolved to FFI call
+    }
+  } else {
+    if (!validate_target_off(bc, target_off, current_bc_off, opname))
+      return false;
+
+    EMIT_NUM(ctx, 0); // placeholder — will hold code index
+
+    meta_info *tm = &meta[target_off];
+    if (target_off < (int32_t)current_bc_off) {
+      assert(tm->resolved_idx != -1);
+      ctx->code.data[target_slot].num = tm->resolved_idx;
+      add_reloc(ctx, target_slot, NULL, INTERNAL);
+    } else {
+      add_fixup(meta, target_off, target_slot);
+    }
+  }
+  return true;
+}
+
+/*
  * Handle jump target resolution (intra-unit only — these are always local)
  */
 static bool handle_jump(decode_ctx *ctx, meta_info *meta,
@@ -798,8 +840,6 @@ static bool decode_internal(decode_ctx *ctx) {
       VM_DEBUG("DECODE: OP_CLOSURE target_raw=0x%x n_captured=%d bc_off=%zu\n",
                target_off, n_captured, current_bc_off);
 
-      bool is_external = IS_EXT_REF(target_off);
-
       // Emit load instructions for each captured variable
       for (int32_t i = 0; i < n_captured; i++) {
         uint8_t type_byte = reader_u8(&ctx->reader);
@@ -840,52 +880,13 @@ static bool decode_internal(decode_ctx *ctx) {
       DEPTH_PUSH(ctx->sv);
 
       EMIT_FUNC(ctx, op_closure);
+      if (!emit_target(ctx, meta, target_off, current_bc_off, "CLOSURE"))
+        goto cleanup;
+      EMIT_NUM(ctx, n_captured);
 
-      size_t target_slot = ctx->code.len;
-      if (is_external) {
-        int str_offset = EXT_REF_INDEX(target_off);
-        const char *ext_func_name = bytecode_get_string(bc, str_offset);
-
-        VM_DEBUG("DECODE: OP_CLOSURE external name='%s' (stub)\n",
-                 ext_func_name);
-
-        resolved_symbol *sym =
-            symbol_table_find_function(ctx->st, ext_func_name);
-        if (sym) {
-          add_reloc(ctx, target_slot, ext_func_name, UNIT);
-          EMIT_NUM(
-              ctx,
-              sym->idx); // placeholder, will be resolved to inter-unit function
-        } else {
-          size_t idx = ffi_call_table_intern(ctx->ffi, ext_func_name);
-          add_reloc(ctx, target_slot, ext_func_name, FFI);
-          EMIT_NUM(ctx, idx); // placeholder, will be resolved to FFI call
-        }
-
-        EMIT_NUM(ctx, n_captured);
-
-      } else {
-        if (!validate_target_off(bc, target_off, current_bc_off, "CLOSURE")) {
-          goto cleanup;
-        }
-
-        EMIT_NUM(ctx, 0); // placeholder — will hold code index
-        EMIT_NUM(ctx, n_captured);
-
+      if (!IS_EXT_REF(target_off))
         da_append(ctx->closures, ((closure_info){.bc_off = target_off,
                                                  .n_captured = n_captured}));
-
-        meta_info *tm = &meta[target_off];
-        if (target_off < (int32_t)current_bc_off) {
-          assert(tm->resolved_idx != -1 &&
-                 "backward closure target must have been visited");
-
-          ctx->code.data[target_slot].num = tm->resolved_idx;
-          add_reloc(ctx, target_slot, NULL, INTERNAL);
-        } else {
-          add_fixup(meta, target_off, target_slot);
-        }
-      }
       break;
     }
 
@@ -898,51 +899,11 @@ static bool decode_internal(decode_ctx *ctx) {
       VM_DEBUG("DECODE: OP_CALL target_off=0x%x n_args=%d "
                "current_bc_off=%zu code_idx=%zu\n",
                target_off, n_args, current_bc_off, ctx->code.len);
-      bool is_external = IS_EXT_REF(target_off);
 
       EMIT_FUNC(ctx, op_call);
-
-      size_t target_slot = ctx->code.len;
-      if (is_external) {
-        int str_offset = EXT_REF_INDEX(target_off);
-        const char *ext_func_name = bytecode_get_string(bc, str_offset);
-
-        VM_DEBUG("DECODE: OP_CALL external '%s' (stub)\n", ext_func_name);
-
-        resolved_symbol *sym =
-            symbol_table_find_function(ctx->st, ext_func_name);
-
-        if (sym) {
-          add_reloc(ctx, target_slot, ext_func_name, UNIT);
-          EMIT_NUM(
-              ctx,
-              sym->idx); // placeholder, will be resolved to inter-unit function
-        } else {
-          size_t idx = ffi_call_table_intern(ctx->ffi, ext_func_name);
-          add_reloc(ctx, target_slot, ext_func_name, FFI);
-          EMIT_NUM(ctx, idx); // placeholder, will be resolved to FFI call
-        }
-        EMIT_NUM(ctx, n_args);
-
-      } else {
-        if (!validate_target_off(bc, (uint32_t)target_off, current_bc_off,
-                                 "CALL")) {
-          goto cleanup;
-        }
-        EMIT_NUM(ctx, 0); // placeholder — will hold code index
-        EMIT_NUM(ctx, n_args);
-
-        meta_info *tm = &meta[target_off];
-        if (target_off < (int32_t)current_bc_off) {
-          assert(tm->resolved_idx != -1 &&
-                 "backward call target must have been visited");
-
-          ctx->code.data[target_slot].num = tm->resolved_idx;
-          add_reloc(ctx, target_slot, NULL, INTERNAL);
-        } else {
-          add_fixup(meta, (uint32_t)target_off, target_slot);
-        }
-      }
+      if (!emit_target(ctx, meta, target_off, current_bc_off, "CALL"))
+        goto cleanup;
+      EMIT_NUM(ctx, n_args);
       break;
     }
 
