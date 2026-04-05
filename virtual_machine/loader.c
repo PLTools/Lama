@@ -9,12 +9,12 @@
 #include "bytecode.h"
 #include "da.h"
 #include "memory.h"
+#include <fcntl.h>
 #include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 typedef struct {
   bytecode **data;
@@ -22,17 +22,25 @@ typedef struct {
   size_t cap;
 } bytecode_array;
 
-/*
- * Build the path to a unit's .bc file by searching through paths.
- */
-static const char *build_unit_path(const char *unit_name,
-                                   const search_paths *paths) {
-  static char path[MAX_PATH_LEN];
+static void free_loaded_units(bytecode_array *units) {
+  for (size_t i = 0; i < units->len; i++) {
+    bytecode_free(units->data[i]);
+  }
+  da_free(*units);
+}
 
+/*
+ * Resolve a unit name against the search paths and load the first
+ * bytecode file.
+ */
+static bytecode *load_unit_from_paths(const char *unit_name,
+                                      const search_paths *paths) {
+  static char path[MAX_PATH_LEN];
   for (size_t i = 0; i < paths->len; i++) {
     snprintf(path, MAX_PATH_LEN, "%s/%s.bc", paths->paths[i], unit_name);
-    if (access(path, F_OK) == 0) {
-      return path;
+    int fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+      return bytecode_load_fd(fd);
     }
   }
 
@@ -79,18 +87,7 @@ static char *extract_unit_name(const char *filename) {
  * Load a single unit and its dependencies recursively.
  */
 static bool load_unit_recursive(bytecode_array *units, const char *unit_name,
-                                const char *filepath,
-                                const search_paths *paths) {
-  if (find_loaded(units, unit_name)) {
-    return true;
-  }
-
-  bytecode *bc = bytecode_load(filepath);
-  if (!bc) {
-    fprintf(stderr, "Failed to load dependency '%s' from '%s'\n", unit_name,
-            filepath);
-    return false;
-  }
+                                bytecode *bc, const search_paths *paths) {
   bc->name = ESTRDUP(unit_name);
 
   // Recursively load dependencies first (topological order)
@@ -104,8 +101,21 @@ static bool load_unit_recursive(bytecode_array *units, const char *unit_name,
       continue;
     }
 
-    const char *dep_path = build_unit_path(import_name, paths);
-    load_unit_recursive(units, import_name, dep_path, paths);
+    if (find_loaded(units, import_name)) {
+      continue;
+    }
+
+    bytecode *dep_bc = load_unit_from_paths(import_name, paths);
+    if (!dep_bc) {
+      fprintf(stderr, "Failed to load dependency '%s'\n", import_name);
+      bytecode_free(bc);
+      return false;
+    }
+
+    if (!load_unit_recursive(units, import_name, dep_bc, paths)) {
+      bytecode_free(bc);
+      return false;
+    }
   }
 
   da_append(*units, bc);
@@ -116,17 +126,22 @@ load_result load(const char *main_unit_path, const search_paths *paths) {
   bytecode_array m;
   da_init(m);
 
-  const char *filepath;
-  char *unit_name;
-  if (is_filepath(main_unit_path)) {
-    filepath = main_unit_path;
-    unit_name = extract_unit_name(main_unit_path);
-  } else {
-    filepath = build_unit_path(main_unit_path, paths);
-    unit_name = ESTRDUP(main_unit_path);
+  bool is_path = is_filepath(main_unit_path);
+  bytecode *bc = is_path ? bytecode_load(main_unit_path)
+                         : load_unit_from_paths(main_unit_path, paths);
+  if (!bc) {
+    fprintf(stderr, "Failed to load unit '%s'\n", main_unit_path);
+    return (load_result){0};
   }
 
-  load_unit_recursive(&m, unit_name, filepath, paths);
+  char *unit_name =
+      is_path ? extract_unit_name(main_unit_path) : ESTRDUP(main_unit_path);
+
+  if (!load_unit_recursive(&m, unit_name, bc, paths)) {
+    free(unit_name);
+    free_loaded_units(&m);
+    return (load_result){0};
+  }
   free(unit_name);
 
   load_result result = {

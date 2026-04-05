@@ -38,6 +38,7 @@ typedef struct {
   const char *name;
 } bytecode;
 
+bytecode *bytecode_load_fd(int fd);
 bytecode *bytecode_load(const char *filename);
 
 void bytecode_free(bytecode *bc);

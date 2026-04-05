@@ -14,8 +14,7 @@
 #define PUB_ENTRY_SIZE 9
 #define IMPORT_ENTRY_SIZE 4
 
-bytecode *bytecode_load(const char *filename) {
-  int fd = open(filename, O_RDONLY);
+bytecode *bytecode_load_fd(int fd) {
   if (fd < 0) {
     perror("bytecode_load: open");
     return NULL;
@@ -78,6 +77,16 @@ bytecode *bytecode_load(const char *filename) {
   bc->name = NULL;
 
   return bc;
+}
+
+bytecode *bytecode_load(const char *filename) {
+  int fd = open(filename, O_RDONLY);
+  if (fd < 0) {
+    perror("bytecode_load: open");
+    return NULL;
+  }
+
+  return bytecode_load_fd(fd);
 }
 
 void bytecode_pubs_init(bytecode_iterator *iter, const bytecode *bc) {
