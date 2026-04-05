@@ -39,6 +39,15 @@ extern aint LtagHash(char *s);
   da_append((ctx)->code, ((insn){.global_ptr = (p)}))
 #define EMIT_PTR(ctx, p) da_append((ctx)->code, ((insn){.ptr = (p)}))
 
+#define CHECK_IDX(idx, limit, name)                                            \
+  do {                                                                         \
+    if ((idx) < 0 || (idx) >= (limit)) {                                       \
+      fprintf(stderr, "%s: index %d >= %d at bc_off=%zu\n", name, (int)(idx),  \
+              (int)(limit), current_bc_off);                                   \
+      goto cleanup;                                                            \
+    }                                                                          \
+  } while (0)
+
 #define FFI_STUB_SIZE 2
 
 typedef enum {
@@ -65,6 +74,12 @@ typedef struct {
   int32_t stack_depth;  // Expected stack depth (-1 if not visited yet)
   fixup_node *fixups;   // Linked list of forward jumps pointing here
 } meta_info;
+
+// Maps CLOSURE target bytecode offsets to their n_captured
+typedef struct {
+  int32_t bc_off;
+  int32_t n_captured;
+} closure_info;
 
 typedef struct {
   insn *code;
@@ -108,6 +123,12 @@ typedef struct {
 } stack_validation;
 
 typedef struct {
+  int32_t n_locals;
+  int32_t n_args;
+  int32_t n_captured; // 0 for BEGIN, >0 for BEGIN_CLOSURE
+} func_ctx;
+
+typedef struct {
   const bytecode *bc;
 
   struct {
@@ -132,6 +153,14 @@ typedef struct {
   ext_global_cache *ext_globals;
 
   stack_validation sv;
+
+  struct {
+    closure_info *data;
+    size_t len;
+    size_t cap;
+  } closures; // CLOSURE target_off -> n_captured mapping
+
+  func_ctx func;
 } decode_ctx;
 
 static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
@@ -146,15 +175,28 @@ static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
 
   da_init(ctx->code);
   da_init(ctx->relocs);
+  da_init(ctx->closures);
 
   ctx->st = st;
   ctx->ffi = ffi;
   ctx->ext_globals = ext_globals;
 
-  ctx->sv = (stack_validation){
-      .depth = 0, .state = LIVE, .max_depth = 0, .max_depth_pos = 0};
+  ctx->sv = (stack_validation){0};
+  ctx->func = (func_ctx){0};
 
   reader_init(&ctx->reader, bc->code, bc->code_size);
+}
+
+/*
+ * Returns n_captured for a CLOSURE target, or -1 if no CLOSURE targets this
+ * offset
+ */
+static int32_t find_n_captured(decode_ctx *ctx, int32_t bc_off) {
+  for (size_t i = 0; i < ctx->closures.len; i++) {
+    if (ctx->closures.data[i].bc_off == bc_off)
+      return ctx->closures.data[i].n_captured;
+  }
+  return -1;
 }
 
 /*
@@ -576,6 +618,7 @@ static bool decode_internal(decode_ctx *ctx) {
     case OP_LD_LOC: {
       DEPTH_PUSH(ctx->sv);
       int32_t idx = reader_i32(&ctx->reader);
+      CHECK_IDX(idx, ctx->func.n_locals, "LD_LOC");
       EMIT_FUNC(ctx, op_ld_loc);
       EMIT_NUM(ctx, idx);
       break;
@@ -583,6 +626,7 @@ static bool decode_internal(decode_ctx *ctx) {
 
     case OP_ST_LOC: {
       int32_t idx = reader_i32(&ctx->reader);
+      CHECK_IDX(idx, ctx->func.n_locals, "ST_LOC");
       EMIT_FUNC(ctx, op_st_loc);
       EMIT_NUM(ctx, idx);
       break;
@@ -591,6 +635,7 @@ static bool decode_internal(decode_ctx *ctx) {
     case OP_LD_ARG: {
       DEPTH_PUSH(ctx->sv);
       int32_t idx = reader_i32(&ctx->reader);
+      CHECK_IDX(idx, ctx->func.n_args, "LD_ARG");
       EMIT_FUNC(ctx, op_ld_arg);
       EMIT_NUM(ctx, idx);
       break;
@@ -598,6 +643,7 @@ static bool decode_internal(decode_ctx *ctx) {
 
     case OP_ST_ARG: {
       int32_t idx = reader_i32(&ctx->reader);
+      CHECK_IDX(idx, ctx->func.n_args, "ST_ARG");
       EMIT_FUNC(ctx, op_st_arg);
       EMIT_NUM(ctx, idx);
       break;
@@ -606,6 +652,8 @@ static bool decode_internal(decode_ctx *ctx) {
     case OP_LD_CLO: {
       DEPTH_PUSH(ctx->sv);
       int32_t idx = reader_i32(&ctx->reader);
+      if (ctx->func.n_captured != -1)
+        CHECK_IDX(idx, ctx->func.n_captured, "LD_CLO");
       EMIT_FUNC(ctx, op_ld_clo);
       EMIT_NUM(ctx, idx);
       break;
@@ -613,6 +661,8 @@ static bool decode_internal(decode_ctx *ctx) {
 
     case OP_ST_CLO: {
       int32_t idx = reader_i32(&ctx->reader);
+      if (ctx->func.n_captured != -1)
+        CHECK_IDX(idx, ctx->func.n_captured, "ST_CLO");
       EMIT_FUNC(ctx, op_st_clo);
       EMIT_NUM(ctx, idx);
       break;
@@ -724,6 +774,14 @@ static bool decode_internal(decode_ctx *ctx) {
       int32_t n_locals = reader_i32(&ctx->reader);
       ctx->sv.depth = 0;
       ctx->sv.max_depth = 0;
+
+      ctx->func =
+          (func_ctx){.n_args = n_args,
+                     .n_locals = n_locals,
+                     .n_captured = (opcode == OP_BEGIN_CLOSURE)
+                                       ? find_n_captured(ctx, current_bc_off)
+                                       : 0};
+
       EMIT_FUNC(ctx, op_begin);
       EMIT_NUM(ctx, n_args);
       EMIT_NUM(ctx, n_locals);
@@ -754,16 +812,20 @@ static bool decode_internal(decode_ctx *ctx) {
           emit_glo(ctx, idx, global_base, op_ld_glo);
           break;
         case 1: // Local
+          CHECK_IDX(idx, ctx->func.n_locals, "CLOSURE desig local");
           DEPTH_PUSH(ctx->sv);
           EMIT_FUNC(ctx, op_ld_loc);
           EMIT_NUM(ctx, idx);
           break;
         case 2: // Arg
+          CHECK_IDX(idx, ctx->func.n_args, "CLOSURE desig arg");
           DEPTH_PUSH(ctx->sv);
           EMIT_FUNC(ctx, op_ld_arg);
           EMIT_NUM(ctx, idx);
           break;
         case 3: // Closure var
+          if (ctx->func.n_captured != -1)
+            CHECK_IDX(idx, ctx->func.n_captured, "CLOSURE desig closure");
           DEPTH_PUSH(ctx->sv);
           EMIT_FUNC(ctx, op_ld_clo);
           EMIT_NUM(ctx, idx);
@@ -809,6 +871,9 @@ static bool decode_internal(decode_ctx *ctx) {
 
         EMIT_NUM(ctx, 0); // placeholder — will hold code index
         EMIT_NUM(ctx, n_captured);
+
+        da_append(ctx->closures, ((closure_info){.bc_off = target_off,
+                                                 .n_captured = n_captured}));
 
         meta_info *tm = &meta[target_off];
         if (target_off < (int32_t)current_bc_off) {
@@ -947,6 +1012,7 @@ cleanup:
     }
   }
   free(meta);
+  da_free(ctx->closures);
 
   return ok;
 }
