@@ -46,6 +46,7 @@ typedef enum {
   OP_ARRAY = 0x58,
   OP_FAIL = 0x59,
   OP_LINE = 0x5A,
+  OP_FAIL_KEEP = 0x5B,
   OP_PATT_STR_CMP = 0x60,
   OP_PATT_STRING = 0x61,
   OP_PATT_ARRAY = 0x62,

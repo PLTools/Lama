@@ -111,9 +111,8 @@ typedef struct {
  * LIVE: currently decoding sequentially, reachable from previous instruction
  * BARRIER: just emitted JMP or END, so next instruction is reachable but not
  * from previous instruction
- * DEAD: not reachable from previous instruction
  */
-typedef enum { LIVE, BARRIER, DEAD } reach_state;
+typedef enum { LIVE, BARRIER } reach_state;
 
 typedef struct {
   int32_t depth;
@@ -340,7 +339,6 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
                         size_t current_bc_off) {
   int32_t target_off = reader_i32(&ctx->reader);
   int32_t depth = ctx->sv.depth;
-  reach_state state = ctx->sv.state;
 
   if (!validate_target_off(ctx->bc, target_off, current_bc_off, "JUMP")) {
     return false;
@@ -359,30 +357,23 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
     add_reloc(ctx, my_idx, NULL, INTERNAL);
     VM_DEBUG("  JUMP: backward to bc_off=%d, (depth=%d, target_depth=%d)\n",
              target_off, depth, tm->stack_depth);
-    if (state != DEAD) {
-      assert(tm->stack_depth != -1 &&
-             "backward jump target must have known stack depth");
-      if (tm->stack_depth != depth) {
-        fprintf(stderr,
-                "Error: Jump stack mismatch at bc_off=%zu (exptected %d, "
-                "actual %d)\n",
-                current_bc_off, depth, tm->stack_depth);
-        return false;
-      }
+    assert(tm->stack_depth != -1 &&
+           "backward jump target must have known stack depth");
+    if (tm->stack_depth != depth) {
+      fprintf(stderr,
+              "Error: Jump stack mismatch at bc_off=%zu (exptected %d, "
+              "actual %d)\n",
+              current_bc_off, depth, tm->stack_depth);
+      return false;
     }
   } else {
     // Forward jump — add fixup
     if (!add_fixup(meta, target_off, my_idx)) {
       return false;
     }
-    if (state == DEAD) {
-      // Don't set or validate depth at target since it's not reachable from
-      // sequential decode
-      VM_DEBUG("  JUMP: forward to bc_off=%d (dead, skipping depth)\n",
-               target_off);
-    } else if (tm->stack_depth == -1) {
-      VM_DEBUG("  JUMP: forward to bc_off=%d, (depth=%d, target_depth=%d)\n",
-               target_off, depth, tm->stack_depth);
+    VM_DEBUG("  JUMP: forward to bc_off=%d, (depth=%d, target_depth=%d)\n",
+             target_off, depth, tm->stack_depth);
+    if (tm->stack_depth == -1) {
       tm->stack_depth = depth;
     } else if (tm->stack_depth != depth) {
       fprintf(stderr,
@@ -400,22 +391,16 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
 
 #define DEPTH_INC(sv, n)                                                       \
   do {                                                                         \
-    if ((sv).state != DEAD) {                                                  \
-      VM_DEBUG("  DEPTH: %d -> %d (+%d)\n", (sv).depth, (sv).depth + (n),      \
-               (n));                                                           \
-      (sv).depth += (n);                                                       \
-      if ((sv).depth > (sv).max_depth)                                         \
-        (sv).max_depth = (sv).depth;                                           \
-    }                                                                          \
+    VM_DEBUG("  DEPTH: %d -> %d (+%d)\n", (sv).depth, (sv).depth + (n), (n));  \
+    (sv).depth += (n);                                                         \
+    if ((sv).depth > (sv).max_depth)                                           \
+      (sv).max_depth = (sv).depth;                                             \
   } while (0)
 #define DEPTH_DEC(sv, n)                                                       \
   do {                                                                         \
-    if ((sv).state != DEAD) {                                                  \
-      VM_DEBUG("  DEPTH: %d -> %d (-%d)\n", (sv).depth, (sv).depth - (n),      \
-               (n));                                                           \
-      (sv).depth -= (n);                                                       \
-      assert((sv).depth >= 0 && "stack underflow");                            \
-    }                                                                          \
+    VM_DEBUG("  DEPTH: %d -> %d (-%d)\n", (sv).depth, (sv).depth - (n), (n));  \
+    (sv).depth -= (n);                                                         \
+    assert((sv).depth >= 0 && "stack underflow");                              \
   } while (0)
 #define DEPTH_PUSH(sv) DEPTH_INC(sv, 1)
 #define DEPTH_POP(sv) DEPTH_DEC(sv, 1)
@@ -443,28 +428,15 @@ static bool decode_internal(decode_ctx *ctx) {
     size_t current_bc_off = reader_pos(&ctx->reader);
     uint8_t opcode = reader_u8(&ctx->reader);
 
-    VM_DEBUG("DECODE: bc_off=%zu %s (0x%02X) depth=%d\n", current_bc_off,
+    VM_DEBUG("DECODE: bc_off=%zu %s (0x%02X) depth=%d%s\n", current_bc_off,
              opcode_to_string(opcode), opcode, ctx->sv.depth,
-             ctx->sv.state == BARRIER ? " [barrier]"
-             : ctx->sv.state == DEAD  ? " [dead]"
-                                      : "");
+             ctx->sv.state == BARRIER ? " [barrier]" : "");
 
     meta_info *m = &meta[current_bc_off];
     m->resolved_idx = (int32_t)ctx->code.len;
 
     // Validate stack depth at intersections
-    if (ctx->sv.state == DEAD) {
-      if (m->stack_depth != -1) {
-        // Forward jump visited
-        VM_DEBUG("  DEPTH: %d -> %d", ctx->sv.depth, m->stack_depth);
-        ctx->sv.depth = m->stack_depth;
-        ctx->sv.state = LIVE;
-      } else {
-        // No forward jump
-        VM_DEBUG("  DEPTH: dead, skipping at bc_off=%zu\n", current_bc_off);
-        m->stack_depth = -1; // unvisited
-      }
-    } else if (ctx->sv.state == BARRIER) {
+    if (ctx->sv.state == BARRIER) {
       if (m->stack_depth != -1) {
         // Forward jump visited
         VM_DEBUG("  DEPTH: %d -> %d", ctx->sv.depth, m->stack_depth);
@@ -592,9 +564,7 @@ static bool decode_internal(decode_ctx *ctx) {
       if (!handle_jump(ctx, meta, current_bc_off)) {
         goto cleanup;
       }
-      if (ctx->sv.state != DEAD) {
-        ctx->sv.state = BARRIER;
-      }
+      ctx->sv.state = BARRIER;
       break;
 
     case OP_CJMP_Z:
@@ -758,13 +728,17 @@ static bool decode_internal(decode_ctx *ctx) {
       break;
     }
 
-    case OP_FAIL: {
+    case OP_FAIL:
+    case OP_FAIL_KEEP: {
+      bool keep_value = opcode == OP_FAIL_KEEP;
       int32_t line = reader_i32(&ctx->reader);
       int32_t col = reader_i32(&ctx->reader);
+      if (!keep_value) {
+        DEPTH_POP(ctx->sv);
+      }
       EMIT_FUNC(ctx, op_fail);
       EMIT_NUM(ctx, line);
       EMIT_NUM(ctx, col);
-      ctx->sv.state = DEAD;
       break;
     }
 
@@ -918,16 +892,14 @@ static bool decode_internal(decode_ctx *ctx) {
 
     case OP_END:
       // depth == 1 <=> return value (?)
-      if (ctx->sv.state != DEAD && ctx->sv.depth != 1) {
+      if (ctx->sv.depth != 1) {
         fprintf(stderr, "Error: END with depth = %d at bc_off=%zu\n",
                 ctx->sv.depth, current_bc_off);
         goto cleanup;
       }
       EMIT_FUNC(ctx, op_end);
-      if (ctx->sv.state != DEAD) {
-        ctx->code.data[ctx->sv.max_depth_pos].num = ctx->sv.max_depth;
-        ctx->sv.state = BARRIER;
-      }
+      ctx->code.data[ctx->sv.max_depth_pos].num = ctx->sv.max_depth;
+      ctx->sv.state = BARRIER;
       break;
 
     case OP_LINE: {
@@ -950,7 +922,7 @@ static bool decode_internal(decode_ctx *ctx) {
       goto cleanup;
     }
 
-    if (ctx->sv.state != DEAD && ctx->sv.depth > ctx->sv.max_depth) {
+    if (ctx->sv.depth > ctx->sv.max_depth) {
       ctx->sv.max_depth = ctx->sv.depth;
     }
   }
