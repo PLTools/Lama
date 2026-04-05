@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern aint LtagHash(char *s);
+
 /*
  * Sentinel value for external references (both functions and globals).
  * Address = -index - 1, so index 0 becomes -1, index 1 becomes -2, etc.
@@ -30,6 +32,7 @@
  */
 #define EMIT_FUNC(ctx, f) da_append((ctx)->code, ((insn){.func = (f)}))
 #define EMIT_NUM(ctx, n) da_append((ctx)->code, ((insn){.num = (n)}))
+#define EMIT_ANUM(ctx, n) da_append((ctx)->code, ((insn){.anum = (n)}))
 #define EMIT_STR(ctx, s) da_append((ctx)->code, ((insn){.str = (s)}))
 #define EMIT_TARGET(ctx, t) da_append((ctx)->code, ((insn){.target = (t)}))
 #define EMIT_GLOBAL_PTR(ctx, p)                                                \
@@ -638,7 +641,7 @@ static bool decode_internal(decode_ctx *ctx) {
       DEPTH_DEC(ctx->sv, n_fields);
       DEPTH_PUSH(ctx->sv);
       EMIT_FUNC(ctx, op_sexp);
-      EMIT_STR(ctx, bytecode_get_string(bc, tag_idx));
+      EMIT_ANUM(ctx, LtagHash((char *)bytecode_get_string(bc, tag_idx)));
       EMIT_NUM(ctx, n_fields);
       break;
     }
@@ -649,7 +652,7 @@ static bool decode_internal(decode_ctx *ctx) {
       int32_t tag_idx = reader_i32(&ctx->reader);
       int32_t n_fields = reader_i32(&ctx->reader);
       EMIT_FUNC(ctx, op_tag);
-      EMIT_STR(ctx, bytecode_get_string(bc, tag_idx));
+      EMIT_ANUM(ctx, LtagHash((char *)bytecode_get_string(bc, tag_idx)));
       EMIT_NUM(ctx, n_fields);
       break;
     }

@@ -242,13 +242,11 @@ void op_barray(DECL_STATE) {
 
 void op_sexp(DECL_STATE) {
   ip++;
-  const char *tag_str = ip->str;
+  aint tag_hash = ip->anum;
   ip++;
   int32_t n_fields = ip->num;
 
-  aint tag_hash = LtagHash((char *)tag_str);
-  VM_DEBUG("SEXP: tag=\"%s\" (hash=0x%lx), n_fields=%d\n", tag_str, tag_hash,
-           n_fields);
+  VM_DEBUG("SEXP: tag_hash=0x%lx, n_fields=%d\n", tag_hash, n_fields);
   // Use the free slot at sp for tag_hash, reverse the whole range in-place
   *sp = tag_hash;
   STACK_REVERSE(sp, n_fields + 1);
@@ -262,14 +260,13 @@ void op_sexp(DECL_STATE) {
 
 void op_tag(DECL_STATE) {
   ip++;
-  const char *tag_str = ip->str;
+  aint tag_hash = ip->anum;
   ip++;
   int32_t n_fields = ip->num;
 
-  aint tag_hash = LtagHash((char *)tag_str);
   aint val = STACK_POP(sp);
-  VM_DEBUG("TAG: tag='%s' hash=0x%lx n_fields=%d val=0x%lx\n", tag_str,
-           (long)tag_hash, n_fields, (long)val);
+  VM_DEBUG("TAG: tag_hash=0x%lx n_fields=%d val=0x%lx\n", (long)tag_hash,
+           n_fields, (long)val);
   aint result = Btag((void *)val, tag_hash, BOX(n_fields));
   VM_DEBUG("TAG: result=%ld\n", (long)UNBOX(result));
   STACK_PUSH(sp, result);

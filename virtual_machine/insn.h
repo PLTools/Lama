@@ -20,6 +20,7 @@ typedef void (*fn)(DECL_STATE);
 typedef union insn {
   fn func;            // Pointer to function
   int32_t num;        // Integer operand (signed)
+  aint anum;          // Runtime value operand
   const char *str;    // String operand (direct pointer)
   union insn *target; // Direct jump target (pointer to insn)
   aint *global_ptr;   // Pointer to a C global variable
