@@ -15,11 +15,6 @@
 #define IMPORT_ENTRY_SIZE 4
 
 bytecode *bytecode_load_fd(int fd) {
-  if (fd < 0) {
-    perror("bytecode_load: open");
-    return NULL;
-  }
-
   struct stat st;
   if (fstat(fd, &st) < 0) {
     perror("bytecode_load: fstat");
