@@ -63,6 +63,8 @@ void op_ffi_call(DECL_STATE);
 
 void op_init(DECL_STATE);
 void op_eof(DECL_STATE);
+#ifdef DEBUG_PRINT
 void op_line(DECL_STATE);
+#endif
 
 #endif // OPS_H

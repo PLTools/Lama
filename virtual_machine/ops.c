@@ -599,9 +599,4 @@ void op_line(DECL_STATE) {
   (void)line;
   DISPATCH();
 }
-#else
-void op_line(DECL_STATE) {
-  ip++;
-  DISPATCH();
-}
 #endif
