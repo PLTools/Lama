@@ -197,33 +197,6 @@ static int32_t find_n_captured(decode_ctx *ctx, int32_t bc_off) {
   return -1;
 }
 
-/*
- * Resolve an external C global -- prefix with "global_", dlsym, cache.
- */
-static void *resolve_ext_global(ext_global_cache *cache, const char *name) {
-  for (size_t i = 0; i < cache->entries.len; i++) {
-    if (strcmp(cache->entries.data[i].name, name) == 0) {
-      return cache->entries.data[i].ptr;
-    }
-  }
-
-  size_t nlen = strlen(name);
-  char prefixed[sizeof(GLOBAL_PREFIX) + nlen];
-  memcpy(prefixed, GLOBAL_PREFIX, sizeof(GLOBAL_PREFIX) - 1);
-  memcpy(prefixed + sizeof(GLOBAL_PREFIX) - 1, name, nlen + 1);
-
-  void *ptr = dlsym(RTLD_DEFAULT, prefixed);
-  if (!ptr) {
-    fprintf(stderr, "Error: unresolved global '%s' (tried '%s')\n", name,
-            prefixed);
-    return NULL;
-  }
-
-  ext_global_entry entry = {.name = name, .ptr = ptr};
-  da_append(cache->entries, entry);
-  return ptr;
-}
-
 static void free_decoded_arr(decoded *arr, size_t n) {
   for (size_t i = 0; i < n; i++) {
     free(arr[i].code);
@@ -259,33 +232,59 @@ static bool validate_target_off(const bytecode *bc, int32_t target_off,
   return true;
 }
 
-static bool emit_ext_glo(decode_ctx *ctx, const char *glob_name, fn op) {
+/*
+ * Resolve an external C global -- prefix with "global_", dlsym, cache.
+ */
+static void *resolve_ext_global_ptr(ext_global_cache *cache, const char *name) {
+  for (size_t i = 0; i < cache->entries.len; i++) {
+    if (strcmp(cache->entries.data[i].name, name) == 0) {
+      return cache->entries.data[i].ptr;
+    }
+  }
+
+  size_t nlen = strlen(name);
+  char prefixed[sizeof(GLOBAL_PREFIX) + nlen];
+  memcpy(prefixed, GLOBAL_PREFIX, sizeof(GLOBAL_PREFIX) - 1);
+  memcpy(prefixed + sizeof(GLOBAL_PREFIX) - 1, name, nlen + 1);
+
+  void *ptr = dlsym(RTLD_DEFAULT, prefixed);
+  if (!ptr) {
+    fprintf(stderr, "Error: unresolved global '%s' (tried '%s')\n", name,
+            prefixed);
+    return NULL;
+  }
+
+  ext_global_entry entry = {.name = name, .ptr = ptr};
+  da_append(cache->entries, entry);
+  return ptr;
+}
+
+static aint *resolve_global_ptr(decode_ctx *ctx, int32_t idx,
+                                size_t global_base) {
+  if (!IS_EXT_REF(idx)) {
+    return &ctx->globals[global_base + idx];
+  }
+
+  int str_offset = EXT_REF_INDEX(idx);
+  const char *glob_name = bytecode_get_string(ctx->bc, str_offset);
+  VM_DEBUG("DECODE: external global '%s'\n", glob_name);
+
   resolved_symbol *sym = symbol_table_find_global(ctx->st, glob_name);
   if (sym) {
-    // Global from another unit
-    EMIT_FUNC(op);
-    EMIT_GLOBAL_PTR(&ctx->globals[sym->idx]);
-    return true;
+    return &ctx->globals[sym->idx];
   }
-  // C global
-  void *ptr = resolve_ext_global(ctx->ext_globals, glob_name);
-  if (!ptr) {
-    return false;
-  }
-  EMIT_FUNC(op);
-  EMIT_GLOBAL_PTR((aint *)ptr);
-  return true;
+
+  return (aint *)resolve_ext_global_ptr(ctx->ext_globals, glob_name);
 }
 
 static bool emit_glo(decode_ctx *ctx, int32_t idx, size_t global_base, fn op) {
-  if (IS_EXT_REF(idx)) {
-    int str_offset = EXT_REF_INDEX(idx);
-    const char *glob_name = bytecode_get_string(ctx->bc, str_offset);
-    VM_DEBUG("DECODE: external global '%s'\n", glob_name);
-    return emit_ext_glo(ctx, glob_name, op);
+  aint *ptr = resolve_global_ptr(ctx, idx, global_base);
+  if (!ptr) {
+    return false;
   }
+
   EMIT_FUNC(op);
-  EMIT_GLOBAL_PTR(&ctx->globals[global_base + idx]);
+  EMIT_GLOBAL_PTR(ptr);
   return true;
 }
 
