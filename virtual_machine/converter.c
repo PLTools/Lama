@@ -968,7 +968,7 @@ cleanup:
 #undef EMIT_GLOBAL_PTR
 #undef EMIT_PTR
 
-static void register_public_symbols(symbol_table *st, const bytecode *bc,
+static bool register_public_symbols(symbol_table *st, const bytecode *bc,
                                     size_t code_offset, size_t global_base,
                                     const int32_t *bc_to_insn_map) {
   public_symbol pub;
@@ -983,15 +983,21 @@ static void register_public_symbols(symbol_table *st, const bytecode *bc,
         fprintf(stderr,
                 "Error: public symbol '%s' at bytecode offset %d not decoded\n",
                 pub.name, pub.code_offset);
-        exit(EXIT_FAILURE);
+        return false;
       }
       int32_t code_idx = insn_idx + code_offset;
-      symbol_table_add_function(st, pub.name, code_idx);
+      if (!symbol_table_add_function(st, pub.name, code_idx)) {
+        return false;
+      }
     } else {
       int32_t global_idx = pub.code_offset + global_base;
-      symbol_table_add_global(st, pub.name, global_idx);
+      if (!symbol_table_add_global(st, pub.name, global_idx)) {
+        return false;
+      }
     }
   }
+
+  return true;
 }
 
 /*
@@ -1098,8 +1104,12 @@ program *decode(bytecode **bc_arr, size_t n, aint *globals) {
     };
     n_decoded++;
 
-    register_public_symbols(st, bc_arr[i], total_code_len, total_globals,
-                            ctx.bc_to_insn_map);
+    if (!register_public_symbols(st, bc_arr[i], total_code_len, total_globals,
+                                 ctx.bc_to_insn_map)) {
+      fprintf(stderr, "Failed to register public symbols for %s\n",
+              bc_arr[i]->name);
+      goto cleanup;
+    }
 
     total_code_len += ctx.code.len;
     total_globals += bc_arr[i]->globals_count;

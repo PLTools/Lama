@@ -1,7 +1,6 @@
 #ifndef SYMBOLS_H
 #define SYMBOLS_H
 
-#include "insn.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -30,9 +29,9 @@ resolved_symbol *symbol_table_find_function(symbol_table *table,
                                             const char *name);
 resolved_symbol *symbol_table_find_global(symbol_table *table,
                                           const char *name);
-int symbol_table_add_function(symbol_table *table, const char *name,
-                              int32_t code_index);
-int symbol_table_add_global(symbol_table *table, const char *name,
-                            int32_t global_idx);
+bool symbol_table_add_function(symbol_table *table, const char *name,
+                               int32_t code_index);
+bool symbol_table_add_global(symbol_table *table, const char *name,
+                             int32_t global_idx);
 
 #endif // SYMBOLS_H
