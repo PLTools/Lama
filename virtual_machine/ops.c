@@ -586,7 +586,8 @@ void op_init(DECL_STATE) {
 void op_eof(DECL_STATE) {
   (void)ip;
   (void)bp;
-  (void)sp;
+  // Pop the result to keep stack consistent between runs
+  STACK_POP(sp);
   return;
 }
 
