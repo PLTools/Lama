@@ -106,7 +106,6 @@ void vm_run(virtual_machine *vm) {
 
   aint *sp = vm->globals - 1;
 
-  __gc_stack_top = (size_t)sp;
   __gc_stack_bottom = (size_t)vm->stack_base;
 
   aint *bp;
