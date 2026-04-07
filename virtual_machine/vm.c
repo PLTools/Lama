@@ -100,7 +100,7 @@ void vm_set_args(virtual_machine *vm, int argc, char *argv[]) {
   vm->argv = argv;
 }
 
-aint vm_run(virtual_machine *vm) {
+void vm_run(virtual_machine *vm) {
   __init();
   set_args(vm->argc, vm->argv);
 
@@ -110,13 +110,10 @@ aint vm_run(virtual_machine *vm) {
   __gc_stack_bottom = (size_t)vm->stack_base;
 
   aint *bp;
-  aint ret_val = 0;
   for (size_t i = 0; i < vm->bc_len; i++) {
     insn *ip = vm->entry_points[i];
     ip->func(ip, sp, bp);
-    ret_val = *sp;
   }
 
   __shutdown();
-  return ret_val;
 }

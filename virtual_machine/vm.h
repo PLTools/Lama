@@ -13,6 +13,6 @@ void vm_destroy(virtual_machine *vm);
 
 void vm_set_args(virtual_machine *vm, int argc, char *argv[]);
 
-aint vm_run(virtual_machine *vm);
+void vm_run(virtual_machine *vm);
 
 #endif // VM_H
