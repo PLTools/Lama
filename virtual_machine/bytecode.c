@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "bytecode.h"
 #include "memory.h"
+#include "opcodes.h"
 #include <fcntl.h>
 #include <libgen.h>
 #include <stdio.h>
@@ -47,11 +48,16 @@ bytecode *bytecode_load_fd(int fd) {
   size_t pubs_offset = imports_offset + (size_t)num_imports * IMPORT_ENTRY_SIZE;
   size_t code_offset = pubs_offset + (size_t)num_pubs * PUB_ENTRY_SIZE;
   size_t code_size = file_size - code_offset;
+  bytecode *bc;
 
-  // TODO: VALIdation
+  if (data[code_offset + code_size - 1] != OP_EOF) {
+    fprintf(stderr, "bytecode_load: bytecode must end with EOF opcode\n");
+    goto err_unmap;
+  }
+
   const char *string_table = (const char *)data + st_offset;
 
-  bytecode *bc = ALLOC(bytecode);
+  bc = ALLOC(bytecode);
 
   bc->map_base = data;
   bc->map_size = file_size;
@@ -72,6 +78,10 @@ bytecode *bytecode_load_fd(int fd) {
   bc->name = NULL;
 
   return bc;
+
+err_unmap:
+  munmap((void *)data, file_size);
+  return NULL;
 }
 
 bytecode *bytecode_load(const char *filename) {

@@ -914,6 +914,12 @@ static bool decode_internal(decode_ctx *ctx) {
     }
 
     case OP_EOF:
+      if (current_bc_off + 1 != bc->code_size) {
+        fprintf(stderr,
+                "Error: EOF opcode before end of bytecode at bc_off=%zu\n",
+                current_bc_off);
+        goto cleanup;
+      }
       break;
 
     default:
