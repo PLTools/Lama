@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 
+#include "memory.h"
 #include "vm.h"
 #include <getopt.h>
 #include <libgen.h>
@@ -65,7 +66,9 @@ int main(int argc, char *argv[]) {
   char *bytecode_file = argv[optind];
 
   // Include main unit's directory by default
-  bytecode_dir = strdup(dirname(bytecode_dir));
+  char *tmp = ESTRDUP(bytecode_file);
+  bytecode_dir = ESTRDUP(dirname(tmp));
+  free(tmp);
   include_paths[0] = bytecode_dir;
 
   virtual_machine *vm = vm_create(bytecode_file, (const char **)include_paths,
