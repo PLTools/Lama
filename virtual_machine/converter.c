@@ -611,17 +611,17 @@ static bool decode_internal(decode_ctx *ctx) {
       EMIT_FUNC(op_sta);
       break;
 
-    case OP_LD: {
+    case OP_LD_GLO: {
       DEPTH_PUSH();
       int32_t idx = reader_i32(&ctx->reader);
-      VM_DEBUG("DECODE: OP_LD global idx=%d\n", idx);
+      VM_DEBUG("DECODE: OP_LD_GLO idx=%d\n", idx);
       emit_glo(ctx, idx, global_base, op_ld_glo);
       break;
     }
 
-    case OP_ST: {
+    case OP_ST_GLO: {
       int32_t idx = reader_i32(&ctx->reader);
-      VM_DEBUG("DECODE: OP_ST global idx=%d\n", idx);
+      VM_DEBUG("DECODE: OP_ST_GLO idx=%d\n", idx);
       emit_glo(ctx, idx, global_base, op_st_glo);
       break;
     }

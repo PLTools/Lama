@@ -50,16 +50,16 @@ const char *opcode_to_string(uint8_t opcode) {
     return "SWAP";
   case OP_ELEM:
     return "ELEM";
-  case OP_LD:
-    return "LD";
+  case OP_LD_GLO:
+    return "LD.GLO";
   case OP_LD_LOC:
     return "LD.LOC";
   case OP_LD_ARG:
     return "LD.ARG";
   case OP_LD_CLO:
     return "LD.CLO";
-  case OP_ST:
-    return "ST";
+  case OP_ST_GLO:
+    return "ST.GLO";
   case OP_ST_LOC:
     return "ST.LOC";
   case OP_ST_ARG:
