@@ -1010,7 +1010,7 @@ static void resolve_relocs(insn *all_code, decoded *dec, size_t code_offset,
 }
 
 static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
-                             size_t total_globals, ffi_call_table *ffi) {
+                             ffi_call_table *ffi) {
   static insn eof_ip = {.func = op_eof};
   size_t ffi_call_len = ffi_call_table_len(ffi);
   size_t ffi_call_offset = total_code_len;
@@ -1046,7 +1046,6 @@ static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
   program *prog = ALLOC(program);
   prog->code = all_code;
   prog->code_len = all_code_len;
-  prog->total_globals = total_globals;
   prog->entry_points = entry_points;
   prog->ffi_data = ffi_call_table_release(ffi);
   prog->ffi_len = ffi_call_len;
@@ -1093,7 +1092,7 @@ program *decode(bytecode **bc_arr, size_t n, aint *globals) {
     total_globals += bc_arr[i]->globals_count;
   }
 
-  prog = link_program(dec_arr, n, total_code_len, total_globals, ffi);
+  prog = link_program(dec_arr, n, total_code_len, ffi);
 
 cleanup:
   symbol_table_destroy(st);
