@@ -25,11 +25,12 @@ struct virtual_machine {
   size_t ffi_count;
   void *stack_base;
   size_t stack_size;
+  int argc;
+  char **argv;
 };
 
 virtual_machine *vm_create(const char *main_unit_path, const char **paths,
                            size_t total_paths_len) {
-  __gc_init();
   search_paths search_paths = {.paths = paths, .len = total_paths_len};
 
   virtual_machine *vm = ALLOC(virtual_machine);
@@ -95,11 +96,14 @@ void vm_destroy(virtual_machine *vm) {
 }
 
 void vm_set_args(virtual_machine *vm, int argc, char *argv[]) {
-  (void)vm;
-  set_args(argc, argv);
+  vm->argc = argc;
+  vm->argv = argv;
 }
 
 aint vm_run(virtual_machine *vm) {
+  __init();
+  set_args(vm->argc, vm->argv);
+
   aint *sp = vm->globals - 1;
 
   __gc_stack_top = (size_t)sp;
@@ -113,5 +117,6 @@ aint vm_run(virtual_machine *vm) {
     ret_val = *sp;
   }
 
+  __shutdown();
   return ret_val;
 }
