@@ -960,6 +960,13 @@ cleanup:
 #undef DEPTH_DEC
 #undef DEPTH_PUSH
 #undef DEPTH_POP
+#undef EMIT_FUNC
+#undef EMIT_NUM
+#undef EMIT_ANUM
+#undef EMIT_STR
+#undef EMIT_TARGET
+#undef EMIT_GLOBAL_PTR
+#undef EMIT_PTR
 
 static void register_public_symbols(symbol_table *st, const bytecode *bc,
                                     size_t code_offset, size_t global_base,
