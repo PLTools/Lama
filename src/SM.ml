@@ -352,13 +352,13 @@ module ByteCode = struct
       | ARRAY n ->
           add_bytes [ (5 * 16) + 8 ];
           add_ints [ n ]
-      (* 0x59/0x5b n:32 n:32  *)
+      (* 0x59/0x5a n:32 n:32  *)
       | FAIL ((l, c), value) ->
-          add_bytes [ if value then (5 * 16) + 11 else (5 * 16) + 9 ];
+          add_bytes [ if value then (5 * 16) + 10 else (5 * 16) + 9 ];
           add_ints [ l; c ]
-      (* 0x5a n:32            *)
+      (* 0x5b n:32            *)
       | LINE n ->
-          add_bytes [ (5 * 16) + 10 ];
+          add_bytes [ (5 * 16) + 11 ];
           add_ints [ n ]
       (* 0x6p                 *)
       | PATT p -> add_bytes [ (6 * 16) + enum patt p ]

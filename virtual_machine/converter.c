@@ -730,7 +730,7 @@ static bool decode_internal(decode_ctx *ctx) {
 
     case OP_FAIL:
     case OP_FAIL_KEEP: {
-      bool keep_value = opcode == OP_FAIL_KEEP;
+      bool keep_value = (opcode & 1) == 0;
       int32_t line = reader_i32(&ctx->reader);
       int32_t col = reader_i32(&ctx->reader);
       if (!keep_value) {
