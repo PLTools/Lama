@@ -356,6 +356,8 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
   meta_info *tm = &meta[target_off];
   if (target_off < (int32_t)current_bc_off) {
     // Backward jump — target was already visited by sequential decode
+    assert(tm->resolved_idx != -1 &&
+           "backward jump target must have been visited");
     if (tm->func_idx != ctx->func_idx) {
       fprintf(
           stderr,
@@ -363,8 +365,6 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
           current_bc_off, target_off);
       return false;
     }
-    assert(tm->resolved_idx != -1 &&
-           "backward jump target must have been visited");
     ctx->code.data[my_idx].num = tm->resolved_idx;
 
     add_reloc(ctx, my_idx, NULL, INTERNAL);
@@ -392,9 +392,6 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
               "%d)\n",
               current_bc_off, depth, tm->stack_depth);
       return false;
-    } else {
-      VM_DEBUG("  JUMP: forward to bc_off=%d, (depth=%d, target_depth=%d)\n",
-               target_off, depth, tm->stack_depth);
     }
   }
   return true;
@@ -906,15 +903,16 @@ static bool decode_internal(decode_ctx *ctx) {
 
       // Validate CLOSURE target's n_captured consistency
       if (!IS_EXT_REF(target_off)) {
-        if (meta[target_off].n_captured != -1 &&
-            meta[target_off].n_captured != n_captured) {
+        int32_t *target_n_captured = &meta[target_off].n_captured;
+        if (meta[target_off].n_captured == -1) {
+          *target_n_captured = n_captured;
+        } else if (*target_n_captured != n_captured) {
           fprintf(stderr,
                   "Error: mismatched CLOSURE arity at target=%d "
                   "(expected %d, got %d)\n",
                   target_off, meta[target_off].n_captured, n_captured);
           goto cleanup;
         }
-        meta[target_off].n_captured = n_captured;
       }
       break;
     }
