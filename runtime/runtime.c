@@ -1292,7 +1292,7 @@ extern aint Lwrite (aint n) {
   printf("%" PRIdAI "\n", UNBOX(n));
   fflush(stdout);
 
-  return 0;
+  return BOX(0);
 }
 
 extern aint Lrandom (aint n) {

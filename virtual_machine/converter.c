@@ -1041,6 +1041,12 @@ static bool register_public_symbols(symbol_table *st, const bytecode *bc,
   bytecode_pubs_init(&iter, bc);
 
   while (bytecode_pubs_next(&iter, &pub)) {
+    if (pub.code_offset < 0 || (size_t)pub.code_offset >= bc->code_size) {
+      fprintf(stderr,
+              "Error: public symbol '%s' has out-of-range code_offset %d\n",
+              pub.name, pub.code_offset, bc->code_size);
+      return false;
+    }
     if (pub.flag == PUB_FLAG_FUNCTION) {
       // pub.code_offset is the offset in the bytecode, so we use the mapping
       int32_t insn_idx = bc_to_insn_map[pub.code_offset];

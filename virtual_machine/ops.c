@@ -459,7 +459,7 @@ void op_st_clo(DECL_STATE) {
              n_locals, max_depth, (void *)bp, (void *)sp);                     \
                                                                                \
     for (int32_t i = 0; i < n_locals; i++) {                                   \
-      STACK_PUSH(sp, 0);                                                       \
+      STACK_PUSH(sp, BOX(0));                                                  \
     }                                                                          \
                                                                                \
     aint *offset = sp - max_depth;                                             \

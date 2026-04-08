@@ -16,43 +16,66 @@
 #define IMPORT_ENTRY_SIZE 4
 
 bytecode *bytecode_load_fd(int fd) {
+  bytecode *bc = NULL;
+  const uint8_t *data = MAP_FAILED;
+  size_t file_size = 0;
   struct stat st;
   if (fstat(fd, &st) < 0) {
     perror("bytecode_load: fstat");
-    close(fd);
-    return NULL;
+    goto out;
   }
 
-  size_t file_size = (size_t)st.st_size;
+  file_size = (size_t)st.st_size;
 
-  const uint8_t *data = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
+  if (file_size == 0) {
+    fprintf(stderr, "bytecode_load: empty file\n");
+    goto out;
+  }
 
+  data = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
   if (data == MAP_FAILED) {
     perror("bytecode_load: mmap");
-    close(fd);
-    return NULL;
+    goto out;
   }
-
-  close(fd);
 
   byte_reader reader;
   reader_init(&reader, data, file_size);
+
+  if (file_size < HEADER_SIZE) {
+    fprintf(stderr, "bytecode_load: file too small for header (%zu bytes)\n",
+            file_size);
+    goto out;
+  }
 
   int32_t string_table_size = reader_i32(&reader);
   int32_t globals_count = reader_i32(&reader);
   int32_t num_imports = reader_i32(&reader);
   int32_t num_pubs = reader_i32(&reader);
 
+  if (string_table_size < 0 || globals_count < 0 || num_imports < 0 ||
+      num_pubs < 0) {
+    fprintf(stderr, "bytecode_load: negative header field\n");
+    goto out;
+  }
+
   size_t st_offset = HEADER_SIZE;
   size_t imports_offset = st_offset + (size_t)string_table_size;
   size_t pubs_offset = imports_offset + (size_t)num_imports * IMPORT_ENTRY_SIZE;
   size_t code_offset = pubs_offset + (size_t)num_pubs * PUB_ENTRY_SIZE;
+
+  if (code_offset > file_size) {
+    fprintf(stderr,
+            "bytecode_load: sections exceed file size (code_offset=%zu, "
+            "file_size=%zu)\n",
+            code_offset, file_size);
+    goto out;
+  }
+
   size_t code_size = file_size - code_offset;
-  bytecode *bc;
 
   if (data[code_offset + code_size - 1] != OP_EOF) {
     fprintf(stderr, "bytecode_load: bytecode must end with EOF opcode\n");
-    goto err_unmap;
+    goto out;
   }
 
   const char *string_table = (const char *)data + st_offset;
@@ -77,11 +100,12 @@ bytecode *bytecode_load_fd(int fd) {
   // will be set later
   bc->name = NULL;
 
+out:
+  close(fd);
+  if (!bc && data != MAP_FAILED) {
+    munmap((void *)data, file_size);
+  }
   return bc;
-
-err_unmap:
-  munmap((void *)data, file_size);
-  return NULL;
 }
 
 bytecode *bytecode_load(const char *filename) {
@@ -97,6 +121,7 @@ bytecode *bytecode_load(const char *filename) {
 void bytecode_pubs_init(bytecode_iterator *iter, const bytecode *bc) {
   reader_init(&iter->reader, bc->pubs, bc->pubs_len * PUB_ENTRY_SIZE);
   iter->string_table = bc->string_table;
+  iter->string_table_size = bc->string_table_size;
   iter->len = bc->pubs_len;
   iter->curr = 0;
 }
@@ -106,6 +131,11 @@ bool bytecode_pubs_next(bytecode_iterator *iter, public_symbol *out) {
     return false;
   }
   int32_t name_offset = reader_i32(&iter->reader);
+  if (name_offset < 0 || (size_t)name_offset >= iter->string_table_size) {
+    fprintf(stderr, "bytecode_pubs_next: name_offset %d out of range\n",
+            name_offset);
+    return false;
+  }
   out->name = iter->string_table + name_offset;
   out->code_offset = reader_i32(&iter->reader);
   out->flag = reader_u8(&iter->reader);
@@ -117,6 +147,7 @@ bool bytecode_pubs_next(bytecode_iterator *iter, public_symbol *out) {
 void bytecode_imports_init(bytecode_iterator *it, const bytecode *bc) {
   reader_init(&it->reader, bc->imports, bc->imports_len * IMPORT_ENTRY_SIZE);
   it->string_table = bc->string_table;
+  it->string_table_size = bc->string_table_size;
   it->len = bc->imports_len;
   it->curr = 0;
 }
@@ -126,6 +157,11 @@ bool bytecode_imports_next(bytecode_iterator *it, const char **out_name) {
     return false;
   }
   int32_t name_offset = reader_i32(&it->reader);
+  if (name_offset < 0 || (size_t)name_offset >= it->string_table_size) {
+    fprintf(stderr, "bytecode_imports_next: name_offset %d out of range\n",
+            name_offset);
+    return false;
+  }
   *out_name = it->string_table + name_offset;
 
   it->curr++;

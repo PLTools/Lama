@@ -46,6 +46,7 @@ void bytecode_free(bytecode *bc);
 typedef struct {
   byte_reader reader;
   const char *string_table;
+  size_t string_table_size;
   size_t len;
   size_t curr;
 } bytecode_iterator;

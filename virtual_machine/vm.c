@@ -58,7 +58,9 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
   // Compute total globals and place at the top of the stack
   vm->total_globals = bytecode_count_globals(lr.units, lr.units_len);
   vm->globals = (aint *)vm->stack_base - vm->total_globals;
-  memset(vm->globals, 0, vm->total_globals * sizeof(aint));
+  for (size_t i = 0; i < vm->total_globals; i++) {
+    vm->globals[i] = BOX(0);
+  }
 
   program *prog = decode(lr.units, lr.units_len, vm->globals);
   if (!prog) {
