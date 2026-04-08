@@ -34,14 +34,14 @@ extern void *Belem(void *p, aint i);
 extern void *Bsta(void *x, aint i, void *v);
 
 extern aint Btag(void *d, aint t, aint n);
-extern aint Barray_patt(void *d, aint n);
-extern aint Bstring_patt(void *x, void *y);
-extern aint Bclosure_tag_patt(void *x);
-extern aint Bboxed_patt(void *x);
-extern aint Bunboxed_patt(void *x);
-extern aint Barray_tag_patt(void *x);
-extern aint Bstring_tag_patt(void *x);
-extern aint Bsexp_tag_patt(void *x);
+extern aint Barray_patt(aint d, aint n);
+extern aint Bstring_patt(aint x, aint y);
+extern aint Bclosure_tag_patt(aint x);
+extern aint Bboxed_patt(aint x);
+extern aint Bunboxed_patt(aint x);
+extern aint Barray_tag_patt(aint x);
+extern aint Bstring_tag_patt(aint x);
+extern aint Bsexp_tag_patt(aint x);
 
 #define DISPATCH()                                                             \
   do {                                                                         \
@@ -84,32 +84,55 @@ extern aint Bsexp_tag_patt(void *x);
     bp = new_bp;                                                               \
   } while (0)
 
-#define DEFINE_BINOP(name, fn, opname)                                         \
+#define DEFINE_BINARY_OP(name, fn, opname)                                     \
   void name(DECL_STATE) {                                                      \
     aint y = STACK_POP(sp);                                                    \
     aint x = STACK_POP(sp);                                                    \
-    VM_DEBUG(opname ": x=%ld, y=%ld\n", (long)UNBOX(x), (long)UNBOX(y));       \
+    VM_DEBUG(opname ": x=0x%lx, y=0x%lx\n", (unsigned long)x,                  \
+             (unsigned long)y);                                                \
     aint res = fn(x, y);                                                       \
     VM_DEBUG(opname " result=%ld\n", (long)UNBOX(res));                        \
     STACK_PUSH(sp, res);                                                       \
     DISPATCH();                                                                \
   }
 
-DEFINE_BINOP(op_add, Ls__Infix_43, "ADD")
-DEFINE_BINOP(op_sub, Ls__Infix_45, "SUB")
-DEFINE_BINOP(op_mul, Ls__Infix_42, "MUL")
-DEFINE_BINOP(op_div, Ls__Infix_47, "DIV")
-DEFINE_BINOP(op_mod, Ls__Infix_37, "MOD")
-DEFINE_BINOP(op_lt, Ls__Infix_60, "LT")
-DEFINE_BINOP(op_le, Ls__Infix_6061, "LE")
-DEFINE_BINOP(op_gt, Ls__Infix_62, "GT")
-DEFINE_BINOP(op_ge, Ls__Infix_6261, "GE")
-DEFINE_BINOP(op_eq, Ls__Infix_6161, "EQ")
-DEFINE_BINOP(op_ne, Ls__Infix_3361, "NE")
-DEFINE_BINOP(op_and, Ls__Infix_3838, "AND")
-DEFINE_BINOP(op_or, Ls__Infix_3333, "OR")
+#define DEFINE_UNARY_OP(name, fn, opname)                                      \
+  void name(DECL_STATE) {                                                      \
+    aint val = STACK_POP(sp);                                                  \
+    VM_DEBUG(opname ": val=0x%lx\n", (unsigned long)val);                      \
+    aint result = fn(val);                                                     \
+    VM_DEBUG(opname " result=%ld\n", (long)UNBOX(result));                     \
+    STACK_PUSH(sp, result);                                                    \
+    DISPATCH();                                                                \
+  }
 
-#undef DEFINE_BINOP
+DEFINE_BINARY_OP(op_add, Ls__Infix_43, "ADD")
+DEFINE_BINARY_OP(op_sub, Ls__Infix_45, "SUB")
+DEFINE_BINARY_OP(op_mul, Ls__Infix_42, "MUL")
+DEFINE_BINARY_OP(op_div, Ls__Infix_47, "DIV")
+DEFINE_BINARY_OP(op_mod, Ls__Infix_37, "MOD")
+DEFINE_BINARY_OP(op_lt, Ls__Infix_60, "LT")
+DEFINE_BINARY_OP(op_le, Ls__Infix_6061, "LE")
+DEFINE_BINARY_OP(op_gt, Ls__Infix_62, "GT")
+DEFINE_BINARY_OP(op_ge, Ls__Infix_6261, "GE")
+DEFINE_BINARY_OP(op_eq, Ls__Infix_6161, "EQ")
+DEFINE_BINARY_OP(op_ne, Ls__Infix_3361, "NE")
+DEFINE_BINARY_OP(op_and, Ls__Infix_3838, "AND")
+DEFINE_BINARY_OP(op_or, Ls__Infix_3333, "OR")
+
+/*
+ * Pattern matching operations
+ */
+DEFINE_BINARY_OP(op_patt_str_cmp, Bstring_patt, "PATT_STR_CMP")
+DEFINE_UNARY_OP(op_patt_string, Bstring_tag_patt, "PATT_STRING")
+DEFINE_UNARY_OP(op_patt_array, Barray_tag_patt, "PATT_ARRAY")
+DEFINE_UNARY_OP(op_patt_sexp, Bsexp_tag_patt, "PATT_SEXP")
+DEFINE_UNARY_OP(op_patt_boxed, Bboxed_patt, "PATT_BOXED")
+DEFINE_UNARY_OP(op_patt_unboxed, Bunboxed_patt, "PATT_UNBOXED")
+DEFINE_UNARY_OP(op_patt_closure, Bclosure_tag_patt, "PATT_CLOSURE")
+
+#undef DEFINE_BINARY_OP
+#undef DEFINE_UNARY_OP
 
 void op_const(DECL_STATE) {
   ip++;
@@ -246,7 +269,7 @@ void op_tag(DECL_STATE) {
   int32_t n_fields = ip->num;
 
   aint val = STACK_POP(sp);
-  VM_DEBUG("TAG: tag_hash=0x%lx n_fields=%d val=0x%lx\n", (long)tag_hash,
+  VM_DEBUG("TAG: tag_hash=0x%lx n_fields=%d val=0x%lx\n", (unsigned long)tag_hash,
            n_fields, (long)val);
   aint result = Btag((void *)val, tag_hash, BOX(n_fields));
   VM_DEBUG("TAG: result=%ld\n", (long)UNBOX(result));
@@ -259,7 +282,7 @@ void op_array(DECL_STATE) {
   int32_t n = ip->num;
   aint val = STACK_POP(sp);
   VM_DEBUG("ARRAY: n=%d, val=%p\n", n, (void *)val);
-  aint result = Barray_patt((void *)val, BOX(n));
+  aint result = Barray_patt(val, BOX(n));
   STACK_PUSH(sp, result);
   DISPATCH();
 }
@@ -274,73 +297,6 @@ void op_fail(DECL_STATE) {
   VM_DEBUG("FAIL: line=%d, col=%d\n", line, col);
   fprintf(stderr, "Match failure at line %d, column %d\n", line, col);
   exit(1);
-}
-
-/*
- * Pattern matching operations
- */
-void op_patt_str_cmp(DECL_STATE) {
-  aint y = STACK_POP(sp);
-  aint x = STACK_POP(sp);
-  VM_DEBUG("PATT_STR_CMP: x=%p, y=%p\n", (void *)x, (void *)y);
-  aint result = Bstring_patt((void *)x, (void *)y);
-  VM_DEBUG("PATT_STR_CMP result=%ld\n", (long)UNBOX(result));
-  STACK_PUSH(sp, result);
-  DISPATCH();
-}
-
-void op_patt_string(DECL_STATE) {
-  aint val = STACK_POP(sp);
-  VM_DEBUG("PATT_STRING: val=%p\n", (void *)val);
-  aint result = Bstring_tag_patt((void *)val);
-  VM_DEBUG("PATT_STRING result=%ld\n", (long)UNBOX(result));
-  STACK_PUSH(sp, result);
-  DISPATCH();
-}
-
-void op_patt_array(DECL_STATE) {
-  aint val = STACK_POP(sp);
-  VM_DEBUG("PATT_ARRAY: val=%p\n", (void *)val);
-  aint result = Barray_tag_patt((void *)val);
-  VM_DEBUG("PATT_ARRAY result=%ld\n", (long)UNBOX(result));
-  STACK_PUSH(sp, result);
-  DISPATCH();
-}
-
-void op_patt_sexp(DECL_STATE) {
-  aint val = STACK_POP(sp);
-  VM_DEBUG("PATT_SEXP: val=%p\n", (void *)val);
-  aint result = Bsexp_tag_patt((void *)val);
-  VM_DEBUG("PATT_SEXP result=%ld\n", (long)UNBOX(result));
-  STACK_PUSH(sp, result);
-  DISPATCH();
-}
-
-void op_patt_boxed(DECL_STATE) {
-  aint val = STACK_POP(sp);
-  VM_DEBUG("PATT_BOXED: val=%p\n", (void *)val);
-  aint result = Bboxed_patt((void *)val);
-  VM_DEBUG("PATT_BOXED result=%ld\n", (long)UNBOX(result));
-  STACK_PUSH(sp, result);
-  DISPATCH();
-}
-
-void op_patt_unboxed(DECL_STATE) {
-  aint val = STACK_POP(sp);
-  VM_DEBUG("PATT_UNBOXED: val=%ld\n", (long)val);
-  aint result = Bunboxed_patt((void *)val);
-  VM_DEBUG("PATT_UNBOXED result=%ld\n", (long)UNBOX(result));
-  STACK_PUSH(sp, result);
-  DISPATCH();
-}
-
-void op_patt_closure(DECL_STATE) {
-  aint val = STACK_POP(sp);
-  VM_DEBUG("PATT_CLOSURE: val=%p\n", (void *)val);
-  aint result = Bclosure_tag_patt((void *)val);
-  VM_DEBUG("PATT_CLOSURE result=%ld\n", (long)UNBOX(result));
-  STACK_PUSH(sp, result);
-  DISPATCH();
 }
 
 /*
@@ -577,7 +533,7 @@ void op_eof(DECL_STATE) {
   (void)ip;
   (void)bp;
   // Pop the result to keep stack consistent between runs
-  STACK_POP(sp);
+  (void)STACK_POP(sp);
   return;
 }
 
