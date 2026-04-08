@@ -29,7 +29,7 @@ typedef struct {
 } name_array;
 
 static bool is_loading(const name_array *stack, const char *name) {
-  for (size_t i = 0; i < stack->len; i++) {
+  for (size_t i = stack->len; i-- > 0; ) {
     if (strcmp(stack->data[i], name) == 0)
       return true;
   }
