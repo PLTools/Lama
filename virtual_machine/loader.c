@@ -22,6 +22,20 @@ typedef struct {
   size_t cap;
 } bytecode_array;
 
+typedef struct {
+  const char **data;
+  size_t len;
+  size_t cap;
+} name_array;
+
+static bool is_loading(const name_array *stack, const char *name) {
+  for (size_t i = 0; i < stack->len; i++) {
+    if (strcmp(stack->data[i], name) == 0)
+      return true;
+  }
+  return false;
+}
+
 static void free_loaded_units(bytecode_array *units) {
   for (size_t i = 0; i < units->len; i++) {
     bytecode_free(units->data[i]);
@@ -86,9 +100,12 @@ static char *extract_unit_name(const char *filename) {
 /*
  * Load a single unit and its dependencies recursively.
  */
-static bool load_unit_recursive(bytecode_array *units, const char *unit_name,
-                                bytecode *bc, const search_paths *paths) {
+static bool load_unit_recursive(bytecode_array *units, name_array *loading,
+                                const char *unit_name, bytecode *bc,
+                                const search_paths *paths) {
   bc->name = ESTRDUP(unit_name);
+
+  da_append(*loading, unit_name);
 
   // Recursively load dependencies first (topological order)
   const char *import_name;
@@ -101,6 +118,12 @@ static bool load_unit_recursive(bytecode_array *units, const char *unit_name,
       continue;
     }
 
+    if (is_loading(loading, import_name)) {
+      fprintf(stderr, "Circular dependency: '%s' -> '%s'\n", unit_name,
+              import_name);
+      goto fail;
+    }
+
     if (find_loaded(units, import_name)) {
       continue;
     }
@@ -108,45 +131,56 @@ static bool load_unit_recursive(bytecode_array *units, const char *unit_name,
     bytecode *dep_bc = load_unit_from_paths(import_name, paths);
     if (!dep_bc) {
       fprintf(stderr, "Failed to load dependency '%s'\n", import_name);
-      bytecode_free(bc);
-      return false;
+      goto fail;
     }
 
-    if (!load_unit_recursive(units, import_name, dep_bc, paths)) {
-      bytecode_free(bc);
-      return false;
+    if (!load_unit_recursive(units, loading, import_name, dep_bc, paths)) {
+      goto fail;
     }
   }
 
+  loading->len--;
   da_append(*units, bc);
   return true;
+
+fail:
+  loading->len--;
+  bytecode_free(bc);
+  return false;
 }
 
 load_result load(const char *main_unit_path, const search_paths *paths) {
   bytecode_array m;
   da_init(m);
 
+  name_array loading;
+  da_init(loading);
+
   bool is_path = is_filepath(main_unit_path);
   bytecode *bc = is_path ? bytecode_load(main_unit_path)
                          : load_unit_from_paths(main_unit_path, paths);
   if (!bc) {
     fprintf(stderr, "Failed to load unit '%s'\n", main_unit_path);
-    return (load_result){0};
+    goto cleanup;
   }
 
   char *unit_name =
       is_path ? extract_unit_name(main_unit_path) : ESTRDUP(main_unit_path);
 
-  if (!load_unit_recursive(&m, unit_name, bc, paths)) {
+  if (!load_unit_recursive(&m, &loading, unit_name, bc, paths)) {
     free(unit_name);
-    free_loaded_units(&m);
-    return (load_result){0};
+    goto cleanup;
   }
   free(unit_name);
+  da_free(loading);
 
-  load_result result = {
+  return (load_result){
       .units = m.data,
       .units_len = m.len,
   };
-  return result;
+
+cleanup:
+  da_free(loading);
+  free_loaded_units(&m);
+  return (load_result){0};
 }
