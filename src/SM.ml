@@ -174,6 +174,7 @@ module ByteCode = struct
     let imports = Stdlib.ref [] in
     let globals = Hashtbl.create 16 in
     let extern_globals = Stdlib.ref S.empty in
+    let extern_funcs = Stdlib.ref S.empty in
     let fixups = Stdlib.ref [] in
     let func_fixups = Stdlib.ref [] in
     let add_lab l = Hashtbl.replace lmap l (Buffer.length code) in
@@ -185,7 +186,9 @@ module ByteCode = struct
         i
     in
     let add_extern name is_fun =
-      if not is_fun then
+      if is_fun then
+        extern_funcs := S.add name !extern_funcs
+      else
         extern_globals := S.add name !extern_globals
     in
     let add_public name is_fun =
@@ -377,9 +380,12 @@ module ByteCode = struct
         let resolved_addr =
           try Hashtbl.find lmap l
           with Not_found ->
-            (* External function: use negative string offset *)
-            let str_off = StringTab.add st l in
-            -(str_off + 1)
+            if S.mem l !extern_funcs then
+              (* External function: use negative string offset *)
+              let str_off = StringTab.add st l in
+              -(str_off + 1)
+            else
+              failwith (Printf.sprintf "ERROR: undefined function '%s'" l)
         in
         Bytes.set_int32_le code addr_ofs (Int32.of_int resolved_addr))
       !func_fixups;
