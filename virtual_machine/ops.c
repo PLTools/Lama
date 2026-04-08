@@ -26,7 +26,6 @@ extern aint Ls__Infix_3361(void *p, void *q); // !=
 extern aint Ls__Infix_3838(void *p, void *q); // &&
 extern aint Ls__Infix_3333(void *p, void *q); // ||
 
-extern aint LtagHash(char *s);
 extern void *Barray(aint *args, aint bn);
 extern void *Bsexp(aint *args, aint bn);
 extern void *Bclosure(aint *args, aint bn);

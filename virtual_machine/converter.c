@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern aint LtagHash(char *s);
+extern aint LtagHash(const char *s);
 
 /*
  * Sentinel value for external references (both functions and globals).
@@ -41,8 +41,8 @@ extern aint LtagHash(char *s);
 #define CHECK_IDX(idx, limit, name)                                            \
   do {                                                                         \
     if ((idx) < 0 || (idx) >= (limit)) {                                       \
-      fprintf(stderr, "%s: index %d >= %d at bc_off=%zu\n", name, (int)(idx),  \
-              (int)(limit), current_bc_off);                                   \
+      fprintf(stderr, "%s: index %d out of range [0, %d) at bc_off=%zu\n",     \
+              name, (int)(idx), (int)(limit), current_bc_off);                 \
       goto cleanup;                                                            \
     }                                                                          \
   } while (0)
@@ -755,7 +755,7 @@ static bool decode_internal(decode_ctx *ctx) {
       DEPTH_DEC(n_fields);
       DEPTH_PUSH();
       EMIT_FUNC(op_sexp);
-      EMIT_ANUM(LtagHash((char *)bytecode_get_string(bc, tag_idx)));
+      EMIT_ANUM(LtagHash(bytecode_get_string(bc, tag_idx)));
       EMIT_NUM(n_fields);
       break;
     }
@@ -766,7 +766,7 @@ static bool decode_internal(decode_ctx *ctx) {
       int32_t tag_idx = reader_i32(&ctx->reader);
       int32_t n_fields = reader_i32(&ctx->reader);
       EMIT_FUNC(op_tag);
-      EMIT_ANUM(LtagHash((char *)bytecode_get_string(bc, tag_idx)));
+      EMIT_ANUM(LtagHash(bytecode_get_string(bc, tag_idx)));
       EMIT_NUM(n_fields);
       break;
     }
@@ -782,10 +782,9 @@ static bool decode_internal(decode_ctx *ctx) {
 
     case OP_FAIL:
     case OP_FAIL_KEEP: {
-      bool keep_value = (opcode & 1) == 0;
       int32_t line = reader_i32(&ctx->reader);
       int32_t col = reader_i32(&ctx->reader);
-      if (!keep_value) {
+      if (opcode == OP_FAIL) {
         DEPTH_POP();
       }
       EMIT_FUNC(op_fail);
