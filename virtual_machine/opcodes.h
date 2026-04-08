@@ -1,6 +1,7 @@
 #ifndef OPCODES_H
 #define OPCODES_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef enum {
@@ -59,5 +60,9 @@ typedef enum {
 } opcode_t;
 
 const char *opcode_to_string(uint8_t opcode);
+
+static inline bool opcode_is_func_begin(uint8_t opcode) {
+  return opcode == OP_BEGIN || opcode == OP_BEGIN_CLOSURE;
+}
 
 #endif

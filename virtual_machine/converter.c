@@ -207,10 +207,6 @@ static fixup_node *add_fixup(meta_info *meta, size_t target_off,
   return node;
 }
 
-static inline bool opcode_is_func_entry(uint8_t opcode) {
-  return opcode == OP_BEGIN || opcode == OP_BEGIN_CLOSURE;
-}
-
 /*
  * Validate that an internal target is valid: in range, and has a correct
  * opcode.
@@ -227,13 +223,13 @@ static bool validate_target_off(const bytecode *bc, int32_t target_off,
   bool bad;
   switch (kind) {
   case TARGET_JUMP:
-    bad = opcode_is_func_entry(got) || got == OP_EOF;
+    bad = opcode_is_func_begin(got) || got == OP_EOF;
     break;
   case TARGET_CALL:
     bad = got != OP_BEGIN;
     break;
   case TARGET_CLOSURE:
-    bad = !opcode_is_func_entry(got);
+    bad = !opcode_is_func_begin(got);
     break;
   }
   if (bad) {
@@ -452,7 +448,7 @@ static bool decode_internal(decode_ctx *ctx) {
              ctx->sv.state == BARRIER ? " [barrier]" : "");
 
     // Validate no nested function
-    if (opcode_is_func_entry(opcode)) {
+    if (opcode_is_func_begin(opcode)) {
       if (ctx->func_idx != -1) {
         fprintf(stderr, "Error: nested function at bc_off=%zu\n",
                 current_bc_off);
