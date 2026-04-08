@@ -446,28 +446,37 @@ void op_st_clo(DECL_STATE) {
 /*
  * Function call operations
  */
-void op_begin(DECL_STATE) {
-  ip++;
-  int32_t n_args = ip->num;
-  (void)n_args;
-  ip++;
-  int32_t n_locals = ip->num;
-  ip++;
-  int32_t max_depth = ip->num;
-
-  VM_DEBUG("BEGIN n_args=%d n_locals=%d max_depth=%d bp=%p sp=%p\n", n_args,
-           n_locals, max_depth, (void *)bp, (void *)sp);
-
-  for (int32_t i = 0; i < n_locals; i++) {
-    STACK_PUSH(sp, 0);
+#define DEFINE_BEGIN(name)                                                     \
+  void name(DECL_STATE) {                                                      \
+    ip++;                                                                      \
+    int32_t n_args = ip->num;                                                  \
+    (void)n_args;                                                              \
+    ip++;                                                                      \
+    int32_t n_locals = ip->num;                                                \
+    ip++;                                                                      \
+    int32_t max_depth = ip->num;                                               \
+                                                                               \
+    VM_DEBUG("BEGIN n_args=%d n_locals=%d max_depth=%d bp=%p sp=%p\n", n_args, \
+             n_locals, max_depth, (void *)bp, (void *)sp);                     \
+                                                                               \
+    for (int32_t i = 0; i < n_locals; i++) {                                   \
+      STACK_PUSH(sp, 0);                                                       \
+    }                                                                          \
+                                                                               \
+    aint *offset = sp - max_depth;                                             \
+    memset(offset + 1, 0, max_depth * sizeof(aint));                           \
+    __gc_stack_top = (size_t)offset;                                           \
+                                                                               \
+    DISPATCH();                                                                \
   }
 
-  aint *offset = sp - max_depth;
-  memset(offset + 1, 0, max_depth * sizeof(aint));
-  __gc_stack_top = (size_t)offset;
-
-  DISPATCH();
-}
+/*
+ * The distinction is made at the opcode level to allow for easier validation
+ * during decoding (and maybe for future things).
+ */
+DEFINE_BEGIN(op_begin)
+DEFINE_BEGIN(op_begin_closure)
+#undef DEFINE_BEGIN
 
 void op_call(DECL_STATE) {
   ip++;

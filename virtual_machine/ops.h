@@ -55,6 +55,7 @@ void op_ld_clo(DECL_STATE);
 void op_st_clo(DECL_STATE);
 
 void op_begin(DECL_STATE);
+void op_begin_closure(DECL_STATE);
 void op_call(DECL_STATE);
 void op_callc(DECL_STATE);
 void op_end(DECL_STATE);

@@ -55,6 +55,12 @@ typedef enum {
   FFI,      // FFI call
 } reloc_kind;
 
+typedef enum {
+  TARGET_JUMP,    // must not land on function entry or EOF
+  TARGET_CALL,    // must land on OP_BEGIN
+  TARGET_CLOSURE, // must land on OP_BEGIN or OP_BEGIN_CLOSURE
+} target_kind;
+
 typedef struct {
   size_t patch_idx;
   const char *name;
@@ -62,23 +68,20 @@ typedef struct {
 } reloc;
 
 typedef struct fixup_node {
-  size_t insn_idx; // Index in code array that needs the jump target
   struct fixup_node *next;
+  size_t insn_idx;      // Index in code array that needs the jump target
+  size_t origin_bc_off; // Source bytecode offset
 } fixup_node;
 
 // Metadata for each bytecode offset
 typedef struct {
   insn *insn;           // NULL if not visited
+  fixup_node *fixups;   // Linked list of forward jumps pointing here
   int32_t resolved_idx; // Index in generated code array (-1 if not visited)
   int32_t stack_depth;  // Expected stack depth (-1 if not visited yet)
-  fixup_node *fixups;   // Linked list of forward jumps pointing here
+  int32_t n_captured;   // n_captured for CLOSURE targets (-1 if not a target)
+  int32_t func_idx; // Current function entry offset (-1 outside any function)
 } meta_info;
-
-// Maps CLOSURE target bytecode offsets to their n_captured
-typedef struct {
-  int32_t bc_off;
-  int32_t n_captured;
-} closure_info;
 
 typedef struct {
   insn *code;
@@ -152,13 +155,8 @@ typedef struct {
 
   stack_validation sv;
 
-  struct {
-    closure_info *data;
-    size_t len;
-    size_t cap;
-  } closures; // CLOSURE target_off -> n_captured mapping
-
   func_ctx func;
+  int32_t func_idx; // Current function entry offset (-1 outside any function)
 } decode_ctx;
 
 static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
@@ -173,28 +171,16 @@ static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
 
   da_init(ctx->code);
   da_init(ctx->relocs);
-  da_init(ctx->closures);
 
   ctx->st = st;
   ctx->ffi = ffi;
   ctx->ext_globals = ext_globals;
 
   ctx->sv = (stack_validation){0};
-  ctx->func = (func_ctx){0};
+  ctx->func = (func_ctx){.n_captured = -1};
+  ctx->func_idx = -1;
 
   reader_init(&ctx->reader, bc->code, bc->code_size);
-}
-
-/*
- * Returns n_captured for a CLOSURE target, or -1 if no CLOSURE targets this
- * offset
- */
-static int32_t find_n_captured(decode_ctx *ctx, int32_t bc_off) {
-  for (size_t i = 0; i < ctx->closures.len; i++) {
-    if (ctx->closures.data[i].bc_off == bc_off)
-      return ctx->closures.data[i].n_captured;
-  }
-  return -1;
 }
 
 static void free_decoded_arr(decoded *arr, size_t n) {
@@ -212,21 +198,47 @@ static void add_reloc(decode_ctx *ctx, size_t patch_idx, const char *name,
 }
 
 static fixup_node *add_fixup(meta_info *meta, size_t target_off,
-                             size_t insn_idx) {
+                             size_t insn_idx, size_t origin_bc_off) {
   fixup_node *node = ALLOC(fixup_node);
   node->insn_idx = insn_idx;
+  node->origin_bc_off = origin_bc_off;
   node->next = meta[target_off].fixups;
   meta[target_off].fixups = node;
   return node;
 }
 
+static inline bool opcode_is_func_entry(uint8_t opcode) {
+  return opcode == OP_BEGIN || opcode == OP_BEGIN_CLOSURE;
+}
+
+/*
+ * Validate that an internal target is valid: in range, and has a correct
+ * opcode.
+ */
 static bool validate_target_off(const bytecode *bc, int32_t target_off,
-                                size_t current_bc_off, const char *op_name) {
-  if (target_off >= (int32_t)bc->code_size) {
-    fprintf(
-        stderr,
-        "Error: %s target_off=%d out of range (bc_off=%zu, code_size=%zu)\n",
-        op_name, target_off, current_bc_off, bc->code_size);
+                                size_t current_bc_off, target_kind kind) {
+  if (target_off < 0 || target_off >= (int32_t)bc->code_size) {
+    fprintf(stderr, "Error: target_off=%d out of range at bc_off=%zu\n",
+            target_off, current_bc_off);
+    return false;
+  }
+
+  uint8_t got = bc->code[target_off];
+  bool bad;
+  switch (kind) {
+  case TARGET_JUMP:
+    bad = opcode_is_func_entry(got) || got == OP_EOF;
+    break;
+  case TARGET_CALL:
+    bad = got != OP_BEGIN;
+    break;
+  case TARGET_CLOSURE:
+    bad = !opcode_is_func_entry(got);
+    break;
+  }
+  if (bad) {
+    fprintf(stderr, "Error: bad target %s at bc_off=%zu, target=%d\n",
+            opcode_to_string(got), current_bc_off, target_off);
     return false;
   }
   return true;
@@ -292,14 +304,15 @@ static bool emit_glo(decode_ctx *ctx, int32_t idx, size_t global_base, fn op) {
  * Emit target slot for CALL/CLOSURE, handles external and internal targets.
  */
 static bool emit_target(decode_ctx *ctx, meta_info *meta, int32_t target_off,
-                        size_t current_bc_off, const char *opname) {
+                        size_t current_bc_off, target_kind kind) {
   const bytecode *bc = ctx->bc;
   size_t target_slot = ctx->code.len;
 
   if (IS_EXT_REF(target_off)) {
     int str_offset = EXT_REF_INDEX(target_off);
     const char *name = bytecode_get_string(bc, str_offset);
-    VM_DEBUG("DECODE: %s external '%s'\n", opname, name);
+    VM_DEBUG("DECODE: %s external target '%s' at bc_off=%zu\n",
+             opcode_to_string(bc->code[current_bc_off]), name, current_bc_off);
 
     resolved_symbol *sym = symbol_table_find_function(ctx->st, name);
     if (sym) {
@@ -312,7 +325,7 @@ static bool emit_target(decode_ctx *ctx, meta_info *meta, int32_t target_off,
       EMIT_NUM(idx); // placeholder, will be resolved to FFI call
     }
   } else {
-    if (!validate_target_off(bc, target_off, current_bc_off, opname))
+    if (!validate_target_off(bc, target_off, current_bc_off, kind))
       return false;
 
     EMIT_NUM(0); // placeholder — will hold code index
@@ -323,7 +336,7 @@ static bool emit_target(decode_ctx *ctx, meta_info *meta, int32_t target_off,
       ctx->code.data[target_slot].num = tm->resolved_idx;
       add_reloc(ctx, target_slot, NULL, INTERNAL);
     } else {
-      add_fixup(meta, target_off, target_slot);
+      add_fixup(meta, target_off, target_slot, current_bc_off);
     }
   }
   return true;
@@ -337,7 +350,7 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
   int32_t target_off = reader_i32(&ctx->reader);
   int32_t depth = ctx->sv.depth;
 
-  if (!validate_target_off(ctx->bc, target_off, current_bc_off, "JUMP")) {
+  if (!validate_target_off(ctx->bc, target_off, current_bc_off, TARGET_JUMP)) {
     return false;
   }
 
@@ -347,6 +360,13 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
   meta_info *tm = &meta[target_off];
   if (target_off < (int32_t)current_bc_off) {
     // Backward jump — target was already visited by sequential decode
+    if (tm->func_idx != ctx->func_idx) {
+      fprintf(
+          stderr,
+          "Error: backward jump escapes function at bc_off=%zu, target=%d\n",
+          current_bc_off, target_off);
+      return false;
+    }
     assert(tm->resolved_idx != -1 &&
            "backward jump target must have been visited");
     ctx->code.data[my_idx].num = tm->resolved_idx;
@@ -365,9 +385,7 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
     }
   } else {
     // Forward jump — add fixup
-    if (!add_fixup(meta, target_off, my_idx)) {
-      return false;
-    }
+    add_fixup(meta, target_off, my_idx, current_bc_off);
     VM_DEBUG("  JUMP: forward to bc_off=%d, (depth=%d, target_depth=%d)\n",
              target_off, depth, tm->stack_depth);
     if (tm->stack_depth == -1) {
@@ -415,6 +433,8 @@ static bool decode_internal(decode_ctx *ctx) {
   for (size_t i = 0; i < bc->code_size; i++) {
     meta[i].resolved_idx = -1;
     meta[i].stack_depth = -1;
+    meta[i].n_captured = -1;
+    meta[i].func_idx = -1;
     meta[i].fixups = NULL;
   }
 
@@ -431,8 +451,19 @@ static bool decode_internal(decode_ctx *ctx) {
              opcode_to_string(opcode), opcode, ctx->sv.depth,
              ctx->sv.state == BARRIER ? " [barrier]" : "");
 
+    // Validate no nested function
+    if (opcode_is_func_entry(opcode)) {
+      if (ctx->func_idx != -1) {
+        fprintf(stderr, "Error: nested function at bc_off=%zu\n",
+                current_bc_off);
+        goto cleanup;
+      }
+      ctx->func_idx = (int32_t)current_bc_off;
+    }
+
     meta_info *m = &meta[current_bc_off];
     m->resolved_idx = (int32_t)ctx->code.len;
+    m->func_idx = ctx->func_idx;
 
     // Validate stack depth at intersections
     if (ctx->sv.state == BARRIER) {
@@ -461,6 +492,20 @@ static bool decode_internal(decode_ctx *ctx) {
     // relocation
     fixup_node *f = m->fixups;
     while (f) {
+      // Validate jumps
+      if (meta[f->origin_bc_off].func_idx != m->func_idx) {
+        uint8_t origin_opcode = bc->code[f->origin_bc_off];
+        bool is_jump = origin_opcode == OP_JMP || origin_opcode == OP_CJMP_Z ||
+                       origin_opcode == OP_CJMP_NZ;
+        if (is_jump) {
+          fprintf(stderr,
+                  "Error: forward jump escapes function at bc_off=%zu -> "
+                  "target=%zu\n",
+                  f->origin_bc_off, current_bc_off);
+          goto cleanup;
+        }
+      }
+
       VM_DEBUG("DECODE: Resolving fixup at bc_off=%zu: insn_idx=%zu -> "
                "code_idx=%zu\n",
                current_bc_off, f->insn_idx, ctx->code.len);
@@ -472,6 +517,14 @@ static bool decode_internal(decode_ctx *ctx) {
       f = next;
     }
     m->fixups = NULL;
+
+    // Validate no instructions outside function bodies (except EOF)
+    if (ctx->func_idx == -1 && opcode != OP_EOF) {
+      fprintf(stderr,
+              "Error: instruction %s outside function body at bc_off=%zu\n",
+              opcode_to_string(opcode), current_bc_off);
+      goto cleanup;
+    }
 
     switch (opcode) {
     case OP_CONST:
@@ -790,14 +843,13 @@ static bool decode_internal(decode_ctx *ctx) {
       ctx->sv.depth = 0;
       ctx->sv.max_depth = 0;
 
-      ctx->func =
-          (func_ctx){.n_args = n_args,
-                     .n_locals = n_locals,
-                     .n_captured = (opcode == OP_BEGIN_CLOSURE)
-                                       ? find_n_captured(ctx, current_bc_off)
-                                       : 0};
+      ctx->func = (func_ctx){.n_args = n_args,
+                             .n_locals = n_locals,
+                             .n_captured = (opcode == OP_BEGIN_CLOSURE)
+                                               ? meta[current_bc_off].n_captured
+                                               : 0};
 
-      EMIT_FUNC(op_begin);
+      EMIT_FUNC(opcode == OP_BEGIN_CLOSURE ? op_begin_closure : op_begin);
       EMIT_NUM(n_args);
       EMIT_NUM(n_locals);
       ctx->sv.max_depth_pos = ctx->code.len;
@@ -853,13 +905,22 @@ static bool decode_internal(decode_ctx *ctx) {
       DEPTH_PUSH();
 
       EMIT_FUNC(op_closure);
-      if (!emit_target(ctx, meta, target_off, current_bc_off, "CLOSURE"))
+      if (!emit_target(ctx, meta, target_off, current_bc_off, TARGET_CLOSURE))
         goto cleanup;
       EMIT_NUM(n_captured);
 
-      if (!IS_EXT_REF(target_off))
-        da_append(ctx->closures, ((closure_info){.bc_off = target_off,
-                                                 .n_captured = n_captured}));
+      // Validate CLOSURE target's n_captured consistency
+      if (!IS_EXT_REF(target_off)) {
+        if (meta[target_off].n_captured != -1 &&
+            meta[target_off].n_captured != n_captured) {
+          fprintf(stderr,
+                  "Error: mismatched CLOSURE arity at target=%d "
+                  "(expected %d, got %d)\n",
+                  target_off, meta[target_off].n_captured, n_captured);
+          goto cleanup;
+        }
+        meta[target_off].n_captured = n_captured;
+      }
       break;
     }
 
@@ -874,7 +935,7 @@ static bool decode_internal(decode_ctx *ctx) {
                target_off, n_args, current_bc_off, ctx->code.len);
 
       EMIT_FUNC(op_call);
-      if (!emit_target(ctx, meta, target_off, current_bc_off, "CALL"))
+      if (!emit_target(ctx, meta, target_off, current_bc_off, TARGET_CALL))
         goto cleanup;
       EMIT_NUM(n_args);
       break;
@@ -899,6 +960,8 @@ static bool decode_internal(decode_ctx *ctx) {
       EMIT_FUNC(op_end);
       ctx->code.data[ctx->sv.max_depth_pos].num = ctx->sv.max_depth;
       ctx->sv.state = BARRIER;
+      ctx->func = (func_ctx){.n_captured = -1};
+      ctx->func_idx = -1;
       break;
 
     case OP_LINE: {
@@ -913,6 +976,11 @@ static bool decode_internal(decode_ctx *ctx) {
     }
 
     case OP_EOF:
+      if (ctx->func_idx != -1) {
+        fprintf(stderr, "Error: EOF inside function body at bc_off=%zu\n",
+                current_bc_off);
+        goto cleanup;
+      }
       if (current_bc_off + 1 != bc->code_size) {
         fprintf(stderr,
                 "Error: EOF opcode before end of bytecode at bc_off=%zu\n",
@@ -950,7 +1018,6 @@ cleanup:
     }
   }
   free(meta);
-  da_free(ctx->closures);
 
   return ok;
 }
@@ -1003,7 +1070,7 @@ static bool register_public_symbols(symbol_table *st, const bytecode *bc,
  * Resolve relocs / placeholders in the final code array after all units are
  * decoded and merged.
  */
-static void resolve_relocs(insn *all_code, decoded *dec, size_t code_offset,
+static bool resolve_relocs(insn *all_code, decoded *dec, size_t code_offset,
                            size_t ffi_call_offset) {
   for (size_t j = 0; j < dec->relocs_len; j++) {
     reloc rel = dec->relocs[j];
@@ -1015,7 +1082,22 @@ static void resolve_relocs(insn *all_code, decoded *dec, size_t code_offset,
       break;
     }
     case UNIT: {
-      all_code[slot].target = &all_code[target_idx];
+      // Validate inter-unit CALL/CLOSURE targets
+      insn *target = &all_code[target_idx];
+      fn caller = all_code[slot - 1].func;
+      assert(caller == op_call || caller == op_closure);
+      const char *caller_name = caller == op_call ? "CALL" : "CLOSURE";
+      const char *target_name =
+          caller == op_call ? "BEGIN" : "BEGIN/BEGIN_CLOSURE";
+      bool ok = caller == op_call ? target->func == op_begin
+                                  : target->func == op_begin ||
+                                        target->func == op_begin_closure;
+      if (!ok) {
+        fprintf(stderr, "Error: inter-unit %s to non-%s function '%s'\n",
+                caller_name, target_name, rel.name);
+        return false;
+      }
+      all_code[slot].target = target;
       break;
     }
     case FFI: {
@@ -1025,6 +1107,7 @@ static void resolve_relocs(insn *all_code, decoded *dec, size_t code_offset,
     }
     }
   }
+  return true;
 }
 
 static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
@@ -1044,7 +1127,11 @@ static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
     // Move instructions into final code array
     memcpy(all_code + code_offset, dec->code, dec->code_len * sizeof(insn));
     entry_points[i] = &all_code[code_offset];
-    resolve_relocs(all_code, dec, code_offset, ffi_call_offset);
+    if (!resolve_relocs(all_code, dec, code_offset, ffi_call_offset)) {
+      free(all_code);
+      free(entry_points);
+      return NULL;
+    }
 
     all_code[code_offset + 1].target = &eof_ip;
 
