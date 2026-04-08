@@ -98,6 +98,8 @@ extern aint Bsexp_tag_patt(void *x);
 DEFINE_BINOP(op_add, Ls__Infix_43, "ADD")
 DEFINE_BINOP(op_sub, Ls__Infix_45, "SUB")
 DEFINE_BINOP(op_mul, Ls__Infix_42, "MUL")
+DEFINE_BINOP(op_div, Ls__Infix_47, "DIV")
+DEFINE_BINOP(op_mod, Ls__Infix_37, "MOD")
 DEFINE_BINOP(op_lt, Ls__Infix_60, "LT")
 DEFINE_BINOP(op_le, Ls__Infix_6061, "LE")
 DEFINE_BINOP(op_gt, Ls__Infix_62, "GT")
@@ -114,26 +116,6 @@ void op_const(DECL_STATE) {
   aint val = ip->num;
   VM_DEBUG("CONST: %ld\n", (long)val);
   STACK_PUSH(sp, BOX(val));
-  DISPATCH();
-}
-
-void op_div(DECL_STATE) {
-  aint y = STACK_POP(sp);
-  aint x = STACK_POP(sp);
-  VM_DEBUG("DIV: x=%ld, y=%ld\n", (long)UNBOX(x), (long)UNBOX(y));
-  aint res = Ls__Infix_47((void *)x, (void *)y);
-  VM_DEBUG("DIV result=%ld\n", (long)UNBOX(res));
-  STACK_PUSH(sp, res);
-  DISPATCH();
-}
-
-void op_mod(DECL_STATE) {
-  aint y = STACK_POP(sp);
-  aint x = STACK_POP(sp);
-  VM_DEBUG("MOD: x=%ld, y=%ld\n", (long)UNBOX(x), (long)UNBOX(y));
-  aint res = Ls__Infix_37((void *)x, (void *)y);
-  VM_DEBUG("MOD result=%ld\n", (long)UNBOX(res));
-  STACK_PUSH(sp, res);
   DISPATCH();
 }
 

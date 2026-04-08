@@ -86,10 +86,10 @@ const char *opcode_to_string(uint8_t opcode) {
     return "ARRAY";
   case OP_FAIL:
     return "FAIL";
-  case OP_LINE:
-    return "LINE";
   case OP_FAIL_KEEP:
     return "FAIL.KEEP";
+  case OP_LINE:
+    return "LINE";
   case OP_PATT_STR_CMP:
     return "PATT.STRCMP";
   case OP_PATT_STRING:
