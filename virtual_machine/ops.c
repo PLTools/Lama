@@ -542,7 +542,6 @@ void op_eof(DECL_STATE) {
   return;
 }
 
-#ifdef DEBUG_PRINT
 void op_line(DECL_STATE) {
   ip++;
   int32_t line = ip->num;
@@ -550,4 +549,3 @@ void op_line(DECL_STATE) {
   (void)line;
   DISPATCH();
 }
-#endif
