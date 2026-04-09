@@ -1041,7 +1041,7 @@ static bool register_public_symbols(symbol_table *st, const bytecode *bc,
     if (pub.code_offset < 0 || (size_t)pub.code_offset >= bc->code_size) {
       fprintf(stderr,
               "Error: public symbol '%s' has out-of-range code_offset %d\n",
-              pub.name, pub.code_offset, bc->code_size);
+              pub.name, pub.code_offset);
       return false;
     }
     if (pub.flag == PUB_FLAG_FUNCTION) {
