@@ -4,14 +4,13 @@
 #include "../runtime/runtime_common.h"
 #include "bytecode.h"
 #include "insn.h"
-#include "reader.h"
 #include <stddef.h>
 #include <stdint.h>
 
 typedef struct {
   insn *code;
   size_t code_len;
-  insn **entry_points;
+  insn *entry_points;
   void *ffi_data;
   size_t ffi_len;
 } program;

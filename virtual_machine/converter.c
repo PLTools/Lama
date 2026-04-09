@@ -285,6 +285,17 @@ static aint *resolve_global_ptr(decode_ctx *ctx, int32_t idx,
   return (aint *)resolve_ext_global_ptr(ctx->ext_globals, glob_name);
 }
 
+#define ENTRY_STEP_SLOTS 4
+
+static void emit_entry_step(insn *slot, insn *main_begin) {
+  slot[0].func = op_call;
+  slot[1].target = main_begin;
+  slot[2].num = 0;
+  // Pop the result of the main unit's BEGIN since we don't do anything
+  // with it.
+  slot[3].func = op_drop;
+}
+
 static bool emit_glo(decode_ctx *ctx, int32_t idx, size_t global_base, fn op) {
   aint *ptr = resolve_global_ptr(ctx, idx, global_base);
   if (!ptr) {
@@ -430,9 +441,6 @@ static bool decode_internal(decode_ctx *ctx) {
     meta[i].func_idx = -1;
     meta[i].fixups = NULL;
   }
-
-  EMIT_FUNC(op_init);
-  EMIT_NUM(0); // placeholder for op_eof
 
   bool ok = false;
 
@@ -1120,7 +1128,7 @@ static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
   size_t all_code_len = ffi_call_offset + ffi_call_len * FFI_STUB_SIZE;
 
   insn *all_code = ALLOC_ARRAY(insn, all_code_len);
-  insn **entry_points = ALLOC_ARRAY(insn *, n);
+  insn *entry_points = ALLOC_ARRAY(insn, ENTRY_STEP_SLOTS * n + 1);
   // Copy code and resolve relocations
   size_t code_offset = 0;
   for (size_t i = 0; i < n; i++) {
@@ -1128,17 +1136,17 @@ static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
 
     // Move instructions into final code array
     memcpy(all_code + code_offset, dec->code, dec->code_len * sizeof(insn));
-    entry_points[i] = &all_code[code_offset];
+    emit_entry_step(&entry_points[ENTRY_STEP_SLOTS * i],
+                    &all_code[code_offset]);
     if (!resolve_relocs(all_code, dec, code_offset, ffi_call_offset)) {
       free(all_code);
       free(entry_points);
       return NULL;
     }
 
-    all_code[code_offset + 1].target = &eof_ip;
-
     code_offset += dec->code_len;
   }
+  entry_points[ENTRY_STEP_SLOTS * n] = eof_ip;
 
   ffi_call_iterator ffi_iter;
   ffi_call_table_emit_init(&ffi_iter, ffi);

@@ -271,8 +271,8 @@ void op_tag(DECL_STATE) {
   int32_t n_fields = ip->num;
 
   aint val = STACK_POP(sp);
-  VM_DEBUG("TAG: tag_hash=0x%lx n_fields=%d val=0x%lx\n", (unsigned long)tag_hash,
-           n_fields, (long)val);
+  VM_DEBUG("TAG: tag_hash=0x%lx n_fields=%d val=0x%lx\n",
+           (unsigned long)tag_hash, n_fields, (long)val);
   aint result = Btag((void *)val, tag_hash, BOX(n_fields));
   VM_DEBUG("TAG: result=%ld\n", (long)UNBOX(result));
   STACK_PUSH(sp, result);
@@ -517,28 +517,10 @@ void op_closure(DECL_STATE) {
   DISPATCH();
 }
 
-/*
- * op_init is a setup for the main op_begin of the entry point unit. It pushes a
- * fake frame with 0 args and no saved state, so that the main function can use
- * the normal CALL/END sequence without worrying about the initial case. The
- * fake return address points to a special op_eof which just returns, causing
- * the whole program to exit when the main function returns.
- */
-void op_init(DECL_STATE) {
-  ip++;
-  insn *eof_ip = ip->target;
-
-  aint *caller_sp = sp;
-  PUSH_FRAME(0, 0, eof_ip, caller_sp);
-
-  DISPATCH();
-}
-
 void op_eof(DECL_STATE) {
   (void)ip;
   (void)bp;
-  // Pop the result to keep stack consistent between runs
-  (void)STACK_POP(sp);
+  (void)sp;
   return;
 }
 

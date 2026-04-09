@@ -62,7 +62,6 @@ void op_end(DECL_STATE);
 void op_closure(DECL_STATE);
 void op_ffi_call(DECL_STATE);
 
-void op_init(DECL_STATE);
 void op_eof(DECL_STATE);
 void op_line(DECL_STATE);
 

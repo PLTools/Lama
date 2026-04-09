@@ -16,8 +16,8 @@ extern void set_args(aint argc, char *argv[]);
 struct virtual_machine {
   bytecode **bc_arr; // Array of unique loaded bytecode units
   size_t bc_len;
-  insn *code;          // Contiguous code array
-  insn **entry_points; // Entry point for each unique unit
+  insn *code;         // Contiguous code array
+  insn *entry_points; // Entry point for each unique unit
   size_t entry_points_len;
   size_t total_globals;
   aint *globals;  // Globals array (at the top of the stack)
@@ -107,12 +107,11 @@ void vm_run(virtual_machine *vm) {
   __gc_stack_bottom = (size_t)vm->stack_base;
   set_args(vm->argc, vm->argv);
 
+  insn *ip = vm->entry_points;
   aint *sp = vm->globals;
   aint *bp = NULL;
-  for (size_t i = 0; i < vm->bc_len; i++) {
-    insn *ip = vm->entry_points[i];
-    ip->func(ip, sp, bp);
-  }
+
+  ip->func(ip, sp, bp);
 
   __shutdown();
 }
