@@ -106,11 +106,11 @@ void vm_run(virtual_machine *vm) {
   __init();
   set_args(vm->argc, vm->argv);
 
-  aint *sp = vm->globals - 1;
+  aint *sp = vm->globals;
 
   __gc_stack_bottom = (size_t)vm->stack_base;
 
-  aint *bp;
+  aint *bp = NULL;
   for (size_t i = 0; i < vm->bc_len; i++) {
     insn *ip = vm->entry_points[i];
     ip->func(ip, sp, bp);

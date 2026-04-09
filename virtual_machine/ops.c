@@ -57,9 +57,9 @@ extern aint Bsexp_tag_patt(aint x);
 /*
  * Stack manipulation macros (stack grows downwards)
  */
-#define STACK_PUSH(sp, val) (*sp-- = (val))
-#define STACK_POP(sp) (*++sp)
-#define STACK_PEEK(sp) (*(sp + 1))
+#define STACK_PUSH(sp, val) (*--(sp) = (val))
+#define STACK_POP(sp) (*sp++)
+#define STACK_PEEK(sp) (*sp)
 #define STACK_REVERSE(base, n)                                                 \
   do {                                                                         \
     for (int32_t _i = 0; _i < (n) / 2; _i++) {                                 \
@@ -77,7 +77,7 @@ extern aint Bsexp_tag_patt(aint x);
 #define PUSH_FRAME(n_args_val, saved_bp, saved_ip, caller_sp_val)              \
   do {                                                                         \
     STACK_PUSH(sp, n_args_val);                                                \
-    aint *new_bp = sp + 1;                                                     \
+    aint *new_bp = sp;                                                         \
     STACK_PUSH(sp, (aint)(saved_bp));                                          \
     STACK_PUSH(sp, (aint)(saved_ip));                                          \
     STACK_PUSH(sp, (aint)(caller_sp_val));                                     \
@@ -144,7 +144,7 @@ void op_const(DECL_STATE) {
 
 void op_drop(DECL_STATE) {
   VM_DEBUG("DROP\n");
-  *++sp = 0;
+  (void)STACK_POP(sp);
   DISPATCH();
 }
 
@@ -236,7 +236,7 @@ void op_barray(DECL_STATE) {
   ip++;
   int32_t n = ip->num;
   VM_DEBUG("BARRAY: n=%d\n", n);
-  aint *args = sp + 1;
+  aint *args = sp;
   STACK_REVERSE(args, n);
   sp += n;
   void *arr = Barray(args, BOX(n));
@@ -251,10 +251,10 @@ void op_sexp(DECL_STATE) {
   int32_t n_fields = ip->num;
 
   VM_DEBUG("SEXP: tag_hash=0x%lx, n_fields=%d\n", tag_hash, n_fields);
-  // Use the free slot at sp for tag_hash, reverse the whole range in-place
-  *sp = tag_hash;
-  STACK_REVERSE(sp, n_fields + 1);
-  aint *args = sp;
+  // Use the free slot below the current top for tag_hash.
+  aint *args = sp - 1;
+  args[0] = tag_hash;
+  STACK_REVERSE(args, n_fields + 1);
   sp += n_fields;
 
   void *s = Bsexp(args, BOX(n_fields + 1));
@@ -401,8 +401,8 @@ void op_st_clo(DECL_STATE) {
     }                                                                          \
                                                                                \
     aint *offset = sp - max_depth;                                             \
-    memset(offset + 1, 0, max_depth * sizeof(aint));                           \
-    __gc_stack_top = (size_t)offset;                                           \
+    memset(offset, 0, max_depth * sizeof(aint));                               \
+    __gc_stack_top = (size_t)(offset - 1);                                     \
                                                                                \
     DISPATCH();                                                                \
   }
@@ -436,7 +436,7 @@ void op_callc(DECL_STATE) {
   int32_t n_args = ip->num;
   ip++; // sort of a return address
 
-  aint closure_val = *(sp + 1 + n_args);
+  aint closure_val = *(sp + n_args);
   aint *closure = (aint *)closure_val;
   aint entry = closure[0];
   insn *target = (insn *)entry;
@@ -501,9 +501,9 @@ void op_closure(DECL_STATE) {
 
   VM_DEBUG("CLOSURE: target=%p n_captured=%d\n", (void *)target, n_captured);
 
-  *sp = (aint)target;
-  STACK_REVERSE(sp + 1, n_captured);
-  aint *args = sp;
+  aint *args = sp - 1;
+  args[0] = (aint)target;
+  STACK_REVERSE(args + 1, n_captured);
   sp += n_captured;
 
   void *closure = Bclosure(args, BOX(n_captured));
