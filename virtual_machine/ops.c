@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "ffi.h"
 #include "insn.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +43,7 @@ extern aint Bunboxed_patt(aint x);
 extern aint Barray_tag_patt(aint x);
 extern aint Bstring_tag_patt(aint x);
 extern aint Bsexp_tag_patt(aint x);
+extern void Bmatch_failure(aint v, const char *fname, aint line, aint col);
 
 #define DISPATCH()                                                             \
   do {                                                                         \
@@ -288,15 +290,18 @@ void op_array(DECL_STATE) {
 }
 
 void op_fail(DECL_STATE) {
-  (void)sp;
   (void)bp;
   ip++;
   int32_t line = ip->num;
   ip++;
   int32_t col = ip->num;
-  VM_DEBUG("FAIL: line=%d, col=%d\n", line, col);
-  fprintf(stderr, "Match failure at line %d, column %d\n", line, col);
-  exit(1);
+  ip++;
+  bool drop_value = ip->num;
+  ip++;
+  const char *module_name = ip->str;
+
+  aint val = drop_value ? STACK_POP(sp) : STACK_PEEK(sp);
+  Bmatch_failure(val, module_name, BOX(line), BOX(col));
 }
 
 /*

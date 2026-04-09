@@ -777,12 +777,15 @@ static bool decode_internal(decode_ctx *ctx) {
     case OP_FAIL_KEEP: {
       int32_t line = reader_i32(&ctx->reader);
       int32_t col = reader_i32(&ctx->reader);
-      if (opcode == OP_FAIL) {
+      bool drop_value = opcode == OP_FAIL;
+      if (drop_value) {
         DEPTH_POP();
       }
       EMIT_FUNC(op_fail);
       EMIT_NUM(line);
       EMIT_NUM(col);
+      EMIT_NUM(drop_value);
+      EMIT_STR(ctx->bc->name);
       break;
     }
 
