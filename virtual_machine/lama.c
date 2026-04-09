@@ -24,7 +24,7 @@ static void print_usage(FILE *dest, const char *prog_name) {
 
 int main(int argc, char *argv[]) {
   char *include_paths[MAX_INCLUDE_PATHS];
-  int include_path_count = 1; // Reserve index 0 for bytecode file's directory
+  int include_path_count = 0;
   // TODO: better error handling in general
   int exit_code = 0;
   char *bytecode_dir = NULL;
@@ -64,13 +64,6 @@ int main(int argc, char *argv[]) {
   }
 
   char *bytecode_file = argv[optind];
-
-  // Include main unit's directory by default
-  char *tmp = ESTRDUP(bytecode_file);
-  bytecode_dir = ESTRDUP(dirname(tmp));
-  free(tmp);
-  include_paths[0] = bytecode_dir;
-
   virtual_machine *vm = vm_create(bytecode_file, (const char **)include_paths,
                                   include_path_count);
   if (!vm) {
