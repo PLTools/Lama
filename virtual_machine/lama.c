@@ -4,11 +4,37 @@
 #include "vm.h"
 #include <getopt.h>
 #include <libgen.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define MAX_INCLUDE_PATHS 64
+
+/*
+ * Check if a string looks like a file (ends with '.bc')
+ */
+static bool is_filepath(const char *str) {
+  size_t len = strlen(str);
+  return len > 3 && strcmp(str + len - 3, ".bc") == 0;
+}
+
+/*
+ * Extract name from filename (without path and extension .bc)
+ */
+static char *extract_unit_name(const char *filename) {
+  char *path_copy = ESTRDUP(filename);
+  char *base = basename(path_copy);
+
+  char *dot = strrchr(base, '.');
+  if (dot && strcmp(dot, ".bc") == 0) {
+    *dot = '\0';
+  }
+
+  char *result = ESTRDUP(base);
+  free(path_copy);
+  return result;
+}
 
 static void print_usage(FILE *dest, const char *prog_name) {
   fprintf(dest, "Usage: %s [options] <bytecode.bc> [args]\n", prog_name);
@@ -28,6 +54,8 @@ int main(int argc, char *argv[]) {
   // TODO: better error handling in general
   int exit_code = 0;
   char *bytecode_dir = NULL;
+  char *main_unit_name_alloc = NULL;
+  const char *main_unit_dir = NULL;
 
   static struct option long_options[] = {{"help", no_argument, 0, 'h'},
                                          {"include", required_argument, 0, 'I'},
@@ -63,9 +91,26 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  char *bytecode_file = argv[optind];
-  virtual_machine *vm = vm_create(bytecode_file, (const char **)include_paths,
-                                  include_path_count);
+  char *name = argv[optind];
+  if (is_filepath(name)) {
+    if (include_path_count >= MAX_INCLUDE_PATHS) {
+      fprintf(stderr, "Maximum number of include paths (%d) exceeded\n",
+              MAX_INCLUDE_PATHS);
+      return 1;
+    }
+
+    char *tmp = ESTRDUP(name);
+    bytecode_dir = ESTRDUP(dirname(tmp));
+    free(tmp);
+
+    main_unit_name_alloc = extract_unit_name(name);
+    name = main_unit_name_alloc;
+    main_unit_dir = bytecode_dir;
+    include_paths[include_path_count++] = bytecode_dir;
+  }
+
+  virtual_machine *vm = vm_create(
+      name, main_unit_dir, (const char **)include_paths, include_path_count);
   if (!vm) {
     exit_code = 1;
     goto cleanup;
@@ -78,6 +123,7 @@ int main(int argc, char *argv[]) {
 
 cleanup:
   vm_destroy(vm);
+  free(main_unit_name_alloc);
   free(bytecode_dir);
   return exit_code;
 }

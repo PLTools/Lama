@@ -10,7 +10,6 @@
 #include "da.h"
 #include "memory.h"
 #include <fcntl.h>
-#include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,32 +42,33 @@ static void free_loaded_units(bytecode_array *units) {
   da_free(*units);
 }
 
-/*
- * Resolve a unit name against the search paths and load the first
- * bytecode file.
- */
-static bytecode *load_unit_from_paths(const char *unit_name,
-                                      const search_paths *paths) {
-  static char path[MAX_PATH_LEN];
-  for (size_t i = 0; i < paths->len; i++) {
-    snprintf(path, MAX_PATH_LEN, "%s/%s.bc", paths->paths[i], unit_name);
-    int fd = open(path, O_RDONLY);
-    if (fd >= 0) {
-      return bytecode_load_fd(fd);
-    }
+static bytecode *load_unit_from_dir(const char *unit_name, const char *dir) {
+  char path[MAX_PATH_LEN];
+  const char *base_dir = dir ? dir : ".";
+
+  snprintf(path, MAX_PATH_LEN, "%s/%s.bc", base_dir, unit_name);
+  int fd = open(path, O_RDONLY);
+  if (fd >= 0) {
+    return bytecode_load_fd(fd);
   }
 
   return NULL;
 }
 
 /*
- * Check if a string looks like a file path (contains '/' or ends with '.bc')
+ * Resolve a unit name against the search paths and load the first
+ * bytecode file.
  */
-static bool is_filepath(const char *str) {
-  if (strchr(str, '/') != NULL)
-    return true;
-  size_t len = strlen(str);
-  return len > 3 && strcmp(str + len - 3, ".bc") == 0;
+static bytecode *load_unit_from_paths(const char *unit_name,
+                                      const search_paths *paths) {
+  for (size_t i = 0; i < paths->len; i++) {
+    bytecode *bc = load_unit_from_dir(unit_name, paths->paths[i]);
+    if (bc) {
+      return bc;
+    }
+  }
+
+  return NULL;
 }
 
 static bool find_loaded(bytecode_array *units, const char *name) {
@@ -78,23 +78,6 @@ static bool find_loaded(bytecode_array *units, const char *name) {
     }
   }
   return false;
-}
-
-/*
- * Extract name from filename (without path and extension .bc)
- */
-static char *extract_unit_name(const char *filename) {
-  char *path_copy = ESTRDUP(filename);
-  char *base = basename(path_copy);
-
-  char *dot = strrchr(base, '.');
-  if (dot && strcmp(dot, ".bc") == 0) {
-    *dot = '\0';
-  }
-
-  char *result = ESTRDUP(base);
-  free(path_copy);
-  return result;
 }
 
 /*
@@ -149,29 +132,23 @@ fail:
   return false;
 }
 
-load_result load(const char *main_unit_path, const search_paths *paths) {
+load_result load(const char *main_unit_name, const char *main_unit_dir,
+                 const search_paths *paths) {
   bytecode_array m;
   da_init(m);
 
   name_array loading;
   da_init(loading);
 
-  bool is_path = is_filepath(main_unit_path);
-  bytecode *bc = is_path ? bytecode_load(main_unit_path)
-                         : load_unit_from_paths(main_unit_path, paths);
+  bytecode *bc = load_unit_from_dir(main_unit_name, main_unit_dir);
   if (!bc) {
-    fprintf(stderr, "Failed to load unit '%s'\n", main_unit_path);
+    fprintf(stderr, "Failed to load unit '%s'\n", main_unit_name);
     goto cleanup;
   }
 
-  char *unit_name =
-      is_path ? extract_unit_name(main_unit_path) : ESTRDUP(main_unit_path);
-
-  if (!load_unit_recursive(&m, &loading, unit_name, bc, paths)) {
-    free(unit_name);
+  if (!load_unit_recursive(&m, &loading, main_unit_name, bc, paths)) {
     goto cleanup;
   }
-  free(unit_name);
   da_free(loading);
 
   return (load_result){

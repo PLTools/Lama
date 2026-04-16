@@ -29,7 +29,8 @@ struct virtual_machine {
   char **argv;
 };
 
-virtual_machine *vm_create(const char *main_unit_path, const char **paths,
+virtual_machine *vm_create(const char *main_unit_name,
+                           const char *main_unit_dir, const char **paths,
                            size_t total_paths_len) {
   search_paths search_paths = {.paths = paths, .len = total_paths_len};
 
@@ -37,7 +38,7 @@ virtual_machine *vm_create(const char *main_unit_path, const char **paths,
   memset(vm, 0, sizeof(virtual_machine));
   vm->stack_base = MAP_FAILED;
 
-  load_result lr = load(main_unit_path, &search_paths);
+  load_result lr = load(main_unit_name, main_unit_dir, &search_paths);
   if (!lr.units) {
     vm_destroy(vm);
     return NULL;

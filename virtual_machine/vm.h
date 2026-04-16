@@ -1,12 +1,12 @@
 #ifndef VM_H
 #define VM_H
 
-#include "../runtime/runtime_common.h"
 #include <stddef.h>
 
 typedef struct virtual_machine virtual_machine;
 
-virtual_machine *vm_create(const char *main_unit_path, const char **paths,
+virtual_machine *vm_create(const char *main_unit_name,
+                           const char *main_unit_dir, const char **paths,
                            size_t total_paths_len);
 
 void vm_destroy(virtual_machine *vm);
