@@ -27,26 +27,6 @@ extern aint LtagHash(const char *s);
 
 #define GLOBAL_PREFIX "global_"
 
-/*
- * Code emission macros - append to code array in context
- */
-#define EMIT_FUNC(f) da_append(ctx->code, ((insn){.func = (f)}))
-#define EMIT_NUM(n) da_append(ctx->code, ((insn){.num = (n)}))
-#define EMIT_ANUM(n) da_append(ctx->code, ((insn){.anum = (n)}))
-#define EMIT_STR(s) da_append(ctx->code, ((insn){.str = (s)}))
-#define EMIT_TARGET(t) da_append(ctx->code, ((insn){.target = (t)}))
-#define EMIT_GLOBAL_PTR(p) da_append(ctx->code, ((insn){.global_ptr = (p)}))
-#define EMIT_PTR(p) da_append(ctx->code, ((insn){.ptr = (p)}))
-
-#define CHECK_IDX(idx, limit, name)                                            \
-  do {                                                                         \
-    if ((idx) < 0 || (idx) >= (limit)) {                                       \
-      fprintf(stderr, "%s: index %d out of range [0, %d) at bc_off=%zu\n",     \
-              name, (int)(idx), (int)(limit), current_bc_off);                 \
-      goto cleanup;                                                            \
-    }                                                                          \
-  } while (0)
-
 #define FFI_STUB_SIZE 2
 
 typedef enum {
@@ -285,6 +265,17 @@ static aint *resolve_global_ptr(decode_ctx *ctx, int32_t idx,
   return (aint *)resolve_ext_global_ptr(ctx->ext_globals, glob_name);
 }
 
+/*
+ * Code emission macros - append to code array in context
+ */
+#define EMIT_FUNC(f) da_append(ctx->code, ((insn){.func = (f)}))
+#define EMIT_NUM(n) da_append(ctx->code, ((insn){.num = (n)}))
+#define EMIT_ANUM(n) da_append(ctx->code, ((insn){.anum = (n)}))
+#define EMIT_STR(s) da_append(ctx->code, ((insn){.str = (s)}))
+#define EMIT_TARGET(t) da_append(ctx->code, ((insn){.target = (t)}))
+#define EMIT_GLOBAL_PTR(p) da_append(ctx->code, ((insn){.global_ptr = (p)}))
+#define EMIT_PTR(p) da_append(ctx->code, ((insn){.ptr = (p)}))
+
 #define ENTRY_STEP_SLOTS 4
 
 static void emit_entry_step(insn *slot, insn *main_begin) {
@@ -425,6 +416,15 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
   } while (0)
 #define DEPTH_PUSH() DEPTH_INC(1)
 #define DEPTH_POP() DEPTH_DEC(1)
+
+#define CHECK_IDX(idx, limit, name)                                            \
+  do {                                                                         \
+    if ((idx) < 0 || (idx) >= (limit)) {                                       \
+      fprintf(stderr, "%s: index %d out of range [0, %d) at bc_off=%zu\n",     \
+              name, (int)(idx), (int)(limit), current_bc_off);                 \
+      goto cleanup;                                                            \
+    }                                                                          \
+  } while (0)
 
 static bool decode_internal(decode_ctx *ctx) {
 
@@ -1026,6 +1026,7 @@ cleanup:
   return ok;
 }
 
+#undef CHECK_IDX
 #undef DEPTH_INC
 #undef DEPTH_DEC
 #undef DEPTH_PUSH
