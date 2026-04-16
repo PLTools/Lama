@@ -26,7 +26,8 @@ static inline int32_t reader_i32(byte_reader *r) {
   assert(r->pos + 4 <= r->size);
   const uint8_t *p = r->data + r->pos;
   r->pos += 4;
-  return (int32_t)(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
+  return (int32_t)((uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+                   ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24));
 }
 
 static inline uint8_t reader_u8(byte_reader *r) {
