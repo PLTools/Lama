@@ -491,7 +491,16 @@ static bool decode_internal(decode_ctx *ctx) {
         VM_DEBUG("  DEPTH: %d -> %d", ctx->sv.depth, m->stack_depth);
         ctx->sv.depth = m->stack_depth;
       } else {
-        // No forward jump
+        // No forward jump has targeted this instruction yet. We are starting a
+        // new "region" after JMP/END, so there is no previous instruction  to
+        // validate against. So set the current decode depth which will be
+        // checked by some backward jump. Example (while loop):
+        //   JMP cond
+        // body:
+        //   ...
+        // cond:
+        //   ...
+        //   CJMP_NZ body
         VM_DEBUG("  DEPTH: barrier, keeping stale depth=%d at bc_off=%zu\n",
                  ctx->sv.depth, current_bc_off);
         m->stack_depth = ctx->sv.depth;
