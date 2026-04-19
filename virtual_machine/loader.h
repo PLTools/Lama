@@ -17,7 +17,6 @@ typedef struct {
   size_t units_len; // Number of unique units
 } load_result;
 
-load_result load(const char *main_unit_name, const char *main_unit_dir,
-                 const search_paths *paths);
+load_result load(const char *main_unit_name, const search_paths *paths);
 
 #endif // LOADER_H

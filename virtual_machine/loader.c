@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static const char bytecode_suffix[] = ".bc";
+
 typedef struct {
   bytecode **data;
   size_t len;
@@ -42,29 +44,19 @@ static void free_loaded_units(bytecode_array *units) {
   da_free(*units);
 }
 
-static bytecode *load_unit_from_dir(const char *unit_name, const char *dir) {
-  char path[MAX_PATH_LEN];
-  const char *base_dir = dir ? dir : ".";
-
-  snprintf(path, MAX_PATH_LEN, "%s/%s.bc", base_dir, unit_name);
-  int fd = open(path, O_RDONLY);
-  if (fd >= 0) {
-    return bytecode_load_fd(fd);
-  }
-
-  return NULL;
-}
-
 /*
  * Resolve a unit name against the search paths and load the first
  * bytecode file.
  */
 static bytecode *load_unit_from_paths(const char *unit_name,
                                       const search_paths *paths) {
+  static char path[MAX_PATH_LEN];
   for (size_t i = 0; i < paths->len; i++) {
-    bytecode *bc = load_unit_from_dir(unit_name, paths->paths[i]);
-    if (bc) {
-      return bc;
+    snprintf(path, MAX_PATH_LEN, "%s/%s%s", paths->paths[i], unit_name,
+             bytecode_suffix);
+    int fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+      return bytecode_load_fd(fd);
     }
   }
 
@@ -132,15 +124,14 @@ fail:
   return false;
 }
 
-load_result load(const char *main_unit_name, const char *main_unit_dir,
-                 const search_paths *paths) {
+load_result load(const char *main_unit_name, const search_paths *paths) {
   bytecode_array m;
   da_init(m);
 
   name_array loading;
   da_init(loading);
 
-  bytecode *bc = load_unit_from_dir(main_unit_name, main_unit_dir);
+  bytecode *bc = load_unit_from_paths(main_unit_name, paths);
   if (!bc) {
     fprintf(stderr, "Failed to load unit '%s'\n", main_unit_name);
     goto cleanup;

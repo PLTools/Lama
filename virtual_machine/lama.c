@@ -9,14 +9,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_INCLUDE_PATHS 64
+// TODO: think about unifying with loader.c
+static const char bytecode_suffix[] = ".bc";
 
 /*
- * Check if a string looks like a file (ends with '.bc')
+ * Check if a string looks like a file path (ends with '.bc')
  */
 static bool is_filepath(const char *str) {
   size_t len = strlen(str);
-  return len > 3 && strcmp(str + len - 3, ".bc") == 0;
+  size_t suffix_len = sizeof(bytecode_suffix) - 1;
+  return len > suffix_len &&
+         strcmp(str + len - suffix_len, bytecode_suffix) == 0;
 }
 
 /*
@@ -27,7 +30,7 @@ static char *extract_unit_name(const char *filename) {
   char *base = basename(path_copy);
 
   char *dot = strrchr(base, '.');
-  if (dot && strcmp(dot, ".bc") == 0) {
+  if (dot && strcmp(dot, bytecode_suffix) == 0) {
     *dot = '\0';
   }
 
@@ -36,11 +39,28 @@ static char *extract_unit_name(const char *filename) {
   return result;
 }
 
+/*
+ * Extract path from filename
+ */
+static char *extract_unit_dir(const char *filename) {
+  char *path_copy = ESTRDUP(filename);
+  char *dir = dirname(path_copy);
+  char *result = ESTRDUP(dir);
+  free(path_copy);
+  return result;
+}
+
+#define MAX_INCLUDE_PATHS 64
+
 static void print_usage(FILE *dest, const char *prog_name) {
-  fprintf(dest, "Usage: %s [options] <bytecode.bc> [args]\n", prog_name);
+  fprintf(dest, "Usage: %s [options] <unit name | bytecode.bc> [args]\n",
+          prog_name);
   fprintf(dest,
           "\nWhen no options are specified, the VM will run the bytecode file "
           "and look for units in the same directory.\n");
+  fprintf(dest,
+          "You can also specify unit name instead of a bytecode file, but "
+          "you need to manually include relevant search paths.\n");
   fprintf(dest, "Options:\n");
   fprintf(dest, "  -h, --help              Show this help message\n");
   fprintf(dest,
@@ -50,12 +70,12 @@ static void print_usage(FILE *dest, const char *prog_name) {
 
 int main(int argc, char *argv[]) {
   char *include_paths[MAX_INCLUDE_PATHS];
-  int include_path_count = 0;
+  int include_path_count = 1;
   // TODO: better error handling in general
   int exit_code = 0;
   char *bytecode_dir = NULL;
-  char *main_unit_name_alloc = NULL;
-  const char *main_unit_dir = NULL;
+  char *main_unit_name = NULL;
+  bool is_path = false;
 
   static struct option long_options[] = {{"help", no_argument, 0, 'h'},
                                          {"include", required_argument, 0, 'I'},
@@ -91,26 +111,20 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  char *name = argv[optind];
-  if (is_filepath(name)) {
-    if (include_path_count >= MAX_INCLUDE_PATHS) {
-      fprintf(stderr, "Maximum number of include paths (%d) exceeded\n",
-              MAX_INCLUDE_PATHS);
-      return 1;
-    }
-
-    char *tmp = ESTRDUP(name);
-    bytecode_dir = ESTRDUP(dirname(tmp));
-    free(tmp);
-
-    main_unit_name_alloc = extract_unit_name(name);
-    name = main_unit_name_alloc;
-    main_unit_dir = bytecode_dir;
-    include_paths[include_path_count++] = bytecode_dir;
+  char *entry_arg = argv[optind];
+  is_path = is_filepath(entry_arg);
+  if (is_path) {
+    bytecode_dir = extract_unit_dir(entry_arg);
+    main_unit_name = extract_unit_name(entry_arg);
+    include_paths[0] = bytecode_dir;
+  } else {
+    main_unit_name = entry_arg;
   }
 
-  virtual_machine *vm = vm_create(
-      name, main_unit_dir, (const char **)include_paths, include_path_count);
+  virtual_machine *vm =
+      vm_create(main_unit_name,
+                (const char **)(is_path ? include_paths : include_paths + 1),
+                is_path ? include_path_count : include_path_count - 1);
   if (!vm) {
     exit_code = 1;
     goto cleanup;
@@ -123,7 +137,9 @@ int main(int argc, char *argv[]) {
 
 cleanup:
   vm_destroy(vm);
-  free(main_unit_name_alloc);
+  if (is_path) {
+    free(main_unit_name);
+  }
   free(bytecode_dir);
   return exit_code;
 }
