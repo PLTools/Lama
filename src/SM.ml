@@ -330,10 +330,10 @@ module ByteCode = struct
       | BEGIN (_, a, l, [], _, _) ->
           add_code_bytes [ (5 * 16) + 2 ];
           add_code_ints [ a; l ] (* with no closure *)
-      (* 0x53 n:32 n:32       *)
-      | BEGIN (_, a, l, _, _, _) ->
+      (* 0x53 n:32 n:32 n:32  *)
+      | BEGIN (_, a, l, ds, _, _) ->
           add_code_bytes [ (5 * 16) + 3 ];
-          add_code_ints [ a; l ] (* with a closure  *)
+          add_code_ints [ a; l; List.length ds ] (* with a closure  *)
       (* 0x54 l:32 n:32 d*:32 *)
       | CLOSURE (s, ds) ->
           add_code_bytes [ (5 * 16) + 4 ];

@@ -399,6 +399,24 @@ static bool handle_jump(decode_ctx *ctx, meta_info *meta,
   return true;
 }
 
+static bool validate_closure_captures(meta_info *meta, int32_t target_off,
+                                      int32_t n_captured,
+                                      size_t current_bc_off) {
+  int32_t *expected = &meta[target_off].n_captured;
+  if (*expected == -1) {
+    *expected = n_captured;
+    return true;
+  }
+  if (*expected != n_captured) {
+    fprintf(stderr,
+            "Error: mismatched closure arity at bc_off=%zu, target=%d "
+            "(expected %d, got %d)\n",
+            current_bc_off, target_off, *expected, n_captured);
+    return false;
+  }
+  return true;
+}
+
 #define DEPTH_INC(n)                                                           \
   do {                                                                         \
     VM_DEBUG("  DEPTH: %d -> %d (+%d)\n", ctx->sv.depth, ctx->sv.depth + (n),  \
@@ -717,8 +735,7 @@ static bool decode_internal(decode_ctx *ctx) {
     case OP_LD_CLO: {
       DEPTH_PUSH();
       int32_t idx = reader_i32(&ctx->reader);
-      if (ctx->func.n_captured != -1)
-        CHECK_IDX(idx, ctx->func.n_captured, "LD_CLO");
+      CHECK_IDX(idx, ctx->func.n_captured, "LD_CLO");
       EMIT_FUNC(op_ld_clo);
       EMIT_NUM(idx);
       break;
@@ -726,8 +743,7 @@ static bool decode_internal(decode_ctx *ctx) {
 
     case OP_ST_CLO: {
       int32_t idx = reader_i32(&ctx->reader);
-      if (ctx->func.n_captured != -1)
-        CHECK_IDX(idx, ctx->func.n_captured, "ST_CLO");
+      CHECK_IDX(idx, ctx->func.n_captured, "ST_CLO");
       EMIT_FUNC(op_st_clo);
       EMIT_NUM(idx);
       break;
@@ -839,20 +855,39 @@ static bool decode_internal(decode_ctx *ctx) {
       EMIT_FUNC(op_patt_closure);
       break;
 
-    case OP_BEGIN:
-    case OP_BEGIN_CLOSURE: {
+    case OP_BEGIN: {
       int32_t n_args = reader_i32(&ctx->reader);
       int32_t n_locals = reader_i32(&ctx->reader);
       ctx->sv.depth = 0;
       ctx->sv.max_depth = 0;
 
-      ctx->func = (func_ctx){.n_args = n_args,
-                             .n_locals = n_locals,
-                             .n_captured = (opcode == OP_BEGIN_CLOSURE)
-                                               ? meta[current_bc_off].n_captured
-                                               : 0};
+      ctx->func =
+          (func_ctx){.n_args = n_args, .n_locals = n_locals, .n_captured = 0};
 
-      EMIT_FUNC(opcode == OP_BEGIN_CLOSURE ? op_begin_closure : op_begin);
+      EMIT_FUNC(op_begin);
+      EMIT_NUM(n_args);
+      EMIT_NUM(n_locals);
+      ctx->sv.max_depth_pos = ctx->code.len;
+      EMIT_NUM(0); // placeholder for max depth, will be patched
+
+      break;
+    }
+
+    case OP_BEGIN_CLOSURE: {
+      int32_t n_args = reader_i32(&ctx->reader);
+      int32_t n_locals = reader_i32(&ctx->reader);
+      int32_t n_captured = reader_i32(&ctx->reader);
+      if (!validate_closure_captures(meta, (int32_t)current_bc_off, n_captured,
+                                     current_bc_off)) {
+        goto cleanup;
+      }
+      ctx->sv.depth = 0;
+      ctx->sv.max_depth = 0;
+
+      ctx->func = (func_ctx){
+          .n_args = n_args, .n_locals = n_locals, .n_captured = n_captured};
+
+      EMIT_FUNC(op_begin_closure);
       EMIT_NUM(n_args);
       EMIT_NUM(n_locals);
       ctx->sv.max_depth_pos = ctx->code.len;
@@ -914,14 +949,8 @@ static bool decode_internal(decode_ctx *ctx) {
 
       // Validate CLOSURE target's n_captured consistency
       if (!IS_EXT_REF(target_off)) {
-        int32_t *target_n_captured = &meta[target_off].n_captured;
-        if (meta[target_off].n_captured == -1) {
-          *target_n_captured = n_captured;
-        } else if (*target_n_captured != n_captured) {
-          fprintf(stderr,
-                  "Error: mismatched CLOSURE arity at target=%d "
-                  "(expected %d, got %d)\n",
-                  target_off, meta[target_off].n_captured, n_captured);
+        if (!validate_closure_captures(meta, target_off, n_captured,
+                                       current_bc_off)) {
           goto cleanup;
         }
       }
