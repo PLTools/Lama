@@ -422,6 +422,13 @@ let compile_binop env op =
   | _ ->
       failwith (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
 
+let normal_label = "L"
+let builtin_label = "B"
+let global_label = "global_"
+let labeled s = normal_label ^ s
+let labeled_builtin s = builtin_label ^ s
+let labeled_global s = global_label ^ s
+
 (* For pointers to be marked by GC as alive they have to be located on the stack.
    As we do not have control where does the C compiler locate them in the moment of GC,
    we have to explicitly locate them on the stack.
@@ -667,19 +674,24 @@ let compile cmd env imports code =
             match instr with
             | LABEL s ->
                 if env#has_stack s then
-                  (env#drop_barrier#retrieve_stack s, [ Label s ])
+                  (env#drop_barrier#retrieve_stack s, [ Label (env#asm_name s) ])
                 else (env#drop_stack, [])
-            | FLABEL s -> (env#drop_barrier, [ Label s ])
-            | SLABEL s -> (env, [ Label s ])
+            | FLABEL s -> (env#drop_barrier, [ Label (env#asm_name s) ])
+            | SLABEL s -> (env, [ Label (env#asm_name s) ])
             | _ -> (env, [])
           else
             match instr with
-            | PUBLIC name -> (env#register_public name, [])
-            | EXTERN name -> (env#register_extern name, [])
+            | PUBLIC (name, is_fun) ->
+                let asm_name = if is_fun then env#asm_name name else labeled_global name in
+                (env#register_public asm_name, [])
+            | EXTERN (name, is_fun) ->
+                let asm_name = if is_fun then env#asm_name name else labeled_global name in
+                (env#register_extern asm_name, [])
             | IMPORT _ -> (env, [])
             | CLOSURE (name, closure) ->
-                let ext = if env#is_external name then E else I in
-                let address = M (F, ext, A, name) in
+                let asm_name = env#asm_name name in
+                let ext = if env#is_external asm_name then E else I in
+                let address = M (F, ext, A, asm_name) in
                 let l, env = env#allocate in
                 let env, push_closure_code =
                   List.fold_left
@@ -752,17 +764,18 @@ let compile cmd env imports code =
                       ]
                   | _ -> [ Mov (v, rax); Mov (rax, I (0, x)); Mov (rax, x) ] )*)
             | BINOP op -> compile_binop env op
-            | LABEL s | FLABEL s | SLABEL s -> (env, [ Label s ])
-            | JMP l -> ((env#set_stack l)#set_barrier, [ Jmp l ])
+            | LABEL s | FLABEL s | SLABEL s -> (env, [ Label (env#asm_name s) ])
+            | JMP l -> ((env#set_stack l)#set_barrier, [ Jmp (env#asm_name l) ])
             | CJMP (s, l) ->
                 let x, env = env#pop in
                 ( env#set_stack l,
-                  [ Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp (s, l) ] )
+                  [ Sar1 x; (*!!!*) Binop ("cmp", L 0, x); CJmp (s, env#asm_name l) ] )
             | BEGIN (f, nargs, nlocals, closure, _args, scopes) ->
+                let asm_f = env#asm_name f in
                 let _ =
-                  let is_safepoint = List.mem f safepoint_functions in
+                  let is_safepoint = List.mem asm_f safepoint_functions in
                   let is_vararg =
-                    Option.is_some @@ List.assoc_opt f vararg_functions
+                    Option.is_some @@ List.assoc_opt asm_f vararg_functions
                   in
                   if is_safepoint || is_vararg then
                     raise
@@ -787,17 +800,13 @@ let compile cmd env imports code =
                     names
                     @ [
                         Meta
-                          (Printf.sprintf "\t.stabn 192,0,0,%s-%s" scope.blab f);
+                          (Printf.sprintf "\t.stabn 192,0,0,%s-%s" (labeled scope.blab) asm_f);
                       ]
                     @ sub_stabs
                     @ [
                         Meta
-                          (Printf.sprintf "\t.stabn 224,0,0,%s-%s" scope.elab f);
+                          (Printf.sprintf "\t.stabn 224,0,0,%s-%s" (labeled scope.elab) asm_f);
                       ]
-                in
-                let name =
-                  if f.[0] = 'L' then String.sub f 1 (String.length f - 1)
-                  else f
                 in
                 let stabs =
                   opt_stabs env
@@ -806,10 +815,10 @@ let compile cmd env imports code =
                      else
                        let func =
                          [
-                           Meta (Printf.sprintf "\t.type %s, @function" name);
+                           Meta (Printf.sprintf "\t.type %s, @function" asm_f);
                            Meta
-                             (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" name
-                                f);
+                             (Printf.sprintf "\t.stabs \"%s:F1\",36,0,0,%s" f
+                                asm_f);
                          ]
                        in
                        let arguments =
@@ -823,13 +832,13 @@ let compile cmd env imports code =
                 let env, check_argc =
                   if f = cmd#topname then (env, [])
                   else
-                    let argc_correct_label = f ^ "_argc_correct" in
+                    let argc_correct_label = asm_f ^ "_argc_correct" in
                     let pat_addr, env =
                       env#string
                         "Function %s called with incorrect arguments count. \
                          Expected: %d. Actual: %d\\n"
                     in
-                    let name_addr, env = env#string name in
+                    let name_addr, env = env#string f in
                     let pat_loc, env = env#allocate in
                     let name_loc, env = env#allocate in
                     let expected_loc, env = env#allocate in
@@ -853,7 +862,7 @@ let compile cmd env imports code =
                 in
                 env#assert_empty_stack;
                 let has_closure = closure <> [] in
-                let env = env#enter f nargs nlocals has_closure in
+                let env = env#enter asm_f nargs nlocals has_closure in
                 ( env,
                   stabs
                   @ [ Meta "\t.cfi_startproc" ]
@@ -911,7 +920,7 @@ let compile cmd env imports code =
                   @
                   if f = cmd#topname then
                     List.map
-                      (fun i -> Call ("init" ^ i))
+                      (fun i -> Call (labeled_init i))
                       (List.filter (fun i -> i <> "Std") imports)
                   else [] @ check_argc )
             | END ->
@@ -954,7 +963,9 @@ let compile cmd env imports code =
                 let x = env#peek in
                 (env, [ Mov (x, rax); Jmp env#epilogue ])
             | ELEM -> compile_call env ~fname:".elem" 2 false
-            | CALL (fname, n, tail) -> compile_call env ~fname n tail
+            | CALL (fname, n, tail) ->
+                let asm_fname = match fname.[0] with '.' -> fname | _ -> env#asm_name fname in
+                compile_call env ~fname:asm_fname n tail
             | CALLC (n, tail) -> compile_call env n tail
             | SEXP (t, n) ->
                 let s, env = env#allocate in
@@ -1148,7 +1159,7 @@ module S = Set.Make (String)
 module M = Map.Make (String)
 
 (* Environment implementation *)
-class env prg mode =
+class env prg mode topname =
   let chars =
     "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'"
   in
@@ -1236,6 +1247,9 @@ class env prg mode =
     method has_stack l = M.mem l stackmap
     method is_external name = S.mem name externs
 
+    (* prefixes a function name or a label *)
+    method asm_name name = if name = topname then name else labeled name
+
     (* gets a location for a variable *)
     method loc x =
       match x with
@@ -1244,8 +1258,9 @@ class env prg mode =
           let ext = if self#is_external name then E else I in
           M (D, ext, V, loc_name)
       | Value.Fun name ->
-          let ext = if self#is_external name then E else I in
-          M (F, ext, A, name)
+          let asm_name = self#asm_name name in
+          let ext = if self#is_external asm_name then E else I in
+          M (F, ext, A, asm_name)
       | Value.Local i -> S i
       | Value.Arg i when i < argument_registers_size -> argument_registers.(i)
       | Value.Arg i -> S (-(i - argument_registers_size) - 1)
@@ -1410,7 +1425,7 @@ class env prg mode =
 let genasm cmd prog =
   let mode = { is_debug = cmd#is_debug; target_os = cmd#target_os } in
   let sm = SM.compile cmd prog in
-  let env, code = compile cmd (new env sm mode) (fst (fst prog)) sm in
+  let env, code = compile cmd (new env sm mode cmd#topname) (fst (fst prog)) sm in
   let globals =
     List.map
       (fun s -> Meta (Printf.sprintf "\t.globl\t%s" (env#prefixed s)))
