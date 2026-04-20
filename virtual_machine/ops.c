@@ -74,7 +74,8 @@ extern void Bmatch_failure(aint v, const char *fname, aint line, aint col);
 #define FRAME_SAVED_BP (-1)
 #define FRAME_SAVED_IP (-2)
 #define FRAME_SAVED_SP (-3)
-#define FRAME_LOCALS (-4)
+#define FRAME_SAVED_GC_TOP (-4)
+#define FRAME_LOCALS (-5)
 
 #define PUSH_FRAME(n_args_val, saved_bp, saved_ip, caller_sp_val)              \
   do {                                                                         \
@@ -83,6 +84,12 @@ extern void Bmatch_failure(aint v, const char *fname, aint line, aint col);
     STACK_PUSH(sp, (aint)(saved_bp));                                          \
     STACK_PUSH(sp, (aint)(saved_ip));                                          \
     STACK_PUSH(sp, (aint)(caller_sp_val));                                     \
+    /*                                                                         \
+     * If we don't restore it, we might end up with a smaller (therefore       \
+     * incorrect) __gc_stack_top.                                              \
+     * See DEFINE_BEGIN.                                                       \
+     */                                                                        \
+    STACK_PUSH(sp, (aint)__gc_stack_top);                                      \
     bp = new_bp;                                                               \
   } while (0)
 
@@ -259,7 +266,17 @@ void op_sexp(DECL_STATE) {
   STACK_REVERSE(args, n_fields + 1);
   sp += n_fields;
 
+  // Ugly corner case due to using sp - 1.
+  // When we reverse, some heap object might occupy sp - 1
+  // when sp - 1 ==  __gc_stack_top  and GC can trigger. Therefore, we need to
+  // "guard" against it.
+  size_t saved_gc_stack_top = __gc_stack_top;
+  size_t sexp_gc_stack_top = (size_t)(args - 1);
+  if (__gc_stack_top == 0 || sexp_gc_stack_top < __gc_stack_top) {
+    __gc_stack_top = sexp_gc_stack_top;
+  }
   void *s = Bsexp(args, BOX(n_fields + 1));
+  __gc_stack_top = saved_gc_stack_top;
   STACK_PUSH(sp, (aint)s);
   DISPATCH();
 }
@@ -407,7 +424,16 @@ void op_st_clo(DECL_STATE) {
                                                                                \
     aint *offset = sp - max_depth;                                             \
     memset(offset, 0, max_depth * sizeof(aint));                               \
-    __gc_stack_top = (size_t)(offset - 1);                                     \
+    size_t new_gc_stack_top = (size_t)(offset - 1);                            \
+    /*                                                                         \
+     * A caller may have stack depth lower than caller's.                      \
+     * Example:                                                                \
+     *   caller: sp = 100, max_depth = 10 -> __gc_stack_top = 89               \
+     *   callee: sp = 96,  max_depth = 2  -> __gc_stack_top = 93               \
+     */                                                                        \
+    if (__gc_stack_top == 0 || new_gc_stack_top < __gc_stack_top) {            \
+      __gc_stack_top = new_gc_stack_top;                                       \
+    }                                                                          \
                                                                                \
     DISPATCH();                                                                \
   }
@@ -465,6 +491,7 @@ void op_end(DECL_STATE) {
   // Restore caller's state from frame
   sp = (aint *)bp[FRAME_SAVED_SP];
   ip = (insn *)bp[FRAME_SAVED_IP];
+  __gc_stack_top = (size_t)bp[FRAME_SAVED_GC_TOP];
   bp = (aint *)bp[FRAME_SAVED_BP];
 
   STACK_PUSH(sp, ret_val);
@@ -492,6 +519,7 @@ void op_ffi_call(DECL_STATE) {
   // Same as op_end
   sp = (aint *)bp[FRAME_SAVED_SP];
   ip = (insn *)bp[FRAME_SAVED_IP];
+  __gc_stack_top = (size_t)bp[FRAME_SAVED_GC_TOP];
   bp = (aint *)bp[FRAME_SAVED_BP];
 
   STACK_PUSH(sp, result);
