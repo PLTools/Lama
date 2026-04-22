@@ -936,8 +936,7 @@ static bool decode_internal(decode_ctx *ctx) {
           EMIT_NUM(idx);
           break;
         case 3: // Closure var
-          if (ctx->func.n_captured != -1)
-            CHECK_IDX(idx, ctx->func.n_captured, "CLOSURE desig closure");
+          CHECK_IDX(idx, ctx->func.n_captured, "CLOSURE desig closure");
           DEPTH_PUSH();
           EMIT_FUNC(op_ld_clo);
           EMIT_NUM(idx);
