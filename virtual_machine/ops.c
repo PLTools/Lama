@@ -62,6 +62,7 @@ extern void Bmatch_failure(aint v, const char *fname, aint line, aint col);
 #define STACK_PUSH(sp, val) (*--(sp) = (val))
 #define STACK_POP(sp) (*sp++)
 #define STACK_PEEK(sp) (*sp)
+#define SYNC_GC_STACK(sp) (__gc_stack_top = (size_t)((sp) - 1))
 #define STACK_REVERSE(base, n)                                                 \
   do {                                                                         \
     for (int32_t _i = 0; _i < (n) / 2; _i++) {                                 \
@@ -74,8 +75,7 @@ extern void Bmatch_failure(aint v, const char *fname, aint line, aint col);
 #define FRAME_SAVED_BP (-1)
 #define FRAME_SAVED_IP (-2)
 #define FRAME_SAVED_SP (-3)
-#define FRAME_SAVED_GC_TOP (-4)
-#define FRAME_LOCALS (-5)
+#define FRAME_LOCALS (-4)
 
 #define PUSH_FRAME(n_args_val, saved_bp, saved_ip, caller_sp_val)              \
   do {                                                                         \
@@ -84,12 +84,6 @@ extern void Bmatch_failure(aint v, const char *fname, aint line, aint col);
     STACK_PUSH(sp, (aint)(saved_bp));                                          \
     STACK_PUSH(sp, (aint)(saved_ip));                                          \
     STACK_PUSH(sp, (aint)(caller_sp_val));                                     \
-    /*                                                                         \
-     * If we don't restore it, we might end up with a smaller (therefore       \
-     * incorrect) __gc_stack_top.                                              \
-     * See DEFINE_BEGIN.                                                       \
-     */                                                                        \
-    STACK_PUSH(sp, (aint)__gc_stack_top);                                      \
     bp = new_bp;                                                               \
   } while (0)
 
@@ -235,6 +229,7 @@ void op_cjmp_nz(DECL_STATE) {
 void op_string(DECL_STATE) {
   ip++;
   const char *str = ip->str;
+  SYNC_GC_STACK(sp);
   void *result = Bstring((void *)&str);
   VM_DEBUG("STRING literal: \"%s\" -> %p\n", str, result);
   STACK_PUSH(sp, (aint)result);
@@ -247,8 +242,9 @@ void op_barray(DECL_STATE) {
   VM_DEBUG("BARRAY: n=%d\n", n);
   aint *args = sp;
   STACK_REVERSE(args, n);
-  sp += n;
+  SYNC_GC_STACK(sp);
   void *arr = Barray(args, BOX(n));
+  sp = args + n;
   STACK_PUSH(sp, (aint)arr);
   DISPATCH();
 }
@@ -264,19 +260,10 @@ void op_sexp(DECL_STATE) {
   aint *args = sp - 1;
   args[0] = tag_hash;
   STACK_REVERSE(args, n_fields + 1);
-  sp += n_fields;
 
-  // Ugly corner case due to using sp - 1.
-  // When we reverse, some heap object might occupy sp - 1
-  // when sp - 1 ==  __gc_stack_top  and GC can trigger. Therefore, we need to
-  // "guard" against it.
-  size_t saved_gc_stack_top = __gc_stack_top;
-  size_t sexp_gc_stack_top = (size_t)(args - 1);
-  if (__gc_stack_top == 0 || sexp_gc_stack_top < __gc_stack_top) {
-    __gc_stack_top = sexp_gc_stack_top;
-  }
+  SYNC_GC_STACK(args);
   void *s = Bsexp(args, BOX(n_fields + 1));
-  __gc_stack_top = saved_gc_stack_top;
+  sp += n_fields;
   STACK_PUSH(sp, (aint)s);
   DISPATCH();
 }
@@ -412,27 +399,12 @@ void op_st_clo(DECL_STATE) {
     (void)n_args;                                                              \
     ip++;                                                                      \
     int32_t n_locals = ip->num;                                                \
-    ip++;                                                                      \
-    int32_t max_depth = ip->num;                                               \
                                                                                \
-    VM_DEBUG("BEGIN n_args=%d n_locals=%d max_depth=%d bp=%p sp=%p\n", n_args, \
-             n_locals, max_depth, (void *)bp, (void *)sp);                     \
+    VM_DEBUG("BEGIN n_args=%d n_locals=%d bp=%p sp=%p\n", n_args, n_locals,    \
+             (void *)bp, (void *)sp);                                          \
                                                                                \
     for (int32_t i = 0; i < n_locals; i++) {                                   \
       STACK_PUSH(sp, BOX(0));                                                  \
-    }                                                                          \
-                                                                               \
-    aint *offset = sp - max_depth;                                             \
-    memset(offset, 0, max_depth * sizeof(aint));                               \
-    size_t new_gc_stack_top = (size_t)(offset - 1);                            \
-    /*                                                                         \
-     * A caller may have stack depth lower than caller's.                      \
-     * Example:                                                                \
-     *   caller: sp = 100, max_depth = 10 -> __gc_stack_top = 89               \
-     *   callee: sp = 96,  max_depth = 2  -> __gc_stack_top = 93               \
-     */                                                                        \
-    if (__gc_stack_top == 0 || new_gc_stack_top < __gc_stack_top) {            \
-      __gc_stack_top = new_gc_stack_top;                                       \
     }                                                                          \
                                                                                \
     DISPATCH();                                                                \
@@ -482,7 +454,6 @@ void op_callc(DECL_STATE) {
 }
 
 void op_end(DECL_STATE) {
-  (void)sp;
   aint ret_val = STACK_POP(sp);
 
   VM_DEBUG("END ret_val=%ld bp=%p sp=%p\n", (long)ret_val, (void *)bp,
@@ -491,7 +462,6 @@ void op_end(DECL_STATE) {
   // Restore caller's state from frame
   sp = (aint *)bp[FRAME_SAVED_SP];
   ip = (insn *)bp[FRAME_SAVED_IP];
-  __gc_stack_top = (size_t)bp[FRAME_SAVED_GC_TOP];
   bp = (aint *)bp[FRAME_SAVED_BP];
 
   STACK_PUSH(sp, ret_val);
@@ -502,7 +472,6 @@ void op_end(DECL_STATE) {
  * FFI call — dispatches via pre-resolved ffi_resolved struct
  */
 void op_ffi_call(DECL_STATE) {
-  (void)sp;
   ip++;
   const ffi_resolved *res = (const ffi_resolved *)ip->ptr;
 
@@ -513,13 +482,13 @@ void op_ffi_call(DECL_STATE) {
 
   // args at bp[1..n_args]
   STACK_REVERSE(bp + 1, n_args);
+  SYNC_GC_STACK(sp);
   aint result = ffi_call_c(res, bp + 1, n_args);
   VM_DEBUG("FFI_CALL: result=%ld\n", (long)result);
 
   // Same as op_end
   sp = (aint *)bp[FRAME_SAVED_SP];
   ip = (insn *)bp[FRAME_SAVED_IP];
-  __gc_stack_top = (size_t)bp[FRAME_SAVED_GC_TOP];
   bp = (aint *)bp[FRAME_SAVED_BP];
 
   STACK_PUSH(sp, result);
@@ -537,9 +506,10 @@ void op_closure(DECL_STATE) {
   aint *args = sp - 1;
   args[0] = (aint)target;
   STACK_REVERSE(args + 1, n_captured);
-  sp += n_captured;
 
+  SYNC_GC_STACK(args);
   void *closure = Bclosure(args, BOX(n_captured));
+  sp += n_captured;
   VM_DEBUG("CLOSURE: created=%p\n", (void *)closure);
   STACK_PUSH(sp, (aint)closure);
   DISPATCH();

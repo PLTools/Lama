@@ -99,8 +99,6 @@ typedef enum { LIVE, BARRIER } reach_state;
 typedef struct {
   int32_t depth;
   reach_state state;
-  int32_t max_depth;
-  size_t max_depth_pos;
 } stack_validation;
 
 typedef struct {
@@ -422,8 +420,6 @@ static bool validate_closure_captures(meta_info *meta, int32_t target_off,
     VM_DEBUG("  DEPTH: %d -> %d (+%d)\n", ctx->sv.depth, ctx->sv.depth + (n),  \
              (n));                                                             \
     ctx->sv.depth += (n);                                                      \
-    if (ctx->sv.depth > ctx->sv.max_depth)                                     \
-      ctx->sv.max_depth = ctx->sv.depth;                                       \
   } while (0)
 #define DEPTH_DEC(n)                                                           \
   do {                                                                         \
@@ -868,7 +864,6 @@ static bool decode_internal(decode_ctx *ctx) {
       int32_t n_args = reader_i32(&ctx->reader);
       int32_t n_locals = reader_i32(&ctx->reader);
       ctx->sv.depth = 0;
-      ctx->sv.max_depth = 0;
 
       ctx->func =
           (func_ctx){.n_args = n_args, .n_locals = n_locals, .n_captured = 0};
@@ -876,8 +871,6 @@ static bool decode_internal(decode_ctx *ctx) {
       EMIT_FUNC(op_begin);
       EMIT_NUM(n_args);
       EMIT_NUM(n_locals);
-      ctx->sv.max_depth_pos = ctx->code.len;
-      EMIT_NUM(0); // placeholder for max depth, will be patched
 
       break;
     }
@@ -891,7 +884,6 @@ static bool decode_internal(decode_ctx *ctx) {
         goto cleanup;
       }
       ctx->sv.depth = 0;
-      ctx->sv.max_depth = 0;
 
       ctx->func = (func_ctx){
           .n_args = n_args, .n_locals = n_locals, .n_captured = n_captured};
@@ -899,8 +891,6 @@ static bool decode_internal(decode_ctx *ctx) {
       EMIT_FUNC(op_begin_closure);
       EMIT_NUM(n_args);
       EMIT_NUM(n_locals);
-      ctx->sv.max_depth_pos = ctx->code.len;
-      EMIT_NUM(0); // placeholder for max depth, will be patched
 
       break;
     }
@@ -999,7 +989,6 @@ static bool decode_internal(decode_ctx *ctx) {
         goto cleanup;
       }
       EMIT_FUNC(op_end);
-      ctx->code.data[ctx->sv.max_depth_pos].num = ctx->sv.max_depth;
       ctx->sv.state = BARRIER;
       ctx->func = (func_ctx){.n_captured = -1};
       ctx->func_idx = -1;
@@ -1034,10 +1023,6 @@ static bool decode_internal(decode_ctx *ctx) {
       fprintf(stderr, "Not yet supported opcode 0x%02X at ip=0x%08zx\n", opcode,
               reader_pos(&ctx->reader) - 1);
       goto cleanup;
-    }
-
-    if (ctx->sv.depth > ctx->sv.max_depth) {
-      ctx->sv.max_depth = ctx->sv.depth;
     }
   }
 
