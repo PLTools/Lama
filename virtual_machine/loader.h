@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define BYTECODE_SUFFIX ".bc"
 #define MAX_PATH_LEN 1024
 
 typedef struct {

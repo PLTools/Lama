@@ -15,8 +15,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-static const char bytecode_suffix[] = ".bc";
-
 typedef struct {
   bytecode **data;
   size_t len;
@@ -53,7 +51,7 @@ static bytecode *load_unit_from_paths(const char *unit_name,
   static char path[MAX_PATH_LEN];
   for (size_t i = 0; i < paths->len; i++) {
     snprintf(path, MAX_PATH_LEN, "%s/%s%s", paths->paths[i], unit_name,
-             bytecode_suffix);
+             BYTECODE_SUFFIX);
     int fd = open(path, O_RDONLY);
     if (fd >= 0) {
       return bytecode_load_fd(fd);

@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 
+#include "loader.h"
 #include "memory.h"
 #include "vm.h"
 #include <getopt.h>
@@ -9,45 +10,32 @@
 #include <stdlib.h>
 #include <string.h>
 
-// TODO: think about unifying with loader.c
-static const char bytecode_suffix[] = ".bc";
-
 /*
- * Check if a string looks like a file path (ends with '.bc')
+ * Extract directory and unit name from a path. Returns false if the suffix does
+ * not match.
  */
-static bool is_filepath(const char *str) {
-  size_t len = strlen(str);
-  size_t suffix_len = sizeof(bytecode_suffix) - 1;
-  return len > suffix_len &&
-         strcmp(str + len - suffix_len, bytecode_suffix) == 0;
-}
+static bool parse_bytecode_path(const char *path, char **unit_name_out,
+                                char **dir_out) {
+  size_t len = strlen(path);
+  size_t suffix_len = sizeof(BYTECODE_SUFFIX) - 1;
+  if (len <= suffix_len ||
+      strcmp(path + len - suffix_len, BYTECODE_SUFFIX) != 0) {
+    return false;
+  }
 
-/*
- * Extract name from filename (without path and extension .bc)
- */
-static char *extract_unit_name(const char *filename) {
-  char *path_copy = ESTRDUP(filename);
+  char *path_copy = ESTRDUP(path);
   char *base = basename(path_copy);
-
   char *dot = strrchr(base, '.');
-  if (dot && strcmp(dot, bytecode_suffix) == 0) {
+  if (dot) {
     *dot = '\0';
   }
 
-  char *result = ESTRDUP(base);
+  char *dir_copy = ESTRDUP(path);
+  *unit_name_out = ESTRDUP(base);
+  *dir_out = ESTRDUP(dirname(dir_copy));
+  free(dir_copy);
   free(path_copy);
-  return result;
-}
-
-/*
- * Extract path from filename
- */
-static char *extract_unit_dir(const char *filename) {
-  char *path_copy = ESTRDUP(filename);
-  char *dir = dirname(path_copy);
-  char *result = ESTRDUP(dir);
-  free(path_copy);
-  return result;
+  return true;
 }
 
 #define MAX_INCLUDE_PATHS 64
@@ -112,10 +100,8 @@ int main(int argc, char *argv[]) {
   }
 
   char *entry_arg = argv[optind];
-  is_path = is_filepath(entry_arg);
+  is_path = parse_bytecode_path(entry_arg, &main_unit_name, &bytecode_dir);
   if (is_path) {
-    bytecode_dir = extract_unit_dir(entry_arg);
-    main_unit_name = extract_unit_name(entry_arg);
     include_paths[0] = bytecode_dir;
   } else {
     main_unit_name = entry_arg;
