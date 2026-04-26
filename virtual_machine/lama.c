@@ -25,10 +25,7 @@ static bool parse_bytecode_path(const char *path, char **unit_name_out,
 
   char *path_copy = ESTRDUP(path);
   char *base = basename(path_copy);
-  char *dot = strrchr(base, '.');
-  if (dot) {
-    *dot = '\0';
-  }
+  base[strlen(base) - suffix_len] = '\0';
 
   char *dir_copy = ESTRDUP(path);
   *unit_name_out = ESTRDUP(base);
