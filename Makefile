@@ -10,7 +10,7 @@ BUILDDIR = _build
 all: build test
 
 build:
-	dune b src runtime runtime32 stdlib tutorial
+	dune b src runtime runtime32 stdlib tutorial virtual_machine
 
 install: all
 	dune b @install --profile=release
