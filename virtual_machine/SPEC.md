@@ -1,4 +1,4 @@
-# ![Lama](lama.svg) Bytecode and VM Instruction Reference
+# ![Lama](../lama.svg) Bytecode and VM Instruction Reference
 
 This document describes two representations:
 
