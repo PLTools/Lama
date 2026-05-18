@@ -18,7 +18,7 @@ else
 endif
 
 DISABLE_WARNINGS=-Wno-shift-negative-value
-COMMON_FLAGS=$(DISABLE_WARNINGS) -g -fstack-protector-all $(ARCH) --std=c11
+COMMON_FLAGS=$(DISABLE_WARNINGS) -O3 -g -fstack-protector-all $(ARCH) --std=c11
 PROD_FLAGS=$(COMMON_FLAGS) $(ENV_FLAGS)
 TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
