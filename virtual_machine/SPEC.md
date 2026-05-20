@@ -51,7 +51,7 @@ The `opcode` field of every bytecode instruction is `uint8`.
 
 # Bytecode file layout
 
-1. Header (16 bytes)
+1. Header (20 bytes)
 2. String table (`string_table_size` bytes)
 3. Imports (`imports_count * 4` bytes)
 4. Public symbols (`public_symbols_count * 9` bytes)
@@ -61,6 +61,7 @@ The `opcode` field of every bytecode instruction is `uint8`.
 
 | Field | Type | Description |
 |:--|:--|:--|
+| `magic` | `uint8[4]` | ASCII bytes `LaMa` |
 | `string_table_size` | `int32` | size of the string table (in bytes) |
 | `globals_count` | `int32` | number of global variables (stored on the stack) |
 | `imports_count` | `int32` | number of imports |

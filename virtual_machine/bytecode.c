@@ -11,7 +11,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define HEADER_SIZE 16
+#define MAGIC "LaMa"
+#define MAGIC_SIZE 4
+#define HEADER_SIZE (MAGIC_SIZE + 16)
 #define PUB_ENTRY_SIZE 9
 #define IMPORT_ENTRY_SIZE 4
 
@@ -47,6 +49,13 @@ bytecode *bytecode_load_fd(int fd) {
     goto out;
   }
 
+  if (memcmp(data, MAGIC, MAGIC_SIZE) != 0) {
+    fprintf(stderr, "bytecode_load: invalid magic number\n");
+    goto out;
+  }
+
+  reader_skip(&reader, MAGIC_SIZE);
+
   int32_t string_table_size = reader_i32(&reader);
   int32_t globals_count = reader_i32(&reader);
   int32_t num_imports = reader_i32(&reader);
@@ -73,7 +82,7 @@ bytecode *bytecode_load_fd(int fd) {
 
   size_t code_size = file_size - code_offset;
 
-  if (data[code_offset + code_size - 1] != OP_EOF) {
+  if (code_size == 0 || data[code_offset + code_size - 1] != OP_EOF) {
     fprintf(stderr, "bytecode_load: bytecode must end with EOF opcode\n");
     goto out;
   }

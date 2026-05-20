@@ -165,6 +165,7 @@ module ByteCode = struct
   (* Public symbol flags *)
   let pub_flag_function = 0
   let pub_flag_global = 1
+  let magic = "LaMa"
 
   let compile cmd insns =
     let code = Buffer.create 256 in
@@ -425,6 +426,7 @@ module ByteCode = struct
     let file = Buffer.create 1024 in
     let add_file_bytes = add_bytes file in
     let add_file_ints = add_ints file in
+    Buffer.add_string file magic;
     add_file_ints
       [ Bytes.length st
       ; Hashtbl.length globals
