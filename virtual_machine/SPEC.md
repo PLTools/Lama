@@ -64,7 +64,7 @@ The `opcode` field of every bytecode instruction is `uint8`.
 | `magic` | `uint8[4]` | ASCII bytes `LaMa` |
 | `version` | `int32` | bytecode format version, currently `1` |
 | `string_table_size` | `int32` | size of the string table (in bytes) |
-| `globals_count` | `int32` | number of global variables (stored on the stack) |
+| `globals_count` | `int32` | number of global variables |
 | `imports_count` | `int32` | number of imports |
 | `public_symbols_count` | `int32` | number of public symbols |
 
@@ -78,7 +78,7 @@ The `opcode` field of every bytecode instruction is `uint8`.
 
 | Field | Type | Description |
 |:--|:--|:--|
-| `name_offset` | `int32` | offset into the string table |
+| `name_offset` | `int32` | offset into the string table for the name of a public symbol |
 | `code_offset` | `int32` | bytecode offset for functions, global index for globals |
 | `flag` | `uint8` | `0` = function, `1` = global |
 
