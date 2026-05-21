@@ -13,7 +13,8 @@
 
 #define MAGIC "LaMa"
 #define MAGIC_SIZE 4
-#define HEADER_SIZE (MAGIC_SIZE + 16)
+#define BYTECODE_VERSION 1
+#define HEADER_SIZE (MAGIC_SIZE + 20)
 #define PUB_ENTRY_SIZE 9
 #define IMPORT_ENTRY_SIZE 4
 
@@ -56,10 +57,17 @@ bytecode *bytecode_load_fd(int fd) {
 
   reader_skip(&reader, MAGIC_SIZE);
 
+  int32_t version = reader_i32(&reader);
   int32_t string_table_size = reader_i32(&reader);
   int32_t globals_count = reader_i32(&reader);
   int32_t num_imports = reader_i32(&reader);
   int32_t num_pubs = reader_i32(&reader);
+
+  if (version != BYTECODE_VERSION) {
+    fprintf(stderr, "bytecode_load: unsupported bytecode version %d\n",
+            version);
+    goto out;
+  }
 
   if (string_table_size < 0 || globals_count < 0 || num_imports < 0 ||
       num_pubs < 0) {

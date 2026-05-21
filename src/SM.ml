@@ -166,6 +166,7 @@ module ByteCode = struct
   let pub_flag_function = 0
   let pub_flag_global = 1
   let magic = "LaMa"
+  let format_version = 1
 
   let compile cmd insns =
     let code = Buffer.create 256 in
@@ -428,7 +429,8 @@ module ByteCode = struct
     let add_file_ints = add_ints file in
     Buffer.add_string file magic;
     add_file_ints
-      [ Bytes.length st
+      [ format_version
+      ; Bytes.length st
       ; Hashtbl.length globals
       ; List.length imports
       ; List.length pubs_resolved
