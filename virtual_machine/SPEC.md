@@ -344,7 +344,7 @@ JMP = 0x15
 
 ### Description
 
-`target` is a bytecode offset naming the jump destination within the code section.
+`target` is a bytecode offset naming the jump destination within the code section. `target` must not be outside of the function's body. All control flow paths reaching the same jump target must agree on operand stack's depth.
 
 ### Implementation notes
 
@@ -380,7 +380,7 @@ END = 0x16
 
 ### Description
 
-`END` terminates the current function body and returns the top stack value to the caller.
+`END` terminates the current function body and returns the top stack value to the caller. `END` is only valid when the current operand-stack depth is exactly `1`, i.e. the function body leaves exactly one return value.
 
 ### Implementation notes
 
@@ -566,14 +566,17 @@ LD_CLO = 0x23
 `LD_LOC`:
 
 * `operand` is a local slot index.
+* `operand` must satisfy `0 <= operand < n_locals`.
 
 `LD_ARG`:
 
 * `operand` is an argument slot index.
+* `operand` must satisfy `0 <= operand < n_args`.
 
 `LD_CLO`:
 
 * `operand` is a closure capture index.
+* `operand` must satisfy `0 <= operand < n_captured`.
 
 ### Implementation notes
 
@@ -623,14 +626,17 @@ ST_CLO = 0x43
 `ST_LOC`:
 
 * `operand` is a local slot index.
+* `operand` must satisfy `0 <= operand < n_locals`.
 
 `ST_ARG`:
 
 * `operand` is an argument slot index.
+* `operand` must satisfy `0 <= operand < n_args`.
 
 `ST_CLO`:
 
 * `operand` is a closure capture index.
+* `operand` must satisfy `0 <= operand < n_captured`.
 
 ### Implementation notes
 
@@ -671,9 +677,7 @@ CJMP_NZ = 0x51
 
 ### Description
 
-`target` is a bytecode offset naming the jump destination within the code section.
-
-`CJMP_Z` jumps when `value == 0`. `CJMP_NZ` jumps when `value != 0`.
+`CJMP_Z` jumps when `value == 0`. `CJMP_NZ` jumps when `value != 0`. `target` is a bytecode offset naming the jump destination within the code section. `target` must not be outside of the function's body. All control flow paths reaching the same jump target must agree on operand stack's depth.
 
 ### Implementation notes
 
@@ -748,7 +752,7 @@ BEGIN_CLOSURE = 0x53
 
 `n_args` is the number of call arguments, `n_locals` is the number of local slots allocated for the closure body, and `n_captured` is the number of captured values expected by the closure entry point.
 
-Each local slot is initialized to `BOX(0)`.
+Each local slot is initialized to `BOX(0)`. Every `CLOSURE` that targets that entry point must use the same `n_captured` value.
 
 ### Implementation notes
 
@@ -793,7 +797,12 @@ Each capture designation is encoded as a `(kind:uint8 index:int32)` pair, where:
 * `kind = 2` denotes a function argument
 * `kind = 3` denotes a captured closure variable
 
-The `target` operand uses the same external function reference encoding described in [external references](#external-references).
+The `target` operand uses the same external function reference encoding described in [external references](#external-references). Internal `target` values must be in range. Internal and inter-unit `target` must point to a function entry `BEGIN` or `BEGIN_CLOSURE`. For each capture designation, the referenced index must be valid for its kind: 
+* `0 <=` local index `< n_locals`.
+* `0 <=` argument index `< n_args`. 
+* `0 <=` closure capture index `< current function n_captured`. 
+For a given internal closure entry point, all `CLOSURE` instructions targeting it must agree on `n_captured`.
+
 
 ### Implementation notes
 
@@ -873,7 +882,7 @@ CALL = 0x56
 
 `target` is a bytecode offset naming the call target. `n_args` is the number of call arguments.
 
-The `target` operand uses the same external function reference encoding described in [external references](#external-references).
+The `target` operand uses the same external function reference encoding described in [external references](#external-references). Internal `target` values must be in range. Internal and inter-unit `CALL` must point to a function entry `BEGIN`.
 
 ### Implementation notes
 
