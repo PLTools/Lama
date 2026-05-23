@@ -28,7 +28,7 @@ $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(OBJECTS) $(TARGET)
 	$(MAKE) -C $(RUNTIME_DIR) BUILD_DIR=$(abspath $(BUILD_DIR)/runtime) clean
+	$(RM) -r $(BUILD_DIR) $(TARGET)
 
 .PHONY: all debug clean

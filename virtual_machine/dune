@@ -1,5 +1,7 @@
 (rule
  (target lama.exe)
+ (mode
+  (promote (until-clean)))
  (deps
   Makefile
   lama.c
