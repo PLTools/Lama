@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 
+#include "disasm.h"
 #include "loader.h"
 #include "memory.h"
 #include "vm.h"
@@ -48,6 +49,7 @@ static void print_usage(FILE *dest, const char *prog_name) {
           "you need to manually include relevant search paths.\n");
   fprintf(dest, "Options:\n");
   fprintf(dest, "  -h, --help              Show this help message\n");
+  fprintf(dest, "  -d, --disassemble       Disassemble the bytecode unit\n");
   fprintf(dest,
           "  -I, --include PATH      Add PATH to unit search paths (can be "
           "used multiple times)\n");
@@ -60,21 +62,27 @@ int main(int argc, char *argv[]) {
   int exit_code = 0;
   char *bytecode_dir = NULL;
   char *main_unit_name = NULL;
+  virtual_machine *vm = NULL;
+  bool disassemble = false;
   bool is_path = false;
 
   static struct option long_options[] = {{"help", no_argument, 0, 'h'},
+                                         {"disassemble", no_argument, 0, 'd'},
                                          {"include", required_argument, 0, 'I'},
                                          {0, 0, 0, 0}};
 
   int opt;
   int option_index = 0;
 
-  while ((opt = getopt_long(argc, argv, "hI:", long_options, &option_index)) !=
+  while ((opt = getopt_long(argc, argv, "hdI:", long_options, &option_index)) !=
          -1) {
     switch (opt) {
     case 'h':
       print_usage(stdout, argv[0]);
       return 0;
+    case 'd':
+      disassemble = true;
+      break;
     case 'I':
       if (include_path_count < MAX_INCLUDE_PATHS) {
         include_paths[include_path_count++] = optarg;
@@ -104,10 +112,29 @@ int main(int argc, char *argv[]) {
     main_unit_name = entry_arg;
   }
 
-  virtual_machine *vm =
-      vm_create(main_unit_name,
-                (const char **)(is_path ? include_paths : include_paths + 1),
-                is_path ? include_path_count : include_path_count - 1);
+  if (disassemble) {
+    bytecode *bc = NULL;
+
+    if (!is_path) {
+      fprintf(stderr, "Disassembly requires a .bc file path\n");
+      exit_code = 1;
+      goto cleanup;
+    }
+
+    bc = bytecode_load(entry_arg);
+    if (!bc) {
+      exit_code = 1;
+      goto cleanup;
+    }
+
+    dump_bytecode(stdout, bc);
+    bytecode_free(bc);
+    goto cleanup;
+  }
+
+  vm = vm_create(main_unit_name,
+                 (const char **)(is_path ? include_paths : include_paths + 1),
+                 is_path ? include_path_count : include_path_count - 1);
   if (!vm) {
     exit_code = 1;
     goto cleanup;

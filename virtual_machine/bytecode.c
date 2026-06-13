@@ -101,6 +101,7 @@ bytecode *bytecode_load_fd(int fd) {
 
   bc->map_base = data;
   bc->map_size = file_size;
+  bc->version = version;
 
   bc->string_table = string_table;
   bc->string_table_size = (size_t)string_table_size;

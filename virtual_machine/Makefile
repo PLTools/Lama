@@ -4,7 +4,7 @@ LIBS = -lffi -ldl
 LDFLAGS = -rdynamic
 BUILD_DIR = .vm-build
 TARGET = lama.exe
-SOURCES = lama.c converter.c vm.c bytecode.c ffi.c loader.c symbols.c ops.c memory.c opcodes.c
+SOURCES = lama.c converter.c vm.c bytecode.c ffi.c loader.c symbols.c ops.c memory.c opcodes.c disasm.c
 OBJECTS = $(addprefix $(BUILD_DIR)/,$(SOURCES:.c=.o))
 
 RUNTIME_DIR = ../runtime

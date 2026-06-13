@@ -21,6 +21,8 @@ typedef struct {
   const uint8_t *map_base;
   size_t map_size;
 
+  int32_t version;
+
   const char *string_table;
   size_t string_table_size;
 

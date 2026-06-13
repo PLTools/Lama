@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static void unknown_opcode(uint8_t opcode) {
+  fprintf(stderr, "Unknown opcode: %d\n", opcode);
+  exit(EXIT_FAILURE);
+}
+
 const char *opcode_to_string(uint8_t opcode) {
   switch ((opcode_t)opcode) {
   case OP_BINOP_ADD:
@@ -51,29 +56,29 @@ const char *opcode_to_string(uint8_t opcode) {
   case OP_ELEM:
     return "ELEM";
   case OP_LD_GLO:
-    return "LD.GLO";
+    return "LD_GLO";
   case OP_LD_LOC:
-    return "LD.LOC";
+    return "LD_LOC";
   case OP_LD_ARG:
-    return "LD.ARG";
+    return "LD_ARG";
   case OP_LD_CLO:
-    return "LD.CLO";
+    return "LD_CLO";
   case OP_ST_GLO:
-    return "ST.GLO";
+    return "ST_GLO";
   case OP_ST_LOC:
-    return "ST.LOC";
+    return "ST_LOC";
   case OP_ST_ARG:
-    return "ST.ARG";
+    return "ST_ARG";
   case OP_ST_CLO:
-    return "ST.CLO";
+    return "ST_CLO";
   case OP_CJMP_Z:
-    return "CJMP.Z";
+    return "CJMP_Z";
   case OP_CJMP_NZ:
-    return "CJMP.NZ";
+    return "CJMP_NZ";
   case OP_BEGIN:
     return "BEGIN";
   case OP_BEGIN_CLOSURE:
-    return "BEGIN.CLO";
+    return "BEGIN_CLOSURE";
   case OP_CLOSURE:
     return "CLOSURE";
   case OP_CALLC:
@@ -87,29 +92,29 @@ const char *opcode_to_string(uint8_t opcode) {
   case OP_FAIL:
     return "FAIL";
   case OP_FAIL_KEEP:
-    return "FAIL.KEEP";
+    return "FAIL_KEEP";
   case OP_LINE:
     return "LINE";
   case OP_PATT_STR_CMP:
-    return "PATT.STRCMP";
+    return "PATT_STR_CMP";
   case OP_PATT_STRING:
-    return "PATT.STRING";
+    return "PATT_STRING";
   case OP_PATT_ARRAY:
-    return "PATT.ARRAY";
+    return "PATT_ARRAY";
   case OP_PATT_SEXP:
-    return "PATT.SEXP";
+    return "PATT_SEXP";
   case OP_PATT_BOXED:
-    return "PATT.BOXED";
+    return "PATT_BOXED";
   case OP_PATT_UNBOXED:
-    return "PATT.UNBOXED";
+    return "PATT_UNBOXED";
   case OP_PATT_CLOSURE:
-    return "PATT.CLOSURE";
+    return "PATT_CLOSURE";
   case OP_BARRAY:
     return "BARRAY";
   case OP_EOF:
     return "EOF";
   default:
-    fprintf(stderr, "Unknown opcode: %d\n", opcode);
-    exit(EXIT_FAILURE);
+    unknown_opcode(opcode);
+    return NULL;
   }
 }
