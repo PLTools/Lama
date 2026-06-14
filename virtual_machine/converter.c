@@ -682,7 +682,6 @@ static bool decode_internal(decode_ctx *ctx) {
       break;
 
     case OP_STA:
-      // TODO:
       DEPTH_DEC(3);
       DEPTH_PUSH();
       EMIT_FUNC(op_sta);

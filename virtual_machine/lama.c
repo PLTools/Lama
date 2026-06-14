@@ -58,7 +58,6 @@ static void print_usage(FILE *dest, const char *prog_name) {
 int main(int argc, char *argv[]) {
   char *include_paths[MAX_INCLUDE_PATHS];
   int include_path_count = 1;
-  // TODO: better error handling in general
   int exit_code = 0;
   char *bytecode_dir = NULL;
   char *main_unit_name = NULL;
@@ -89,19 +88,19 @@ int main(int argc, char *argv[]) {
       } else {
         fprintf(stderr, "Maximum number of include paths (%d) exceeded\n",
                 MAX_INCLUDE_PATHS);
-        return 1;
+        return EXIT_FAILURE;
       }
       break;
     default:
       print_usage(stderr, argv[0]);
-      return 1;
+      return EXIT_FAILURE;
     }
   }
 
   if (optind >= argc) {
     fprintf(stderr, "No bytecode file specified\n\n");
     print_usage(stderr, argv[0]);
-    return 1;
+    return EXIT_FAILURE;
   }
 
   char *entry_arg = argv[optind];
@@ -117,13 +116,13 @@ int main(int argc, char *argv[]) {
 
     if (!is_path) {
       fprintf(stderr, "Disassembly requires a .bc file path\n");
-      exit_code = 1;
+      exit_code = EXIT_FAILURE;
       goto cleanup;
     }
 
     bc = bytecode_load(entry_arg);
     if (!bc) {
-      exit_code = 1;
+      exit_code = EXIT_FAILURE;
       goto cleanup;
     }
 
@@ -136,7 +135,7 @@ int main(int argc, char *argv[]) {
                  (const char **)(is_path ? include_paths : include_paths + 1),
                  is_path ? include_path_count : include_path_count - 1);
   if (!vm) {
-    exit_code = 1;
+    exit_code = EXIT_FAILURE;
     goto cleanup;
   }
 
