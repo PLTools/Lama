@@ -29,9 +29,8 @@ On the other hand the language can be used in the future as a raw substrate to a
 
 The current implementation contains a native code compiler for **x86-64**, written in **OCaml**, a runtime library with garbage-collection support and a bytecode virtual machine written in **C**, and a small standard library, written in ![lama](lama.svg) itself.
 
-In addition, a source-level reference interpreter is implemented as well as a compiler to a stack machine bytecode.
-While the stack machine representation is used as an intermediate representation by the native code compiler, the generated stack machine
-bytecode can be interpreted by the virtual machine.
+In addition, a source-level reference interpreter is implemented as well as a compiler to a small abstract stack machine.
+This abstract stack machine code can in turn be serialized as bytecode for execution by the virtual machine, or used as an intermediate representation by the native code compiler.
 
 ## Language Specification
 
