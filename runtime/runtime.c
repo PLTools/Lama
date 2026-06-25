@@ -1266,7 +1266,7 @@ extern aint Lread () {
   // int result = BOX(0);
   aint result = BOX(0);
 
-  printf("> ");
+  printf(" > ");
   fflush(stdout);
   scanf("%" SCNdAI, &result);
 
