@@ -1474,7 +1474,7 @@ extern void* Ltl (void *v) {
 extern int Lread () {
   int result = BOX(0);
 
-  printf ("> ");
+  printf (" > ");
   fflush (stdout);
   scanf  ("%d", &result);
 
