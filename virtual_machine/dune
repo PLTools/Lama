@@ -1,0 +1,32 @@
+(rule
+ (target lama.exe)
+ (mode
+  (promote (until-clean)))
+ (deps
+  Makefile
+  lama.c
+  converter.c
+  vm.c
+  bytecode.c
+  ffi.c
+  loader.c
+  symbols.c
+  ops.c
+  memory.c
+  opcodes.c
+  (glob_files *.h)
+  ../runtime/Makefile
+  ../runtime/gc.c
+  ../runtime/gc.h
+  ../runtime/runtime.c
+  ../runtime/runtime.h
+  ../runtime/runtime_common.h
+  ../runtime/printf.S)
+ (action
+  (run
+   make
+   TARGET=%{target})))
+
+(alias
+ (name default)
+ (deps lama.exe))

@@ -7,7 +7,7 @@
 
 # Lama
 
-![lama](lama.svg) is a programming language (initualy developed by JetBrains Research) for educational purposes as an exemplary language to introduce the domain of programming languages, compilers, and tools.
+![lama](lama.svg) is a programming language (initially developed by JetBrains Research) for educational purposes as an exemplary language to introduce the domain of programming languages, compilers, and tools.
 Its general characteristics are:
 
 * procedural with first-class functions - functions can be passed as arguments, placed in data structures,
@@ -27,10 +27,10 @@ The lack of a type system (a vital feature for a real-world language
 for software engineering) is an intensional decision that allows showing the unchained diversity of runtime behaviors, including those that a typical type system is called to prevent.
 On the other hand the language can be used in the future as a raw substrate to apply various ways of software verification (including type systems).
 
-The current implementation contains a native code compiler for **x86-64**, written in **OCaml**, a runtime library with garbage-collection support, written in **C**, and a small standard library, written in ![lama](lama.svg) itself.
+The current implementation contains a native code compiler for **x86-64**, written in **OCaml**, a runtime library with garbage-collection support and a bytecode virtual machine written in **C**, and a small standard library, written in ![lama](lama.svg) itself.
 
-In addition, a source-level reference interpreter is implemented as well as a compiler to a small stack machine.
-The stack machine code can in turn be either interpreted on a stack machine interpreter, or used as an intermediate representation by the native code compiler.
+In addition, a source-level reference interpreter is implemented as well as a compiler to a small abstract stack machine.
+This abstract stack machine code can in turn be serialized as bytecode for execution by the virtual machine, or used as an intermediate representation by the native code compiler.
 
 ## Language Specification
 

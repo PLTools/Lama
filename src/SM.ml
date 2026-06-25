@@ -165,6 +165,8 @@ module ByteCode = struct
   (* Public symbol flags *)
   let pub_flag_function = 0
   let pub_flag_global = 1
+  let magic = "LaMa"
+  let format_version = 1
 
   let compile cmd insns =
     let code = Buffer.create 256 in
@@ -173,88 +175,139 @@ module ByteCode = struct
     let pubs = Stdlib.ref [] in
     let imports = Stdlib.ref [] in
     let globals = Hashtbl.create 16 in
-    let glob_count = Stdlib.ref 0 in
+    let extern_globals = Stdlib.ref S.empty in
+    let extern_funcs = Stdlib.ref S.empty in
     let fixups = Stdlib.ref [] in
+    let func_fixups = Stdlib.ref [] in
     let add_lab l = Hashtbl.replace lmap l (Buffer.length code) in
+    let add_global name =
+      try Hashtbl.find globals name
+      with Not_found ->
+        let i = Hashtbl.length globals in
+        Hashtbl.add globals name i;
+        i
+    in
+    let add_extern name is_fun =
+      if is_fun then
+        extern_funcs := S.add name !extern_funcs
+      else
+        extern_globals := S.add name !extern_globals
+    in
     let add_public name is_fun =
       let flag = if is_fun then pub_flag_function else pub_flag_global in
       pubs := (name, flag) :: !pubs
     in
     let add_import l = imports := l :: !imports in
     let add_fixup l = fixups := (Buffer.length code, l) :: !fixups in
-    let add_bytes = List.iter (fun x -> Buffer.add_char code @@ Char.chr x) in
-    let add_ints =
-      List.iter (fun x -> Buffer.add_int32_ne code @@ Int32.of_int x)
+    let add_func_fixup l = func_fixups := (Buffer.length code, l) :: !func_fixups in
+    let add_bytes buffer = 
+      List.iter (fun x -> Buffer.add_uint8 buffer x) 
     in
+    let add_ints buffer =
+      List.iter (fun x -> Buffer.add_int32_le buffer @@ Int32.of_int x)
+    in
+    let add_code_bytes = add_bytes code in
+    let add_code_ints = add_ints code in
     let add_strings =
-      List.iter (fun x ->
-          Buffer.add_int32_ne code @@ Int32.of_int @@ StringTab.add st x)
+      let unescape x =
+        let n = String.length x in
+        let buf = Buffer.create n in
+        let rec iterate i =
+          if i < n then
+            match x.[i] with
+            | '"' ->
+                Buffer.add_char buf '"';
+                iterate (i + 1)
+            | '\\' -> (
+                if i + 1 >= n then
+                  Buffer.add_char buf '\\'
+                else
+                  match x.[i + 1] with
+                  | 'n' ->
+                      Buffer.add_char buf '\n';
+                      iterate (i + 2)
+                  | 't' ->
+                      Buffer.add_char buf '\t';
+                      iterate (i + 2)
+                  | 'r' ->
+                      Buffer.add_char buf '\r';
+                      iterate (i + 2)
+                  | _ ->
+                      Buffer.add_char buf '\\';
+                      iterate (i + 1))
+            | c ->
+                Buffer.add_char buf c;
+                iterate (i + 1)
+        in
+        iterate 0;
+        Buffer.contents buf
+      in
+      List.iter (fun x -> add_code_ints [ StringTab.add st @@ unescape x ])
     in
     let add_designations n =
       let b x = match n with None -> x | Some b -> (b * 16) + x in
       List.iter (function
         | Value.Global s ->
-            let i =
-              try Hashtbl.find globals s
-              with Not_found ->
-                let i = !glob_count in
-                incr glob_count;
-                Hashtbl.add globals s i;
-                i
-            in
-            add_bytes [ b 0 ];
-            add_ints [ i ]
+            if S.mem s !extern_globals then begin
+              let str_off = StringTab.add st s in
+              add_code_bytes [ b 0 ];
+              add_code_ints [ -str_off - 1 ]
+            end else begin
+              let i = add_global s in
+              add_code_bytes [ b 0 ];
+              add_code_ints [ i ]
+            end
         | Value.Local n ->
-            add_bytes [ b 1 ];
-            add_ints [ n ]
+            add_code_bytes [ b 1 ];
+            add_code_ints [ n ]
         | Value.Arg n ->
-            add_bytes [ b 2 ];
-            add_ints [ n ]
+            add_code_bytes [ b 2 ];
+            add_code_ints [ n ]
         | Value.Access n ->
-            add_bytes [ b 3 ];
-            add_ints [ n ]
+            add_code_bytes [ b 3 ];
+            add_code_ints [ n ]
         | _ ->
             failwith
               (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__))
     in
     let insn_code = function
       (* 0x0s                 *)
-      | BINOP s -> add_bytes [ opnum s ]
+      | BINOP s -> add_code_bytes [ opnum s ]
       (* 0x10 n:32            *)
       | CONST n ->
-          add_bytes [ (1 * 16) + 0 ];
-          add_ints [ n ]
+          add_code_bytes [ (1 * 16) + 0 ];
+          add_code_ints [ n ]
       (* 0x11 s:32            *)
       | STRING s ->
-          add_bytes [ (1 * 16) + 1 ];
+          add_code_bytes [ (1 * 16) + 1 ];
           add_strings [ s ]
       (* 0x12 s:32 n:32       *)
       | SEXP (s, n) ->
-          add_bytes [ (1 * 16) + 2 ];
+          add_code_bytes [ (1 * 16) + 2 ];
           add_strings [ s ];
-          add_ints [ n ]
+          add_code_ints [ n ]
       (* 0x13                 *)
-      | STI -> add_bytes [ (1 * 16) + 3 ]
+      | STI -> add_code_bytes [ (1 * 16) + 3 ]
       (* 0x14                 *)
-      | STA -> add_bytes [ (1 * 16) + 4 ]
+      | STA -> add_code_bytes [ (1 * 16) + 4 ]
       | LABEL s | FLABEL s | SLABEL s -> add_lab s
       (* 0x15 l:32            *)
       | JMP s ->
-          add_bytes [ (1 * 16) + 5 ];
+          add_code_bytes [ (1 * 16) + 5 ];
           add_fixup s;
-          add_ints [ 0 ]
+          add_code_ints [ 0 ]
       (* 0x16                 *)
-      | END -> add_bytes [ (1 * 16) + 6 ]
+      | END -> add_code_bytes [ (1 * 16) + 6 ]
       (* 0x17                 *)
-      | RET -> add_bytes [ (1 * 16) + 7 ]
+      | RET -> add_code_bytes [ (1 * 16) + 7 ]
       (* 0x18                 *)
-      | DROP -> add_bytes [ (1 * 16) + 8 ]
+      | DROP -> add_code_bytes [ (1 * 16) + 8 ]
       (* 0x19                 *)
-      | DUP -> add_bytes [ (1 * 16) + 9 ]
+      | DUP -> add_code_bytes [ (1 * 16) + 9 ]
       (* 0x1a                 *)
-      | SWAP -> add_bytes [ (1 * 16) + 10 ]
+      | SWAP -> add_code_bytes [ (1 * 16) + 10 ]
       (* 0x1b                 *)
-      | ELEM -> add_bytes [ (1 * 16) + 11 ]
+      | ELEM -> add_code_bytes [ (1 * 16) + 11 ]
       (* 0x2d n:32            *)
       | LD d -> add_designations (Some 2) [ d ]
       (* 0x3d n:32            *)
@@ -263,69 +316,65 @@ module ByteCode = struct
       | ST d -> add_designations (Some 4) [ d ]
       (* 0x50 l:32            *)
       | CJMP ("z", s) ->
-          add_bytes [ (5 * 16) + 0 ];
+          add_code_bytes [ (5 * 16) + 0 ];
           add_fixup s;
-          add_ints [ 0 ]
+          add_code_ints [ 0 ]
       (* 0x51 l:32            *)
       | CJMP ("nz", s) ->
-          add_bytes [ (5 * 16) + 1 ];
+          add_code_bytes [ (5 * 16) + 1 ];
           add_fixup s;
-          add_ints [ 0 ]
-      (* 0x70                 *)
-      | CALL ("read", _, _) -> add_bytes [ (7 * 16) + 0 ]
-      (* 0x71                 *)
-      | CALL ("write", _, _) -> add_bytes [ (7 * 16) + 1 ]
-      (* 0x72                 *)
-      | CALL ("length", _, _) -> add_bytes [ (7 * 16) + 2 ]
-      (* 0x73                 *)
-      | CALL ("string", _, _) -> add_bytes [ (7 * 16) + 3 ]
+          add_code_ints [ 0 ]
       (* 0x74                 *)
       | CALL (".array", n, _) ->
-          add_bytes [ (7 * 16) + 4 ];
-          add_ints [ n ]
+          add_code_bytes [ (7 * 16) + 4 ];
+          add_code_ints [ n ]
       (* 0x52 n:32 n:32       *)
       | BEGIN (_, a, l, [], _, _) ->
-          add_bytes [ (5 * 16) + 2 ];
-          add_ints [ a; l ] (* with no closure *)
-      (* 0x53 n:32 n:32       *)
-      | BEGIN (_, a, l, _, _, _) ->
-          add_bytes [ (5 * 16) + 3 ];
-          add_ints [ a; l ] (* with a closure  *)
+          add_code_bytes [ (5 * 16) + 2 ];
+          add_code_ints [ a; l ] (* with no closure *)
+      (* 0x53 n:32 n:32 n:32  *)
+      | BEGIN (_, a, l, ds, _, _) ->
+          add_code_bytes [ (5 * 16) + 3 ];
+          add_code_ints [ a; l; List.length ds ] (* with a closure  *)
       (* 0x54 l:32 n:32 d*:32 *)
       | CLOSURE (s, ds) ->
-          add_bytes [ (5 * 16) + 4 ];
-          add_fixup s;
-          add_ints [ 0; List.length ds ];
+          add_code_bytes [ (5 * 16) + 4 ];
+          add_func_fixup s;
+          add_code_ints [ 0; List.length ds ];
           add_designations None ds
       (* 0x55 n:32            *)
       | CALLC (n, _) ->
-          add_bytes [ (5 * 16) + 5 ];
-          add_ints [ n ]
+          add_code_bytes [ (5 * 16) + 5 ];
+          add_code_ints [ n ]
       (* 0x56 l:32 n:32       *)
       | CALL (fn, n, _) ->
-          add_bytes [ (5 * 16) + 6 ];
-          add_fixup fn;
-          add_ints [ 0; n ]
+          add_code_bytes [ (5 * 16) + 6 ];
+          add_func_fixup fn;
+          add_code_ints [ 0; n ]
       (* 0x57 s:32 n:32       *)
       | TAG (s, n) ->
-          add_bytes [ (5 * 16) + 7 ];
+          add_code_bytes [ (5 * 16) + 7 ];
           add_strings [ s ];
-          add_ints [ n ]
+          add_code_ints [ n ]
       (* 0x58 n:32            *)
       | ARRAY n ->
-          add_bytes [ (5 * 16) + 8 ];
-          add_ints [ n ]
+          add_code_bytes [ (5 * 16) + 8 ];
+          add_code_ints [ n ]
       (* 0x59 n:32 n:32       *)
-      | FAIL ((l, c), _) ->
-          add_bytes [ (5 * 16) + 9 ];
-          add_ints [ l; c ]
-      (* 0x5a n:32            *)
+      | FAIL ((l, c), false) ->
+          add_code_bytes [ (5 * 16) + 9 ];
+          add_code_ints [ l; c ]
+      (* 0x5a n:32 n:32       *)
+      | FAIL ((l, c), true) ->
+          add_code_bytes [ (5 * 16) + 10 ];
+          add_code_ints [ l; c ]
+      (* 0x5b n:32            *)
       | LINE n ->
-          add_bytes [ (5 * 16) + 10 ];
-          add_ints [ n ]
+          add_code_bytes [ (5 * 16) + 11 ];
+          add_code_ints [ n ]
       (* 0x6p                 *)
-      | PATT p -> add_bytes [ (6 * 16) + enum patt p ]
-      | EXTERN _ -> ()
+      | PATT p -> add_code_bytes [ (6 * 16) + enum patt p ]
+      | EXTERN (name, is_fun) -> add_extern name is_fun
       | PUBLIC (name, is_fun) -> add_public name is_fun
       | IMPORT s -> add_import s
       | _ ->
@@ -333,11 +382,25 @@ module ByteCode = struct
             (Printf.sprintf "Unexpected pattern: %s: %d" __FILE__ __LINE__)
     in
     List.iter insn_code insns;
-    add_bytes [ 255 ];
+    add_code_bytes [ 255 ];
     let code = Buffer.to_bytes code in
     List.iter
+      (fun (addr_ofs, l) ->
+        let resolved_addr =
+          try Hashtbl.find lmap l
+          with Not_found ->
+            if S.mem l !extern_funcs then
+              (* External function: use negative string offset *)
+              let str_off = StringTab.add st l in
+              -(str_off + 1)
+            else
+              failwith (Printf.sprintf "ERROR: undefined function '%s'" l)
+        in
+        Bytes.set_int32_le code addr_ofs (Int32.of_int resolved_addr))
+      !func_fixups;
+    List.iter
       (fun (ofs, l) ->
-        Bytes.set_int32_ne code ofs
+        Bytes.set_int32_le code ofs
           (Int32.of_int
           @@
           try Hashtbl.find lmap l
@@ -346,7 +409,7 @@ module ByteCode = struct
       !fixups;
     let pubs_resolved =
       List.rev_map (fun (name, flag) ->
-          let pos = 
+          let pos =
             if flag = pub_flag_global then
               try Hashtbl.find globals name
               with Not_found ->
@@ -356,21 +419,29 @@ module ByteCode = struct
               with Not_found ->
                 failwith (Printf.sprintf "ERROR: undefined label of public '%s'" name)
           in
-          (Int32.of_int @@ StringTab.add st name, Int32.of_int pos, flag))
+          (StringTab.add st name, pos, flag))
         !pubs
     in
+    let imports = List.rev_map (fun l -> StringTab.add st l) !imports in
     let st = Buffer.to_bytes st.StringTab.buffer in
     let file = Buffer.create 1024 in
-    Buffer.add_int32_ne file (Int32.of_int @@ Bytes.length st);
-    Buffer.add_int32_ne file (Int32.of_int @@ !glob_count);
-    Buffer.add_int32_ne file (Int32.of_int @@ List.length pubs_resolved);
+    let add_file_bytes = add_bytes file in
+    let add_file_ints = add_ints file in
+    Buffer.add_string file magic;
+    add_file_ints
+      [ format_version
+      ; Bytes.length st
+      ; Hashtbl.length globals
+      ; List.length imports
+      ; List.length pubs_resolved
+      ];
+    Buffer.add_bytes file st;
+    add_file_ints imports;
     List.iter
       (fun (n, o, f) ->
-        Buffer.add_int32_ne file n;
-        Buffer.add_int32_ne file o;
-        Buffer.add_uint8 file f)
+        add_file_ints [ n; o ];
+        add_file_bytes [ f ])
       pubs_resolved;
-    Buffer.add_bytes file st;
     Buffer.add_bytes file code;
     let f = open_out_bin (Printf.sprintf "%s.bc" cmd#basename) in
     Buffer.output_buffer f file;
@@ -1663,9 +1734,12 @@ let compile cmd ((imports, _), p) =
       ]
       env
   in
+  let top_public =
+    match cmd#get_mode with `BC -> [] | _ -> [ PUBLIC (topname, true) ]
+  in
   let prg =
     List.map (fun i -> IMPORT i) imports
-    @ [ PUBLIC (topname, true) ] @ env#get_decls @ List.flatten prg
+    @ top_public @ env#get_decls @ List.flatten prg
   in
   (*Printf.eprintf "Before propagating closures:\n";
     Printf.eprintf "%s\n%!" env#show_funinfo;
