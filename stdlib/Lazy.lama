@@ -3,18 +3,24 @@
 --
 -- Deferred computations.
 
+import Ref;
+
 public fun makeLazy (f) {
-  var value, set = false;
-  
+  -- state cell [set, value]: the closure below may not assign captured
+  -- variables directly (unsupported by the selfhosted x86 compiler),
+  -- so mutation goes through array elements instead
+  var isSet = ref(false);
+  var value = ref(0);
+
   fun () {
-    if set
-    then value
+    if deref(isSet)
+    then deref(value)
     else
       var c; -- need this temporary since in value := f () value would
                -- create an intermediate managed pointer
-      set   := true;
-      c     := f ();
-      value := c;
+      c := f ();
+      isSet ::= true;
+      value ::= c;
       c
     fi
   } 

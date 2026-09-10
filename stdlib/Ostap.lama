@@ -6,12 +6,35 @@
 
 import List;
 import Collection;
+import Array;
 import Ref;
 import Fun;
 import Matcher;
 import Data;
 
-var tab, hct, restab, log = false;
+var tab, errTab, hct, restab, log = false;
+
+-- Each top-level parse runs in a fresh "epoch". The per-parser memo tables are
+-- captured inside parser closures and so persist across independent parses; the
+-- epoch is mixed into every memo key so that entries from one parse can never be
+-- mistaken for those of another (different input buffer). This mirrors the
+-- reference implementation, which starts each parse with an empty memo table.
+var epochCounter = 0, curEpoch = 0;
+
+-- A source of fresh, stable memo keys for parsers that are built exactly once
+-- (top-level non-terminals bound to a variable). Each such parser calls
+-- freshKey at construction time and keeps that integer for the whole run, so
+-- the outer memo table is keyed by a cheap integer rather than by hashing the
+-- parser closure structurally. Parsers that are reconstructed on every use
+-- (grammar rules parameterised by a precedence level) cannot use a fresh key;
+-- they pass an explicit, stable key to memoK instead (e.g. [SomeTag, level]).
+var keyCounter = 0;
+
+
+fun freshKey () {
+  keyCounter := keyCounter + 1;
+  keyCounter
+}
 
 public fun logOn () {
   log := true
@@ -23,64 +46,95 @@ public fun initOstap () {
   hct    := emptyMemo ()
 }
 
-public fun memo (f) {
-  -- f := lookupMemo (hct, f);
-  
-  if log then printf ("Memoizing %x=%s\n", f, f.string) fi;
-  
-  case findHashTab (deref (tab), f) of
-    None      -> if log then printf ("new table...\n") fi;
-                 tab ::= addHashTab (deref (tab), f, ref (emptyMap (compare)))
-                 
-  | Some (tt) -> skip
+fun isBigger(newRes, oldRes) {
+  if oldRes == {} then true elif newRes == {} then false else
+    case [newRes, oldRes] of
+      [Fail(_, l1, c1), Fail(_, l2, c2)] -> if compare([l1, c1], [l2, c2]) > 0 then true else false fi
+    esac
+  fi
+}
+
+-- Memoize parser `p` under the explicit key `key`. The key identifies the
+-- non-terminal in the global table `tab`; it must be a small, cheap value
+-- (an integer from freshKey, or a tag such as [SomeTag, level]) -- NOT the
+-- parser closure, whose structural hash/compare walks the whole captured
+-- environment. Equal keys share one per-position memo table, which is what
+-- gives packrat sharing; reconstructing `p` on every call is fine because the
+-- body only runs on the first probe of a position and is replayed thereafter.
+fun memoCore (key, p) {
+  var t;
+
+  case findHashTab (deref (tab), key) of
+      None      -> tab ::= addHashTab (deref (tab), key, ref ({}))
+    | Some (tt) -> skip
   esac;
-  
+  t :=
+    case findHashTab (deref (tab), key) of
+      Some (t) -> t
+    esac;
+
   fun (k) {
     fun (s) {
-      var t =
-         case findHashTab (deref (tab), f) of
-           Some (t) -> t
-         esac;
-        
-      if log then printf ("Applying memoized parser to %s\n", s.string) fi;
-      case findMap (deref (t), s) of
-        None  ->
-          if log then printf ("New stream item\n") fi;
-          t ::= addMap (deref (t), s, [addSet (emptySet (compare), k), emptySet (fun (r1, r2) {
-                                                                                   case [r1, r2] of
-                                                                                     [Fail (_, _, _), Fail (_, _, _)] -> 0
-                                                                                   | _                                -> compare (r1, r2)
-                                                                                   esac
-                                                                                 })]);
-          f (fun (r) {
-               --r := lookupMemo (restab, r);
-
-               if log then printf ("Running continuation with result %s\n", r.string) fi;
-               case findMap (deref (t), s) of
-                 Some ([ks, rs]) ->                   
-                   if memSet (rs, r)
-                   then skip
-                   else
-                     t ::= addMap (deref (t), s, [ks, addSet (rs, r)]);
-                     iterSet (fun (k) {k (r)}, ks)
-                   fi
-               esac
-             }          
-            )
-            (s)
-      | Some ([ks, rs]) ->
-          t ::= addMap (deref (t), s, [addSet (ks, k), rs]);
-          iterSet (k, rs)
+      -- The input buffer is invariant during a parse and positions are dense
+      -- 0..bufLength, so the per-non-terminal memo table is a flat array
+      -- indexed directly by position -- O(1), no hashing, no per-entry list
+      -- cells (which a hashtable would allocate for every memoised position).
+      -- Each slot holds [epoch, cell]; the epoch distinguishes entries from
+      -- different parses, and a fresh, longer buffer triggers reallocation.
+      var pos  = getPos (s),
+          arr  = case deref (t) of
+                   {} -> initArray (bufLength (s) + 1, fun (_) {{}})
+                 | a  -> if pos >= a.length then initArray (bufLength (s) + 1, fun (_) {{}}) else a fi
+                 esac,
+          slot = arr [pos],
+          entry = case slot of
+                    {} -> {}
+                  | _  -> if slot [0] == curEpoch then slot [1] else {} fi
+                  esac;
+      t ::= arr;
+      case entry of
+          {} ->
+            -- First probe of this position: the cell [continuations, results,
+            -- failRes] is mutated in place; the continuation closes over `cell`.
+            var cell = [{k}, {}, {}];
+            arr [pos] := [curEpoch, cell];
+            p (fun (r) {
+              case r of
+                  Fail (_, _, _) ->
+                    if isBigger(r, cell[2]) then
+                      cell[2] := r;
+                      iter(fun (k) { k(r) }, cell[0])
+                    fi
+                | _              ->
+                    cell[1] := r : cell[1];
+                    iter(fun (k) { k(r) }, cell[0])
+              esac
+            }) (s)
+        | _  ->
+            entry[0] := k : entry[0];
+            iter (k, entry[1]);
+            if entry[2] != {} then k(entry[2]) fi
       esac
     }
   }
 }
 
+-- For parsers built once (bound to a variable): assign a fresh stable key.
+public fun memo (p) {
+  memoCore (freshKey (), p)
+}
+
+-- For parsers reconstructed on every use (level-parameterised grammar rules):
+-- pass an explicit, stable key (e.g. [SomeTag, level]) so that all
+-- reconstructions of the same non-terminal share one memo table.
+public fun memoK (key, p) {
+  memoCore (key, p)
+}
+
 public fun token (x) {
-  -- printf ("token: %s\n", x.string);
   case x of
-    #str -> memo $ fun (k) {fun (s) {k $ matchString (s, x)}}
-  | _    -> memo $ fun (k) {fun (s) {k $ matchRegexp (s, x)}}
+      #str -> fun (k) {fun (s) {k $ matchString (s, x)}}
+    | _    -> fun (k) {fun (s) {k $ matchRegexp (s, x)}}
   esac
 }
 
@@ -100,8 +154,13 @@ public fun empty (k) {
   fun (s) {k (Succ ({}, s))}
 }
 
+-- Alternation is NOT memoized. Memoization is applied selectively, at the
+-- top-level non-terminals (via memo / memoK), not at every combinator. An
+-- alternation is just one node of a non-terminal's body and is reconstructed
+-- together with it; memoizing it separately would flood the global table with
+-- single-use entries. The alternatives it combines are themselves memoized
+-- non-terminals, so packrat sharing across the branches is preserved.
 public fun alt (a, b) {
-  memo $ 
   fun (k) {
     fun (s) {
       if log then printf ("Running alt at %s\n", s.string) fi;
@@ -112,16 +171,15 @@ public fun alt (a, b) {
 }
 
 public fun seq (a, b) {
-  memo $ 
   fun (k) {
     fun (s) {
       if log then printf ("Running seq at %s\n", s.string) fi;
       a (fun (ar) {
-                  case ar of             
-                    Succ (x, s) -> b (x) (k) (s)
-                  | _          -> k (ar)
-                  esac
-         }) (s)
+        case ar of
+            Succ (x, s) -> b (x) (k) (s)
+          | _          -> k (ar)
+        esac
+      }) (s)
     }
   }
 }
@@ -133,9 +191,9 @@ public infix @ at * (a, f) {
   fun (k) {
     fun (s) {
       a (fun (x) {k (case x of
-                       Succ (x, s) -> Succ (f (x), s)
-                     | _           -> x
-                     esac)}) (s)
+          Succ (x, s) -> Succ (f (x), s)
+        | _           -> x
+      esac)}) (s)
     }
   }
 }
@@ -143,14 +201,10 @@ public infix @ at * (a, f) {
 public infix @@ at * ([name, a], f) {
   fun (k) {
     fun (s) {
-      var aa =
-      a (fun (x) {k (case x of               
-                       Succ (x, s) -> Succ (f (x), s)
-                     | _           -> x
-                     esac)});
---      printf ("aa=%s\n", aa.string);
---      printf ("@@: %s\n", name);
-      aa (s)
+      a (fun (x) {k (case x of
+          Succ (x, s) -> Succ (f (x), s)
+        | _           -> x
+      esac)}) (s)
     }
   }
 }
@@ -169,7 +223,7 @@ public fun rep0 (a) {
   empty @ lift({}) | a |> fun (x) {rep0 (a) @ fun (as) {x : as}}
 }
 
-public fun rep (a) {  
+public fun rep (a) {
   a |> (fun (x) {rep0 (a) @ fun (as) {x : as}})
 }
 
@@ -209,44 +263,43 @@ public fun showStream (name) {
 
 fun createResult () {
   var errors   = ref ({}),
-        line     = ref (0),
-        col      = ref (0),
-        value    = ref ({}),
-        hasError = ref (false),
-        hasValue = ref (false);
+      line     = ref (0),
+      col      = ref (0),
+      value    = ref ({}),
+      hasError = ref (false),
+      hasValue = ref (false);
 
   fun k (x) {
     if log then printf ("Result: %s\n", x.string) fi;
     case x of
-      Succ (v, s)    ->
-        if log then printf ("Result stream: %s\n", showMatcher (s)) fi;
-        if deref (hasValue)
-        then failure (sprintf ("Ostap: ambiguous parsing (%s vs. %s)", deref (value).string, v.string))
-        else
-          hasValue ::= true;
-          value    ::= v
-        fi
-    | Fail (err, l, c) ->
-        if deref (hasError)
-        then
-          var c = compare ([line, col], [l, c]);
-
-          if   c == 0 then errors ::= err : deref (errors)
-          elif c <  0 then errors ::= {err}; line ::= l; col ::= c
+        Succ (v, s)    ->
+          if log then printf ("Result stream: %s\n", showMatcher (s)) fi;
+          if deref (hasValue)
+            then failure (sprintf ("Ostap: ambiguous parsing (%s vs. %s)", deref (value).string, v.string))
+            else
+              hasValue ::= true;
+              value    ::= v
           fi
-        else
-          hasError ::= true;
-          errors   ::= {err};
-          line     ::= l;
-          col      ::= c
-        fi
+      | Fail (err, l, c) ->
+          if deref (hasError)
+            then
+              var cmp = compare ([deref(line), deref(col)], [l, c]);
+              if   cmp == 0 then errors ::= err : deref (errors)
+                elif cmp <  0 then errors ::= {err}; line ::= l; col ::= c
+              fi
+            else
+              hasError ::= true;
+              errors   ::= {err};
+              line     ::= l;
+              col      ::= c
+          fi
     esac
   }
 
   fun get () {
     if   deref (hasValue) then Succ (deref (value))
-    elif deref (hasError) then Fail (deref (errors), deref (line), deref (col))
-    else failure ("Ostap::createAcceptor::get: nothing to return\n")
+      elif deref (hasError) then Fail (deref (errors), deref (line), deref (col))
+      else failure ("Ostap::createAcceptor::get: nothing to return\n")
     fi
   }
 
@@ -262,26 +315,30 @@ fun result (acc) {
 }
 
 public fun parse (p, m) {
-  var acc = createResult ();
+  var savedEpoch = curEpoch, acc = createResult ();
+  epochCounter := epochCounter + 1;
+  curEpoch     := epochCounter;
 
   p (acc.k) (m);
 
-  acc.result
+  case acc.result of res -> curEpoch := savedEpoch; res esac
 }
 
 public fun parseString (p, s) {
-  var acc = createResult ();
+  var savedEpoch = curEpoch, acc = createResult ();
+  epochCounter := epochCounter + 1;
+  curEpoch     := epochCounter;
 
   p (acc.k) (initMatcher (s));
 
-  acc.result
+  case acc.result of res -> curEpoch := savedEpoch; res esac
 }
 
 public fun left (op, f) {
   fun (c, x) {
-     fun (y) {
-       f (c (x), op, y)
-     }
+    fun (y) {
+      f (c (x), op, y)
+    }
   }
 }
 
@@ -297,46 +354,53 @@ public fun right (op, f) {
 fun altl (level) {
   case level of
     [assoc, ps] ->
-       var assfun = case assoc of Left -> left | Right -> right | Nona -> left esac;
-       case map (fun (p) {
-                   case p of
-                     [op, sema] -> op @ fun (op) {assfun (op, sema)}
-                   esac
-                 }, ps) of
-         p : ps -> foldl (infix |, p, ps)
-       esac
+      var assfun = case assoc of Left -> left | Right -> right | Nona -> left esac;
+      case map (fun (p) {
+        case p of
+          [op, sema] -> op @ fun (op) {assfun (op, sema)}
+        esac
+      }, ps) of
+        p : ps -> foldl (infix |, p, ps)
+      esac
   esac
 }
 
 public fun expr (ops, opnd) {
   fun inner (ops) {
     case ops of
-      {}         -> fun (c) {opnd @ c}
-    | level : tl ->
+        {}         -> fun (c) {opnd @ c}
+      | level : tl ->
         var lops = altl (level),
-            next = inner (tl);
+            next = inner (tl),
+            -- The operand parser for this level, built ONCE and memoized so it
+            -- is shared across every use (both alternation branches and every
+            -- recursive step). This is the only thing that needs memoization;
+            -- the per-continuation alternation below is reconstructed each step
+            -- and so is combined with altNM to avoid polluting the memo table.
+            nId  = memo (next (id));
 
         case level.fst of
-          Nona ->
-           fun this (c) {
-             next (id) |> fun (l) {lops |> fun (op) {next (id) @ fun (r) {c (op)(id, l)(r)}}}
-           | next (id) @ c
-           }
+            Nona ->
+              fun this (c) {
+                nId |> fun (l) {lops |> fun (op) {nId @ fun (r) {c (op)(id, l)(r)}}}
+                  | nId @ c
+              }
 
-           this
+              this
 
-        | _    ->
-           fun this (c) {
-             next (id) |> fun (l) {lops |> fun (op) {this (op (c, l))}}
-           | next (id) @ c
-           }
+          | _    ->
+              fun this (c) {
+                nId |> fun (l) {lops |> fun (op) {this (op (c, l))}}
+                  | nId @ c
+              }
 
-           this
+              this
         esac
-    esac  
+    esac
   }
 
   inner (ops) (id)
 }
 
+-- logOn ();
 initOstap ()

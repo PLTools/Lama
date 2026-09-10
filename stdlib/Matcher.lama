@@ -12,111 +12,86 @@ public fun createRegexp (r, name) {
   l
 }
 
--- Create an immutable matcher.
--- Arguments:
---    buf --- a string to match in
---    pos --- an integer beginning position to match from
---    line, col --- line and column numbers
--- This function is internal, do not use it directly.
--- To initially create a matcher use initMatcher function (see below).
-fun createMatcher (buf, pos, line, col) {
-  -- Shows a matcher in a readable form
-  fun show () {
-    sprintf ("buf : %-40s\npos : %d\nline: %d\ncol : %d\n", buf, pos, line, col)
-  }
+-- A matcher is a flat, immutable record [buf, pos, line, col].
+--
+-- It used to be a tuple of seven closures (show/eof/matchString/... each
+-- capturing the whole enclosing frame). Because a matcher is part of every
+-- parse result (Succ (value, stream)) and those results are retained in the
+-- memo table, the heavy closure-tuple representation dominated the live heap.
+-- A four-slot record is ~20x smaller and makes getPos/getLine/getCol plain
+-- array reads instead of closure calls. The public interface below is
+-- unchanged, so callers are unaffected.
 
-  -- Calculates the number of remaining unmatched characters in the buffer
-  fun rest () {
-    buf.length - pos
-  }
+-- Moves the position pointer forward `n` characters, recomputing line/col.
+fun shiftMatcher (m, n) {
+  var buf = m[0], pos = m[1], i, l = m[2], c = m[3];
 
-  -- Moves the position pointer on given number of characters.
-  fun shift (n) {
-    var i, l = line, c = col;
-    
-    for i := pos, i < pos+n, i := i+1 do
-      case buf [i] of
+  for i := pos, i < pos + n, i := i + 1 do
+    case buf [i] of
         '\n' -> l := l + 1; c := 1
       | '\t' -> c := c + 8
       | _    -> c := c + 1
-      esac
-    od;
-    
-    createMatcher (buf, pos + n, l, c)
-  }
+    esac
+  od;
 
-  fun matchString (s) {
-    fun min (x, y) {
-      if x < y then x else y fi
-    }
-    
-    -- printf ("Matching string %s against %s...\n", s, substring (buf, pos, min (10, buf.length - pos)));
-
-    if s.length > rest ()
-    then Fail (sprintf ("""%s"" expected", s), line, col)
-    elif matchSubString (buf, s, pos) then Succ (s, shift (s.length)) 
-    else Fail (sprintf ("""%s"" expected at", s), line, col)
-    fi
-  }
-
-  fun matchRegexp (r) {
-    var n;
-
-    fun min (x, y) {
-      if x < y then x else y fi
-    }
-    
-    -- printf ("Matching regexp %x against %s...\n", r, substring (buf, pos, min (10, buf.length - pos)));
-
-    if (n := regexpMatch (r[0], buf, pos)) >= 0
-    then Succ (substring (buf, pos, n), shift (n))
-    else Fail (sprintf ("%s expected", r[1]), line, col)
-    fi
-  }
-
-  fun eof () {
-    if rest () == 0
-    then Succ ("", shift (0))
-    else Fail ("EOF expected", line, col)
-    fi
-  }
-  
-  [show,
-   eof,
-   matchString,
-   matchRegexp,
-   fun () {line},
-   fun () {col}]  
+  [buf, pos + n, l, c]
 }
 
-public fun showMatcher (m) {
-  m [0] ()
+-- Creates a fresh matcher from a string buffer.
+public fun initMatcher (buf) {
+  [buf, 0, 1, 1]
 }
 
-public fun endOfMatcher (m) {
-  m [1] ()
+-- Gets a position
+public fun getPos (m) {
+  m [1]
 }
 
-public fun matchString (m, s) {
-  m [2] (s)
-}
-
--- Matches against a regexp
-public fun matchRegexp (m, r) {
-  m [3] (r)
+-- Length of the underlying buffer (invariant for the whole parse).
+public fun bufLength (m) {
+  m [0].length
 }
 
 -- Gets a line number
 public fun getLine (m) {
-  m [4] ()
+  m [2]
 }
 
 -- Gets a column number
 public fun getCol (m) {
-  m [5] ()
+  m [3]
 }
 
--- Creates a fresh matcher from a string buffer
-public fun initMatcher (buf) {
-  createMatcher (buf, 0, 1, 1)
+-- Shows a matcher in a readable form
+public fun showMatcher (m) {
+  sprintf ("buf : %-40s\npos : %d\nline: %d\ncol : %d\n", m[0], m[1], m[2], m[3])
+}
+
+-- Matches against a string
+public fun matchString (m, s) {
+  var buf = m[0], pos = m[1];
+
+  if s.length > buf.length - pos
+    then Fail (sprintf ("""%s"" expected", s), m[2], m[3])
+    elif matchSubString (buf, s, pos) then Succ (s, shiftMatcher (m, s.length))
+    else Fail (sprintf ("""%s"" expected at", s), m[2], m[3])
+  fi
+}
+
+-- Matches against a regexp
+public fun matchRegexp (m, r) {
+  var buf = m[0], pos = m[1], n;
+
+  if (n := regexpMatch (r[0], buf, pos)) >= 0
+    then Succ (substring (buf, pos, n), shiftMatcher (m, n))
+    else Fail (sprintf ("%s expected", r[1]), m[2], m[3])
+  fi
+}
+
+-- Succeeds only at the end of input
+public fun endOfMatcher (m) {
+  if m[0].length - m[1] == 0
+    then Succ ("", m)
+    else Fail ("EOF expected", m[2], m[3])
+  fi
 }

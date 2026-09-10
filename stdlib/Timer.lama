@@ -13,13 +13,13 @@ public fun timer () {
   }
 }
 
--- Formats a given time as a floating-point number
+-- Formats a given time (in microseconds) as a floating-point number of seconds.
 public fun toSeconds (t) {
   var s = sprintf ("%d", t);
-  
-  if s.length >= 7
-  then
-    sprintf ("%s.%s", substring (s, 0, s.length - 7 + 1), substring (s, s.length - 7 + 1, 6))
-  else sprintf ("0.%s", s)
-  fi
+
+  while s.length < 7 do
+    s := "0" + s
+  od;
+
+  sprintf ("%s.%s", substring (s, 0, s.length - 6), substring (s, s.length - 6, 6))
 }
