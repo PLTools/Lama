@@ -2,4 +2,5 @@
  (section share)
  (files
   (glob_files (*.lama with_prefix x64))
-  (glob_files (*.lama with_prefix x32))))
+  ;(glob_files (*.lama with_prefix x32))
+  ))

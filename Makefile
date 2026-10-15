@@ -7,10 +7,10 @@ BUILDDIR = _build
 
 .DEFAULT_GOAL := build
 
-all: build test
+all: build
 
 build:
-	dune b src runtime runtime32 stdlib tutorial
+	dune b src runtime stdlib tutorial
 
 install: all
 	dune b @install --profile=release

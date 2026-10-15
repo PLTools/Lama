@@ -1,67 +1,67 @@
-(rule
- (enabled_if
-  (= %{system} "linux"))
- (deps
-  ../Makefile
-  ../../runtime32/Std.i
-  ../List.lama
-  ../Array.lama
-  ../Buffer.lama
-  ../Collection.lama
-  ../Data.lama
-  ../Fun.lama
-  ../Lazy.lama
-  ../List.lama
-  ../Matcher.lama
-  ../Ostap.lama
-  ../Random.lama
-  ../Ref.lama
-  ../STM.lama
-  ../Timer.lama
-  %{project_root}/src/Driver.exe)
- (targets
-  Array.i
-  Array.o
-  Buffer.i
-  Buffer.o
-  Collection.i
-  Collection.o
-  Data.i
-  Data.o
-  Fun.i
-  Fun.o
-  Lazy.i
-  Lazy.o
-  List.i
-  List.o
-  Matcher.i
-  Matcher.o
-  Ostap.i
-  Ostap.o
-  Random.i
-  Random.o
-  Ref.i
-  Ref.o
-  STM.i
-  STM.o
-  Timer.i
-  Timer.o)
- (mode
-  (promote (until-clean)))
- (action
-  (progn
-   (setenv
-    SRCDIR
-    ".."
-    (setenv
-     LAMA
-     "../../runtime32"
-     (setenv
-      LAMAC
-      "../../src/Driver.exe -32 -I ../../runtime32"
-      (run make -j2 -f ../Makefile all)))))))
-(install
- (section share)
- (files
-  (glob_files (*.i with_prefix x32))
-  (glob_files (*.o with_prefix x32))))
+; (rule
+;  (enabled_if
+;   (= %{system} "linux"))
+;  (deps
+;   ../Makefile
+;   ../../runtime32/Std.i
+;   ../List.lama
+;   ../Array.lama
+;   ../Buffer.lama
+;   ../Collection.lama
+;   ../Data.lama
+;   ../Fun.lama
+;   ../Lazy.lama
+;   ../List.lama
+;   ../Matcher.lama
+;   ../Ostap.lama
+;   ../Random.lama
+;   ../Ref.lama
+;   ../STM.lama
+;   ../Timer.lama
+;   %{project_root}/src/Driver.exe)
+;  (targets
+;   Array.i
+;   Array.o
+;   Buffer.i
+;   Buffer.o
+;   Collection.i
+;   Collection.o
+;   Data.i
+;   Data.o
+;   Fun.i
+;   Fun.o
+;   Lazy.i
+;   Lazy.o
+;   List.i
+;   List.o
+;   Matcher.i
+;   Matcher.o
+;   Ostap.i
+;   Ostap.o
+;   Random.i
+;   Random.o
+;   Ref.i
+;   Ref.o
+;   STM.i
+;   STM.o
+;   Timer.i
+;   Timer.o)
+;  (mode
+;   (promote (until-clean)))
+;  (action
+;   (progn
+;    (setenv
+;     SRCDIR
+;     ".."
+;     (setenv
+;      LAMA
+;      "../../runtime32"
+;      (setenv
+;       LAMAC
+;       "../../src/Driver.exe -32 -I ../../runtime32"
+;       (run make -j2 -f ../Makefile all)))))))
+; (install
+;  (section share)
+;  (files
+;   (glob_files (*.i with_prefix x32))
+;   (glob_files (*.o with_prefix x32))))
