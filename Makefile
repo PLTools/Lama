@@ -10,6 +10,7 @@ BUILDDIR = _build
 all: build test
 
 build:
+	dune b src runtime stdlib tutorial
 	dune b src runtime runtime32 stdlib tutorial
 
 install: all
