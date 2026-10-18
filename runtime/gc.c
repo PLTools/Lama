@@ -460,7 +460,7 @@ void update_references (memory_chunk *old_heap) {
     heap_next_obj_iterator(&it);
   }
   // fix pointers from stack
-  scan_and_fix_region(old_heap, (void *)__gc_stack_top + sizeof(size_t), (void *)__gc_stack_bottom + sizeof(size_t));
+  scan_and_fix_region(old_heap, (void *)__gc_stack_top + sizeof(size_t), (void *)__gc_stack_bottom);
 
   // fix pointers from extra_roots
   scan_and_fix_region_roots(old_heap);

@@ -1,1 +1,5 @@
-depexts: [ [ "gcc-14-multilib" ] {os-distribution = "ubuntu"} ]
+depexts: [
+  [ "gcc-i686-linux-gnu" "linux-libc-dev:i386"  "libc6-dev-i386-cross"] {os-distribution = "ubuntu"}
+  [ "libgcc-13-dev-i386-cross" ] {os-distribution = "ubuntu" & os-version >= "24.04" }
+  [ "libgcc-14-dev-i386-cross" ] {os-distribution = "ubuntu" & os-version >= "24.04" }
+]

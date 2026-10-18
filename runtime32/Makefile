@@ -1,6 +1,7 @@
 RUNTIME=runtime.a
 
 .DEFAULT  := $(RUNTIME)
+CC := i686-linux-gnu-gcc
 
 $(RUNTIME): gc_runtime.o runtime.o
 	ar rc $@ gc_runtime.o runtime.o
