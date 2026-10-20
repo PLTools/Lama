@@ -95,7 +95,7 @@ void   physically_relocate (memory_chunk *);
 // an auxiliary data structure called `extra_roots_pool`.
 // extra_roots_pool is a simple LIFO stack. During `pop` it compares that pop's
 // argument is equal to the current stack top.
-#define MAX_EXTRA_ROOTS_NUMBER 32
+#define MAX_EXTRA_ROOTS_NUMBER (1 << 20)
 
 typedef struct {
   int    current_free;
