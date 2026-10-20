@@ -18,30 +18,43 @@
   %{project_root}/src/Driver.exe)
  (targets
   Array.i
+  Array.bc
   Array.o
   Buffer.i
+  Buffer.bc
   Buffer.o
   Collection.i
+  Collection.bc
   Collection.o
   Data.i
+  Data.bc
   Data.o
   Fun.i
+  Fun.bc
   Fun.o
   Lazy.i
+  Lazy.bc
   Lazy.o
   List.i
+  List.bc
   List.o
   Matcher.i
+  Matcher.bc
   Matcher.o
   Ostap.i
+  Ostap.bc
   Ostap.o
   Random.i
+  Random.bc
   Random.o
   Ref.i
+  Ref.bc
   Ref.o
   STM.i
+  STM.bc
   STM.o
   Timer.i
+  Timer.bc
   Timer.o)
  (mode
   (promote (until-clean)))
@@ -56,10 +69,13 @@
      (setenv
       LAMAC
       "../../src/Driver.exe -64 -I ../../runtime"
-      (run make -j2 -f ../Makefile all)))))))
+      (progn
+       (run make -j2 -f ../Makefile obj)
+       (run make -j2 -f ../Makefile bytecode))))))))
 
 (install
  (section share)
  (files
   (glob_files (*.i with_prefix x64))
+  (glob_files (*.bc with_prefix x64))
   (glob_files (*.o with_prefix x64))))

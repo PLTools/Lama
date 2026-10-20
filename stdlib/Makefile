@@ -1,4 +1,4 @@
-.PHONY: all
+.PHONY: all obj bytecode
 
 SHELL := /bin/bash
 SRCDIR ?= .
@@ -8,12 +8,17 @@ $(info FILES = $(FILES))
 OFILES = $(FILES:$(SRCDIR)/%=%)
 OFILES := $(OFILES:.lama=.o)
 $(info OFILES = $(OFILES))
+BCFILES = $(OFILES:.o=.bc)
 ALL := $(sort $(OFILES))
 LAMAC ?= ../src/lamac
 BDIR ?= .
 
-all: $(addprefix $(BDIR)/,$(ALL))
+all: obj
+
+obj: $(addprefix $(BDIR)/,$(ALL))
 $(info ALL = $(ALL), SRCDIR = $(SRCDIR))
+
+bytecode: obj $(addprefix $(BDIR)/,$(BCFILES))
 $(BDIR)/Fun.o: $(BDIR)/Ref.o
 
 $(BDIR)/Data.o: $(BDIR)/Ref.o $(BDIR)/Collection.o
@@ -33,7 +38,10 @@ $(BDIR)/STM.o: $(BDIR)/List.o $(BDIR)/Fun.o
 $(BDIR)/%.o: $(SRCDIR)/%.lama
 	$(LAMAC) -g -I . -c $< #-o $@
 
+$(BDIR)/%.bc: $(SRCDIR)/%.lama obj
+	$(LAMAC) -I . -b $<
+
 clean:
-	$(RM) -r *.s *.o *.i *~
+	$(RM) -r *.s *.o *.i *.bc *~
 	pushd regression && make clean && popd
 
