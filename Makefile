@@ -1,4 +1,4 @@
-1.PHONY: all regression
+.PHONY: all regression
 .PHONY: clean test regression regression-expressions regression-all uninstall install build
 
 INSTALL ?= install -v
