@@ -13,4 +13,7 @@ int disasm(const bytecode *bc, FILE *f);
 int disasm_func(const bytecode *bc, size_t code_offset, const char *name,
                 uint8_t flag, FILE *f);
 
+/* Dump the whole bytecode to a given file. */
+void dump_bytecode(FILE *f, const bytecode *bc) {
+
 #endif /* DISASM_H */
