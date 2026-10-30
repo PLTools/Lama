@@ -31,3 +31,8 @@
 (alias
  (name default)
  (deps lama.exe))
+
+(install
+ (section bin)
+ (files
+  (lama.exe as lamavm)))

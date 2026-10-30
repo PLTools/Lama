@@ -23,5 +23,6 @@
  (depends
   posix-uname
   GT
+  conf-libffi
   (ostap
    (>= 0.6))))

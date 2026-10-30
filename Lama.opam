@@ -11,6 +11,7 @@ depends: [
   "dune" {>= "3.11"}
   "posix-uname"
   "GT"
+  "conf-libffi"
   "ostap" {>= "0.6"}
   "odoc" {with-doc}
 ]
