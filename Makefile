@@ -1,4 +1,4 @@
-.PHONY: all regression
+1.PHONY: all regression
 .PHONY: clean test regression regression-expressions regression-all uninstall install build
 
 INSTALL ?= install -v
@@ -7,10 +7,13 @@ BUILDDIR = _build
 
 .DEFAULT_GOAL := build
 
-all: build test
+all: build
+# test
 
 build:
-	dune b src runtime runtime32 stdlib tutorial virtual_machine
+	dune b src runtime runtime32 stdlib tutorial
+
+# virtual_machine
 
 install: all
 	dune b @install --profile=release
@@ -22,7 +25,6 @@ _build/default/Lama.install:
 uninstall: _build/default/Lama.install
 	$(RM) -r `opam var share`/Lama
 	dune uninstall
-
 
 regression-all: regression regression-expressions
 
