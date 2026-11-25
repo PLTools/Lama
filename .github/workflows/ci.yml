@@ -1,0 +1,62 @@
+name: Main workflow
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "1.30"
+
+permissions: read-all
+
+# a new push to a pull request cancels its previous run
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  OPAMCONFIRMLEVEL: unsafe-yes
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          # Intel macOS
+          - macos-15-intel
+        ocaml-compiler:
+          - 4.14.2
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout tree
+        uses: actions/checkout@v4
+
+      - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          dune-cache: true
+
+      - run: gcc --version
+
+      - run: opam pin add Lama.dev . --no-action
+      # opam >= 2.1 installs the system packages (depexts) as well
+      - run: opam install . --deps-only --with-test
+
+      # the 32-bit runtime is built on Linux only
+      - run: rm -fr runtime32
+        if: runner.os == 'macOS'
+      - run: opam exec -- dune b src runtime runtime32 stdlib tutorial
+        if: runner.os != 'macOS'
+      - run: opam exec -- dune b src runtime stdlib tutorial
+        if: runner.os == 'macOS'
+      - run: opam exec -- dune b @install --profile=release
+      - run: opam exec -- dune    install --profile=release
+      - run: opam exec -- dune test stdlib/regression
+      - run: opam exec -- dune test regression_long
+      - run: opam exec -- dune test regression
+      - run: opam exec -- make regression-all
