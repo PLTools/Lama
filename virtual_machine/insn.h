@@ -10,7 +10,7 @@
 
 union insn;
 // State: ip = instruction pointer, sp = stack pointer, bp = base pointer
-#define DECL_STATE union insn *ip, aint *sp, aint *bp
+#define DECL_STATE union insn *ip, intptr_t *sp, intptr_t *bp
 #define STATE ip, sp, bp
 
 // Function pointer type for opcode handlers (returns void for tail calls)
@@ -20,10 +20,10 @@ typedef void (*fn)(DECL_STATE);
 typedef union insn {
   fn func;            // Pointer to function
   int32_t num;        // Integer operand (signed)
-  aint anum;          // Runtime value operand
+  intptr_t anum;          // Runtime value operand
   const char *str;    // String operand (direct pointer)
   union insn *target; // Direct jump target (pointer to insn)
-  aint *global_ptr;   // Pointer to a C global variable
+  intptr_t *global_ptr;   // Pointer to a C global variable
   void *ptr;          // Generic pointer
 } insn;
 

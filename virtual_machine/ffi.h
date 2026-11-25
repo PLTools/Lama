@@ -36,6 +36,6 @@ typedef struct {
 void ffi_call_table_emit_init(ffi_call_iterator *iter, ffi_call_table *table);
 bool ffi_call_table_emit_next(ffi_call_iterator *iter, ffi_resolved **out);
 
-aint ffi_call_c(const ffi_resolved *res, aint *args, int n_args);
+intptr_t ffi_call_c(const ffi_resolved *res, intptr_t *args, int n_args);
 
 #endif // FFI_CALL_H

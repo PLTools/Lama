@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern aint LtagHash(const char *s);
+extern intptr_t LtagHash(const char *s);
 
 /*
  * Sentinel value for external references (both functions and globals).
@@ -117,7 +117,7 @@ typedef struct {
   } code;
 
   byte_reader reader;
-  aint *globals;
+  intptr_t *globals;
   size_t global_offset;
 
   struct {
@@ -139,7 +139,7 @@ typedef struct {
 
 static void decode_ctx_init(decode_ctx *ctx, const bytecode *bc,
                             symbol_table *st, ffi_call_table *ffi,
-                            ext_global_cache *ext_globals, aint *globals,
+                            ext_global_cache *ext_globals, intptr_t *globals,
                             size_t global_offset) {
   ctx->bc = bc;
 
@@ -245,7 +245,7 @@ static void *resolve_ext_global_ptr(ext_global_cache *cache, const char *name) {
   return ptr;
 }
 
-static aint *resolve_global_ptr(decode_ctx *ctx, int32_t idx,
+static intptr_t *resolve_global_ptr(decode_ctx *ctx, int32_t idx,
                                 size_t global_base) {
   if (!IS_EXT_REF(idx)) {
     return &ctx->globals[global_base + idx];
@@ -260,7 +260,7 @@ static aint *resolve_global_ptr(decode_ctx *ctx, int32_t idx,
     return &ctx->globals[sym->idx];
   }
 
-  return (aint *)resolve_ext_global_ptr(ctx->ext_globals, glob_name);
+  return (intptr_t *)resolve_ext_global_ptr(ctx->ext_globals, glob_name);
 }
 
 /*
@@ -286,7 +286,7 @@ static void emit_entry_step(insn *slot, insn *main_begin) {
 }
 
 static bool emit_glo(decode_ctx *ctx, int32_t idx, size_t global_base, fn op) {
-  aint *ptr = resolve_global_ptr(ctx, idx, global_base);
+  intptr_t *ptr = resolve_global_ptr(ctx, idx, global_base);
   if (!ptr) {
     return false;
   }
@@ -1190,7 +1190,7 @@ static program *link_program(decoded *dec_arr, size_t n, size_t total_code_len,
   return prog;
 }
 
-program *decode(bytecode **bc_arr, size_t n, aint *globals) {
+program *decode(bytecode **bc_arr, size_t n, intptr_t *globals) {
   symbol_table *st = symbol_table_create();
   ffi_call_table *ffi = ffi_call_table_create();
   ext_global_cache ext_globals = {0};

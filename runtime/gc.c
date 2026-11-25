@@ -708,7 +708,7 @@ void set_forward_address (void *obj, size_t addr) {
 
 bool is_marked (void *obj) {
   data *d        = TO_DATA(obj);
-  aint   mark_bit = GET_MARK_BIT(d->forward_address);
+  intptr_t mark_bit = GET_MARK_BIT(d->forward_address);
   return mark_bit;
 }
 
@@ -758,7 +758,7 @@ lama_type get_type_row_ptr (void *ptr) {
 }
 
 lama_type get_type_header_ptr (void *ptr) {
-  auint *header = (auint *)ptr;
+  uintptr_t *header = (uintptr_t *)ptr;
   switch (TAG(*header)) {
     case ARRAY_TAG: return ARRAY;
     case STRING_TAG: return STRING;
@@ -797,7 +797,7 @@ size_t obj_size_row_ptr (void *ptr) {
 }
 
 size_t obj_size_header_ptr (void *ptr) {
-  ptrt len = LEN(*(ptrt *)ptr);
+  uintptr_t len = LEN(*(uintptr_t *)ptr);
   switch (get_type_header_ptr(ptr)) {
     case ARRAY: return array_size(len);
     case STRING: return string_size(len);
@@ -891,7 +891,7 @@ size_t get_header_size (lama_type type) {
   }
 }
 
-void *alloc_string (auint len) {
+void *alloc_string (uintptr_t len) {
   data *obj        = alloc(string_size(len));
   obj->data_header = STRING_TAG | (len << 3);
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
@@ -907,7 +907,7 @@ void *alloc_string (auint len) {
   return obj;
 }
 
-void *alloc_array (auint len) {
+void *alloc_array (uintptr_t len) {
   data *obj        = alloc(array_size(len));
   obj->data_header = ARRAY_TAG | (len << 3);
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
@@ -923,7 +923,7 @@ void *alloc_array (auint len) {
   return obj;
 }
 
-void *alloc_sexp (auint members) {
+void *alloc_sexp (uintptr_t members) {
   sexp *obj        = alloc(sexp_size(members));
   obj->data_header = SEXP_TAG | (members << 3);
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
@@ -940,7 +940,7 @@ void *alloc_sexp (auint members) {
   return obj;
 }
 
-void *alloc_closure (auint captured) {
+void *alloc_closure (uintptr_t captured) {
 
   data *obj        = alloc(closure_size(captured));
   obj->data_header = CLOSURE_TAG | (captured << 3);

@@ -14,7 +14,7 @@
 #include <sys/mman.h>
 #include <time.h>
 
-#define WORD_SIZE (CHAR_BIT * sizeof(ptrt))
+#define WORD_SIZE (CHAR_BIT * sizeof(uintptr_t))
 
 _Noreturn void failure (char *s, ...);
 

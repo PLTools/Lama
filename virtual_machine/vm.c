@@ -11,7 +11,7 @@
 #include <sys/mman.h>
 
 extern size_t __gc_stack_top, __gc_stack_bottom;
-extern void set_args(aint argc, char *argv[]);
+extern void set_args(intptr_t argc, char *argv[]);
 
 struct virtual_machine {
   bytecode **bc_arr; // Array of unique loaded bytecode units
@@ -20,7 +20,7 @@ struct virtual_machine {
   insn *entry_points; // Entry point for each unique unit
   size_t entry_points_len;
   size_t total_globals;
-  aint *globals;  // Globals array (at the top of the stack)
+  intptr_t *globals;  // Globals array (at the top of the stack)
   void *ffi_data; // ffi_resolved array
   size_t ffi_count;
   void *stack_base;
@@ -57,7 +57,7 @@ virtual_machine *vm_create(const char *main_unit_name, const char **paths,
 
   // Compute total globals and place at the top of the stack
   vm->total_globals = bytecode_count_globals(lr.units, lr.units_len);
-  vm->globals = (aint *)vm->stack_base - vm->total_globals;
+  vm->globals = (intptr_t *)vm->stack_base - vm->total_globals;
   for (size_t i = 0; i < vm->total_globals; i++) {
     vm->globals[i] = BOX(0);
   }
@@ -108,8 +108,8 @@ void vm_run(virtual_machine *vm) {
   set_args(vm->argc, vm->argv);
 
   insn *ip = vm->entry_points;
-  aint *sp = vm->globals;
-  aint *bp = NULL;
+  intptr_t *sp = vm->globals;
+  intptr_t *bp = NULL;
 
   ip->func(ip, sp, bp);
 

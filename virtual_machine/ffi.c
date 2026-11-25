@@ -162,7 +162,7 @@ bool ffi_call_table_emit_next(ffi_call_iterator *iter, ffi_resolved **out) {
   return true;
 }
 
-static aint call_args_array(void *fn_ptr, aint *args) {
+static intptr_t call_args_array(void *fn_ptr, intptr_t *args) {
   ffi_cif cif;
   ffi_type *arg_types[1] = {&ffi_type_pointer};
   void *arg_values[1] = {&args};
@@ -176,10 +176,10 @@ static aint call_args_array(void *fn_ptr, aint *args) {
   }
 
   ffi_call(&cif, FFI_FN(fn_ptr), &result, arg_values);
-  return (aint)result;
+  return (intptr_t)result;
 }
 
-static aint call_variadic(void *fn_ptr, int fixed_args, aint *args,
+static intptr_t call_variadic(void *fn_ptr, int fixed_args, intptr_t *args,
                           int n_args) {
   if (n_args < fixed_args) {
     fprintf(stderr, "FFI variadic call: expected at least %d args, got %d\n",
@@ -190,7 +190,7 @@ static aint call_variadic(void *fn_ptr, int fixed_args, aint *args,
   ffi_cif cif;
   ffi_type *arg_types[n_args];
   void *arg_values[n_args];
-  aint int_values[n_args];
+  intptr_t int_values[n_args];
   void *result = NULL;
 
   for (int i = 0; i < n_args; i++) {
@@ -212,14 +212,14 @@ static aint call_variadic(void *fn_ptr, int fixed_args, aint *args,
   }
 
   ffi_call(&cif, FFI_FN(fn_ptr), &result, arg_values);
-  return (aint)result;
+  return (intptr_t)result;
 }
 
-static aint call_regular(void *fn_ptr, aint *args, int n_args) {
+static intptr_t call_regular(void *fn_ptr, intptr_t *args, int n_args) {
   ffi_cif cif;
   ffi_type *arg_types[n_args];
   void *arg_values[n_args];
-  aint result;
+  intptr_t result;
 
   for (int i = 0; i < n_args; i++) {
     arg_types[i] = &ffi_type_pointer;
@@ -237,7 +237,7 @@ static aint call_regular(void *fn_ptr, aint *args, int n_args) {
   return result;
 }
 
-aint ffi_call_c(const ffi_resolved *res, aint *args, int n_args) {
+intptr_t ffi_call_c(const ffi_resolved *res, intptr_t *args, int n_args) {
   switch (res->kind) {
   case FFI_ARGS_ARRAY:
     return call_args_array(res->fn_ptr, args);
