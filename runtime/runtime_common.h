@@ -9,10 +9,6 @@
 #  error "FULL_INVARIANT_CHECKS requires DEBUG_VERSION"
 #endif
 
-#if defined(__x86_64__) || defined(__ppc64__)
-#define X86_64
-#endif
-
 // Every heap word, object header field and Lama value is pointer-sized: intptr_t for (boxed)
 // Lama values, uintptr_t for header fields, addresses and raw heap words. C11 only guarantees
 // that these types can hold a void * (they may be wider), so the runtime checks it here.

@@ -17,8 +17,8 @@ else
 	  ENV_FLAGS := 
 endif
 
-DISABLE_WARNINGS=-Wno-shift-negative-value
-COMMON_FLAGS=$(DISABLE_WARNINGS) -O3 -g -fstack-protector-all $(ARCH) --std=c11
+WARNINGS=-Wpointer-arith
+COMMON_FLAGS=$(WARNINGS) -O3 -g -fstack-protector-all $(ARCH) --std=c11
 PROD_FLAGS=$(COMMON_FLAGS) $(ENV_FLAGS)
 TEST_FLAGS=$(COMMON_FLAGS) -DDEBUG_VERSION
 UNIT_TESTS_FLAGS=$(TEST_FLAGS)
@@ -30,10 +30,10 @@ all: $(BUILD_DIR)/gc.o $(BUILD_DIR)/runtime.o $(BUILD_DIR)/printf.o
 $(BUILD_DIR):
 	mkdir -p $@
 
-$(BUILD_DIR)/gc.o: gc.c gc.h | $(BUILD_DIR)
+$(BUILD_DIR)/gc.o: gc.c gc.h runtime.h runtime_common.h | $(BUILD_DIR)
 	$(CC) $(PROD_FLAGS) -c gc.c -o $(BUILD_DIR)/gc.o
 
-$(BUILD_DIR)/runtime.o: runtime.c runtime.h | $(BUILD_DIR)
+$(BUILD_DIR)/runtime.o: runtime.c runtime.h gc.h runtime_common.h | $(BUILD_DIR)
 	$(CC) $(PROD_FLAGS) -c runtime.c -o $(BUILD_DIR)/runtime.o
 
 $(BUILD_DIR)/printf.o: printf.S | $(BUILD_DIR)
