@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern intptr_t LtagHash(const char *s);
+extern intptr_t lama_tag_hash(const char *s);
 
 /*
  * Sentinel value for external references (both functions and globals).
@@ -776,7 +776,7 @@ static bool decode_internal(decode_ctx *ctx) {
       DEPTH_DEC(n_fields);
       DEPTH_PUSH();
       EMIT_FUNC(op_sexp);
-      EMIT_ANUM(LtagHash(bytecode_get_string(bc, tag_idx)));
+      EMIT_ANUM(lama_tag_hash(bytecode_get_string(bc, tag_idx)));
       EMIT_NUM(n_fields);
       break;
     }
@@ -787,7 +787,7 @@ static bool decode_internal(decode_ctx *ctx) {
       int32_t tag_idx = reader_i32(&ctx->reader);
       int32_t n_fields = reader_i32(&ctx->reader);
       EMIT_FUNC(op_tag);
-      EMIT_ANUM(LtagHash(bytecode_get_string(bc, tag_idx)));
+      EMIT_ANUM(lama_tag_hash(bytecode_get_string(bc, tag_idx)));
       EMIT_NUM(n_fields);
       break;
     }

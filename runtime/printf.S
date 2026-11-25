@@ -15,7 +15,7 @@
         .extern PREFIXED(Bsprintf)
 
         .global PREFIXED(Lfailure)
-        .extern PREFIXED(failure)
+        .extern PREFIXED(Bfailure)
 
         .extern cnt_percentage_sign
 
@@ -166,4 +166,4 @@ PREFIXED(Lfailure_continue):
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     PREFIXED(failure)
+        jmp     PREFIXED(Bfailure)
