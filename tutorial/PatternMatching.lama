@@ -40,6 +40,8 @@ case E of
 | E -> printf ("Yes, this is E.\n") 
 esac;
 
+printf ("Note: only the first 10 characters of a tag are significant in compiled code, so VeryLongTagA and VeryLongTagB denote the same tag.\n");
+
 printf ("You can discriminate the scrutinee on the number of arguments as well:\n");
 
 case A of

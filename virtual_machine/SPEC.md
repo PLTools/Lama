@@ -276,7 +276,7 @@ The fields are taken from the stack and used as the contents of the constructed 
 [op_sexp][tag_hash][n_fields]
 ```
 
-`tag_offset` is resolved beforehand during decoding to `tag_hash` (using runtime `LtagHash`).
+`tag_offset` is resolved beforehand during decoding to `tag_hash` (using the runtime's `lama_tag_hash`, which hashes a C string).
 
 `<ip, sp, bp>` → `<ip + 3, sp + n_fields - 1, bp>`
 
@@ -926,7 +926,7 @@ TAG = 0x57
 [op_tag][tag_hash][n_fields]
 ```
 
-`tag_offset` is resolved during decoding to `tag_hash` (using runtime `LtagHash`).
+`tag_offset` is resolved during decoding to `tag_hash` (using the runtime's `lama_tag_hash`, which hashes a C string).
 
 `<ip, sp, bp>` → `<ip + 3, sp, bp>`
 

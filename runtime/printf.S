@@ -3,7 +3,6 @@
 #elif defined(__APPLE__)
 #define PREFIXED(name) _##name
 #endif
-        .data
 
         .global PREFIXED(Lprintf)
         .extern PREFIXED(Bprintf)
@@ -15,11 +14,31 @@
         .extern PREFIXED(Bsprintf)
 
         .global PREFIXED(Lfailure)
-        .extern PREFIXED(failure)
-
-        .extern cnt_percentage_sign
+        .extern PREFIXED(Bfailure)
 
         .text
+
+# Unboxes in place the \count words starting at address \words: every word with the lowest
+# bit set (a boxed integer) is shifted right arithmetically. Clobbers \words, \count and r10.
+# The macro has named parameters: otherwise the Darwin assembler treats $1 and $8 in its body as
+# positional macro arguments.
+.macro UNBOX_ARGS words, count
+1:
+        testq   \count, \count
+        jz      3f
+
+        decq    \count
+        movq    (\words), %r10
+        testq   $1, %r10
+        jz      2f
+# unbox value
+        sarq    %r10
+        movq    %r10, (\words)
+2:
+        addq    $8, \words
+        jmp     1b
+3:
+.endm
 
 PREFIXED(Lprintf):
 # save return address
@@ -32,23 +51,9 @@ PREFIXED(Lprintf):
         pushq   %rsi
         movq    %rsp, %rax
 # rdi --- format string
-# r11 --- number of arguments except format string 
-PREFIXED(Lprintf_loop):
-        movq    $0, %r12
-        cmpq    %r11, %r12
-        jz    PREFIXED(Lprintf_continue)
+# r11 --- number of arguments except format string
+        UNBOX_ARGS %rax, %r11
 
-        decq    %r11
-        movq    (%rax), %r10
-        testq   $1, %r10
-        jz    PREFIXED(Lprintf_loop_end)
-# unbox value
-        sarq    %r10
-        movq    %r10, (%rax)
-PREFIXED(Lprintf_loop_end):
-        addq    $8, %rax
-        jmp     PREFIXED(Lprintf_loop)
-PREFIXED(Lprintf_continue):
         popq    %rsi
         popq    %rdx
         popq    %rcx
@@ -69,23 +74,9 @@ PREFIXED(Lfprintf):
         movq    %rsp, %rax
 # rdi --- FILE*
 # rsi --- format string
-# r11 --- number of arguments except format string 
-PREFIXED(Lfprintf_loop):
-        movq    $0, %r12
-        cmpq    %r11, %r12
-        jz    PREFIXED(Lfprintf_continue)
+# r11 --- number of arguments except format string
+        UNBOX_ARGS %rax, %r11
 
-        decq    %r11
-        movq    (%rax), %r10
-        testq   $1, %r10
-        jz    PREFIXED(Lfprintf_loop_end)
-# unbox value
-        sarq    %r10
-        movq    %r10, (%rax)
-PREFIXED(Lfprintf_loop_end):
-        addq    $8, %rax
-        jmp     PREFIXED(Lfprintf_loop)
-PREFIXED(Lfprintf_continue):
         popq    %rdx
         popq    %rcx
         popq    %r8
@@ -105,23 +96,9 @@ PREFIXED(Lsprintf):
         pushq   %rsi
         movq    %rsp, %rax
 # rdi --- format string
-# r11 --- number of arguments except format string 
-PREFIXED(Lsprintf_loop):
-        movq    $0, %r12
-        cmpq    %r11, %r12
-        jz    PREFIXED(Lsprintf_continue)
+# r11 --- number of arguments except format string
+        UNBOX_ARGS %rax, %r11
 
-        decq    %r11
-        movq    (%rax), %r10
-        testq   $1, %r10
-        jz    PREFIXED(Lsprintf_loop_end)
-# unbox value
-        sarq    %r10
-        movq    %r10, (%rax)
-PREFIXED(Lsprintf_loop_end):
-        addq    $8, %rax
-        jmp     PREFIXED(Lsprintf_loop)
-PREFIXED(Lsprintf_continue):
         popq    %rsi
         popq    %rdx
         popq    %rcx
@@ -142,23 +119,9 @@ PREFIXED(Lfailure):
         pushq   %rsi
         movq    %rsp, %rax
 # rdi --- format string
-# r11 --- number of arguments except format string 
-PREFIXED(Lfailure_loop):
-        movq    $0, %r12
-        cmpq    %r11, %r12
-        jz    PREFIXED(Lfailure_continue)
+# r11 --- number of arguments except format string
+        UNBOX_ARGS %rax, %r11
 
-        decq    %r11
-        movq    (%rax), %r10
-        testq   $1, %r10
-        jz    PREFIXED(Lfailure_loop_end)
-# unbox value
-        sarq    %r10
-        movq    %r10, (%rax)
-PREFIXED(Lfailure_loop_end):
-        addq    $8, %rax
-        jmp     PREFIXED(Lfailure_loop)
-PREFIXED(Lfailure_continue):
         popq    %rsi
         popq    %rdx
         popq    %rcx
@@ -166,4 +129,4 @@ PREFIXED(Lfailure_continue):
         popq    %r9
 # restore return address
         pushq   %r14
-        jmp     PREFIXED(failure)
+        jmp     PREFIXED(Bfailure)

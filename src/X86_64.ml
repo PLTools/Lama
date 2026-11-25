@@ -1298,7 +1298,9 @@ class env prg mode topname =
     (* peeks two topmost values from the stack (the stack itself does not change) *)
     method peek2 = SymbolicStack.peek2 stack
 
-    (* tag hash: gets a hash for a string tag *)
+    (* tag hash: gets a hash for a string tag; only the first 10 characters are taken into account
+       (6 bits each, so that the boxed hash fits into a word): tags that share them collide, see
+       "Implementation-dependent Limitations" in the language specification *)
     method hash tag =
       let h = Stdlib.ref 0 in
       for i = 0 to min (String.length tag - 1) 9 do

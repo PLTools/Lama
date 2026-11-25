@@ -57,7 +57,8 @@ returns a string, acquired via processing these arguments according to the forma
 
 \descr{\lstinline|fun hash (value)|}{Returns integer hash for the argument value; also works for cyclic data structures.}
 
-\descr{\lstinline|fun tagHash (s)|}{Returns an integer value for a hash of tag, represented by string \lstinline|s|.}
+\descr{\lstinline|fun tagHash (s)|}{Returns an integer value for a hash of tag, represented by string \lstinline|s|; only the first
+  10 characters of \lstinline|s| are taken into account (see Chapter~\ref{sec:limitations}).}
 
 \descr{\lstinline|fun compare (value1, value2)|}{Performs a structural deep comparison of two values. Determines a
   linear order relation for every pairs of values. Returns \lstinline|0| if the values are structurally equal, negative or
