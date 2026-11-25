@@ -885,15 +885,26 @@ extern void *Lstring (intptr_t* args /* void *p */) {
   return s;
 }
 
+// Registers args[0 .. n) as extra roots unless they lie on the stack that the collector scans
+// (arguments passed by Lama code and by the VM do); returns whether they were registered.
+static bool push_roots (intptr_t *args, intptr_t n) {
+  if (n <= 0 || gc_stack_contains(args, args + n)) return false;
+  for (intptr_t i = 0; i < n; i++) push_extra_root((void **)&args[i]);
+  return true;
+}
+
+static void pop_roots (bool pushed, intptr_t *args, intptr_t n) {
+  if (!pushed) return;
+  for (intptr_t i = n - 1; i >= 0; --i) pop_extra_root((void **)&args[i]);
+}
+
 extern void *Bclosure (intptr_t* args, intptr_t bn) {
   data         *r;
   intptr_t       n = UNBOX(bn);
 
   PRE_GC();
 
-  for (intptr_t i = 0; i < n; ++i) {
-    push_extra_root((void**)&args[i + 1]);
-  }
+  bool rooted = push_roots(args + 1, n);
 
   r = (data *)alloc_closure(n + 1);
   ((void **)r->contents)[0] = (void*) args[0];
@@ -902,9 +913,7 @@ extern void *Bclosure (intptr_t* args, intptr_t bn) {
     ((intptr_t *)r->contents)[i + 1] = args[i + 1];
   }
 
-  for (intptr_t i = n - 1; i >= 0; --i) {
-    pop_extra_root((void**)&args[i + 1]);
-  }
+  pop_roots(rooted, args + 1, n);
 
   POST_GC();
 
@@ -917,9 +926,7 @@ extern void *Barray (intptr_t* args, intptr_t bn) {
   
   PRE_GC();
 
-  for (intptr_t i = 0; i < n; i++) {
-    push_extra_root((void**)&args[i]);
-  }
+  bool rooted = push_roots(args, n);
 
   r = (data *)alloc_array(n);
 
@@ -927,9 +934,7 @@ extern void *Barray (intptr_t* args, intptr_t bn) {
     ((intptr_t *)r->contents)[i] = args[i];
   }
 
-  for (intptr_t i = n - 1; i >= 0; --i) {
-    pop_extra_root((void**)&args[i]);
-  }
+  pop_roots(rooted, args, n);
 
   POST_GC();
   return r->contents;
@@ -943,9 +948,7 @@ extern void *Bsexp (intptr_t* args, intptr_t bn) {
 
   intptr_t fields_cnt = n - 1;
 
-  for (intptr_t i = 0; i < fields_cnt; i++) {
-    push_extra_root((void**)&args[i]);
-  }
+  bool rooted = push_roots(args, fields_cnt);
 
   r = alloc_sexp(fields_cnt);
 
@@ -955,9 +958,7 @@ extern void *Bsexp (intptr_t* args, intptr_t bn) {
 
   r->tag = UNBOX(args[fields_cnt]);
 
-  for (intptr_t i = fields_cnt - 1; i >= 0; --i) {
-    pop_extra_root((void**)&args[i]);
-  }
+  pop_roots(rooted, args, fields_cnt);
 
   POST_GC();
   return (void *)((data *)r)->contents;

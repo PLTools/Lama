@@ -105,6 +105,9 @@ typedef struct {
 } extra_roots_pool;
 
 void clear_extra_roots (void);
+// whether [begin, end) lies in the part of Lama's stack that the collector scans; values there need
+// no extra roots
+bool gc_stack_contains (void *begin, void *end);
 void push_extra_root (void **p);
 void pop_extra_root (void **p);
 

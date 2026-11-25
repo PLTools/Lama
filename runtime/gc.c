@@ -389,11 +389,14 @@ void scan_and_fix_region (void *start, void *end) {
 #endif
 }
 
+bool gc_stack_contains (void *begin, void *end) {
+  return __gc_stack_top != 0 && (uintptr_t)begin >= __gc_stack_top + sizeof(uintptr_t)
+         && (uintptr_t)end <= __gc_stack_bottom;
+}
+
 // whether update_references fixes this root slot anyway: it lies on Lama's stack or in the global area
 static bool root_slot_is_scanned (void **slot) {
-  if (slot >= (void **)(__gc_stack_top + sizeof(uintptr_t)) && slot < (void **)__gc_stack_bottom) {
-    return true;
-  }
+  if (gc_stack_contains(slot, slot + 1)) { return true; }
 #ifdef LAMA_ENV
   if (slot >= (void **)&__start_custom_data && slot < (void **)&__stop_custom_data) { return true; }
 #endif
