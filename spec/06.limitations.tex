@@ -7,7 +7,9 @@
 The following limitations are in effect for \textsc{x86-64} platform implementation:
 
 \begin{itemize}
-\item the range of representable integers is \newline [-4611686018427387905..4611686018427387904] (63-bit signed in two-complement representation);
-\item the maximal length of array/string/number of S-expression parameters is 2305843009213693952 (61-bit unsigned integer);
-\item the maximal number of S-expression constructor name symbols taken into account is 9.
+\item the range of representable integers is \newline [-4611686018427387904..4611686018427387903] (63-bit signed in two-complement representation);
+\item the maximal length of array/string/number of S-expression parameters is 2305843009213693951 (61-bit unsigned integer); in practice
+  it is further limited by the size of the heap;
+\item only the first 10 characters of an S-expression constructor name are taken into account: constructors whose names share
+  them are indistinguishable (the source-level interpreter, option \lstinline|-i|, compares full names).
 \end{itemize}

@@ -225,6 +225,9 @@ extern intptr_t Llength (void *p) {
 static char *chars = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'";
 #define MAX_SEXP_TAGLEN ((WORD_SIZE - 1) / 6)
 
+// Only the first MAX_SEXP_TAGLEN (10) characters of a tag are hashed, 6 bits each, so that the
+// boxed hash fits into a word: tags that share them collide. The compiler (method hash in
+// src/X86_64.ml) uses the same scheme; see "Implementation-dependent Limitations" in the spec.
 intptr_t lama_tag_hash (const char *s) {
   const char *p;
   intptr_t h     = 0;
