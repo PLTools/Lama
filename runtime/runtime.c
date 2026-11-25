@@ -284,41 +284,60 @@ static StringBuf stringBuf;
 
 static void createStringBuf () {
   stringBuf.contents = (char *)malloc(STRINGBUF_INIT);
-  memset(stringBuf.contents, 0, STRINGBUF_INIT);
-  stringBuf.ptr = 0;
-  stringBuf.len = STRINGBUF_INIT;
+  if (stringBuf.contents == NULL) failure("string buffer: out of memory\n");
+  stringBuf.contents[0] = 0;
+  stringBuf.ptr         = 0;
+  stringBuf.len         = STRINGBUF_INIT;
 }
 
 static void deleteStringBuf () { free(stringBuf.contents); }
 
-static void extendStringBuf () {
-  intptr_t len = stringBuf.len << 1;
+// makes room for n more characters and the terminating '\0'
+static void reserveStringBuf (size_t n) {
+  if ((size_t)(stringBuf.len - stringBuf.ptr) > n) return;
 
-  stringBuf.contents = (char *)realloc(stringBuf.contents, len);
-  stringBuf.len      = len;
+  size_t len      = MAX((size_t)stringBuf.len * 2, (size_t)stringBuf.ptr + n + 1);
+  char  *contents = (char *)realloc(stringBuf.contents, len);
+
+  if (contents == NULL) failure("string buffer: out of memory\n");
+  stringBuf.contents = contents;
+  stringBuf.len      = (intptr_t)len;
+}
+
+// appends n characters of s, which may contain '\0'
+static void appendStringBuf (const char *s, size_t n) {
+  reserveStringBuf(n);
+  memcpy(stringBuf.contents + stringBuf.ptr, s, n);
+  stringBuf.ptr += n;
+  stringBuf.contents[stringBuf.ptr] = 0;
 }
 
 static void vprintStringBuf (char *fmt, va_list args) {
-  intptr_t written, rest;
-  char    *buf;
-  va_list  vsnargs;
+  va_list vsnargs;
 
-again:
   va_copy(vsnargs, args);
-
-  buf  = &stringBuf.contents[stringBuf.ptr];
-  rest = stringBuf.len - stringBuf.ptr;
-
-  written = vsnprintf(buf, rest, fmt, vsnargs);
-
+  int written =
+      vsnprintf(stringBuf.contents + stringBuf.ptr, stringBuf.len - stringBuf.ptr, fmt, vsnargs);
   va_end(vsnargs);
 
-  if (written >= rest) {
-    extendStringBuf();
-    goto again;
+  if (written < 0) failure("string buffer: %s\n", strerror(errno));
+
+  if (written >= stringBuf.len - stringBuf.ptr) {
+    // the output did not fit: format it once more into a buffer of the exact size
+    reserveStringBuf((size_t)written);
+    va_copy(vsnargs, args);
+    vsnprintf(stringBuf.contents + stringBuf.ptr, stringBuf.len - stringBuf.ptr, fmt, vsnargs);
+    va_end(vsnargs);
   }
 
   stringBuf.ptr += written;
+}
+
+// the contents of the string buffer as a Lama string; the caller runs between PRE_GC and POST_GC
+static void *stringBufToLama (void) {
+  data *r = (data *)alloc_string((uintptr_t)stringBuf.ptr);
+  memcpy(r->contents, stringBuf.contents, (size_t)stringBuf.ptr);
+  return r->contents;
 }
 
 static void printStringBuf (char *fmt, ...) __attribute__((format(printf, 1, 2)));
@@ -381,7 +400,11 @@ static void printValue (void *p) {
     a = TO_DATA(p);
 
     switch (TAG(a->data_header)) {
-      case STRING_TAG: printStringBuf("\"%s\"", a->contents); break;
+      case STRING_TAG:
+        appendStringBuf("\"", 1);
+        appendStringBuf(a->contents, LEN(a->data_header));
+        appendStringBuf("\"", 1);
+        break;
 
       case CLOSURE_TAG: {
 
@@ -454,7 +477,7 @@ static void stringcat (void *p) {
     a = TO_DATA(p);
 
     switch (TAG(a->data_header)) {
-      case STRING_TAG: printStringBuf("%s", a->contents); break;
+      case STRING_TAG: appendStringBuf(a->contents, LEN(a->data_header)); break;
 
       case SEXP_TAG: {
         if (is_proper_list(p)) {
@@ -836,10 +859,7 @@ extern void *Lstringcat (intptr_t *args /* void* p */) {
   createStringBuf();
   stringcat((void*)args[0]);
 
-  push_extra_root((void**)&args[0]);
-  void* content = stringBuf.contents;
-  s = Bstring((intptr_t*) &content);
-  pop_extra_root((void**)&args[0]);
+  s = stringBufToLama();
 
   deleteStringBuf();
 
@@ -856,10 +876,7 @@ extern void *Lstring (intptr_t* args /* void *p */) {
   createStringBuf();
   printValue((void*)args[0]);
 
-  push_extra_root((void**)&args[0]);
-  void* content = stringBuf.contents;
-  s = Bstring((intptr_t*)&content);
-  pop_extra_root((void**)&args[0]);
+  s = stringBufToLama();
 
   deleteStringBuf();
 
@@ -1185,10 +1202,7 @@ extern void *Bsprintf (char *fmt, ...) {
 
     PRE_GC();
 
-    push_extra_root((void **)&fmt);
-    void* content = stringBuf.contents;
-    s = Bstring((intptr_t*)&content);
-    pop_extra_root((void **)&fmt);
+    s = stringBufToLama();
 
     POST_GC();
 
