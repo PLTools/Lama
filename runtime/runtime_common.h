@@ -3,11 +3,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <limits.h>
 
-// this flag makes GC behavior a bit different for testing purposes.
-//#define DEBUG_VERSION
-//#define FULL_INVARIANT_CHECKS
+// DEBUG_VERSION makes GC behaviour a bit different for testing purposes
+#if defined(FULL_INVARIANT_CHECKS) && !defined(DEBUG_VERSION)
+#  error "FULL_INVARIANT_CHECKS requires DEBUG_VERSION"
+#endif
 
 #if defined(__x86_64__) || defined(__ppc64__)
 #define X86_64
@@ -25,14 +25,10 @@ _Static_assert(sizeof(uintptr_t) == sizeof(void *), "Lama runtime: uintptr_t mus
 #define CLOSURE_TAG 0x00000007
 #define UNBOXED_TAG 0x00000009   // Not actually a data_header; used to return from LkindOf
 #define LEN_MASK (UINTPTR_MAX ^ 7)
-#define LEN(x) (uintptr_t)(((uintptr_t)x & LEN_MASK) >> 3)
-#define TAG(x) (x & 7)
+#define LEN(x) ((uintptr_t)(((uintptr_t)(x) & LEN_MASK) >> 3))
+#define TAG(x) ((x) & 7)
 
-#ifndef DEBUG_VERSION
-#  define DATA_HEADER_SZ (sizeof(uintptr_t) + sizeof(uintptr_t))
-#else
-#  define DATA_HEADER_SZ (sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uintptr_t))
-#endif
+#define DATA_HEADER_SZ offsetof(data, contents)
 
 #define MEMBER_SIZE sizeof(uintptr_t)
 
@@ -41,10 +37,10 @@ _Static_assert(sizeof(uintptr_t) == sizeof(void *), "Lama runtime: uintptr_t mus
 
 #define UNBOXED(x) (((intptr_t)(x)) & 1)
 #define UNBOX(x) (((intptr_t)(x)) >> 1)
-#define BOX(x) ((((intptr_t)(x)) << 1) | 1)
+#define BOX(x) ((intptr_t)((((uintptr_t)(x)) << 1) | 1))
 
-#define BYTES_TO_WORDS(bytes) (((bytes) - 1) / sizeof(size_t) + 1)
-#define WORDS_TO_BYTES(words) ((words) * sizeof(size_t))
+#define BYTES_TO_WORDS(bytes) (((bytes) - 1) / sizeof(uintptr_t) + 1)
+#define WORDS_TO_BYTES(words) ((words) * sizeof(uintptr_t))
 
 // CAREFUL WITH DOUBLE EVALUATION!
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
@@ -56,13 +52,13 @@ typedef struct {
   uintptr_t data_header;
 
 #ifdef DEBUG_VERSION
-  size_t id;
+  uintptr_t id;
 #endif
 
   // last bit is used as MARK-BIT, the rest are used to store address where object should move
   // last bit can be used because due to alignment we can assume that last two bits are always 0's
   uintptr_t forward_address;
-  char   contents[];
+  char      contents[];
 } data;
 
 typedef struct {
@@ -71,14 +67,14 @@ typedef struct {
   uintptr_t data_header;
 
 #ifdef DEBUG_VERSION
-  size_t id;
+  uintptr_t id;
 #endif
 
   // last bit is used as MARK-BIT, the rest are used to store address where object should move
   // last bit can be used because due to alignment we can assume that last two bits are always 0's
   uintptr_t forward_address;
   uintptr_t tag;
-  char   contents[];
+  char      contents[];
 } sexp;
 
 #endif

@@ -38,28 +38,30 @@
 // if heap is full after gc shows in how many times it has to be extended
 #define EXTRA_ROOM_HEAP_COEFFICIENT 2
 #define MINIMUM_HEAP_CAPACITY (553246 * 2)
+// address space reserved for the heap at start-up (halved until mmap succeeds); the heap never moves
+#define HEAP_RESERVE_MAX_BYTES ((size_t)64 << 30)
 
 #include <stdbool.h>
-#include <stddef.h>
 
 typedef enum { ARRAY, CLOSURE, STRING, SEXP } lama_type;
 
 typedef struct {
-  size_t *current;
+  uintptr_t *current;
 } heap_iterator;
 
 typedef struct {
-  lama_type type;   // holds type of object, which fields we are iterating over
-  void     *obj_ptr;   // place to store a pointer to the object header
-  void     *cur_field;
+  void *obj_ptr;   // place to store a pointer to the object header
+  void *cur_field;
 } obj_field_iterator;
 
-// Memory pool for linear memory allocation
+// Memory pool for linear memory allocation: [begin, end) is accessible, [begin, begin + reserved)
+// is reserved address space
 typedef struct {
-  size_t *begin;
-  size_t *end;
-  size_t *current;
-  size_t  size;
+  uintptr_t *begin;
+  uintptr_t *end;
+  uintptr_t *current;
+  size_t     size;       // in words, == end - begin
+  size_t     reserved;   // in words
 } memory_chunk;
 
 // the only GC-related function that should be exposed, others are useful for tests and internal implementation
@@ -83,8 +85,8 @@ void scan_global_area (void);
 void compact_phase (size_t additional_size);
 // specific for Lisp-2 algorithm
 size_t compute_locations ();
-void   update_references (memory_chunk *);
-void   physically_relocate (memory_chunk *);
+void   update_references (void);
+void   physically_relocate (void);
 
 // ============================================================================
 //                            GC extra roots
@@ -107,8 +109,11 @@ void push_extra_root (void **p);
 void pop_extra_root (void **p);
 
 // ============================================================================
-//                   Implemented in GASM: see gc_runtime.s
+//                        GC initialisation and shutdown
 // ============================================================================
+// bounds of Lama's stack, scanned for roots: [__gc_stack_top + word, __gc_stack_bottom)
+extern uintptr_t __gc_stack_top, __gc_stack_bottom;
+
 // MANDATORY TO CALL BEFORE ANY INTERACTION WITH GC (apart from cases where we
 // are working with virtual stack as happens in tests)
 void __gc_init (void);
@@ -119,14 +124,10 @@ void __init (void);
 
 // mostly useful for tests but basically you want to call this in case you want
 // to deallocate all object allocated via GC
-extern void __shutdown (void);
+void __shutdown (void);
 
-// ============================================================================
-//                    invoked from GASM: see gc_runtime.s
-// ============================================================================
-extern void        gc_test_and_mark_root (size_t **root);
-bool               is_valid_heap_pointer (const size_t *);
-static inline bool is_valid_pointer (const size_t *);
+// p is an unboxed value pointing into the used part of the heap
+bool is_valid_heap_pointer (const uintptr_t *p);
 
 // ============================================================================
 //                     Auxiliary functions for tests
@@ -136,15 +137,16 @@ static inline bool is_valid_pointer (const size_t *);
 // returns number of ids dumped
 // object_ids_buf is pointer to area preallocated by user for dumping ids of objects in heap
 // object_ids_buf_size is in WORDS, NOT BYTES
-size_t objects_snapshot (int *object_ids_buf, size_t object_ids_buf_size);
+size_t objects_snapshot (uintptr_t *object_ids_buf, size_t object_ids_buf_size);
 #endif
 
 #ifdef DEBUG_VERSION
 // essential function to mock program stack
-void set_stack (size_t stack_top, size_t stack_bottom);
+void set_stack (uintptr_t stack_top, uintptr_t stack_bottom);
 
 // function to mock extra roots (Lama specific)
-void set_extra_roots (size_t extra_roots_size, void **extra_roots_ptr);
+// extra_roots_size is the number of root addresses in extra_roots_ptr
+void set_extra_roots (size_t extra_roots_size, void ***extra_roots_ptr);
 #endif
 
 // ============================================================================
@@ -152,13 +154,13 @@ void set_extra_roots (size_t extra_roots_size, void **extra_roots_ptr);
 // ============================================================================
 // accepts pointer to the start of the region and to the end of the region
 // scans it and if it meets a pointer, it should be modified in according to forward address
-void scan_and_fix_region (memory_chunk *old_heap, void *start, void *end);
+void scan_and_fix_region (void *start, void *end);
 
 // takes a pointer to an object content as an argument, returns forwarding address
-size_t get_forward_address (void *obj);
+uintptr_t get_forward_address (void *obj);
 
 // takes a pointer to an object content as an argument, sets forwarding address to value 'addr'
-void set_forward_address (void *obj, size_t addr);
+void set_forward_address (void *obj, uintptr_t addr);
 
 // takes a pointer to an object content as an argument, returns whether this object was marked as live
 bool is_marked (void *obj);
@@ -188,8 +190,6 @@ lama_type get_type_row_ptr (void *ptr);
 // returns correct type when pointer to an object header is passed
 lama_type get_type_header_ptr (void *ptr);
 
-// returns correct object size (together with header) of an object, ptr is pointer to an actual data is passed (header is excluded)
-size_t obj_size_row_ptr (void *ptr);
 // returns correct object size (together with header) of an object, ptr is pointer to an object header
 size_t obj_size_header_ptr (void *ptr);
 
