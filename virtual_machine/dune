@@ -1,5 +1,10 @@
+; the virtual machine is built on Linux only: it relies on Linux-specific mmap flags and
+; linker options
+
 (rule
  (target lama.exe)
+ (enabled_if
+  (= %{system} linux))
  (mode
   (promote (until-clean)))
  (deps
@@ -30,9 +35,13 @@
 
 (alias
  (name default)
+ (enabled_if
+  (= %{system} linux))
  (deps lama.exe))
 
 (install
  (section bin)
+ (enabled_if
+  (= %{system} linux))
  (files
   (lama.exe as lamavm)))
