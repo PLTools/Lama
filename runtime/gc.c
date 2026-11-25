@@ -621,7 +621,9 @@ void clear_extra_roots (void) { extra_roots.current_free = 0; }
 
 void push_extra_root (void **p) {
   if (extra_roots.current_free >= MAX_EXTRA_ROOTS_NUMBER) {
-    perror("ERROR: push_extra_roots: extra_roots_pool overflow\n");
+    fprintf(stderr, "ERROR: push_extra_roots: extra_roots_pool overflow; max number is %d\n", MAX_EXTRA_ROOTS_NUMBER);
+    printf("ERROR: push_extra_roots: extra_roots_pool overflow; max number is %d\n", MAX_EXTRA_ROOTS_NUMBER);
+    fflush(stdout);
     exit(1);
   }
   assert(p >= (void **)__gc_stack_top || p < (void **)__gc_stack_bottom);

@@ -89,7 +89,7 @@ void push_extra_root (void ** p) {
   printf ("push_extra_root %p %p\n", p, &p); fflush (stdout);
 # endif
   if (extra_roots.current_free >= MAX_EXTRA_ROOTS_NUMBER) {
-    perror ("ERROR: push_extra_roots: extra_roots_pool overflow");
+    perror ("LAMA-1.30 32-bit ERROR: push_extra_roots: extra_roots_pool overflow");
     exit   (1);
   }
   extra_roots.roots[extra_roots.current_free] = p;

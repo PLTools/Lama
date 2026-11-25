@@ -37,7 +37,7 @@
 #define SET_FORWARD_ADDRESS(x, addr) (x = ((x & 3) | ((ptrt)(addr))))
 // if heap is full after gc shows in how many times it has to be extended
 #define EXTRA_ROOM_HEAP_COEFFICIENT 2
-#define MINIMUM_HEAP_CAPACITY (64)
+#define MINIMUM_HEAP_CAPACITY (553246 * 2)
 
 #include <stdbool.h>
 #include <stddef.h>
