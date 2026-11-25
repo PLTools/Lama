@@ -1,8 +1,20 @@
+# editors
 *~
+.merlin
+.vscode/
+
+# dune build directory
+_build/
+
+# OCaml build artefacts
 *.cmi
 *.cmx
 *.cmo
-*.o
-.merlin
+*.cmt
+*.cmti
+*.cma
+*.cmxa
 
-.vscode
+# C build artefacts
+*.o
+*.a
