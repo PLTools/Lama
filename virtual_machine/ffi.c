@@ -68,6 +68,7 @@ static const func_metadata func_table[] = {
     {"printf", "Bprintf", false, 1},
     {"fprintf", "Bfprintf", false, 2},
     {"sprintf", "Bsprintf", false, 1},
+    {"failure", "Bfailure", false, 1},
 
     // Sentinel
     {NULL, NULL, false, 0}};
@@ -193,8 +194,9 @@ static intptr_t call_variadic(void *fn_ptr, int fixed_args, intptr_t *args,
   intptr_t int_values[n_args];
   void *result = NULL;
 
+  // only the variadic tail is unboxed, as in the native wrappers (runtime/printf.S)
   for (int i = 0; i < n_args; i++) {
-    if (UNBOXED(args[i])) {
+    if (i >= fixed_args && UNBOXED(args[i])) {
       int_values[i] = UNBOX(args[i]);
       arg_types[i] = &ffi_type_pointer;
       arg_values[i] = &int_values[i];

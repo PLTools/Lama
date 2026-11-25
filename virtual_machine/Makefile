@@ -18,7 +18,10 @@ debug: $(TARGET)
 $(TARGET): $(OBJECTS) $(RUNTIME_LIB) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJECTS) -Wl,--whole-archive $(RUNTIME_LIB) -Wl,--no-whole-archive $(LIBS)
 
-$(RUNTIME_LIB):
+# the runtime archive is rebuilt whenever a runtime source changes
+RUNTIME_SOURCES = $(wildcard $(RUNTIME_DIR)/*.c $(RUNTIME_DIR)/*.h $(RUNTIME_DIR)/*.S) $(RUNTIME_DIR)/Makefile
+
+$(RUNTIME_LIB): $(RUNTIME_SOURCES)
 	$(MAKE) -C $(RUNTIME_DIR) LAMA_ENV=0 BUILD_DIR=$(abspath $(BUILD_DIR)/runtime)
 
 $(BUILD_DIR):

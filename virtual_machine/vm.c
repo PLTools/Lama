@@ -10,8 +10,7 @@
 #include <string.h>
 #include <sys/mman.h>
 
-extern size_t __gc_stack_top, __gc_stack_bottom;
-extern void set_args(intptr_t argc, char *argv[]);
+extern void set_args(int argc, char *argv[]);
 
 struct virtual_machine {
   bytecode **bc_arr; // Array of unique loaded bytecode units
@@ -104,7 +103,9 @@ void vm_set_args(virtual_machine *vm, int argc, char *argv[]) {
 
 void vm_run(virtual_machine *vm) {
   __init();
-  __gc_stack_bottom = (size_t)vm->stack_base;
+  __gc_stack_bottom = (uintptr_t)vm->stack_base;
+  // set_args allocates: the collector must scan the globals already (as SYNC_GC_STACK(sp) does)
+  __gc_stack_top = (uintptr_t)(vm->globals - 1);
   set_args(vm->argc, vm->argv);
 
   insn *ip = vm->entry_points;

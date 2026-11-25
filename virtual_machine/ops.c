@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern size_t __gc_stack_top;
+extern uintptr_t __gc_stack_top;
 
 /*
  * External runtime functions (runtime.c)
@@ -62,7 +62,7 @@ extern void Bmatch_failure(intptr_t v, const char *fname, intptr_t line, intptr_
 #define STACK_PUSH(sp, val) (*--(sp) = (val))
 #define STACK_POP(sp) (*sp++)
 #define STACK_PEEK(sp) (*sp)
-#define SYNC_GC_STACK(sp) (__gc_stack_top = (size_t)((sp) - 1))
+#define SYNC_GC_STACK(sp) (__gc_stack_top = (uintptr_t)((sp) - 1))
 #define STACK_REVERSE(base, n)                                                 \
   do {                                                                         \
     for (int32_t _i = 0; _i < (n) / 2; _i++) {                                 \
