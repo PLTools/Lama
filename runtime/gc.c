@@ -545,6 +545,8 @@ void physically_relocate (void) {
 #endif
 }
 
+// The upper bound is inclusive: the content of an object without fields (such as []) starts where
+// the object ends, which is heap.current for the last object.
 bool is_valid_heap_pointer (const uintptr_t *p) {
   return !UNBOXED(p) && (uintptr_t)heap.begin <= (uintptr_t)p && (uintptr_t)p <= (uintptr_t)heap.current;
 }

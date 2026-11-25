@@ -20,8 +20,7 @@ _Static_assert(sizeof(uintptr_t) == sizeof(void *), "Lama runtime: uintptr_t mus
 #define SEXP_TAG 0x00000005
 #define CLOSURE_TAG 0x00000007
 #define UNBOXED_TAG 0x00000009   // Not actually a data_header; used to return from LkindOf
-#define LEN_MASK (UINTPTR_MAX ^ 7)
-#define LEN(x) ((uintptr_t)(((uintptr_t)(x) & LEN_MASK) >> 3))
+#define LEN(x) ((uintptr_t)(x) >> 3)
 #define TAG(x) ((x) & 7)
 
 #define DATA_HEADER_SZ offsetof(data, contents)
