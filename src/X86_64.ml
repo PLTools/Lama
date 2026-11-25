@@ -656,6 +656,10 @@ let compile_call env ?fname nargs tail =
 let opt_stabs env stabs =
   match env#mode.target_os with Darwin -> [] | Linux -> stabs
 
+(* DWARF call frame information is not emitted for macOS either: there the internal labels of a
+   function are symbols, and the assembler cannot compute the CFI advances across them *)
+let opt_cfi env cfi = match env#mode.target_os with Darwin -> [] | Linux -> cfi
+
 (* Symbolic stack machine evaluator
 
      compile : env -> prg -> env * instr list
@@ -865,7 +869,7 @@ let compile cmd env imports code =
                 let env = env#enter asm_f nargs nlocals has_closure in
                 ( env,
                   stabs
-                  @ [ Meta "\t.cfi_startproc" ]
+                  @ opt_cfi env [ Meta "\t.cfi_startproc" ]
                   @ (if f = cmd#topname then
                        [
                          Mov (M (D, I, V, "init"), rax);
@@ -882,12 +886,12 @@ let compile cmd env imports code =
                          Mov (L 1, M (D, I, V, "init"));
                        ]
                      else [])
+                  @ [ Push rbp ]
+                  @ opt_cfi env
+                      [ Meta "\t.cfi_def_cfa_offset\t8"; Meta "\t.cfi_offset 5, -8" ]
+                  @ [ Mov (rsp, rbp) ]
+                  @ opt_cfi env [ Meta "\t.cfi_def_cfa_register\t5" ]
                   @ [
-                      Push rbp;
-                      Meta "\t.cfi_def_cfa_offset\t8";
-                      Meta "\t.cfi_offset 5, -8";
-                      Mov (rsp, rbp);
-                      Meta "\t.cfi_def_cfa_register\t5";
                       Binop ("-", C env#lsize, rsp);
                       Mov (rdi, r12);
                       Mov (rsi, r13);
@@ -940,11 +944,11 @@ let compile cmd env imports code =
                     Pop rbp;
                   ]
                   @ (if name = "main" then [ Binop ("^", rax, rax) ] else [])
+                  @ opt_cfi env
+                      [ Meta "\t.cfi_restore\trbp"; Meta "\t.cfi_def_cfa\t4, 4" ]
+                  @ [ Ret ]
+                  @ opt_cfi env [ Meta "\t.cfi_endproc" ]
                   @ [
-                      Meta "\t.cfi_restore\trbp";
-                      Meta "\t.cfi_def_cfa\t4, 4";
-                      Ret;
-                      Meta "\t.cfi_endproc";
                       Meta
                         (* Allocate space for the symbolic stack
                            Add extra word if needed to preserve alignment *)

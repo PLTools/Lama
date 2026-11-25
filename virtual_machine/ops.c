@@ -45,15 +45,26 @@ extern aint Bstring_tag_patt(aint x);
 extern aint Bsexp_tag_patt(aint x);
 extern void Bmatch_failure(aint v, const char *fname, aint line, aint col);
 
+// musttail guarantees that dispatching does not grow the C stack (GCC >= 15, clang >= 13); older
+// compilers usually turn these calls into jumps at -O2 and above, without a guarantee
+#if defined(__has_attribute)
+#  if __has_attribute(musttail)
+#    define MUSTTAIL __attribute__((musttail))
+#  endif
+#endif
+#ifndef MUSTTAIL
+#  define MUSTTAIL
+#endif
+
 #define DISPATCH()                                                             \
   do {                                                                         \
     ip++;                                                                      \
-    __attribute__((musttail)) return ip->func(STATE);                          \
+    MUSTTAIL return ip->func(STATE);                                           \
   } while (0)
 
 #define DISPATCH_JUMP()                                                        \
   do {                                                                         \
-    __attribute__((musttail)) return ip->func(STATE);                          \
+    MUSTTAIL return ip->func(STATE);                                           \
   } while (0)
 
 /*
@@ -228,10 +239,11 @@ void op_cjmp_nz(DECL_STATE) {
  */
 void op_string(DECL_STATE) {
   ip++;
-  const char *str = ip->str;
   SYNC_GC_STACK(sp);
-  void *result = Bstring((void *)&str);
-  VM_DEBUG("STRING literal: \"%s\" -> %p\n", str, result);
+  // the operand is passed by its address in the instruction stream: passing the address of a local
+  // would keep the compiler from turning DISPATCH into a jump
+  void *result = Bstring((aint *)&ip->str);
+  VM_DEBUG("STRING literal: \"%s\" -> %p\n", ip->str, result);
   STACK_PUSH(sp, (aint)result);
   DISPATCH();
 }
