@@ -249,7 +249,6 @@ void *gc_alloc_on_existing_heap (size_t size) {
   if (size <= (size_t)(heap.end - heap.current)) {
     void *p = (void *)heap.current;
     heap.current += size;
-    memset(p, 0, WORDS_TO_BYTES(size));
     return p;
   }
   return NULL;
@@ -949,8 +948,9 @@ static void check_obj_len (uintptr_t len, size_t member_size, size_t extra_membe
 
 void *alloc_string (uintptr_t len) {
   check_obj_len(len, 1, 1, "string");
-  data *obj        = alloc(string_size(len));
-  obj->data_header = STRING_TAG | (len << 3);
+  data *obj          = alloc(string_size(len));
+  obj->data_header   = STRING_TAG | (len << 3);
+  obj->contents[len] = 0;
 #if defined(DEBUG_VERSION) && defined(DEBUG_PRINT)
   fprintf(stderr, "%p, [STRING] tag=%" PRIuPTR "\n", (void *)obj, TAG(obj->data_header));
 #endif

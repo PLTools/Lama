@@ -827,7 +827,8 @@ extern void *LmakeString (intptr_t length) {
 
   PRE_GC();
 
-  r = (data *)alloc_string(n);   // '\0' in the end of the string is taken into account
+  r = (data *)alloc_string(n);
+  memset(r->contents, 0, n);
 
   POST_GC();
 
@@ -841,10 +842,9 @@ extern void *Bstring (intptr_t* args/*void *p*/) {
   PRE_GC();
 
   push_extra_root((void**)&args[0]);
-  s = LmakeString(BOX(n));
+  s = ((data *)alloc_string(n))->contents;
   pop_extra_root((void**)&args[0]);
-  char *s_contents = (char *)s;
-  strncpy(s_contents, (char*)args[0], n + 1);   // +1 because of '\0' in the end of C-strings
+  memcpy(s, (char *)args[0], n);
 
   POST_GC();
 
@@ -1283,12 +1283,11 @@ extern void *LreadLine () {
   // pointer is live across the allocation
   PRE_GC();
 
-  s = LmakeString(BOX(n));
+  s = ((data *)alloc_string((uintptr_t)n))->contents;
 
   POST_GC();
 
   memcpy(s, buf, n);
-  ((char *)s)[n] = 0;
 
   free(buf);
   return s;
@@ -1309,7 +1308,7 @@ extern void *Lfread (char *fname) {
     PRE_GC();
 
     push_extra_root((void **)&fname);
-    void *s = LmakeString(BOX(size));
+    void *s = ((data *)alloc_string((uintptr_t)size))->contents;
     pop_extra_root((void **)&fname);
 
     POST_GC();
